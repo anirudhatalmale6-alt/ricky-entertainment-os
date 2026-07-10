@@ -60,10 +60,13 @@ async def price_benchmark(
     db: DbSession,
     _: CurrentUser,
     category: str | None = Query(None, description="Category to benchmark against"),
+    subcategory: str | None = Query(None, description="Narrow to a subcategory (familia), e.g. DJ vs Orquesta"),
     region: str | None = Query(None, description="Optionally narrow to a region"),
 ):
     """Average / min / max base price of similar shows, so an artist knows
-    whether their price is above or below the market for that category."""
+    whether their price is above or below the market. Narrows by category and,
+    when given, by subcategory (familia) - so a DJ compares with DJs, not with
+    orquestas - and optionally by region."""
     stmt = select(
         func.count(Show.id),
         func.avg(Show.base_price),
@@ -72,11 +75,14 @@ async def price_benchmark(
     ).where(Show.is_active.is_(True), Show.base_price.is_not(None))
     if category:
         stmt = stmt.where(Show.category == category)
+    if subcategory:
+        stmt = stmt.where(Show.subcategory == subcategory)
     if region:
         stmt = stmt.join(Artist, Show.artist_id == Artist.id).where(Artist.region == region)
     count, avg, mn, mx = (await db.execute(stmt)).one()
     return PriceBenchmarkOut(
         category=category,
+        subcategory=subcategory,
         region=region,
         sample_size=count or 0,
         average_price=round(float(avg), 2) if avg is not None else None,

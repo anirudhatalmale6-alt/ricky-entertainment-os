@@ -162,6 +162,7 @@ class ShowOut(ShowBase):
 class PriceBenchmarkOut(BaseModel):
     """Market reference so a musician knows if their price is high or low."""
     category: str | None = None
+    subcategory: str | None = None
     region: str | None = None
     sample_size: int
     average_price: float | None = None
