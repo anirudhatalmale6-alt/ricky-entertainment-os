@@ -71,6 +71,16 @@ class ArtistUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class PriceBenchmarkOut(BaseModel):
+    """Market reference so a musician knows if their price is high or low."""
+    category: str | None = None
+    region: str | None = None
+    sample_size: int
+    average_price: float | None = None
+    min_price: float | None = None
+    max_price: float | None = None
+
+
 class ArtistOut(ArtistBase):
     model_config = ConfigDict(from_attributes=True)
     id: int

@@ -1,12 +1,12 @@
 """Artist endpoints: marketplace catalogue + admin CRUD."""
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, require_permission
 from app.models.artist import Artist
 from app.models.seasonal_rate import ArtistSeasonalRate
-from app.schemas.artist import ArtistCreate, ArtistOut, ArtistUpdate
+from app.schemas.artist import ArtistCreate, ArtistOut, ArtistUpdate, PriceBenchmarkOut
 
 router = APIRouter(prefix="/artists", tags=["artists"])
 
@@ -38,6 +38,39 @@ async def list_artists(
         stmt = stmt.where(Artist.is_active.is_(True))
     res = await db.execute(stmt)
     return list(res.scalars().all())
+
+
+@router.get("/price-benchmark", response_model=PriceBenchmarkOut)
+async def price_benchmark(
+    db: DbSession,
+    _: CurrentUser,
+    category: str | None = Query(None, description="Category to benchmark against"),
+    region: str | None = Query(None, description="Optionally narrow to a region"),
+):
+    """Average / min / max price of similar acts.
+
+    Gives a musician a reference so they know whether they are charging above
+    or below the market for their category (and optionally their region).
+    """
+    stmt = select(
+        func.count(Artist.id),
+        func.avg(Artist.base_price),
+        func.min(Artist.base_price),
+        func.max(Artist.base_price),
+    ).where(Artist.is_active.is_(True), Artist.base_price.is_not(None))
+    if category:
+        stmt = stmt.where(Artist.category == category)
+    if region:
+        stmt = stmt.where(Artist.region == region)
+    count, avg, mn, mx = (await db.execute(stmt)).one()
+    return PriceBenchmarkOut(
+        category=category,
+        region=region,
+        sample_size=count or 0,
+        average_price=round(float(avg), 2) if avg is not None else None,
+        min_price=float(mn) if mn is not None else None,
+        max_price=float(mx) if mx is not None else None,
+    )
 
 
 @router.get("/{artist_id}", response_model=ArtistOut)
