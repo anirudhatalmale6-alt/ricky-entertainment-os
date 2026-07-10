@@ -3,6 +3,15 @@ from app.models.user import User, Role, Permission, role_permissions
 from app.models.company import Company
 from app.models.booker import Booker
 from app.models.artist import Artist
+from app.models.seasonal_rate import ArtistSeasonalRate
+from app.models.enums import (
+    PayoutSpeed,
+    RiskTier,
+    PAYOUT_COMMISSION,
+    PAYOUT_DAYS,
+    RISK_COMMISSION,
+    risk_tier_for_days,
+)
 
 __all__ = [
     "User",
@@ -12,4 +21,11 @@ __all__ = [
     "Company",
     "Booker",
     "Artist",
+    "ArtistSeasonalRate",
+    "PayoutSpeed",
+    "RiskTier",
+    "PAYOUT_COMMISSION",
+    "PAYOUT_DAYS",
+    "RISK_COMMISSION",
+    "risk_tier_for_days",
 ]

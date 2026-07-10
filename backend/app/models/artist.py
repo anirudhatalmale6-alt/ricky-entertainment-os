@@ -1,10 +1,11 @@
 """Artist model - the product of the marketplace."""
 from __future__ import annotations
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
+from app.models.enums import PayoutSpeed
 
 
 class Artist(Base, TimestampMixin):
@@ -18,8 +19,26 @@ class Artist(Base, TimestampMixin):
     category: Mapped[str] = mapped_column(String(80), index=True)  # musica en vivo, dj, show, etc.
     bio: Mapped[str | None] = mapped_column(Text)
 
+    # Act details captured in the profile "alta"
+    members: Mapped[int] = mapped_column(Integer, default=1)          # Integrantes
+    duration_minutes: Mapped[int | None] = mapped_column(Integer)     # Duracion del show
+    requirements: Mapped[str | None] = mapped_column(Text)            # Requerimientos (escenario, sonido, etc.)
+
     # Pricing (MXN)
     base_price: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    # % extra applied for special events (weddings, etc.)
+    special_event_surcharge_pct: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+
+    # How the artist wants to get paid (drives their commission).
+    payout_speed: Mapped[PayoutSpeed] = mapped_column(
+        SQLEnum(PayoutSpeed, values_callable=lambda e: [m.value for m in e]),
+        default=PayoutSpeed.MENSUAL,
+    )
+
+    # Marketplace flags
+    offers_audition: Mapped[bool] = mapped_column(Boolean, default=False)       # ofrece audicion
+    allow_subcontracting: Mapped[bool] = mapped_column(Boolean, default=False)  # deja que proveedores lo contacten
+    is_provider: Mapped[bool] = mapped_column(Boolean, default=False)           # se dio de alta como Proveedor
 
     # Location
     city: Mapped[str | None] = mapped_column(String(120))
@@ -33,3 +52,6 @@ class Artist(Base, TimestampMixin):
     rating: Mapped[float | None] = mapped_column(Numeric(3, 2))  # 0.00 - 5.00
 
     user: Mapped["User | None"] = relationship(back_populates="artist_profile")  # noqa: F821
+    seasonal_rates: Mapped[list["ArtistSeasonalRate"]] = relationship(  # noqa: F821
+        back_populates="artist", cascade="all, delete-orphan"
+    )
