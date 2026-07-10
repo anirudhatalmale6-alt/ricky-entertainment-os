@@ -96,15 +96,33 @@ class ArtistBase(BaseModel):
     valid_passport: bool = False
     usa_visa: bool = False
 
-    # pricing (base fields; full overhaul pending client confirmation)
+    # pricing - one price per event type (all MXN, all optional)
     base_price: float | None = None
+    price_hotel: float | None = None
+    price_corporate: float | None = None
+    price_wedding: float | None = None
+    price_private: float | None = None
+    price_restaurant: float | None = None
+    price_festival: float | None = None
+    extra_hour_price: float | None = None
+    transport_from_price: float | None = None
+    lodging_price: float | None = None       # None = "a acordar"
+    meals_price: float | None = None         # None = "a acordar"
+    per_diem_price: float | None = None       # None = "a acordar"
     special_event_surcharge_pct: float = 0
-    payout_speed: PayoutSpeed = PayoutSpeed.MENSUAL
+    payout_speed: PayoutSpeed = PayoutSpeed.STANDARD
 
     # marketplace flags
     offers_audition: bool = False
     allow_subcontracting: bool = False
     is_partner: bool = False  # artist registered as provider ("Partner")
+    partner_monthly_fee: float | None = None
+    calendar_sync: str | None = None  # google / outlook / none
+
+    # registration consents
+    accepted_terms: bool = False
+    accepted_privacy: bool = False
+    authorized_data_use: bool = False
 
     # fiscal + banking
     rfc: str | None = None
@@ -172,11 +190,27 @@ class ArtistUpdate(BaseModel):
     valid_passport: bool | None = None
     usa_visa: bool | None = None
     base_price: float | None = None
+    price_hotel: float | None = None
+    price_corporate: float | None = None
+    price_wedding: float | None = None
+    price_private: float | None = None
+    price_restaurant: float | None = None
+    price_festival: float | None = None
+    extra_hour_price: float | None = None
+    transport_from_price: float | None = None
+    lodging_price: float | None = None
+    meals_price: float | None = None
+    per_diem_price: float | None = None
     special_event_surcharge_pct: float | None = None
     payout_speed: PayoutSpeed | None = None
     offers_audition: bool | None = None
     allow_subcontracting: bool | None = None
     is_partner: bool | None = None
+    partner_monthly_fee: float | None = None
+    calendar_sync: str | None = None
+    accepted_terms: bool | None = None
+    accepted_privacy: bool | None = None
+    authorized_data_use: bool | None = None
     rfc: str | None = None
     cfdi_use: str | None = None
     tax_regime: str | None = None

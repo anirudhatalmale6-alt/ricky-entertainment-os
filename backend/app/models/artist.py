@@ -73,19 +73,46 @@ class Artist(Base, TimestampMixin):
     valid_passport: Mapped[bool] = mapped_column(Boolean, default=False)
     usa_visa: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    # --- Pricing (MXN) - base fields; full pricing overhaul pending -----
+    # --- Step 3: Tarifas base (MXN) - one price per event type ---------
+    # base_price is the general / reference price (used for the benchmark and
+    # for the seasonal % model); the per-event-type prices below refine it.
     base_price: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    price_hotel: Mapped[float | None] = mapped_column(Numeric(12, 2))          # Precio base hotel
+    price_corporate: Mapped[float | None] = mapped_column(Numeric(12, 2))      # Evento corporativo
+    price_wedding: Mapped[float | None] = mapped_column(Numeric(12, 2))        # Boda
+    price_private: Mapped[float | None] = mapped_column(Numeric(12, 2))        # Evento privado
+    price_restaurant: Mapped[float | None] = mapped_column(Numeric(12, 2))     # Restaurante / lounge
+    price_festival: Mapped[float | None] = mapped_column(Numeric(12, 2))       # Festival / publico
+    # Add-ons. NULL means "a acordar" (to be agreed) for the optional ones.
+    extra_hour_price: Mapped[float | None] = mapped_column(Numeric(12, 2))     # Hora adicional
+    transport_from_price: Mapped[float | None] = mapped_column(Numeric(12, 2)) # Traslado (desde)
+    lodging_price: Mapped[float | None] = mapped_column(Numeric(12, 2))        # Hospedaje (si aplica)
+    meals_price: Mapped[float | None] = mapped_column(Numeric(12, 2))          # Alimentacion (si aplica)
+    per_diem_price: Mapped[float | None] = mapped_column(Numeric(12, 2))       # Viaticos (si aplica)
+    # % extra for special events (weddings etc.) from REVISION RICKY.
     special_event_surcharge_pct: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    # Plan de liquidacion (payout speed) - see enums.PayoutSpeed.
     payout_speed: Mapped[PayoutSpeed] = mapped_column(
         SQLEnum(PayoutSpeed, values_callable=lambda e: [m.value for m in e]),
-        default=PayoutSpeed.MENSUAL,
+        default=PayoutSpeed.STANDARD,
     )
 
     # --- Marketplace flags ---------------------------------------------
     offers_audition: Mapped[bool] = mapped_column(Boolean, default=False)       # ofrece audicion
     allow_subcontracting: Mapped[bool] = mapped_column(Boolean, default=False)  # deja que Partners lo contacten
     # Artist who upgraded to provider - branded "Partner" so they feel part of it.
+    # Partner is a paid subscription ($499/mes) that adds visibility + a
+    # "Partner Verificado" badge and unlocks subcontracting between acts.
     is_partner: Mapped[bool] = mapped_column(Boolean, default=False)
+    partner_monthly_fee: Mapped[float | None] = mapped_column(Numeric(10, 2))   # 499 when Partner
+
+    # Optional calendar sync chosen at sign-up (google / outlook / none).
+    calendar_sync: Mapped[str | None] = mapped_column(String(20))
+
+    # Registration consents (step 4).
+    accepted_terms: Mapped[bool] = mapped_column(Boolean, default=False)
+    accepted_privacy: Mapped[bool] = mapped_column(Boolean, default=False)
+    authorized_data_use: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # --- Step 4: fiscal + banking (Mexico) -----------------------------
     rfc: Mapped[str | None] = mapped_column(String(20))
