@@ -14,7 +14,10 @@ class SeasonalRateCreate(BaseModel):
     label: str
     start_date: date
     end_date: date
-    price: float
+    # % over base price (Navidad +300, temporada baja -10). Fully open.
+    adjustment_pct: float = 0
+    # Optional absolute override - wins over the percentage when provided.
+    price: float | None = None
 
 
 class SeasonalRateOut(SeasonalRateCreate):
