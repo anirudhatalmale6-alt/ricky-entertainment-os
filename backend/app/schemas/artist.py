@@ -110,7 +110,7 @@ class ArtistBase(BaseModel):
     meals_price: float | None = None         # None = "a acordar"
     per_diem_price: float | None = None       # None = "a acordar"
     special_event_surcharge_pct: float = 0
-    payout_speed: PayoutSpeed = PayoutSpeed.STANDARD
+    payout_speed: PayoutSpeed = PayoutSpeed.MENSUAL
 
     # marketplace flags
     offers_audition: bool = False

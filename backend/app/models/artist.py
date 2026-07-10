@@ -94,7 +94,7 @@ class Artist(Base, TimestampMixin):
     # Plan de liquidacion (payout speed) - see enums.PayoutSpeed.
     payout_speed: Mapped[PayoutSpeed] = mapped_column(
         SQLEnum(PayoutSpeed, values_callable=lambda e: [m.value for m in e]),
-        default=PayoutSpeed.STANDARD,
+        default=PayoutSpeed.MENSUAL,
     )
 
     # --- Marketplace flags ---------------------------------------------

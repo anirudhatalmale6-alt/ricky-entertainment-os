@@ -12,33 +12,28 @@ import enum
 class PayoutSpeed(str, enum.Enum):
     """"Plan de liquidacion" - how fast an artist wants to receive their money.
 
-    The faster they want it, the higher the extra commission the platform
-    charges the artist for advancing/prioritising the payout. Values and
-    percentages taken from David's definitive registration sheet ("Hoja
-    Registro", 2026-07-11).
+    The faster they want it, the higher the commission the platform charges the
+    artist for advancing/prioritising the payout. Percentages per REVISION RICKY
+    (the PDF), confirmed by David as the definitive plan (2026-07-11).
     """
 
-    STANDARD = "standard"   # after client pays + 3 business days -> no cost
-    FAST = "fast"           # 15 days after the event            -> +1.5%
-    PRIORITY = "priority"   # 7 days after the event             -> +2.5%
-    EXPRESS = "express"     # 3 days after the event             -> +4%
+    MENSUAL = "mensual"   # pays out monthly   -> 3.5%
+    FAST = "fast"         # pays out in 15 days -> 7.5%
+    EXPRESS = "express"   # pays out in 7 days  -> 12%
 
 
-# Extra commission charged to the ARTIST for each payout speed.
+# Commission charged to the ARTIST for each payout speed.
 PAYOUT_COMMISSION: dict[PayoutSpeed, float] = {
-    PayoutSpeed.STANDARD: 0.0,
-    PayoutSpeed.FAST: 0.015,
-    PayoutSpeed.PRIORITY: 0.025,
-    PayoutSpeed.EXPRESS: 0.04,
+    PayoutSpeed.MENSUAL: 0.035,
+    PayoutSpeed.FAST: 0.075,
+    PayoutSpeed.EXPRESS: 0.12,
 }
 
-# Days until the artist receives the money (Standard counts from client payment
-# + 3 business days; the rest count from the event date).
+# Days until the artist receives the money.
 PAYOUT_DAYS: dict[PayoutSpeed, int] = {
-    PayoutSpeed.STANDARD: 3,
+    PayoutSpeed.MENSUAL: 30,
     PayoutSpeed.FAST: 15,
-    PayoutSpeed.PRIORITY: 7,
-    PayoutSpeed.EXPRESS: 3,
+    PayoutSpeed.EXPRESS: 7,
 }
 
 
