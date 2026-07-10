@@ -1,48 +1,15 @@
-"""Artist schemas: create / update / read, incl. seasonal rates, media, docs."""
+"""Artist (profile) schemas: create / update / read, with nested shows + docs."""
 from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
+from pydantic import BaseModel, ConfigDict, computed_field
 
-from app.models.enums import (
-    ARTIST_CATEGORIES,
-    ARTIST_SUBCATEGORIES,
-    MAX_ARTIST_IMAGES,
-    PAYOUT_COMMISSION,
-    PayoutSpeed,
-)
+from app.models.enums import PAYOUT_COMMISSION, PayoutSpeed
+from app.schemas.show import ShowCreate, ShowOut
 
 
-# --- Seasonal rates -------------------------------------------------------
-
-class SeasonalRateCreate(BaseModel):
-    label: str
-    start_date: date
-    end_date: date
-    # % over base price (Navidad +300, temporada baja -10). Fully open.
-    adjustment_pct: float = 0
-    # Optional absolute override - wins over the percentage when provided.
-    price: float | None = None
-
-
-class SeasonalRateOut(SeasonalRateCreate):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-
-
-# --- Media / documents ----------------------------------------------------
-
-class ArtistImageCreate(BaseModel):
-    url: str
-    is_profile: bool = False
-    caption: str | None = None
-
-
-class ArtistImageOut(ArtistImageCreate):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-
+# --- Documents (profile level) --------------------------------------------
 
 class ArtistDocumentCreate(BaseModel):
     doc_type: str
@@ -55,7 +22,7 @@ class ArtistDocumentOut(ArtistDocumentCreate):
     id: int
 
 
-# --- Artist ---------------------------------------------------------------
+# --- Artist profile -------------------------------------------------------
 
 class ArtistBase(BaseModel):
     # who they are
@@ -64,35 +31,14 @@ class ArtistBase(BaseModel):
     last_name: str | None = None
     date_of_birth: date | None = None
     artist_type: str | None = None
-    category: str                       # Musica / Shows / Fotografia y Video / Produccion
-    subcategory: str | None = None      # Solista / DJ / Danza / Magia... (must match category)
-    genres: list[str] = []
     bio: str | None = None
     years_experience: str | None = None
     languages_spoken: list[str] = []
-    show_languages: list[str] = []
+    social_links: dict[str, str] = {}
 
     phone: str | None = None
     email: str | None = None
     website: str | None = None
-
-    # the show + rider
-    show_name: str | None = None
-    show_description: str | None = None
-    members: int = 1
-    duration_minutes: int | None = None
-    setup_minutes: int | None = None
-    teardown_minutes: int | None = None
-    space_required: str | None = None
-    power_required: str | None = None
-    equipment_included: list[str] = []
-    equipment_required: str | None = None
-    dressing_room: str | None = None
-    requirements: str | None = None
-
-    video_url: str | None = None
-    audio_url: str | None = None
-    social_links: dict[str, str] = {}
 
     # availability
     base_city: str | None = None
@@ -103,26 +49,10 @@ class ArtistBase(BaseModel):
     valid_passport: bool = False
     usa_visa: bool = False
 
-    # pricing - one price per event type (all MXN, all optional)
-    base_price: float | None = None
-    price_hotel: float | None = None
-    price_corporate: float | None = None
-    price_wedding: float | None = None
-    price_private: float | None = None
-    price_restaurant: float | None = None
-    price_festival: float | None = None
-    extra_hour_price: float | None = None
-    transport_from_price: float | None = None
-    lodging_price: float | None = None       # None = "a acordar"
-    meals_price: float | None = None         # None = "a acordar"
-    per_diem_price: float | None = None       # None = "a acordar"
-    special_event_surcharge_pct: float = 0
+    # payout preference + marketplace flags
     payout_speed: PayoutSpeed = PayoutSpeed.MENSUAL
-
-    # marketplace flags
-    offers_audition: bool = False
     allow_subcontracting: bool = False
-    is_partner: bool = False  # artist registered as provider ("Partner")
+    is_partner: bool = False
     partner_monthly_fee: float | None = None
     calendar_sync: str | None = None  # google / outlook / none
 
@@ -149,23 +79,9 @@ class ArtistBase(BaseModel):
     country: str = "Mexico"
     postal_code: str | None = None
 
-    @model_validator(mode="after")
-    def _check_category(self):
-        if self.category not in ARTIST_CATEGORIES:
-            raise ValueError(
-                f"category must be one of {list(ARTIST_CATEGORIES)}"
-            )
-        if self.subcategory is not None and self.subcategory not in ARTIST_CATEGORIES[self.category]:
-            raise ValueError(
-                f"subcategory '{self.subcategory}' is not valid for category "
-                f"'{self.category}'. Options: {ARTIST_CATEGORIES[self.category]}"
-            )
-        return self
-
 
 class ArtistCreate(ArtistBase):
-    seasonal_rates: list[SeasonalRateCreate] = []
-    images: list[ArtistImageCreate] = Field(default=[], max_length=MAX_ARTIST_IMAGES)
+    shows: list[ShowCreate] = []
     documents: list[ArtistDocumentCreate] = []
 
 
@@ -178,31 +94,13 @@ class ArtistUpdate(BaseModel):
     last_name: str | None = None
     date_of_birth: date | None = None
     artist_type: str | None = None
-    category: str | None = None
-    subcategory: str | None = None
-    genres: list[str] | None = None
     bio: str | None = None
     years_experience: str | None = None
     languages_spoken: list[str] | None = None
-    show_languages: list[str] | None = None
+    social_links: dict[str, str] | None = None
     phone: str | None = None
     email: str | None = None
     website: str | None = None
-    show_name: str | None = None
-    show_description: str | None = None
-    members: int | None = None
-    duration_minutes: int | None = None
-    setup_minutes: int | None = None
-    teardown_minutes: int | None = None
-    space_required: str | None = None
-    power_required: str | None = None
-    equipment_included: list[str] | None = None
-    equipment_required: str | None = None
-    dressing_room: str | None = None
-    requirements: str | None = None
-    video_url: str | None = None
-    audio_url: str | None = None
-    social_links: dict[str, str] | None = None
     base_city: str | None = None
     work_radius_km: int | None = None
     states_worked: list[str] | None = None
@@ -210,21 +108,7 @@ class ArtistUpdate(BaseModel):
     own_vehicle: bool | None = None
     valid_passport: bool | None = None
     usa_visa: bool | None = None
-    base_price: float | None = None
-    price_hotel: float | None = None
-    price_corporate: float | None = None
-    price_wedding: float | None = None
-    price_private: float | None = None
-    price_restaurant: float | None = None
-    price_festival: float | None = None
-    extra_hour_price: float | None = None
-    transport_from_price: float | None = None
-    lodging_price: float | None = None
-    meals_price: float | None = None
-    per_diem_price: float | None = None
-    special_event_surcharge_pct: float | None = None
     payout_speed: PayoutSpeed | None = None
-    offers_audition: bool | None = None
     allow_subcontracting: bool | None = None
     is_partner: bool | None = None
     partner_monthly_fee: float | None = None
@@ -249,32 +133,6 @@ class ArtistUpdate(BaseModel):
     is_verified: bool | None = None
     is_active: bool | None = None
 
-    @model_validator(mode="after")
-    def _check_category(self):
-        if self.category is not None and self.category not in ARTIST_CATEGORIES:
-            raise ValueError(f"category must be one of {list(ARTIST_CATEGORIES)}")
-        if self.subcategory is not None:
-            # If category is being set too, enforce the pairing; otherwise just
-            # require the subcategory to be a known value.
-            if self.category is not None:
-                if self.subcategory not in ARTIST_CATEGORIES[self.category]:
-                    raise ValueError(
-                        f"subcategory '{self.subcategory}' is not valid for category '{self.category}'"
-                    )
-            elif self.subcategory not in ARTIST_SUBCATEGORIES:
-                raise ValueError(f"unknown subcategory '{self.subcategory}'")
-        return self
-
-
-class PriceBenchmarkOut(BaseModel):
-    """Market reference so a musician knows if their price is high or low."""
-    category: str | None = None
-    region: str | None = None
-    sample_size: int
-    average_price: float | None = None
-    min_price: float | None = None
-    max_price: float | None = None
-
 
 class ArtistOut(ArtistBase):
     model_config = ConfigDict(from_attributes=True)
@@ -282,8 +140,7 @@ class ArtistOut(ArtistBase):
     is_verified: bool
     is_active: bool
     rating: float | None = None
-    seasonal_rates: list[SeasonalRateOut] = []
-    images: list[ArtistImageOut] = []
+    shows: list[ShowOut] = []
     documents: list[ArtistDocumentOut] = []
     created_at: datetime
 

@@ -1,7 +1,9 @@
-"""Artist media and documents.
+"""Media and documents.
 
-Gallery images / press kit / legal & fiscal documents an artist uploads
-during registration (steps 2 and 4 of the sign-up flow).
+- ShowImage: gallery / profile photos that belong to a SHOW (max 5 per show).
+- ArtistDocument: legal & fiscal documents that belong to the PROFILE (INE,
+  constancia SAT, comprobante bancario, contrato...). These are the person's/
+  provider's documents, shared across all their shows.
 """
 from __future__ import annotations
 
@@ -11,16 +13,16 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
 
 
-class ArtistImage(Base, TimestampMixin):
-    __tablename__ = "artist_images"
+class ShowImage(Base, TimestampMixin):
+    __tablename__ = "show_images"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    artist_id: Mapped[int] = mapped_column(ForeignKey("artists.id", ondelete="CASCADE"), index=True)
+    show_id: Mapped[int] = mapped_column(ForeignKey("shows.id", ondelete="CASCADE"), index=True)
     url: Mapped[str] = mapped_column(String(500))
     is_profile: Mapped[bool] = mapped_column(Boolean, default=False)  # foto de perfil vs galeria
     caption: Mapped[str | None] = mapped_column(String(255))
 
-    artist: Mapped["Artist"] = relationship(back_populates="images")  # noqa: F821
+    show: Mapped["Show"] = relationship(back_populates="images")  # noqa: F821
 
 
 class ArtistDocument(Base, TimestampMixin):
