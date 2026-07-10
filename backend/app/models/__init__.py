@@ -4,6 +4,7 @@ from app.models.company import Company
 from app.models.booker import Booker
 from app.models.artist import Artist
 from app.models.seasonal_rate import ArtistSeasonalRate
+from app.models.media import ArtistImage, ArtistDocument
 from app.models.enums import (
     PayoutSpeed,
     RiskTier,
@@ -22,6 +23,8 @@ __all__ = [
     "Booker",
     "Artist",
     "ArtistSeasonalRate",
+    "ArtistImage",
+    "ArtistDocument",
     "PayoutSpeed",
     "RiskTier",
     "PAYOUT_COMMISSION",

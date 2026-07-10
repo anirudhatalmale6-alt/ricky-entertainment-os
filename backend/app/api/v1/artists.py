@@ -5,16 +5,23 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, require_permission
 from app.models.artist import Artist
+from app.models.media import ArtistDocument, ArtistImage
 from app.models.seasonal_rate import ArtistSeasonalRate
 from app.schemas.artist import ArtistCreate, ArtistOut, ArtistUpdate, PriceBenchmarkOut
 
 router = APIRouter(prefix="/artists", tags=["artists"])
 
+_ARTIST_RELS = (
+    selectinload(Artist.seasonal_rates),
+    selectinload(Artist.images),
+    selectinload(Artist.documents),
+)
+
 
 async def _get_artist_or_404(db: DbSession, artist_id: int) -> Artist:
     res = await db.execute(
         select(Artist)
-        .options(selectinload(Artist.seasonal_rates))
+        .options(*_ARTIST_RELS)
         .where(Artist.id == artist_id)
     )
     artist = res.scalar_one_or_none()
@@ -31,7 +38,7 @@ async def list_artists(
     active_only: bool = Query(True, description="Only active artists"),
 ):
     """Browse the artist catalogue (any authenticated user)."""
-    stmt = select(Artist).options(selectinload(Artist.seasonal_rates)).order_by(Artist.stage_name)
+    stmt = select(Artist).options(*_ARTIST_RELS).order_by(Artist.stage_name)
     if category:
         stmt = stmt.where(Artist.category == category)
     if active_only:
@@ -85,10 +92,14 @@ async def get_artist(artist_id: int, db: DbSession, _: CurrentUser):
     dependencies=[Depends(require_permission("artist.manage"))],
 )
 async def create_artist(payload: ArtistCreate, db: DbSession):
-    data = payload.model_dump(exclude={"seasonal_rates"})
+    data = payload.model_dump(exclude={"seasonal_rates", "images", "documents"})
     artist = Artist(**data)
     for rate in payload.seasonal_rates:
         artist.seasonal_rates.append(ArtistSeasonalRate(**rate.model_dump()))
+    for img in payload.images:
+        artist.images.append(ArtistImage(**img.model_dump()))
+    for doc in payload.documents:
+        artist.documents.append(ArtistDocument(**doc.model_dump()))
     db.add(artist)
     await db.commit()
     return await _get_artist_or_404(db, artist.id)
