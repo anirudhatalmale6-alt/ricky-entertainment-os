@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from urllib.parse import quote_plus
 
 from pydantic import BaseModel, ConfigDict, computed_field
 
@@ -15,6 +16,10 @@ class VenueCreate(BaseModel):
     capacity: int | None = None
     ambiance_type: str | None = None
     usual_schedule: str | None = None
+    address: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    map_url: str | None = None
 
 
 class VenueUpdate(BaseModel):
@@ -23,6 +28,10 @@ class VenueUpdate(BaseModel):
     capacity: int | None = None
     ambiance_type: str | None = None
     usual_schedule: str | None = None
+    address: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    map_url: str | None = None
     is_active: bool | None = None
 
 
@@ -32,6 +41,26 @@ class VenueOut(VenueCreate):
     company_id: int
     is_active: bool
     created_at: datetime
+
+    @computed_field
+    @property
+    def google_maps_url(self) -> str | None:
+        """Ready-to-open Google Maps navigation link for the artist."""
+        if self.latitude is not None and self.longitude is not None:
+            return f"https://www.google.com/maps/search/?api=1&query={self.latitude},{self.longitude}"
+        if self.address:
+            return f"https://www.google.com/maps/search/?api=1&query={quote_plus(self.address)}"
+        return None
+
+    @computed_field
+    @property
+    def waze_url(self) -> str | None:
+        """Ready-to-open Waze navigation link for the artist."""
+        if self.latitude is not None and self.longitude is not None:
+            return f"https://waze.com/ul?ll={self.latitude},{self.longitude}&navigate=yes"
+        if self.address:
+            return f"https://waze.com/ul?q={quote_plus(self.address)}"
+        return None
 
 
 # --- Company --------------------------------------------------------------
