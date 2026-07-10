@@ -39,7 +39,7 @@ class ArtistBase(BaseModel):
 
     offers_audition: bool = False
     allow_subcontracting: bool = False
-    is_provider: bool = False
+    is_partner: bool = False  # artist registered as provider ("Partner")
 
     city: str | None = None
     region: str | None = None
@@ -63,7 +63,7 @@ class ArtistUpdate(BaseModel):
     payout_speed: PayoutSpeed | None = None
     offers_audition: bool | None = None
     allow_subcontracting: bool | None = None
-    is_provider: bool | None = None
+    is_partner: bool | None = None
     city: str | None = None
     region: str | None = None
     country: str | None = None

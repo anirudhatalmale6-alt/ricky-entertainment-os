@@ -37,8 +37,9 @@ class Artist(Base, TimestampMixin):
 
     # Marketplace flags
     offers_audition: Mapped[bool] = mapped_column(Boolean, default=False)       # ofrece audicion
-    allow_subcontracting: Mapped[bool] = mapped_column(Boolean, default=False)  # deja que proveedores lo contacten
-    is_provider: Mapped[bool] = mapped_column(Boolean, default=False)           # se dio de alta como Proveedor
+    allow_subcontracting: Mapped[bool] = mapped_column(Boolean, default=False)  # deja que Partners lo contacten
+    # Artist who upgraded to provider - branded "Partner" so they feel part of it.
+    is_partner: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Location
     city: Mapped[str | None] = mapped_column(String(120))
