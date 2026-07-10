@@ -12,6 +12,9 @@ from app.models.enums import (
     PAYOUT_DAYS,
     RISK_COMMISSION,
     risk_tier_for_days,
+    ARTIST_CATEGORIES,
+    ARTIST_SUBCATEGORIES,
+    MAX_ARTIST_IMAGES,
 )
 
 __all__ = [
@@ -31,4 +34,7 @@ __all__ = [
     "PAYOUT_DAYS",
     "RISK_COMMISSION",
     "risk_tier_for_days",
+    "ARTIST_CATEGORIES",
+    "ARTIST_SUBCATEGORIES",
+    "MAX_ARTIST_IMAGES",
 ]

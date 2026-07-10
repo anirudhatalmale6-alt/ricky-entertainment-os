@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, require_permission
 from app.models.artist import Artist
+from app.models.enums import ARTIST_CATEGORIES
 from app.models.media import ArtistDocument, ArtistImage
 from app.models.seasonal_rate import ArtistSeasonalRate
 from app.schemas.artist import ArtistCreate, ArtistOut, ArtistUpdate, PriceBenchmarkOut
@@ -45,6 +46,12 @@ async def list_artists(
         stmt = stmt.where(Artist.is_active.is_(True))
     res = await db.execute(stmt)
     return list(res.scalars().all())
+
+
+@router.get("/taxonomy")
+async def category_taxonomy(_: CurrentUser) -> dict[str, list[str]]:
+    """Category -> subcategories map that drives the registration dropdowns."""
+    return ARTIST_CATEGORIES
 
 
 @router.get("/price-benchmark", response_model=PriceBenchmarkOut)

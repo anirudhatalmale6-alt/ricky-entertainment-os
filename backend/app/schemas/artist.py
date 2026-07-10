@@ -3,9 +3,15 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
-from app.models.enums import PAYOUT_COMMISSION, PayoutSpeed
+from app.models.enums import (
+    ARTIST_CATEGORIES,
+    ARTIST_SUBCATEGORIES,
+    MAX_ARTIST_IMAGES,
+    PAYOUT_COMMISSION,
+    PayoutSpeed,
+)
 
 
 # --- Seasonal rates -------------------------------------------------------
@@ -58,7 +64,8 @@ class ArtistBase(BaseModel):
     last_name: str | None = None
     date_of_birth: date | None = None
     artist_type: str | None = None
-    category: str
+    category: str                       # Musica / Shows / Fotografia y Video / Produccion
+    subcategory: str | None = None      # Solista / DJ / Danza / Magia... (must match category)
     genres: list[str] = []
     bio: str | None = None
     years_experience: str | None = None
@@ -142,10 +149,23 @@ class ArtistBase(BaseModel):
     country: str = "Mexico"
     postal_code: str | None = None
 
+    @model_validator(mode="after")
+    def _check_category(self):
+        if self.category not in ARTIST_CATEGORIES:
+            raise ValueError(
+                f"category must be one of {list(ARTIST_CATEGORIES)}"
+            )
+        if self.subcategory is not None and self.subcategory not in ARTIST_CATEGORIES[self.category]:
+            raise ValueError(
+                f"subcategory '{self.subcategory}' is not valid for category "
+                f"'{self.category}'. Options: {ARTIST_CATEGORIES[self.category]}"
+            )
+        return self
+
 
 class ArtistCreate(ArtistBase):
     seasonal_rates: list[SeasonalRateCreate] = []
-    images: list[ArtistImageCreate] = []
+    images: list[ArtistImageCreate] = Field(default=[], max_length=MAX_ARTIST_IMAGES)
     documents: list[ArtistDocumentCreate] = []
 
 
@@ -159,6 +179,7 @@ class ArtistUpdate(BaseModel):
     date_of_birth: date | None = None
     artist_type: str | None = None
     category: str | None = None
+    subcategory: str | None = None
     genres: list[str] | None = None
     bio: str | None = None
     years_experience: str | None = None
@@ -227,6 +248,22 @@ class ArtistUpdate(BaseModel):
     postal_code: str | None = None
     is_verified: bool | None = None
     is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def _check_category(self):
+        if self.category is not None and self.category not in ARTIST_CATEGORIES:
+            raise ValueError(f"category must be one of {list(ARTIST_CATEGORIES)}")
+        if self.subcategory is not None:
+            # If category is being set too, enforce the pairing; otherwise just
+            # require the subcategory to be a known value.
+            if self.category is not None:
+                if self.subcategory not in ARTIST_CATEGORIES[self.category]:
+                    raise ValueError(
+                        f"subcategory '{self.subcategory}' is not valid for category '{self.category}'"
+                    )
+            elif self.subcategory not in ARTIST_SUBCATEGORIES:
+                raise ValueError(f"unknown subcategory '{self.subcategory}'")
+        return self
 
 
 class PriceBenchmarkOut(BaseModel):

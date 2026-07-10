@@ -9,6 +9,35 @@ from __future__ import annotations
 import enum
 
 
+# Artist category -> subcategories taxonomy (from David's registration sheet,
+# 2026-07-11). Main "Categoria" plus a "Subcategoria" chosen under it.
+ARTIST_CATEGORIES: dict[str, list[str]] = {
+    "Musica": ["Solista", "Dueto", "Trio", "Banda", "Orquesta", "Mariachi", "DJ"],
+    "Shows": [
+        "Danza",
+        "Magia e Ilusionismo",
+        "Circo & Acrobacias",
+        "Tematico o de Temporada",
+        "Infantiles y Familiares",
+        "Espectaculos Visuales",
+        "Musica en vivo",
+        "Comedia & Stand Up",
+        "Tributos",
+        "Variedades",
+    ],
+    "Fotografia y Video": ["Fotografia", "Video"],
+    "Produccion": ["Audio", "Iluminacion", "Escenarios"],
+}
+
+# All valid subcategory values (flattened), for lenient partial-update checks.
+ARTIST_SUBCATEGORIES: set[str] = {
+    sub for subs in ARTIST_CATEGORIES.values() for sub in subs
+}
+
+# Max gallery photos an artist can upload (was 20; David capped it at 5).
+MAX_ARTIST_IMAGES = 5
+
+
 class PayoutSpeed(str, enum.Enum):
     """"Plan de liquidacion" - how fast an artist wants to receive their money.
 

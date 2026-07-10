@@ -33,7 +33,8 @@ class Artist(Base, TimestampMixin):
     last_name: Mapped[str | None] = mapped_column(String(120))         # Apellidos
     date_of_birth: Mapped[date | None] = mapped_column(Date)
     artist_type: Mapped[str | None] = mapped_column(String(80))        # Solista / agrupacion
-    category: Mapped[str] = mapped_column(String(80), index=True)      # main category
+    category: Mapped[str] = mapped_column(String(80), index=True)      # Musica / Shows / Fotografia y Video / Produccion
+    subcategory: Mapped[str | None] = mapped_column(String(80), index=True)  # Solista / DJ / Danza / Magia...
     genres: Mapped[list] = mapped_column(JSON, default=list)           # Categorias (varias): Jazz, Lounge...
     bio: Mapped[str | None] = mapped_column(Text)                      # Biografia corta
     years_experience: Mapped[str | None] = mapped_column(String(40))  # "10+ anos"
