@@ -1,5 +1,6 @@
 """SQLAlchemy models - imported here so metadata is fully registered."""
 from app.models.user import User, Role, Permission, role_permissions
+from app.models.property_group import PropertyGroup
 from app.models.company import Company
 from app.models.venue import Venue
 from app.models.booker import Booker
@@ -24,6 +25,7 @@ __all__ = [
     "Role",
     "Permission",
     "role_permissions",
+    "PropertyGroup",
     "Company",
     "Venue",
     "Booker",

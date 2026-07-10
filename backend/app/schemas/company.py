@@ -69,6 +69,7 @@ class CompanyBase(BaseModel):
     name: str
     company_type: str = "hotel"
     logo_url: str | None = None
+    group_id: int | None = None   # parent chain/group, if any
     # fiscal
     tax_id: str | None = None
     legal_name: str | None = None
@@ -103,6 +104,7 @@ class CompanyUpdate(BaseModel):
     name: str | None = None
     company_type: str | None = None
     logo_url: str | None = None
+    group_id: int | None = None
     tax_id: str | None = None
     legal_name: str | None = None
     cfdi_use: str | None = None

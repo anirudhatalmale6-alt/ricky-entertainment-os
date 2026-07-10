@@ -7,7 +7,7 @@ attendance is measured there.
 """
 from __future__ import annotations
 
-from sqlalchemy import Enum as SQLEnum, Integer, JSON, String
+from sqlalchemy import Enum as SQLEnum, ForeignKey, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -21,6 +21,10 @@ class Company(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255), index=True)         # Nombre comercial
     company_type: Mapped[str] = mapped_column(String(40), default="hotel")  # hotel, restaurant, salon, bar, cadena
     logo_url: Mapped[str | None] = mapped_column(String(500))
+    # Optional parent chain/group - NULL for an independent property.
+    group_id: Mapped[int | None] = mapped_column(
+        ForeignKey("property_groups.id", ondelete="SET NULL"), index=True
+    )
 
     # Fiscal (Mexico)
     tax_id: Mapped[str | None] = mapped_column(String(20))             # RFC
@@ -54,6 +58,9 @@ class Company(Base, TimestampMixin):
     # window has enough history to auto-classify the tier.
     agreed_payment_days: Mapped[int | None] = mapped_column(Integer)
 
+    group: Mapped["PropertyGroup | None"] = relationship(  # noqa: F821
+        back_populates="properties"
+    )
     bookers: Mapped[list["Booker"]] = relationship(  # noqa: F821
         back_populates="company"
     )
