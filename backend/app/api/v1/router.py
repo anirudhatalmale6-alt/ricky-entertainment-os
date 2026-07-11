@@ -5,6 +5,7 @@ from app.api.v1 import (
     artists,
     auth,
     bookings,
+    chat,
     companies,
     groups,
     intelligence,
@@ -22,4 +23,5 @@ api_router.include_router(companies.router)
 api_router.include_router(groups.router)
 api_router.include_router(bookings.router)
 api_router.include_router(requests.router)
+api_router.include_router(chat.router)
 api_router.include_router(intelligence.router)

@@ -11,6 +11,7 @@ from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.media import ShowImage, ArtistDocument
 from app.models.booking import Booking
 from app.models.product_request import ProductRequest, RequestProposal
+from app.models.conversation import Conversation, Message
 from app.models.enums import (
     PayoutSpeed,
     RiskTier,
@@ -46,6 +47,8 @@ __all__ = [
     "Booking",
     "ProductRequest",
     "RequestProposal",
+    "Conversation",
+    "Message",
     "PayoutSpeed",
     "RiskTier",
     "BookingStatus",
