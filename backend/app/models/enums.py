@@ -90,6 +90,32 @@ RISK_COMMISSION: dict[RiskTier, float] = {
 }
 
 
+class BookingStatus(str, enum.Enum):
+    """Life-cycle of an "actuacion" (a show booked at a venue on a date).
+
+    PENDING    - the hotel requested it; the artist has not confirmed yet.
+    CONFIRMED  - the artist accepted; it is locked into both calendars.
+    COMPLETED  - the show happened (attendance can be registered).
+    CANCELLED  - dropped by either side (before the 2h cut-off).
+    NO_SHOW    - was confirmed but the artist did not turn up.
+    """
+
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    NO_SHOW = "no_show"
+
+
+# How close (in hours before the show starts) a booking may still be cancelled
+# without penalty. David's rule: 2h.
+CANCELLATION_CUTOFF_HOURS = 2
+
+# Minimum gap the same artist needs between two shows, to account for travel /
+# teardown before the next actuacion. David's rule: 1h buffer.
+TRAVEL_BUFFER_HOURS = 1
+
+
 def risk_tier_for_days(avg_payment_days: float) -> RiskTier:
     """Map a company's average days-to-pay to its earned risk tier.
 

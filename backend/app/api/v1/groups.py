@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 
 from app.api.deps import DbSession, require_permission
+from app.models.booking import Booking
 from app.models.company import Company
+from app.models.enums import BookingStatus
 from app.models.property_group import PropertyGroup
 from app.models.venue import Venue
 from app.schemas.property_group import (
@@ -157,17 +159,42 @@ async def group_dashboard(group_id: int, db: DbSession):
     ).all()
     stats = {cid: (n, cap) for cid, n, cap in rows}
 
+    # actuaciones + gasto per property (confirmed + completed count as booked spend)
+    counted = (BookingStatus.CONFIRMED, BookingStatus.COMPLETED)
+    brows = (
+        await db.execute(
+            select(
+                Booking.company_id,
+                func.count(Booking.id),
+                func.coalesce(func.sum(Booking.agreed_price), 0),
+            )
+            .where(
+                Booking.company_id.in_([c.id for c in companies]) if companies else False,
+                Booking.status.in_(counted),
+            )
+            .group_by(Booking.company_id)
+        )
+    ).all()
+    bstats = {cid: (n, spend) for cid, n, spend in brows}
+
     props = []
-    total_venues = total_cap = 0
+    total_venues = total_cap = total_bookings = 0
+    total_spend = 0.0
     for c in companies:
         n, cap = stats.get(c.id, (0, 0))
+        bn, spend = bstats.get(c.id, (0, 0))
         total_venues += n
         total_cap += int(cap)
+        total_bookings += bn
+        total_spend += float(spend)
         props.append(PropertySummary(
             id=c.id, name=c.name, company_type=c.company_type, city=c.city,
             risk_tier=c.risk_tier, venues_count=n, total_capacity=int(cap),
+            bookings_count=bn, total_spend=float(spend),
         ))
     return GroupDashboardOut(
         group_id=group.id, group_name=group.name, property_count=len(companies),
-        total_venues=total_venues, total_capacity=total_cap, properties=props,
+        total_venues=total_venues, total_capacity=total_cap,
+        total_bookings=total_bookings, total_spend=round(total_spend, 2),
+        properties=props,
     )

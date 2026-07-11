@@ -38,6 +38,8 @@ class PropertySummary(BaseModel):
     risk_tier: RiskTier
     venues_count: int = 0
     total_capacity: int = 0
+    bookings_count: int = 0      # actuaciones confirmadas + realizadas
+    total_spend: float = 0.0     # gasto en entretenimiento (MXN)
 
     @computed_field
     @property
@@ -59,4 +61,6 @@ class GroupDashboardOut(BaseModel):
     property_count: int
     total_venues: int
     total_capacity: int
+    total_bookings: int = 0      # actuaciones de toda la cadena
+    total_spend: float = 0.0     # gasto consolidado en entretenimiento (MXN)
     properties: list[PropertySummary] = []
