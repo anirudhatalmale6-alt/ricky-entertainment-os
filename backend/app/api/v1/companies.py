@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import DbSession, require_permission
 from app.models.company import Company
+from app.models.property_budget import PropertyBudget
 from app.models.venue import Venue
 from app.schemas.company import (
     CompanyCreate,
@@ -14,6 +15,7 @@ from app.schemas.company import (
     VenueOut,
     VenueUpdate,
 )
+from app.schemas.property_budget import PropertyBudgetIn, PropertyBudgetOut
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -146,4 +148,61 @@ async def update_venue(venue_id: int, payload: VenueUpdate, db: DbSession):
 async def delete_venue(venue_id: int, db: DbSession):
     venue = await _get_venue_or_404(db, venue_id)
     await db.delete(venue)
+    await db.commit()
+
+
+# --- Monthly budget ("perfil de presupuesto") ------------------------------
+
+@router.get(
+    "/{company_id}/budgets",
+    response_model=list[PropertyBudgetOut],
+    dependencies=[Depends(require_permission("company.manage"))],
+)
+async def list_budgets(company_id: int, db: DbSession):
+    await _get_company_or_404(db, company_id)
+    res = await db.execute(
+        select(PropertyBudget)
+        .where(PropertyBudget.company_id == company_id)
+        .order_by(PropertyBudget.year.desc(), PropertyBudget.month.desc())
+    )
+    return list(res.scalars().all())
+
+
+@router.put(
+    "/{company_id}/budgets",
+    response_model=PropertyBudgetOut,
+    dependencies=[Depends(require_permission("company.manage"))],
+)
+async def upsert_budget(company_id: int, payload: PropertyBudgetIn, db: DbSession):
+    """Load (or overwrite) one month of the property's entertainment budget."""
+    await _get_company_or_404(db, company_id)
+    res = await db.execute(
+        select(PropertyBudget).where(
+            PropertyBudget.company_id == company_id,
+            PropertyBudget.year == payload.year,
+            PropertyBudget.month == payload.month,
+        )
+    )
+    row = res.scalar_one_or_none()
+    if row is None:
+        row = PropertyBudget(company_id=company_id, **payload.model_dump())
+        db.add(row)
+    else:
+        for field, value in payload.model_dump().items():
+            setattr(row, field, value)
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+@router.delete(
+    "/budgets/{budget_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_permission("company.manage"))],
+)
+async def delete_budget(budget_id: int, db: DbSession):
+    row = await db.get(PropertyBudget, budget_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Budget not found")
+    await db.delete(row)
     await db.commit()

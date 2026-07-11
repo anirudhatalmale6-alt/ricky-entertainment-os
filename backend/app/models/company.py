@@ -7,7 +7,7 @@ attendance is measured there.
 """
 from __future__ import annotations
 
-from sqlalchemy import Enum as SQLEnum, ForeignKey, Integer, JSON, String
+from sqlalchemy import Boolean, Enum as SQLEnum, ForeignKey, Integer, JSON, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -47,6 +47,16 @@ class Company(Base, TimestampMixin):
     country: Mapped[str] = mapped_column(String(80), default="Mexico")
     postal_code: Mapped[str | None] = mapped_column(String(10))
 
+    # Property profile - feeds Market Intelligence benchmarking.
+    # Room revenue proxy = rooms * avg_daily_rate * occupancy% (occupancy comes
+    # from the monthly budget row). star_rating drives the 5* / 4* comparatives.
+    rooms: Mapped[int | None] = mapped_column(Integer)                 # numero de habitaciones
+    avg_daily_rate: Mapped[float | None] = mapped_column(Numeric(12, 2))  # tarifa promedio (ADR)
+    star_rating: Mapped[int | None] = mapped_column(Integer)           # categoria 1-5 estrellas
+    # Whether this property pays for the premium Market Intelligence add-on.
+    # The market comparative (benchmarking) is the "Partners" paid feature.
+    is_partner: Mapped[bool] = mapped_column(Boolean, default=False)
+
     # Commercial conditions
     # Payment-behaviour risk tier -> drives the commission charged to the company.
     # Everybody starts at A; it can be renegotiated at sign-up or earned over time.
@@ -65,5 +75,8 @@ class Company(Base, TimestampMixin):
         back_populates="company"
     )
     venues: Mapped[list["Venue"]] = relationship(  # noqa: F821
+        back_populates="company", cascade="all, delete-orphan"
+    )
+    budgets: Mapped[list["PropertyBudget"]] = relationship(  # noqa: F821
         back_populates="company", cascade="all, delete-orphan"
     )

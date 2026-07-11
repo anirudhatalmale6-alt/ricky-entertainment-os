@@ -3,6 +3,7 @@ from app.models.user import User, Role, Permission, role_permissions
 from app.models.property_group import PropertyGroup
 from app.models.company import Company
 from app.models.venue import Venue
+from app.models.property_budget import PropertyBudget
 from app.models.booker import Booker
 from app.models.artist import Artist
 from app.models.show import Show
@@ -32,6 +33,7 @@ __all__ = [
     "PropertyGroup",
     "Company",
     "Venue",
+    "PropertyBudget",
     "Booker",
     "Artist",
     "Show",

@@ -88,6 +88,11 @@ class CompanyBase(BaseModel):
     region: str | None = None
     country: str = "Mexico"
     postal_code: str | None = None
+    # property profile (feeds Market Intelligence)
+    rooms: int | None = None                # numero de habitaciones
+    avg_daily_rate: float | None = None     # tarifa promedio (ADR)
+    star_rating: int | None = None          # categoria 1-5 estrellas
+    is_partner: bool = False                # accede al benchmarking premium
     # commercial
     risk_tier: RiskTier = RiskTier.A
     agreed_payment_days: int | None = None
@@ -120,6 +125,10 @@ class CompanyUpdate(BaseModel):
     region: str | None = None
     country: str | None = None
     postal_code: str | None = None
+    rooms: int | None = None
+    avg_daily_rate: float | None = None
+    star_rating: int | None = None
+    is_partner: bool | None = None
     risk_tier: RiskTier | None = None
     agreed_payment_days: int | None = None
 
