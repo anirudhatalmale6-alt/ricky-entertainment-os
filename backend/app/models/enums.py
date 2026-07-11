@@ -107,6 +107,31 @@ class BookingStatus(str, enum.Enum):
     NO_SHOW = "no_show"
 
 
+class RequestStatus(str, enum.Enum):
+    """Life-cycle of a "solicitud" - a contratante's open request for a product
+    (the Freelancer-style board where hotels ask and artists propose).
+
+    OPEN      - published; artists can still send proposals.
+    CLOSED    - the hotel stopped taking proposals (no winner chosen).
+    FULFILLED - a proposal was accepted / the request was satisfied.
+    CANCELLED - withdrawn by the hotel.
+    """
+
+    OPEN = "open"
+    CLOSED = "closed"
+    FULFILLED = "fulfilled"
+    CANCELLED = "cancelled"
+
+
+class ProposalStatus(str, enum.Enum):
+    """An artist's proposal to a solicitud."""
+
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    WITHDRAWN = "withdrawn"
+
+
 # How close (in hours before the show starts) a booking may still be cancelled
 # without penalty. David's rule: 2h.
 CANCELLATION_CUTOFF_HOURS = 2

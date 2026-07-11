@@ -10,10 +10,13 @@ from app.models.show import Show
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.media import ShowImage, ArtistDocument
 from app.models.booking import Booking
+from app.models.product_request import ProductRequest, RequestProposal
 from app.models.enums import (
     PayoutSpeed,
     RiskTier,
     BookingStatus,
+    RequestStatus,
+    ProposalStatus,
     PAYOUT_COMMISSION,
     PAYOUT_DAYS,
     RISK_COMMISSION,
@@ -41,9 +44,13 @@ __all__ = [
     "ShowImage",
     "ArtistDocument",
     "Booking",
+    "ProductRequest",
+    "RequestProposal",
     "PayoutSpeed",
     "RiskTier",
     "BookingStatus",
+    "RequestStatus",
+    "ProposalStatus",
     "PAYOUT_COMMISSION",
     "PAYOUT_DAYS",
     "RISK_COMMISSION",

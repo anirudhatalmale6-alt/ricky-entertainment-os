@@ -45,6 +45,30 @@ class CategoryTrend(BaseModel):
     trend: str = "flat"                          # up / down / flat
 
 
+class DemandRow(BaseModel):
+    """One act category (or subcategory) ranked by how much it is being asked for."""
+    key: str
+    requests: int = 0            # solicitudes publicadas
+    bookings: int = 0            # actuaciones contratadas
+    booked_value: float = 0.0    # $ ya contratado (confirmadas+realizadas)
+    demand_score: int = 0        # requests + bookings
+    share_pct: float = 0.0       # % de la demanda total
+    prev_score: int = 0          # demanda en el periodo anterior
+    change_pct: float | None = None
+    trend: str = "flat"          # up / down / flat
+
+
+class DemandIntelligenceOut(BaseModel):
+    """Supplier-facing view: 'que es lo que mas se esta pidiendo'."""
+    window_days: int
+    currency: str = "MXN"
+    total_requests: int = 0
+    total_bookings: int = 0
+    top_categories: list[DemandRow] = []
+    top_subcategories: list[DemandRow] = []
+    note: str = ""
+
+
 class MarketIntelligenceOut(BaseModel):
     year: int
     month: int

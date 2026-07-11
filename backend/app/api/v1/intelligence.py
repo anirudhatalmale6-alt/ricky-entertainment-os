@@ -13,19 +13,22 @@ it per property.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 
 from app.api.deps import DbSession, require_permission
 from app.models.booking import Booking
 from app.models.company import Company
 from app.models.enums import BookingStatus
+from app.models.product_request import ProductRequest
 from app.models.property_budget import PropertyBudget
 from app.models.show import Show
 from app.schemas.intelligence import (
     CategoryTrend,
+    DemandIntelligenceOut,
+    DemandRow,
     MarketIntelligenceOut,
     PropertyIntelligence,
     StarTierStat,
@@ -210,4 +213,115 @@ async def market_intelligence(
               "habitaciones (tarifa * ocupacion * habitaciones). El comparativo "
               "de mercado (vs_market, vs pares, por estrellas) es la funcion "
               "premium para Partners."),
+    )
+
+
+# --- Demand intelligence (supplier-facing) ---------------------------------
+
+async def _resolve_company_ids(db, group_id: int | None) -> list[int] | None:
+    """Company ids of a group, or None to mean 'the whole market'."""
+    if group_id is None:
+        return None
+    rows = (
+        await db.execute(select(Company.id).where(Company.group_id == group_id))
+    ).all()
+    return [cid for (cid,) in rows]
+
+
+async def _request_demand(db, col, cids, start, end) -> dict[str, int]:
+    q = select(col, func.count(ProductRequest.id)).where(
+        ProductRequest.created_at >= start,
+        ProductRequest.created_at < end,
+        col.is_not(None),
+    )
+    if cids is not None:
+        q = q.where(ProductRequest.company_id.in_(cids))
+    rows = (await db.execute(q.group_by(col))).all()
+    return {k: n for k, n in rows if k}
+
+
+async def _booking_demand(db, col, cids, start, end) -> dict[str, tuple[int, float]]:
+    booked_value = func.coalesce(
+        func.sum(case((Booking.status.in_(_BOOKED), Booking.agreed_price), else_=0)), 0
+    )
+    q = (
+        select(col, func.count(Booking.id), booked_value)
+        .join(Show, Show.id == Booking.show_id)
+        .where(
+            Booking.created_at >= start,
+            Booking.created_at < end,
+            Booking.status != BookingStatus.CANCELLED,
+            col.is_not(None),
+        )
+    )
+    if cids is not None:
+        q = q.where(Booking.company_id.in_(cids))
+    rows = (await db.execute(q.group_by(col))).all()
+    return {k: (n, float(v)) for k, n, v in rows if k}
+
+
+def _demand_rows(req_cur, book_cur, req_prev, book_prev, limit=None) -> list[DemandRow]:
+    keys = set(req_cur) | set(book_cur) | set(req_prev) | set(book_prev)
+    rows: list[DemandRow] = []
+    for k in keys:
+        rq = req_cur.get(k, 0)
+        bk, val = book_cur.get(k, (0, 0.0))
+        score = rq + bk
+        prev = req_prev.get(k, 0) + book_prev.get(k, (0, 0.0))[0]
+        delta = score - prev
+        rows.append(DemandRow(
+            key=k, requests=rq, bookings=bk, booked_value=round(val, 2),
+            demand_score=score, prev_score=prev, change_pct=_pct(delta, prev),
+            trend="up" if delta > 0 else "down" if delta < 0 else "flat",
+        ))
+    total = sum(r.demand_score for r in rows)
+    for r in rows:
+        r.share_pct = _pct(r.demand_score, total) or 0.0
+    rows.sort(key=lambda r: r.demand_score, reverse=True)
+    return rows[:limit] if limit else rows
+
+
+@router.get(
+    "/demand",
+    response_model=DemandIntelligenceOut,
+    dependencies=[Depends(require_permission("report.view"))],
+)
+async def demand_intelligence(
+    db: DbSession,
+    days: int = Query(default=90, ge=1, le=365),
+    group_id: int | None = Query(default=None),
+):
+    """What the market is asking for - so proveedores/artistas know what to offer.
+
+    Ranks act categories and subcategories by demand (published requests +
+    contracted actuaciones) over the last `days`, with the trend vs the previous
+    equal window.
+    """
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    start = now - timedelta(days=days)
+    prev_start = now - timedelta(days=2 * days)
+    cids = await _resolve_company_ids(db, group_id)
+
+    cat_req_cur = await _request_demand(db, ProductRequest.category, cids, start, now)
+    cat_book_cur = await _booking_demand(db, Show.category, cids, start, now)
+    cat_req_prev = await _request_demand(db, ProductRequest.category, cids, prev_start, start)
+    cat_book_prev = await _booking_demand(db, Show.category, cids, prev_start, start)
+
+    sub_req_cur = await _request_demand(db, ProductRequest.subcategory, cids, start, now)
+    sub_book_cur = await _booking_demand(db, Show.subcategory, cids, start, now)
+    sub_req_prev = await _request_demand(db, ProductRequest.subcategory, cids, prev_start, start)
+    sub_book_prev = await _booking_demand(db, Show.subcategory, cids, prev_start, start)
+
+    top_categories = _demand_rows(cat_req_cur, cat_book_cur, cat_req_prev, cat_book_prev)
+    top_subcategories = _demand_rows(sub_req_cur, sub_book_cur, sub_req_prev, sub_book_prev, limit=10)
+
+    return DemandIntelligenceOut(
+        window_days=days,
+        total_requests=sum(cat_req_cur.values()),
+        total_bookings=sum(n for n, _ in cat_book_cur.values()),
+        top_categories=top_categories,
+        top_subcategories=top_subcategories,
+        note=("Demanda = solicitudes publicadas + actuaciones contratadas en la "
+              "ventana. Sirve para que los proveedores sepan que es lo que mas se "
+              "esta pidiendo y hacia donde crece."),
     )
