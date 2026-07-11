@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RICKY Entertainment OS</title>
+<style>
+  :root{
+    --bg:#0e0f16; --bg2:#151723; --card:#1a1d2b; --card2:#20233400;
+    --line:#2a2e42; --txt:#e7e9f3; --mut:#8b90ab; --mut2:#5f647f;
+    --acc:#a855f7; --acc2:#ec4899; --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --info:#60a5fa;
+    --grad:linear-gradient(135deg,#a855f7,#ec4899);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--txt);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+
+  /* Sidebar */
+  .side{background:var(--bg2);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:6px}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
+  .logo{width:34px;height:34px;border-radius:9px;background:var(--grad);display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff}
+  .brand b{font-size:15px;letter-spacing:.3px}
+  .brand span{display:block;font-size:10.5px;color:var(--mut);letter-spacing:1.4px;text-transform:uppercase}
+  .navlbl{font-size:10px;color:var(--mut2);text-transform:uppercase;letter-spacing:1.2px;padding:14px 10px 6px}
+  .nav{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:var(--mut);cursor:pointer;font-weight:500;position:relative}
+  .nav:hover{background:#ffffff08;color:var(--txt)}
+  .nav.on{background:#ffffff0f;color:var(--txt)}
+  .nav.on::before{content:"";position:absolute;left:-14px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--grad)}
+  .nav .ic{font-size:16px;width:20px;text-align:center}
+  .pro{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.6px;color:#fff;background:var(--grad);padding:2px 6px;border-radius:5px}
+  .side .foot{margin-top:auto;font-size:11px;color:var(--mut2);padding:10px}
+
+  /* Topbar */
+  .main{display:flex;flex-direction:column;min-width:0}
+  .top{display:flex;align-items:center;gap:16px;padding:16px 26px;border-bottom:1px solid var(--line);background:#12131d}
+  .top h1{font-size:18px;font-weight:700}
+  .top .sub{font-size:12px;color:var(--mut)}
+  .spacer{flex:1}
+  .ctrl{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);padding:7px 11px;border-radius:9px;font-size:13px;color:var(--txt)}
+  .ctrl select{background:transparent;border:0;color:var(--txt);font-size:13px;outline:none}
+  .ava{width:34px;height:34px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:13px}
+
+  .wrap{padding:24px 26px;max-width:1240px}
+  .panel{display:none}.panel.on{display:block}
+
+  /* Cards / grid */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px 17px;position:relative;overflow:hidden}
+  .kpi .k{font-size:11.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:7px}
+  .kpi .v{font-size:26px;font-weight:750;margin-top:9px;letter-spacing:-.5px}
+  .kpi .d{font-size:11.5px;color:var(--mut);margin-top:3px}
+  .kpi .orb{position:absolute;right:-18px;top:-18px;width:70px;height:70px;border-radius:50%;background:var(--grad);opacity:.13;filter:blur(4px)}
+  .grid2{display:grid;grid-template-columns:1.35fr 1fr;gap:16px}
+  .grid2b{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:1000px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2,.grid2b{grid-template-columns:1fr}}
+
+  .box{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px}
+  .box h3{font-size:13.5px;font-weight:650;margin-bottom:3px;display:flex;align-items:center;gap:8px}
+  .box .hint{font-size:11.5px;color:var(--mut);margin-bottom:15px}
+  .box.pro{border-color:#a855f74d}
+  .box.pro::after{content:"PARTNER";position:absolute}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:10.5px;color:var(--mut2);text-transform:uppercase;letter-spacing:.7px;font-weight:600;padding:0 10px 9px 0}
+  td{padding:10px 10px 10px 0;border-top:1px solid var(--line);font-size:13px;vertical-align:middle}
+  tr:first-child td{border-top:0}
+  .muted{color:var(--mut)}
+
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+  .c-pending{background:#fbbf241f;color:var(--warn)}
+  .c-confirmed{background:#60a5fa1f;color:var(--info)}
+  .c-completed{background:#34d3991f;color:var(--ok)}
+  .c-cancelled{background:#f871711f;color:var(--bad)}
+  .c-open{background:#34d3991f;color:var(--ok)}
+  .c-fulfilled{background:#a855f71f;color:var(--acc)}
+  .star{color:var(--warn);font-size:12px}
+
+  /* bars */
+  .bar-row{display:grid;grid-template-columns:120px 1fr 54px;align-items:center;gap:12px;margin:11px 0}
+  .bar-row .lbl{font-size:12.5px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .track{height:9px;background:#ffffff0d;border-radius:6px;overflow:hidden}
+  .fill{height:100%;border-radius:6px;background:var(--grad)}
+  .bar-row .val{font-size:12.5px;font-weight:650;text-align:right}
+  .trend{font-size:11px;font-weight:700;margin-left:6px}
+  .up{color:var(--ok)}.down{color:var(--bad)}.flat{color:var(--mut)}
+
+  /* diverging (vs market) */
+  .div-row{display:grid;grid-template-columns:150px 1fr 60px;align-items:center;gap:12px;margin:10px 0}
+  .div-wrap{position:relative;height:20px;background:#ffffff08;border-radius:5px}
+  .div-mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--mut2)}
+  .div-bar{position:absolute;top:4px;height:12px;border-radius:3px}
+
+  /* donut */
+  .donut-wrap{display:flex;align-items:center;gap:22px}
+  .donut{width:132px;height:132px;border-radius:50%;position:relative;flex:none}
+  .donut::after{content:"";position:absolute;inset:20px;background:var(--card);border-radius:50%}
+  .donut .cn{position:absolute;inset:0;display:grid;place-items:center;text-align:center;z-index:2}
+  .donut .cn b{font-size:20px;display:block}.donut .cn s{font-size:10px;color:var(--mut);text-decoration:none;text-transform:uppercase;letter-spacing:.5px}
+  .leg{display:flex;flex-direction:column;gap:9px}
+  .leg div{display:flex;align-items:center;gap:9px;font-size:12.5px}
+  .dot{width:10px;height:10px;border-radius:3px;flex:none}
+
+  /* request cards */
+  .reqs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .reqc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
+  .reqc .t{font-weight:650;font-size:14px;margin-bottom:8px}
+  .reqc .meta{font-size:12px;color:var(--mut);margin:3px 0}
+  .reqc .ft{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+
+  /* chat */
+  .chat{display:grid;grid-template-columns:280px 1fr;gap:0;height:560px;background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden}
+  .clist{border-right:1px solid var(--line);overflow-y:auto}
+  .citem{padding:13px 15px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:11px;align-items:center}
+  .citem:hover,.citem.on{background:#ffffff08}
+  .citem .av{width:38px;height:38px;border-radius:10px;background:var(--grad);display:grid;place-items:center;font-weight:700;flex:none}
+  .citem .nm{font-size:13px;font-weight:600}.citem .lm{font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+  .badge{margin-left:auto;background:var(--acc2);color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;padding:0 5px}
+  .thread{display:flex;flex-direction:column}
+  .thead{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:600}
+  .msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:10px;background:#12131d}
+  .msg{max-width:70%;padding:9px 13px;border-radius:13px;font-size:13px}
+  .msg.them{background:var(--card);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
+  .msg.me{background:var(--grad);align-self:flex-end;border-bottom-right-radius:4px}
+  .msg .tm{font-size:9.5px;opacity:.6;margin-top:4px}
+  .cbar{padding:13px 16px;border-top:1px solid var(--line);display:flex;gap:10px}
+  .cbar input{flex:1;background:#12131d;border:1px solid var(--line);border-radius:9px;padding:10px 13px;color:var(--txt);outline:none}
+  .cbar button,.pillbtn{background:var(--grad);border:0;color:#fff;font-weight:600;padding:0 16px;border-radius:9px;cursor:pointer}
+
+  .soon{text-align:center;padding:46px 20px;color:var(--mut)}
+  .soon .big{font-size:40px;margin-bottom:12px}
+  .newsbar{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#a855f71a,#ec48991a);border:1px solid #a855f733;border-radius:11px;padding:12px 16px;margin-bottom:16px}
+  .newsbar .tag{background:var(--grad);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:5px;letter-spacing:.5px;flex:none}
+  .newsbar .tick{overflow:hidden;white-space:nowrap;color:var(--mut)}
+
+  /* login */
+  .login{position:fixed;inset:0;background:radial-gradient(1200px 600px at 70% -10%,#a855f722,transparent),var(--bg);display:grid;place-items:center;z-index:50}
+  .login .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:34px 32px;width:340px;text-align:center}
+  .login .logo{width:52px;height:52px;margin:0 auto 16px;font-size:24px;border-radius:13px}
+  .login h2{font-size:19px;margin-bottom:4px}.login p{color:var(--mut);font-size:12.5px;margin-bottom:20px}
+  .login input{width:100%;background:#12131d;border:1px solid var(--line);border-radius:9px;padding:11px 13px;color:var(--txt);margin-bottom:11px;outline:none}
+  .login button{width:100%;background:var(--grad);border:0;color:#fff;font-weight:650;padding:12px;border-radius:9px;cursor:pointer;font-size:14px}
+  .err{color:var(--bad);font-size:12px;min-height:16px;margin-top:6px}
+  .load{color:var(--mut);padding:30px;text-align:center}
+</style>
+</head>
+<body>
+<div class="login" id="login">
+  <div class="card">
+    <div class="logo" style="background:var(--grad);display:grid;place-items:center;font-weight:800;color:#fff">R</div>
+    <h2>RICKY Entertainment OS</h2>
+    <p>Panel de control</p>
+    <input id="email" value="admin@ricky.os" placeholder="Correo">
+    <input id="pass" type="password" value="Admin123!" placeholder="Contraseña">
+    <button onclick="login()">Entrar</button>
+    <div class="err" id="lerr"></div>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">R</div>
+      <div><b>RICKY</b><span>Entertainment OS</span></div>
+    </div>
+    <div class="navlbl">Operación</div>
+    <div class="nav on" data-p="home"><span class="ic">📊</span> Resumen</div>
+    <div class="nav" data-p="cal"><span class="ic">🗓️</span> Actuaciones</div>
+    <div class="nav" data-p="reqs"><span class="ic">📣</span> Solicitudes</div>
+    <div class="nav" data-p="chat"><span class="ic">💬</span> Chat</div>
+    <div class="navlbl">Inteligencia · Partner</div>
+    <div class="nav" data-p="market"><span class="ic">📈</span> Market Intelligence <span class="pro">PRO</span></div>
+    <div class="nav" data-p="demand"><span class="ic">🔥</span> Tendencias <span class="pro">PRO</span></div>
+    <div class="nav" data-p="news"><span class="ic">📰</span> Noticias <span class="pro">PRO</span></div>
+    <div class="foot">v0.1 · demo</div>
+  </aside>
+
+  <div class="main">
+    <div class="top">
+      <div>
+        <h1 id="ptitle">Resumen</h1>
+        <div class="sub" id="psub">Vista consolidada</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="ctrl">🏨 <select id="groupSel" onchange="reload()"></select></div>
+      <div class="ctrl" id="monthCtrl">📅 Julio 2026</div>
+      <div class="ava">RA</div>
+    </div>
+    <div class="wrap">
+      <div class="panel on" id="panel-home"><div class="load">Cargando…</div></div>
+      <div class="panel" id="panel-cal"></div>
+      <div class="panel" id="panel-reqs"></div>
+      <div class="panel" id="panel-chat"></div>
+      <div class="panel" id="panel-market"></div>
+      <div class="panel" id="panel-demand"></div>
+      <div class="panel" id="panel-news"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = (window.RICKY_API || "http://localhost:8000") + "/api/v1";
+const PERIOD = {year:2026, month:7};
+let TOKEN=null, GROUPS=[], GID=null, CACHE={};
+const MXN = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n||0);
+const CATCOL = {"Musica":"#a855f7","Shows":"#ec4899","Fotografia y Video":"#60a5fa","Produccion":"#34d399"};
+const palette=["#a855f7","#ec4899","#60a5fa","#34d399","#fbbf24","#f87171"];
+const stars = n => n? '★'.repeat(n):'—';
+const esc = s => (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+async function api(path){
+  const r = await fetch(API+path,{headers:{Authorization:"Bearer "+TOKEN}});
+  if(!r.ok) throw new Error(path+" "+r.status);
+  return r.json();
+}
+async function post(path,body){
+  const r = await fetch(API+path,{method:"POST",headers:{Authorization:"Bearer "+TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  if(!r.ok) throw new Error(path+" "+r.status); return r.json();
+}
+
+async function login(){
+  const el=document.getElementById('lerr'); el.textContent="";
+  try{
+    const r = await fetch(API+"/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:document.getElementById('email').value,password:document.getElementById('pass').value})});
+    if(!r.ok){el.textContent="Credenciales incorrectas";return;}
+    TOKEN=(await r.json()).access_token;
+    document.getElementById('login').style.display="none";
+    document.getElementById('app').style.display="grid";
+    await boot();
+  }catch(e){el.textContent="No se pudo conectar al servidor";}
+}
+
+async function boot(){
+  GROUPS = await api("/groups");
+  const sel=document.getElementById('groupSel');
+  sel.innerHTML = GROUPS.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join("");
+  GID = GROUPS.length? GROUPS[0].id : null;
+  await reload();
+}
+async function reload(){
+  GID = document.getElementById('groupSel').value || GID;
+  CACHE={};
+  const active=document.querySelector('.nav.on').dataset.p;
+  await show(active,true);
+}
+
+const TITLES={home:["Resumen","Vista consolidada de la cadena"],cal:["Actuaciones","Agenda de shows por venue"],
+  reqs:["Solicitudes","Tablero de pedidos abiertos"],chat:["Chat","Conversaciones hotel · artista"],
+  market:["Market Intelligence","Benchmarking de gasto en entretenimiento"],
+  demand:["Tendencias de demanda","Lo que más se está pidiendo"],news:["Noticias","Novedades del entretenimiento"]};
+
+document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>{
+  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));
+  n.classList.add('on'); show(n.dataset.p);
+});
+async function show(p,force){
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+  document.getElementById('panel-'+p).classList.add('on');
+  document.getElementById('ptitle').textContent=TITLES[p][0];
+  document.getElementById('psub').textContent=TITLES[p][1];
+  document.getElementById('monthCtrl').style.visibility=(p==='market')?'visible':'visible';
+  const box=document.getElementById('panel-'+p);
+  if(box.dataset.loaded && !force) return;
+  box.innerHTML='<div class="load">Cargando…</div>';
+  try{ await RENDER[p](box); box.dataset.loaded="1"; }
+  catch(e){ box.innerHTML='<div class="load">Error: '+esc(e.message)+'</div>'; }
+}
+
+const bars = (rows)=> rows.map(r=>`<div class="bar-row"><div class="lbl">${esc(r.lbl)}</div>
+  <div class="track"><div class="fill" style="width:${r.pct}%;${r.col?'background:'+r.col:''}"></div></div>
+  <div class="val">${r.val}${r.trend?`<span class="trend ${r.trend}">${r.trend==='up'?'▲':r.trend==='down'?'▼':'—'}</span>`:''}</div></div>`).join("");
+
+const RENDER = {
+  async home(box){
+    const [dash, cats, reqs, bk] = await Promise.all([
+      api(`/groups/${GID}/dashboard`),
+      api(`/intelligence/demand?days=90&group_id=${GID}`),
+      api(`/requests?status=open`),
+      api(`/bookings?group_id=${GID}`)
+    ]);
+    const mkt = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
+    const occs = mkt.properties.map(p=>p.occupancy_pct).filter(v=>v!=null);
+    const occ = occs.length? (occs.reduce((a,b)=>a+b,0)/occs.length):null;
+    const now=new Date();
+    const upcoming = bk.filter(b=>['pending','confirmed'].includes(b.status)).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)).slice(0,6);
+    const maxd = Math.max(...cats.top_categories.map(c=>c.demand_score),1);
+    box.innerHTML=`
+      <div class="kpis">
+        <div class="kpi"><div class="orb"></div><div class="k">🎭 Actuaciones (mes)</div><div class="v">${dash.total_bookings}</div><div class="d">confirmadas + realizadas</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">💰 Gasto entretenimiento</div><div class="v">${MXN(dash.total_spend)}</div><div class="d">consolidado de la cadena</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">🏨 Ocupación prom.</div><div class="v">${occ!=null?occ.toFixed(0)+'%':'—'}</div><div class="d">${dash.property_count} propiedades</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">📣 Solicitudes abiertas</div><div class="v">${reqs.length}</div><div class="d">en el tablero</div></div>
+      </div>
+      <div class="grid2">
+        <div class="box"><h3>🗓️ Próximas actuaciones</h3><div class="hint">Agenda inmediata de la cadena</div>
+          <table><thead><tr><th>Show</th><th>Venue</th><th>Fecha</th><th>Estado</th></tr></thead><tbody>
+          ${upcoming.length? upcoming.map(b=>`<tr><td>${esc(b.show_name||'—')}</td><td class="muted">${esc(b.venue_name||'—')}</td>
+            <td class="muted">${fmtDate(b.starts_at)}</td><td>${chip(b.status)}</td></tr>`).join(""):`<tr><td colspan="4" class="muted">Sin actuaciones próximas</td></tr>`}
+          </tbody></table>
+        </div>
+        <div class="box"><h3>🔥 Lo más pedido</h3><div class="hint">Demanda por categoría (90 días)</div>
+          ${bars(cats.top_categories.slice(0,5).map(c=>({lbl:c.key,pct:Math.round(c.demand_score/maxd*100),val:c.demand_score,col:CATCOL[c.key],trend:c.trend})))}
+        </div>
+      </div>`;
+  },
+
+  async cal(box){
+    const bk = await api(`/bookings?group_id=${GID}`);
+    const order={pending:0,confirmed:1,completed:2,cancelled:3};
+    bk.sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
+    box.innerHTML=`<div class="box"><h3>🗓️ Agenda de actuaciones</h3><div class="hint">${bk.length} actuaciones · toda la cadena</div>
+      <table><thead><tr><th>Fecha</th><th>Show</th><th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th></tr></thead><tbody>
+      ${bk.map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td><td class="muted">${esc(b.venue_name||'—')}</td>
+        <td>${MXN(b.agreed_price)}</td><td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td></tr>`).join("")}
+      </tbody></table></div>`;
+  },
+
+  async reqs(box){
+    const rs = await api(`/requests`);
+    box.innerHTML=`<div class="reqs">${rs.map(r=>`
+      <div class="reqc"><div class="t">${esc(r.title)}</div>
+        <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
+        <div class="meta">🎭 ${esc(r.category||'—')}${r.subcategory?' · '+esc(r.subcategory):''}</div>
+        <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
+        <div class="ft">${chip(r.status)}<span class="muted">${r.proposals_count} propuesta${r.proposals_count===1?'':'s'}</span></div>
+      </div>`).join("") || '<div class="muted">Sin solicitudes.</div>'}</div>`;
+  },
+
+  async market(box){
+    const m = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
+    const maxAbs = Math.max(1,...m.properties.map(p=>Math.abs(p.vs_market_pct||0)));
+    const div = m.properties.filter(p=>p.intensity_pct!=null).map(p=>{
+      const v=p.vs_market_pct||0, w=Math.abs(v)/maxAbs*50;
+      const style = v>=0? `left:50%;width:${w}%;background:var(--ok)` : `right:50%;width:${w}%;background:var(--bad)`;
+      return `<div class="div-row"><div class="lbl">${esc(p.name)} <span class="star">${stars(p.star_rating)}</span></div>
+        <div class="div-wrap"><div class="div-mid"></div><div class="div-bar" style="${style}"></div></div>
+        <div class="val" style="text-align:right">${(v>=0?'+':'')+v.toFixed(1)}%</div></div>`;
+    }).join("");
+    // donut by star
+    const tot=m.by_star_rating.reduce((a,s)=>a+s.spend_share_pct,0)||1; let acc=0; const seg=[];
+    m.by_star_rating.forEach((s,i)=>{const from=acc/tot*360; acc+=s.spend_share_pct; const to=acc/tot*360;
+      seg.push(`${palette[i%palette.length]} ${from}deg ${to}deg`);});
+    const maxc=Math.max(1,...m.spend_by_category.map(c=>c.spend));
+    box.innerHTML=`
+      <div class="kpis">
+        <div class="kpi"><div class="orb"></div><div class="k">📈 Intensidad prom. mercado</div><div class="v">${m.market_avg_intensity_pct!=null?m.market_avg_intensity_pct.toFixed(1)+'%':'—'}</div><div class="d">gasto / facturación de habitaciones</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">💰 Gasto total</div><div class="v">${MXN(m.total_entertainment_spend)}</div><div class="d">actuaciones del mes</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">🧾 Presupuesto cargado</div><div class="v">${MXN(m.total_entertainment_budget)}</div><div class="d">plan de la cadena</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">🏨 Propiedades</div><div class="v">${m.property_count}</div><div class="d">en el análisis</div></div>
+      </div>
+      <div class="grid2b">
+        <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
+          <h3>⚖️ Intensidad vs. mercado</h3><div class="hint">Qué tanto gasta cada propiedad sobre/bajo el promedio</div>${div||'<div class="muted">Carga presupuesto y ocupación para ver el comparativo.</div>'}</div>
+        <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
+          <h3>⭐ Gasto por categoría de estrellas</h3><div class="hint">Reparto del gasto del mercado</div>
+          <div class="donut-wrap"><div class="donut" style="background:conic-gradient(${seg.join(",")||'#333 0 360deg'})"><div class="cn"><b>${MXN(m.total_entertainment_spend)}</b><s>total</s></div></div>
+            <div class="leg">${m.by_star_rating.map((s,i)=>`<div><span class="dot" style="background:${palette[i%palette.length]}"></span> ${s.star_rating}★ · ${s.spend_share_pct.toFixed(0)}% <span class="muted">(${MXN(s.total_spend)})</span></div>`).join("")||'<span class="muted">—</span>'}</div>
+          </div>
+        </div>
+      </div>
+      <div class="box" style="margin-top:16px"><h3>🎭 Conceptos que suben y bajan</h3><div class="hint">Gasto por categoría · este mes vs. anterior</div>
+        ${bars(m.spend_by_category.map(c=>({lbl:c.category,pct:Math.round(c.spend/maxc*100),val:MXN(c.spend),col:CATCOL[c.category],trend:c.trend})))||'<div class="muted">Sin datos.</div>'}
+      </div>`;
+  },
+
+  async demand(box){
+    const d = await api(`/intelligence/demand?days=90&group_id=${GID}`);
+    const maxc=Math.max(1,...d.top_categories.map(c=>c.demand_score));
+    const maxs=Math.max(1,...d.top_subcategories.map(c=>c.demand_score));
+    box.innerHTML=`
+      <div class="kpis" style="grid-template-columns:repeat(2,1fr);max-width:520px">
+        <div class="kpi"><div class="orb"></div><div class="k">📣 Solicitudes (90 días)</div><div class="v">${d.total_requests}</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">🎭 Actuaciones contratadas</div><div class="v">${d.total_bookings}</div></div>
+      </div>
+      <div class="grid2b">
+        <div class="box"><h3>🔥 Categorías más pedidas</h3><div class="hint">Solicitudes + actuaciones · vs. periodo anterior</div>
+          ${bars(d.top_categories.map(c=>({lbl:c.key,pct:Math.round(c.demand_score/maxc*100),val:c.demand_score,col:CATCOL[c.key],trend:c.trend})))}</div>
+        <div class="box"><h3>🎯 Conceptos específicos</h3><div class="hint">Subcategorías con más demanda</div>
+          ${bars(d.top_subcategories.map((c,i)=>({lbl:c.key,pct:Math.round(c.demand_score/maxs*100),val:c.demand_score,col:palette[i%palette.length],trend:c.trend})))||'<div class="muted">—</div>'}</div>
+      </div>`;
+  },
+
+  async chat(box){
+    const convs = await api(`/conversations`);
+    if(!convs.length){box.innerHTML='<div class="box"><div class="muted">Sin conversaciones aún.</div></div>';return;}
+    box.innerHTML=`<div class="chat"><div class="clist" id="clist"></div>
+      <div class="thread"><div class="thead" id="thead">—</div><div class="msgs" id="msgs"></div>
+      <div class="cbar"><input id="cin" placeholder="Escribe un mensaje…"><button onclick="sendMsg()">Enviar</button></div></div></div>`;
+    const cl=document.getElementById('clist');
+    cl.innerHTML=convs.map((c,i)=>`<div class="citem ${i===0?'on':''}" data-id="${c.id}" onclick="openConv(${c.id},this)">
+      <div class="av">${esc((c.artist_name||'A')[0])}</div>
+      <div style="min-width:0"><div class="nm">${esc(c.artist_name||'Artista')}</div><div class="lm">${esc(c.last_message||'—')}</div></div>
+      ${c.unread_for_company?`<span class="badge">${c.unread_for_company}</span>`:''}</div>`).join("");
+    CACHE.convs=convs; openConv(convs[0].id);
+  },
+
+  async news(box){
+    box.innerHTML=`
+      <div class="newsbar"><span class="tag">EN VIVO</span><div class="tick">🎤 Coldplay anuncia gira 2027 · 🎭 Cirque du Soleil abre temporada en Riviera Maya · 🎶 Festival de jazz en Cancún rompe récord de asistencia…</div></div>
+      <div class="box"><div class="soon"><div class="big">📰</div>
+        <h3 style="justify-content:center">Banner de noticias · Próximamente</h3>
+        <p style="max-width:440px;margin:10px auto 0">Feed RSS en vivo con novedades del entretenimiento en el mundo, para que el dashboard se sienta vivo. Función Partner de pago, activable desde la barra de herramientas.</p>
+      </div></div>`;
+  }
+};
+
+async function openConv(id,el){
+  if(el){document.querySelectorAll('.citem').forEach(x=>x.classList.remove('on'));el.classList.add('on');}
+  const c=(CACHE.convs||[]).find(x=>x.id===id)||{};
+  document.getElementById('thead').textContent=(c.artist_name||'Artista')+' · '+(c.company_name||'Hotel');
+  const msgs=await api(`/conversations/${id}/messages`);
+  CACHE.cur=id;
+  document.getElementById('msgs').innerHTML=msgs.map(m=>`<div class="msg ${m.sender_role==='company'?'me':'them'}">${esc(m.body)}<div class="tm">${fmtDate(m.created_at)}</div></div>`).join("");
+  const mm=document.getElementById('msgs'); mm.scrollTop=mm.scrollHeight;
+}
+async function sendMsg(){
+  const inp=document.getElementById('cin'); const b=inp.value.trim(); if(!b||!CACHE.cur)return;
+  inp.value="";
+  await post(`/conversations/${CACHE.cur}/messages`,{sender_role:"company",body:b});
+  openConv(CACHE.cur);
+}
+
+function chip(s){const map={pending:'Pendiente',confirmed:'Confirmada',completed:'Realizada',cancelled:'Cancelada',open:'Abierta',fulfilled:'Adjudicada',closed:'Cerrada'};
+  return `<span class="chip c-${s}">${map[s]||s}</span>`;}
+function fmtDate(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});}
+window.chip=chip;window.fmtDate=fmtDate;window.openConv=openConv;window.sendMsg=sendMsg;window.login=login;window.reload=reload;
+</script>
+</body>
+</html>
