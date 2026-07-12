@@ -15,9 +15,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 
 from app.api.deps import DbSession, require_permission
+from app.api.v1.bookings import _check_travel_buffer, _now
 from app.models.artist import Artist
+from app.models.booking import Booking
 from app.models.company import Company
-from app.models.enums import ProposalStatus, RequestStatus
+from app.models.enums import RISK_COMMISSION, BookingStatus, ProposalStatus, RequestStatus
 from app.models.product_request import ProductRequest, RequestProposal
 from app.schemas.product_request import (
     ProductRequestCreate,
@@ -248,9 +250,13 @@ async def _get_proposal_or_404(db: DbSession, request_id: int, proposal_id: int)
     dependencies=[Depends(require_permission("booking.manage"))],
 )
 async def accept_proposal(request_id: int, proposal_id: int, db: DbSession):
-    """Hotel picks a winner: this proposal is accepted, the rest rejected, and
-    the request is marked fulfilled."""
+    """Hotel picks a winner: this proposal is accepted, the rest rejected, the
+    request is marked fulfilled, and the actuacion is generated automatically so
+    it goes straight to the agenda (David's call). The hotel then only picks the
+    venue and confirms the fecha on the calendar."""
     req = await _get_request_or_404(db, request_id)
+    if req.status == RequestStatus.FULFILLED:
+        raise HTTPException(status_code=409, detail="La solicitud ya fue adjudicada")
     winner = await _get_proposal_or_404(db, request_id, proposal_id)
     others = list(
         (await db.execute(
@@ -260,9 +266,59 @@ async def accept_proposal(request_id: int, proposal_id: int, db: DbSession):
     for p in others:
         p.status = ProposalStatus.ACCEPTED if p.id == winner.id else ProposalStatus.REJECTED
     req.status = RequestStatus.FULFILLED
+
+    # Auto-generate the actuacion from the winning proposal.
+    booking = await _booking_from_proposal(db, req, winner)
+
     await db.commit()
     await db.refresh(winner)
-    return await _decorate_proposal(db, winner)
+    out = await _decorate_proposal(db, winner)
+    return out.model_copy(update={"booking_id": booking.id if booking else None})
+
+
+async def _booking_from_proposal(
+    db: DbSession, req: ProductRequest, winner: RequestProposal
+) -> Booking | None:
+    """Build a PENDING actuacion out of an accepted proposal. The request has no
+    show/venue (it is a free-form product), so those stay open for the hotel to
+    fill on the calendar; company, artist, price and the tentative fecha come
+    straight from the solicitud + propuesta."""
+    if winner.artist_id is None:
+        return None
+
+    company = await db.get(Company, req.company_id) if req.company_id else None
+    commission_pct = (
+        round(RISK_COMMISSION[company.risk_tier] * 100, 2) if company else None
+    )
+
+    # Prefer the requested fecha; if none was given, drop a tentative slot the
+    # hotel adjusts on the calendar, and only run the travel-buffer check when we
+    # have a real date to check against.
+    starts_at = req.event_date or _now()
+    if req.event_date is not None:
+        await _check_travel_buffer(db, winner.artist_id, starts_at, None)
+
+    note = f"Generada desde solicitud #{req.id}: {req.title}"
+    if req.event_date is None:
+        note += " (fecha tentativa, confirmar en agenda)"
+
+    booking = Booking(
+        show_id=None,
+        venue_id=None,
+        company_id=req.company_id,
+        artist_id=winner.artist_id,
+        booker_id=req.booker_id,
+        starts_at=starts_at,
+        event_type="solicitud",
+        agreed_price=winner.proposed_price,
+        currency=winner.currency,
+        commission_pct=commission_pct,
+        notes=note,
+        status=BookingStatus.PENDING,
+    )
+    db.add(booking)
+    await db.flush()  # assign booking.id within the same transaction
+    return booking
 
 
 @router.post(

@@ -83,3 +83,5 @@ class ProposalOut(BaseModel):
     status: ProposalStatus
     created_at: datetime
     artist_name: str | None = None
+    # set when accepting a proposal auto-generates the actuacion
+    booking_id: int | None = None
