@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 
-from app.api.deps import DbSession, require_permission
+from app.api.deps import CurrentScope, DbSession, require_permission
 from app.models.artist import Artist
 from app.models.company import Company
 from app.models.conversation import Conversation, Message
@@ -115,6 +115,26 @@ async def list_conversations(
         q = q.where(Conversation.booking_id == booking_id)
     convs = list((await db.execute(q.order_by(Conversation.created_at.desc()))).scalars().all())
     # freshest activity first
+    out = [await _decorate(db, c) for c in convs]
+    out.sort(key=lambda o: o.last_message_at or o.created_at, reverse=True)
+    return out
+
+
+@router.get("/mine", response_model=list[ConversationOut])
+async def my_conversations(scope: CurrentScope, db: DbSession):
+    """My chat inbox, resolved from who I am: an artist sees their own threads,
+    a hotel manager their property's, a group director the whole chain."""
+    q = select(Conversation)
+    if scope.is_artist:
+        q = q.where(Conversation.artist_id == scope.artist_id)
+    elif scope.group_id is not None:
+        sub = select(Company.id).where(Company.group_id == scope.group_id)
+        q = q.where(Conversation.company_id.in_(sub))
+    elif scope.company_id is not None:
+        q = q.where(Conversation.company_id == scope.company_id)
+    elif not scope.is_admin:
+        return []  # authenticated but no linked profile -> nothing of "mine"
+    convs = list((await db.execute(q.order_by(Conversation.created_at.desc()))).scalars().all())
     out = [await _decorate(db, c) for c in convs]
     out.sort(key=lambda o: o.last_message_at or o.created_at, reverse=True)
     return out

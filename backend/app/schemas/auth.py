@@ -9,6 +9,46 @@ class RegisterRequest(BaseModel):
     role: str = Field(default="booker")  # booker | artist | admin | finance
 
 
+class ArtistRegisterRequest(BaseModel):
+    """Self sign-up for an artist/proveedor: creates the login + the profile."""
+    email: EmailStr
+    full_name: str = Field(min_length=2, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    stage_name: str = Field(min_length=2, max_length=255)  # nombre artistico
+    artist_type: str | None = None
+    phone: str | None = None
+    base_city: str | None = None
+
+
+class ContratanteRegisterRequest(BaseModel):
+    """Self sign-up for a hotel/venue manager. Either joins an existing company
+    (company_id) or creates a new one on the fly (company_name)."""
+    email: EmailStr
+    full_name: str = Field(min_length=2, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    company_id: int | None = None
+    company_name: str | None = Field(default=None, max_length=255)
+    group_id: int | None = None       # a group director oversees the whole chain
+    position: str | None = None       # e.g. "Director de actividades"
+    phone: str | None = None
+
+
+class MeOut(BaseModel):
+    """Who am I + what slice I own - the frontend uses this to render the right
+    dashboard and gate the Partner features."""
+    id: int
+    email: EmailStr
+    full_name: str
+    role: str | None = None
+    permissions: list[str] = []
+    is_admin: bool = False
+    artist_id: int | None = None
+    company_id: int | None = None
+    group_id: int | None = None
+    artist_name: str | None = None
+    company_name: str | None = None
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

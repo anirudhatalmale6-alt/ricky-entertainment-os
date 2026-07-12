@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.api.deps import DbSession, require_permission
+from app.api.deps import CurrentScope, DbSession, require_permission
 from app.models.booking import Booking
 from app.models.company import Company
 from app.models.enums import (
@@ -180,6 +180,46 @@ async def list_bookings(
     shows = {s.id: s for s in (
         (await db.execute(select(Show).where(Show.id.in_(sids)))).scalars().all()
         if sids else []
+    )}
+    return [_decorate(b, venues.get(b.venue_id), shows.get(b.show_id)) for b in bookings]
+
+
+@router.get("/mine", response_model=list[BookingOut])
+async def my_bookings(
+    scope: CurrentScope,
+    db: DbSession,
+    status_filter: BookingStatus | None = Query(None, alias="status"),
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+):
+    """My agenda, resolved from who I am: an artist sees their own actuaciones,
+    a hotel manager their property's, a group director the whole chain."""
+    stmt = select(Booking)
+    if scope.is_artist:
+        stmt = stmt.where(Booking.artist_id == scope.artist_id)
+    elif scope.group_id is not None:
+        sub = select(Company.id).where(Company.group_id == scope.group_id)
+        stmt = stmt.where(Booking.company_id.in_(sub))
+    elif scope.company_id is not None:
+        stmt = stmt.where(Booking.company_id == scope.company_id)
+    elif not scope.is_admin:
+        return []  # authenticated but no linked profile
+    if status_filter is not None:
+        stmt = stmt.where(Booking.status == status_filter)
+    if date_from is not None:
+        stmt = stmt.where(Booking.starts_at >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(Booking.starts_at <= date_to)
+    stmt = stmt.order_by(Booking.starts_at)
+
+    bookings = list((await db.execute(stmt)).scalars().all())
+    vids = {b.venue_id for b in bookings if b.venue_id}
+    sids = {b.show_id for b in bookings if b.show_id}
+    venues = {v.id: v for v in (
+        (await db.execute(select(Venue).where(Venue.id.in_(vids)))).scalars().all() if vids else []
+    )}
+    shows = {s.id: s for s in (
+        (await db.execute(select(Show).where(Show.id.in_(sids)))).scalars().all() if sids else []
     )}
     return [_decorate(b, venues.get(b.venue_id), shows.get(b.show_id)) for b in bookings]
 
