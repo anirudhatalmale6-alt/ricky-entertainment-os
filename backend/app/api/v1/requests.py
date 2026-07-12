@@ -14,7 +14,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 
-from app.api.deps import DbSession, require_permission
+from app.api.deps import DbSession, get_current_user, require_permission
 from app.api.v1.bookings import _check_travel_buffer, _now
 from app.models.artist import Artist
 from app.models.booking import Booking
@@ -74,7 +74,7 @@ async def create_request(payload: ProductRequestCreate, db: DbSession):
 @router.get(
     "",
     response_model=list[ProductRequestOut],
-    dependencies=[Depends(require_permission("report.view"))],
+    dependencies=[Depends(get_current_user)],  # the board is browsable by any signed-in user (artists included)
 )
 async def list_requests(
     db: DbSession,
@@ -136,7 +136,7 @@ async def list_requests(
 @router.get(
     "/{request_id}",
     response_model=ProductRequestOut,
-    dependencies=[Depends(require_permission("report.view"))],
+    dependencies=[Depends(get_current_user)],
 )
 async def get_request(request_id: int, db: DbSession):
     return await _decorate(db, await _get_request_or_404(db, request_id))
@@ -215,7 +215,7 @@ async def submit_proposal(request_id: int, payload: ProposalCreate, db: DbSessio
 @router.get(
     "/{request_id}/proposals",
     response_model=list[ProposalOut],
-    dependencies=[Depends(require_permission("report.view"))],
+    dependencies=[Depends(get_current_user)],
 )
 async def list_proposals(request_id: int, db: DbSession):
     await _get_request_or_404(db, request_id)

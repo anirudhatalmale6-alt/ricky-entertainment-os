@@ -140,22 +140,33 @@ async def my_conversations(scope: CurrentScope, db: DbSession):
     return out
 
 
-@router.get(
-    "/{conversation_id}",
-    response_model=ConversationOut,
-    dependencies=[Depends(require_permission("report.view"))],
-)
-async def get_conversation(conversation_id: int, db: DbSession):
-    return await _decorate(db, await _get_conversation_or_404(db, conversation_id))
+async def _assert_participant(db: DbSession, scope, conv: Conversation) -> None:
+    """A conversation is private to its two sides: the artist and the hotel (a
+    group director covers every hotel in the chain). Admin/finance can see all."""
+    if scope.is_admin:
+        return
+    if scope.artist_id is not None and conv.artist_id == scope.artist_id:
+        return
+    if scope.company_id is not None and conv.company_id == scope.company_id:
+        return
+    if scope.group_id is not None and conv.company_id is not None:
+        comp = await db.get(Company, conv.company_id)
+        if comp and comp.group_id == scope.group_id:
+            return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes acceso a esta conversacion")
 
 
-@router.get(
-    "/{conversation_id}/messages",
-    response_model=list[MessageOut],
-    dependencies=[Depends(require_permission("report.view"))],
-)
-async def list_messages(conversation_id: int, db: DbSession):
-    await _get_conversation_or_404(db, conversation_id)
+@router.get("/{conversation_id}", response_model=ConversationOut)
+async def get_conversation(conversation_id: int, scope: CurrentScope, db: DbSession):
+    conv = await _get_conversation_or_404(db, conversation_id)
+    await _assert_participant(db, scope, conv)
+    return await _decorate(db, conv)
+
+
+@router.get("/{conversation_id}/messages", response_model=list[MessageOut])
+async def list_messages(conversation_id: int, scope: CurrentScope, db: DbSession):
+    conv = await _get_conversation_or_404(db, conversation_id)
+    await _assert_participant(db, scope, conv)
     rows = (
         await db.execute(
             select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at)
@@ -168,10 +179,10 @@ async def list_messages(conversation_id: int, db: DbSession):
     "/{conversation_id}/messages",
     response_model=MessageOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def send_message(conversation_id: int, payload: MessageCreate, db: DbSession):
-    await _get_conversation_or_404(db, conversation_id)
+async def send_message(conversation_id: int, payload: MessageCreate, scope: CurrentScope, db: DbSession):
+    conv = await _get_conversation_or_404(db, conversation_id)
+    await _assert_participant(db, scope, conv)
     msg = Message(conversation_id=conversation_id, **payload.model_dump())
     db.add(msg)
     await db.commit()
@@ -179,18 +190,16 @@ async def send_message(conversation_id: int, payload: MessageCreate, db: DbSessi
     return msg
 
 
-@router.post(
-    "/{conversation_id}/read",
-    response_model=ConversationOut,
-    dependencies=[Depends(require_permission("booking.manage"))],
-)
+@router.post("/{conversation_id}/read", response_model=ConversationOut)
 async def mark_read(
     conversation_id: int,
+    scope: CurrentScope,
     db: DbSession,
     role: str = Query(..., pattern="^(artist|company)$"),
 ):
     """Mark the other side's messages as read for the given viewer role."""
     conv = await _get_conversation_or_404(db, conversation_id)
+    await _assert_participant(db, scope, conv)
     other = "company" if role == "artist" else "artist"
     now = datetime.now(timezone.utc)
     unread = (

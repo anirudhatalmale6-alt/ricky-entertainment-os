@@ -141,6 +141,11 @@
   .login h2{font-size:19px;margin-bottom:4px}.login p{color:var(--mut);font-size:12.5px;margin-bottom:20px}
   .login input{width:100%;background:#12131d;border:1px solid var(--line);border-radius:9px;padding:11px 13px;color:var(--txt);margin-bottom:11px;outline:none}
   .login button{width:100%;background:var(--grad);border:0;color:#fff;font-weight:650;padding:12px;border-radius:9px;cursor:pointer;font-size:14px}
+  .login .tabs{display:flex;gap:6px;margin-bottom:16px}
+  .login .tab{flex:1;padding:8px 4px;font-size:11.5px;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--mut);transition:.15s}
+  .login .tab.on{background:var(--grad);color:#fff;border-color:transparent}
+  .login .aform{display:none;flex-direction:column;text-align:left}
+  .login .aform.on{display:flex}
   .err{color:var(--bad);font-size:12px;min-height:16px;margin-top:6px}
   .load{color:var(--mut);padding:30px;text-align:center}
 </style>
@@ -150,10 +155,38 @@
   <div class="card">
     <div class="logo" style="background:var(--grad);display:grid;place-items:center;font-weight:800;color:#fff">R</div>
     <h2>RICKY Entertainment OS</h2>
-    <p>Panel de control</p>
-    <input id="email" value="admin@ricky.os" placeholder="Correo">
-    <input id="pass" type="password" value="Admin123!" placeholder="Contraseña">
-    <button onclick="login()">Entrar</button>
+    <p>Entra a tu panel</p>
+    <div class="tabs">
+      <div class="tab on" data-t="login" onclick="authTab('login')">Entrar</div>
+      <div class="tab" data-t="artist" onclick="authTab('artist')">Soy artista</div>
+      <div class="tab" data-t="hotel" onclick="authTab('hotel')">Soy hotel</div>
+    </div>
+
+    <div class="aform on" id="f-login">
+      <input id="email" value="admin@ricky.os" placeholder="Correo">
+      <input id="pass" type="password" value="Admin123!" placeholder="Contraseña">
+      <input id="otp" placeholder="Código 2FA (si tienes activado)" style="display:none">
+      <button onclick="login()">Entrar</button>
+    </div>
+
+    <div class="aform" id="f-artist">
+      <input id="a_name" placeholder="Tu nombre">
+      <input id="a_stage" placeholder="Nombre artístico / proveedor">
+      <input id="a_city" placeholder="Ciudad base (opcional)">
+      <input id="a_email" placeholder="Correo">
+      <input id="a_pass" type="password" placeholder="Contraseña (mín. 8)">
+      <button onclick="regArtist()">Crear cuenta de artista</button>
+    </div>
+
+    <div class="aform" id="f-hotel">
+      <input id="h_name" placeholder="Tu nombre">
+      <input id="h_company" placeholder="Nombre del hotel / empresa">
+      <input id="h_pos" placeholder="Puesto (opcional)">
+      <input id="h_email" placeholder="Correo">
+      <input id="h_pass" type="password" placeholder="Contraseña (mín. 8)">
+      <button onclick="regHotel()">Crear cuenta de hotel</button>
+    </div>
+
     <div class="err" id="lerr"></div>
   </div>
 </div>
@@ -183,7 +216,7 @@
         <div class="sub" id="psub">Vista consolidada</div>
       </div>
       <div class="spacer"></div>
-      <div class="ctrl">🏨 <select id="groupSel" onchange="reload()"></select></div>
+      <div class="ctrl" id="groupWrap">🏨 <select id="groupSel" onchange="reload()"></select></div>
       <div class="ctrl" id="monthCtrl">📅 Julio 2026</div>
       <div class="ava">RA</div>
     </div>
@@ -202,7 +235,7 @@
 <script>
 const API = (window.RICKY_API || "http://localhost:8000") + "/api/v1";
 const PERIOD = {year:2026, month:7};
-let TOKEN=null, GROUPS=[], GID=null, CACHE={};
+let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company";
 const MXN = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n||0);
 const CATCOL = {"Musica":"#a855f7","Shows":"#ec4899","Fotografia y Video":"#60a5fa","Produccion":"#34d399"};
 const palette=["#a855f7","#ec4899","#60a5fa","#34d399","#fbbf24","#f87171"];
@@ -219,29 +252,102 @@ async function post(path,body){
   if(!r.ok) throw new Error(path+" "+r.status); return r.json();
 }
 
+const val = id => (document.getElementById(id).value||"").trim();
+function authTab(t){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
+  document.querySelectorAll('.aform').forEach(x=>x.classList.remove('on'));
+  document.getElementById('f-'+t).classList.add('on');
+  document.getElementById('lerr').textContent="";
+}
+function regErr(d){
+  if(d&&d.detail){ if(typeof d.detail==='string')return d.detail;
+    if(Array.isArray(d.detail)&&d.detail[0])return d.detail[0].msg||"Datos inválidos"; }
+  return "No se pudo crear la cuenta";
+}
+async function afterAuth(token){
+  TOKEN=token;
+  ME = await api("/auth/me");
+  document.getElementById('login').style.display="none";
+  document.getElementById('app').style.display="grid";
+  applyRole();
+  await boot();
+}
 async function login(){
   const el=document.getElementById('lerr'); el.textContent="";
   try{
-    const r = await fetch(API+"/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({email:document.getElementById('email').value,password:document.getElementById('pass').value})});
+    const body={email:val('email'),password:val('pass')};
+    const otp=val('otp'); if(otp) body.totp_code=otp;
+    const r = await fetch(API+"/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     if(!r.ok){el.textContent="Credenciales incorrectas";return;}
-    TOKEN=(await r.json()).access_token;
-    document.getElementById('login').style.display="none";
-    document.getElementById('app').style.display="grid";
-    await boot();
+    const d=await r.json();
+    if(d.requires_2fa){document.getElementById('otp').style.display="block";el.textContent="Ingresa tu código 2FA";return;}
+    await afterAuth(d.access_token);
+  }catch(e){el.textContent="No se pudo conectar al servidor";}
+}
+async function regArtist(){
+  const el=document.getElementById('lerr'); el.textContent="";
+  try{
+    const r = await fetch(API+"/auth/register/artist",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({full_name:val('a_name'),stage_name:val('a_stage'),base_city:val('a_city')||null,email:val('a_email'),password:val('a_pass')})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){el.textContent=regErr(d);return;}
+    await afterAuth(d.access_token);
+  }catch(e){el.textContent="No se pudo conectar al servidor";}
+}
+async function regHotel(){
+  const el=document.getElementById('lerr'); el.textContent="";
+  try{
+    const r = await fetch(API+"/auth/register/contratante",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({full_name:val('h_name'),company_name:val('h_company'),position:val('h_pos')||null,email:val('h_email'),password:val('h_pass')})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){el.textContent=regErr(d);return;}
+    await afterAuth(d.access_token);
   }catch(e){el.textContent="No se pudo conectar al servidor";}
 }
 
+function setNavLabel(p,ic,txt){
+  const n=document.querySelector(`.nav[data-p='${p}']`);
+  if(n) n.innerHTML=`<span class="ic">${ic}</span> ${txt}`;
+}
+function applyRole(){
+  SELF = !ME.is_admin;                       // artist / contratante -> scoped /mine views
+  const isArtist = !!ME.artist_id;
+  const isDirector = !!ME.group_id;
+  SENDER = isArtist ? "artist" : "company";
+  // identity in the header + sidebar
+  const initials=(ME.full_name||'RA').split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase();
+  document.querySelector('.ava').textContent=initials||'RA';
+  document.querySelector('.brand span').textContent = ME.is_admin?'Administración':(isArtist?(ME.artist_name||'Artista'):(ME.company_name||'Contratante'));
+  const show=(p,on)=>{const n=document.querySelector(`.nav[data-p='${p}']`); if(n) n.style.display=on?'':'none';};
+  const lbls=document.querySelectorAll('.navlbl');       // [0]=Operación, [1]=Inteligencia·Partner
+  const canPartner = ME.is_admin || isDirector;          // chain-level analytics need a group scope
+  show('news', canPartner); show('market', canPartner); show('demand', canPartner);
+  if(lbls[1]) lbls[1].style.display = canPartner?'':'none';
+  show('home', ME.is_admin || isDirector);               // consolidated home needs a chain
+  if(isArtist){ setNavLabel('cal','🗓️','Mi agenda'); setNavLabel('chat','💬','Mis chats'); }
+  else if(!ME.is_admin){ setNavLabel('cal','🗓️','Mis actuaciones'); }
+  document.getElementById('groupWrap').style.display = ME.is_admin ? '' : 'none';
+}
+
 async function boot(){
-  GROUPS = await api("/groups");
   const sel=document.getElementById('groupSel');
-  sel.innerHTML = GROUPS.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join("");
-  GID = GROUPS.length? GROUPS[0].id : null;
-  await reload();
+  if(ME.is_admin){
+    GROUPS = await api("/groups");
+    sel.innerHTML = GROUPS.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join("");
+    GID = GROUPS.length? GROUPS[0].id : null;
+  } else {
+    GID = ME.group_id || null;
+  }
+  // land on the first visible section (home is hidden for artists / single hotels)
+  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));
+  const first=[...document.querySelectorAll('.nav')].find(n=>n.style.display!=='none');
+  document.querySelectorAll('.panel').forEach(x=>{x.dataset.loaded="";});
+  if(first){ first.classList.add('on'); await show(first.dataset.p,true); }
 }
 async function reload(){
-  GID = document.getElementById('groupSel').value || GID;
+  if(ME&&ME.is_admin) GID = document.getElementById('groupSel').value || GID;
   CACHE={};
+  document.querySelectorAll('.panel').forEach(x=>{x.dataset.loaded="";});
   const active=document.querySelector('.nav.on').dataset.p;
   await show(active,true);
 }
@@ -307,10 +413,10 @@ const RENDER = {
   },
 
   async cal(box){
-    const bk = await api(`/bookings?group_id=${GID}`);
-    const order={pending:0,confirmed:1,completed:2,cancelled:3};
+    const bk = await api(SELF ? `/bookings/mine` : `/bookings?group_id=${GID}`);
     bk.sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
-    box.innerHTML=`<div class="box"><h3>🗓️ Agenda de actuaciones</h3><div class="hint">${bk.length} actuaciones · toda la cadena</div>
+    const scopeTxt = SELF ? (ME.artist_id?'tus actuaciones':'las de tu hotel') : 'toda la cadena';
+    box.innerHTML=`<div class="box"><h3>🗓️ Agenda de actuaciones</h3><div class="hint">${bk.length} actuaciones · ${scopeTxt}</div>
       <table><thead><tr><th>Fecha</th><th>Show</th><th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th></tr></thead><tbody>
       ${bk.map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td><td class="muted">${esc(b.venue_name||'—')}</td>
         <td>${MXN(b.agreed_price)}</td><td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td></tr>`).join("")}
@@ -383,16 +489,18 @@ const RENDER = {
   },
 
   async chat(box){
-    const convs = await api(`/conversations`);
+    const convs = await api(SELF ? `/conversations/mine` : `/conversations`);
     if(!convs.length){box.innerHTML='<div class="box"><div class="muted">Sin conversaciones aún.</div></div>';return;}
+    const other = c => SENDER==='artist' ? (c.company_name||'Hotel') : (c.artist_name||'Artista');
+    const unread = c => SENDER==='artist' ? c.unread_for_artist : c.unread_for_company;
     box.innerHTML=`<div class="chat"><div class="clist" id="clist"></div>
       <div class="thread"><div class="thead" id="thead">—</div><div class="msgs" id="msgs"></div>
       <div class="cbar"><input id="cin" placeholder="Escribe un mensaje…"><button onclick="sendMsg()">Enviar</button></div></div></div>`;
     const cl=document.getElementById('clist');
     cl.innerHTML=convs.map((c,i)=>`<div class="citem ${i===0?'on':''}" data-id="${c.id}" onclick="openConv(${c.id},this)">
-      <div class="av">${esc((c.artist_name||'A')[0])}</div>
-      <div style="min-width:0"><div class="nm">${esc(c.artist_name||'Artista')}</div><div class="lm">${esc(c.last_message||'—')}</div></div>
-      ${c.unread_for_company?`<span class="badge">${c.unread_for_company}</span>`:''}</div>`).join("");
+      <div class="av">${esc(other(c)[0])}</div>
+      <div style="min-width:0"><div class="nm">${esc(other(c))}</div><div class="lm">${esc(c.last_message||'—')}</div></div>
+      ${unread(c)?`<span class="badge">${unread(c)}</span>`:''}</div>`).join("");
     CACHE.convs=convs; openConv(convs[0].id);
   },
 
@@ -412,13 +520,13 @@ async function openConv(id,el){
   document.getElementById('thead').textContent=(c.artist_name||'Artista')+' · '+(c.company_name||'Hotel');
   const msgs=await api(`/conversations/${id}/messages`);
   CACHE.cur=id;
-  document.getElementById('msgs').innerHTML=msgs.map(m=>`<div class="msg ${m.sender_role==='company'?'me':'them'}">${esc(m.body)}<div class="tm">${fmtDate(m.created_at)}</div></div>`).join("");
+  document.getElementById('msgs').innerHTML=msgs.map(m=>`<div class="msg ${m.sender_role===SENDER?'me':'them'}">${esc(m.body)}<div class="tm">${fmtDate(m.created_at)}</div></div>`).join("");
   const mm=document.getElementById('msgs'); mm.scrollTop=mm.scrollHeight;
 }
 async function sendMsg(){
   const inp=document.getElementById('cin'); const b=inp.value.trim(); if(!b||!CACHE.cur)return;
   inp.value="";
-  await post(`/conversations/${CACHE.cur}/messages`,{sender_role:"company",body:b});
+  await post(`/conversations/${CACHE.cur}/messages`,{sender_role:SENDER,body:b});
   openConv(CACHE.cur);
 }
 
@@ -426,6 +534,7 @@ function chip(s){const map={pending:'Pendiente',confirmed:'Confirmada',completed
   return `<span class="chip c-${s}">${map[s]||s}</span>`;}
 function fmtDate(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});}
 window.chip=chip;window.fmtDate=fmtDate;window.openConv=openConv;window.sendMsg=sendMsg;window.login=login;window.reload=reload;
+window.authTab=authTab;window.regArtist=regArtist;window.regHotel=regHotel;
 </script>
 </body>
 </html>
