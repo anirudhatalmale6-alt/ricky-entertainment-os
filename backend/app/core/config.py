@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "RICKY Entertainment OS"
     API_V1_PREFIX: str = "/api/v1"
     ENVIRONMENT: str = "development"
+    # Sub-path the app is served under (e.g. "/ricky" behind cPanel Passenger).
+    # Empty for a root deploy or local uvicorn. The frontend reads this to build
+    # its API base, and FastAPI uses it as root_path for docs/openapi.
+    ROOT_PATH: str = ""
 
     # Database - SQLite for dev, PostgreSQL (asyncpg) for prod
     #   postgresql+asyncpg://user:pass@host:5432/dbname
