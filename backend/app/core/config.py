@@ -5,12 +5,23 @@ local development so the project runs out of the box; set DATABASE_URL to a
 PostgreSQL DSN for production.
 """
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Resolve .env by absolute path (backend root / app root), not relative to the
+# process CWD. Under cPanel Passenger the working directory is not guaranteed to
+# be the app root, and a missing .env would silently fall back to insecure
+# defaults (wrong ROOT_PATH, default SECRET_KEY). This works for both layouts:
+#   repo:   backend/app/core/config.py -> backend/.env
+#   deploy: ricky_app/app/core/config.py -> ricky_app/.env
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=str(_ENV_FILE), env_file_encoding="utf-8", extra="ignore"
+    )
 
     # Project
     PROJECT_NAME: str = "RICKY Entertainment OS"
