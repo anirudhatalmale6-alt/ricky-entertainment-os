@@ -15,14 +15,41 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Ensure schema + baseline data exist before serving the first request. Guarded
 # so a hiccup here never takes the whole app down on boot.
-try:
+#
+# Passenger preloads this module and then *forks* worker processes. We must leave
+# ZERO open DB connections behind: any aiosqlite connection (and its background
+# thread) created here would be dead in the forked child and the first request
+# would hang. So we dispose the engine at the end of the same event loop that ran
+# the seed. NullPool (see db/session.py) already avoids pooling; this is belt-and-
+# suspenders.
+async def _boot() -> None:
     from seed import main as seed_main
+    from app.db.session import engine
 
-    asyncio.run(seed_main())
+    try:
+        await seed_main()
+    finally:
+        await engine.dispose()
+
+
+try:
+    asyncio.run(_boot())
 except Exception as exc:  # pragma: no cover - boot-time best effort
     sys.stderr.write(f"[passenger_wsgi] seed skipped: {exc}\n")
 
-from a2wsgi import ASGIMiddleware  # noqa: E402
-from app.main import app as asgi_app  # noqa: E402
 
-application = ASGIMiddleware(asgi_app)
+# Build the ASGI->WSGI bridge LAZILY, on the first request inside each worker.
+# Passenger preloads this module and then forks worker processes; a2wsgi's
+# ASGIMiddleware spins up an event loop that would not survive the fork, so
+# constructing it here (post-fork, once per worker) is what makes it fork-safe.
+_bridge = None
+
+
+def application(environ, start_response):
+    global _bridge
+    if _bridge is None:
+        from a2wsgi import ASGIMiddleware
+        from app.main import app as asgi_app
+
+        _bridge = ASGIMiddleware(asgi_app)
+    return _bridge(environ, start_response)
