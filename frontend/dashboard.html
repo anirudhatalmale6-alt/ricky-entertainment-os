@@ -233,7 +233,7 @@
 </div>
 
 <script>
-const API = (window.RICKY_API || "http://localhost:8000") + "/api/v1";
+const API = (window.RICKY_API ?? "http://localhost:8000") + "/api/v1";  // "" = same-origin root deploy
 const PERIOD = {year:2026, month:7};
 let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company";
 const MXN = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n||0);
@@ -380,6 +380,14 @@ const bars = (rows)=> rows.map(r=>`<div class="bar-row"><div class="lbl">${esc(r
 
 const RENDER = {
   async home(box){
+    if(!GID){                                  // no chain scope yet -> never call /groups/null/...
+      box.innerHTML=`<div class="box" style="text-align:center;padding:48px 24px">
+        <div style="font-size:34px;margin-bottom:8px">🏨</div>
+        <h3 style="margin:0 0 6px">Aún no hay propiedades en tu cadena</h3>
+        <div class="hint">En cuanto se registren hoteles o venues en tu grupo, aquí verás el Dashboard Ejecutivo consolidado: actuaciones, gasto, ocupación y solicitudes de toda la cadena.</div>
+      </div>`;
+      return;
+    }
     const [dash, cats, reqs, bk] = await Promise.all([
       api(`/groups/${GID}/dashboard`),
       api(`/intelligence/demand?days=90&group_id=${GID}`),

@@ -134,7 +134,10 @@ async def detach_property(group_id: int, company_id: int, db: DbSession):
 @router.get(
     "/{group_id}/dashboard",
     response_model=GroupDashboardOut,
-    dependencies=[Depends(require_permission("company.manage"))],
+    # Read-only consolidated view = reporting, not management. A chain director
+    # (booker role: report.view) must be able to see their own exec dashboard;
+    # creating/editing/attaching properties stays gated by company.manage above.
+    dependencies=[Depends(require_permission("report.view"))],
 )
 async def group_dashboard(group_id: int, db: DbSession):
     """Consolidated dashboard across all properties of the group - what a chain
