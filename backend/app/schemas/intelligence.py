@@ -24,6 +24,9 @@ class PropertyIntelligence(BaseModel):
     intensity_pct: float | None = None           # % de la facturacion que va a entretenimiento
     vs_market_pct: float | None = None           # diferencia vs promedio de mercado
     vs_star_peers_pct: float | None = None        # diferencia vs pares de su categoria
+    spend_per_room: float | None = None          # gasto de entretenimiento / habitaciones
+    spend_per_guest: float | None = None         # gasto / (habitaciones * huespedes_por_hab)
+    city: str | None = None
     is_partner: bool = False
 
 
@@ -75,9 +78,31 @@ class MarketIntelligenceOut(BaseModel):
     currency: str = "MXN"
     property_count: int = 0
     market_avg_intensity_pct: float | None = None
+    market_avg_spend_per_room: float | None = None    # promedio de mercado del gasto/habitacion
+    market_avg_spend_per_guest: float | None = None   # promedio de mercado del gasto/huesped
+    guests_per_room: float = 2.1                       # supuesto (configurable) para gasto/huesped
     total_entertainment_budget: float = 0.0
     total_entertainment_spend: float = 0.0
     properties: list[PropertyIntelligence] = []
     by_star_rating: list[StarTierStat] = []
     spend_by_category: list[CategoryTrend] = []
+    note: str = ""
+
+
+class ZoneStat(BaseModel):
+    """One zone (ciudad) with its contracting activity and average tariff."""
+    zone: str
+    properties: int = 0          # hoteles activos en la zona
+    bookings: int = 0            # actuaciones (no canceladas) en la ventana
+    total_spend: float = 0.0     # $ contratado (confirmadas + realizadas)
+    avg_price: float | None = None   # tarifa promedio por contratacion
+    share_pct: float = 0.0       # % de las contrataciones del mercado (heat map)
+
+
+class ZoneIntelligenceOut(BaseModel):
+    """Geografia de la demanda: donde se contrata mas y donde es mas caro."""
+    window_days: int
+    currency: str = "MXN"
+    total_bookings: int = 0
+    zones: list[ZoneStat] = []
     note: str = ""

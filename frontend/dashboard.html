@@ -180,6 +180,12 @@
   .invtot{display:flex;align-items:baseline;gap:10px;margin:2px 0 14px}
   .invtot b{font-size:15px}.invtot span{font-size:12px;color:var(--mut)}
 
+  /* heat map (zones) */
+  .heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .heatcell{border:1px solid var(--line);border-radius:11px;padding:14px 15px;display:flex;flex-direction:column;gap:2px}
+  .heatcell b{font-size:14px}.heatcell span{font-size:11.5px;color:var(--txt);opacity:.85}
+  .heatcell s{font-size:19px;font-weight:750;text-decoration:none;margin-top:4px}
+
   .soon{text-align:center;padding:46px 20px;color:var(--mut)}
   .soon .big{font-size:40px;margin-bottom:12px}
   .newsbar{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#a855f71a,#ec48991a);border:1px solid #a855f733;border-radius:11px;padding:12px 16px;margin-bottom:16px}
@@ -590,6 +596,9 @@ const RENDER = {
 
   async market(box){
     const m = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
+    let zones=null; try{ zones=await api(`/intelligence/zones?days=180${GID?`&group_id=${GID}`:''}`);}catch(e){}
+    const maxRoom=Math.max(1,...m.properties.map(p=>p.spend_per_room||0));
+    const maxGuest=Math.max(1,...m.properties.map(p=>p.spend_per_guest||0));
     const maxAbs = Math.max(1,...m.properties.map(p=>Math.abs(p.vs_market_pct||0)));
     const div = m.properties.filter(p=>p.intensity_pct!=null).map(p=>{
       const v=p.vs_market_pct||0, w=Math.abs(v)/maxAbs*50;
@@ -622,13 +631,35 @@ const RENDER = {
       </div>
       <div class="box" style="margin-top:16px"><h3>🎭 Conceptos que suben y bajan</h3><div class="hint">Gasto por categoría · este mes vs. anterior</div>
         ${bars(m.spend_by_category.map(c=>({lbl:c.category,pct:Math.round(c.spend/maxc*100),val:MXN(c.spend),col:CATCOL[c.category],trend:c.trend})))||'<div class="muted">Sin datos.</div>'}
-      </div>`;
+      </div>
+      <div class="grid2b" style="margin-top:16px">
+        <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
+          <h3>🛏️ Gasto por habitación</h3><div class="hint">Gasto de entretenimiento ÷ habitaciones · promedio de mercado ${MXN(m.market_avg_spend_per_room)}</div>
+          ${bars(m.properties.filter(p=>p.spend_per_room!=null).map(p=>({lbl:p.name,pct:Math.round(p.spend_per_room/maxRoom*100),val:MXN(p.spend_per_room)})))||'<div class="muted">Carga habitaciones y actuaciones para verlo.</div>'}</div>
+        <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
+          <h3>🧑‍🤝‍🧑 Gasto por huésped</h3><div class="hint">÷ (habitaciones × ${m.guests_per_room} huéspedes) · promedio de mercado ${MXN(m.market_avg_spend_per_guest)}</div>
+          ${bars(m.properties.filter(p=>p.spend_per_guest!=null).map(p=>({lbl:p.name,pct:Math.round(p.spend_per_guest/maxGuest*100),val:MXN(p.spend_per_guest)})))||'<div class="muted">—</div>'}</div>
+      </div>
+      ${zones&&zones.zones.length?(()=>{const maxSh=Math.max(1,...zones.zones.map(z=>z.share_pct));const maxAvg=Math.max(1,...zones.zones.map(z=>z.avg_price||0));return `
+      <div class="box" style="margin-top:16px;position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
+        <h3>🗺️ Mapa de calor por zona</h3><div class="hint">Dónde se está contratando más · ${zones.total_bookings} contrataciones (últimos ${zones.window_days} días)</div>
+        <div class="heat">${zones.zones.map(z=>{const o=(0.18+0.62*(z.share_pct/maxSh)).toFixed(2);return `<div class="heatcell" style="background:linear-gradient(135deg,rgba(168,85,247,${o}),rgba(236,72,153,${o}))"><b>${esc(z.zone)}</b><span>${z.bookings} contrataciones · ${z.properties} hotel${z.properties===1?'':'es'}</span><s>${z.share_pct.toFixed(0)}%</s></div>`;}).join("")}</div></div>
+      <div class="box" style="margin-top:16px;position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
+        <h3>💵 Tarifa promedio por zona</h3><div class="hint">Precio promedio de contratación · qué zona es la más cara</div>
+        ${bars(zones.zones.filter(z=>z.avg_price!=null).sort((a,b)=>b.avg_price-a.avg_price).map(z=>({lbl:z.zone,pct:Math.round(z.avg_price/maxAvg*100),val:MXN(z.avg_price)})))||'<div class="muted">—</div>'}</div>`;})():''}`;
   },
 
   async demand(box){
-    const d = await api(`/intelligence/demand?days=90&group_id=${GID}`);
+    const [d, mus, shw] = await Promise.all([
+      api(`/intelligence/demand?days=90&group_id=${GID}`),
+      api(`/intelligence/demand?days=120&category=Musica${GID?`&group_id=${GID}`:''}`),
+      api(`/intelligence/demand?days=120&category=Shows${GID?`&group_id=${GID}`:''}`)
+    ]);
     const maxc=Math.max(1,...d.top_categories.map(c=>c.demand_score));
     const maxs=Math.max(1,...d.top_subcategories.map(c=>c.demand_score));
+    const maxM=Math.max(1,...mus.top_subcategories.map(c=>c.demand_score));
+    const maxS=Math.max(1,...shw.top_subcategories.map(c=>c.demand_score));
+    const trendBars=(rows,max,col)=>bars(rows.map(c=>({lbl:c.key,pct:Math.round(c.demand_score/max*100),val:c.demand_score,col:col,trend:c.trend})));
     box.innerHTML=`
       <div class="kpis" style="grid-template-columns:repeat(2,1fr);max-width:520px">
         <div class="kpi"><div class="orb"></div><div class="k">📣 Solicitudes (90 días)</div><div class="v">${d.total_requests}</div></div>
@@ -639,6 +670,12 @@ const RENDER = {
           ${bars(d.top_categories.map(c=>({lbl:c.key,pct:Math.round(c.demand_score/maxc*100),val:c.demand_score,col:CATCOL[c.key],trend:c.trend})))}</div>
         <div class="box"><h3>🎯 Conceptos específicos</h3><div class="hint">Subcategorías con más demanda</div>
           ${bars(d.top_subcategories.map((c,i)=>({lbl:c.key,pct:Math.round(c.demand_score/maxs*100),val:c.demand_score,col:palette[i%palette.length],trend:c.trend})))||'<div class="muted">—</div>'}</div>
+      </div>
+      <div class="grid2b" style="margin-top:16px">
+        <div class="box"><h3>🎵 Trends Music</h3><div class="hint">Subgéneros de música que más crecen · últimos 120 días</div>
+          ${trendBars(mus.top_subcategories,maxM,CATCOL['Musica'])||'<div class="muted">Sin datos de música aún.</div>'}</div>
+        <div class="box"><h3>🎭 Trends Shows</h3><div class="hint">Tipos de show que más crecen · últimos 120 días</div>
+          ${trendBars(shw.top_subcategories,maxS,CATCOL['Shows'])||'<div class="muted">Sin datos de shows aún.</div>'}</div>
       </div>`;
   },
 
