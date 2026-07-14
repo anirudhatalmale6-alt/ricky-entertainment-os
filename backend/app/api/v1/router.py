@@ -9,6 +9,7 @@ from app.api.v1 import (
     companies,
     groups,
     intelligence,
+    me,
     requests,
     shows,
     users,
@@ -25,3 +26,4 @@ api_router.include_router(bookings.router)
 api_router.include_router(requests.router)
 api_router.include_router(chat.router)
 api_router.include_router(intelligence.router)
+api_router.include_router(me.router)

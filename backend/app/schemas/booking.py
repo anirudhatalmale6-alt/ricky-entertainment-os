@@ -86,6 +86,7 @@ class BookingOut(BaseModel):
     venue_capacity: int | None = None
     venue_name: str | None = None
     show_name: str | None = None
+    company_name: str | None = None
 
     @computed_field
     @property

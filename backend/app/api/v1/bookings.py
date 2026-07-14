@@ -55,12 +55,18 @@ async def _get_or_404(db: DbSession, booking_id: int) -> Booking:
     return booking
 
 
-def _decorate(booking: Booking, venue: Venue | None, show: Show | None) -> BookingOut:
+def _decorate(
+    booking: Booking,
+    venue: Venue | None,
+    show: Show | None,
+    company: Company | None = None,
+) -> BookingOut:
     out = BookingOut.model_validate(booking)
     return out.model_copy(update={
         "venue_capacity": venue.capacity if venue else None,
         "venue_name": venue.name if venue else None,
         "show_name": show.show_name if show else None,
+        "company_name": company.name if company else None,
     })
 
 
@@ -170,9 +176,10 @@ async def list_bookings(
     stmt = stmt.order_by(Booking.starts_at)
 
     bookings = list((await db.execute(stmt)).scalars().all())
-    # batch-load venue / show names for the cards
+    # batch-load venue / show / company names for the cards
     vids = {b.venue_id for b in bookings if b.venue_id}
     sids = {b.show_id for b in bookings if b.show_id}
+    cids = {b.company_id for b in bookings if b.company_id}
     venues = {v.id: v for v in (
         (await db.execute(select(Venue).where(Venue.id.in_(vids)))).scalars().all()
         if vids else []
@@ -181,7 +188,11 @@ async def list_bookings(
         (await db.execute(select(Show).where(Show.id.in_(sids)))).scalars().all()
         if sids else []
     )}
-    return [_decorate(b, venues.get(b.venue_id), shows.get(b.show_id)) for b in bookings]
+    companies = {c.id: c for c in (
+        (await db.execute(select(Company).where(Company.id.in_(cids)))).scalars().all()
+        if cids else []
+    )}
+    return [_decorate(b, venues.get(b.venue_id), shows.get(b.show_id), companies.get(b.company_id)) for b in bookings]
 
 
 @router.get("/mine", response_model=list[BookingOut])
@@ -215,13 +226,17 @@ async def my_bookings(
     bookings = list((await db.execute(stmt)).scalars().all())
     vids = {b.venue_id for b in bookings if b.venue_id}
     sids = {b.show_id for b in bookings if b.show_id}
+    cids = {b.company_id for b in bookings if b.company_id}
     venues = {v.id: v for v in (
         (await db.execute(select(Venue).where(Venue.id.in_(vids)))).scalars().all() if vids else []
     )}
     shows = {s.id: s for s in (
         (await db.execute(select(Show).where(Show.id.in_(sids)))).scalars().all() if sids else []
     )}
-    return [_decorate(b, venues.get(b.venue_id), shows.get(b.show_id)) for b in bookings]
+    companies = {c.id: c for c in (
+        (await db.execute(select(Company).where(Company.id.in_(cids)))).scalars().all() if cids else []
+    )}
+    return [_decorate(b, venues.get(b.venue_id), shows.get(b.show_id), companies.get(b.company_id)) for b in bookings]
 
 
 @router.get(

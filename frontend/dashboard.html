@@ -128,6 +128,58 @@
   .cbar input{flex:1;background:#12131d;border:1px solid var(--line);border-radius:9px;padding:10px 13px;color:var(--txt);outline:none}
   .cbar button,.pillbtn{background:var(--grad);border:0;color:#fff;font-weight:600;padding:0 16px;border-radius:9px;cursor:pointer}
 
+  /* score ring */
+  .ring{width:104px;height:104px;border-radius:50%;position:relative;flex:none}
+  .ring::after{content:"";position:absolute;inset:11px;background:var(--card);border-radius:50%}
+  .ring .cn{position:absolute;inset:0;display:grid;place-items:center;text-align:center;z-index:2;line-height:1.1}
+  .ring .cn b{font-size:23px;display:block}.ring .cn s{font-size:9.5px;color:var(--mut);text-decoration:none}
+
+  /* calendar */
+  .cal{width:100%}
+  .cal .hd{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:6px}
+  .cal .hd span{font-size:10px;color:var(--mut2);text-transform:uppercase;letter-spacing:.5px;text-align:center}
+  .cal .gr{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .cal .cell{aspect-ratio:1;border:1px solid var(--line);border-radius:8px;padding:5px 6px;font-size:12px;position:relative;min-height:40px}
+  .cal .cell.out{opacity:.28}
+  .cal .cell.today{border-color:var(--acc);background:#a855f712}
+  .cal .cell .dts{position:absolute;bottom:5px;left:6px;display:flex;gap:3px}
+  .cal .cell .dts i{width:6px;height:6px;border-radius:50%;display:block}
+  .cal-leg{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:11.5px;color:var(--mut)}
+  .cal-leg span{display:flex;align-items:center;gap:6px}
+  .d-confirmed{background:var(--info)}.d-pending{background:var(--warn)}.d-completed{background:var(--ok)}.d-cancelled{background:var(--bad)}
+
+  /* summary rows (solicitudes / market) */
+  .srow{display:flex;align-items:center;gap:11px;padding:11px 0;border-top:1px solid var(--line)}
+  .srow:first-of-type{border-top:0}
+  .srow .ic2{width:34px;height:34px;border-radius:9px;background:#ffffff0d;display:grid;place-items:center;font-size:16px;flex:none}
+  .srow .lb{font-size:12.5px}.srow .lb s{display:block;font-size:11px;color:var(--mut);text-decoration:none}
+  .srow .nb{margin-left:auto;font-size:17px;font-weight:700}
+
+  /* partner CTA */
+  .partner{background:linear-gradient(135deg,#a855f71f,#ec48991f);border:1px solid #a855f74d;border-radius:13px;padding:18px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .partner .cr{font-size:30px}
+  .partner b{font-size:15px}.partner p{font-size:12.5px;color:var(--mut);margin-top:2px;max-width:520px}
+
+  /* forms */
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .field label{font-size:11.5px;color:var(--mut);font-weight:600}
+  .field input,.field textarea,.field select{background:#12131d;border:1px solid var(--line);border-radius:9px;padding:10px 12px;color:var(--txt);font-size:13px;outline:none;font-family:inherit;width:100%}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--acc)}
+  .field textarea{resize:vertical;min-height:74px}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  @media(max-width:640px){.fgrid{grid-template-columns:1fr}}
+  .btn{background:var(--grad);border:0;color:#fff;font-weight:650;padding:10px 18px;border-radius:9px;cursor:pointer;font-size:13px}
+  .btn.ghost{background:#ffffff0d;color:var(--txt);border:1px solid var(--line)}
+  .btn.danger{background:#f871711a;color:var(--bad);border:1px solid #f871714d}
+  .btn:disabled{opacity:.55;cursor:default}
+  .saverow{display:flex;align-items:center;gap:12px;margin-top:4px}
+  .saved{font-size:12px;color:var(--ok);opacity:0;transition:.2s}.saved.on{opacity:1}
+  .showcard{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:#ffffff05}
+  .showcard .hh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .showcard .tag2{font-size:10.5px;color:var(--mut);background:#ffffff0d;padding:3px 9px;border-radius:20px}
+  .invtot{display:flex;align-items:baseline;gap:10px;margin:2px 0 14px}
+  .invtot b{font-size:15px}.invtot span{font-size:12px;color:var(--mut)}
+
   .soon{text-align:center;padding:46px 20px;color:var(--mut)}
   .soon .big{font-size:40px;margin-bottom:12px}
   .newsbar{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#a855f71a,#ec48991a);border:1px solid #a855f733;border-radius:11px;padding:12px 16px;margin-bottom:16px}
@@ -202,6 +254,8 @@
     <div class="nav" data-p="cal"><span class="ic">🗓️</span> Actuaciones</div>
     <div class="nav" data-p="reqs"><span class="ic">📣</span> Solicitudes</div>
     <div class="nav" data-p="chat"><span class="ic">💬</span> Chat</div>
+    <div class="nav" data-p="bill" style="display:none"><span class="ic">🧾</span> Facturación</div>
+    <div class="nav" data-p="profile" style="display:none"><span class="ic">👤</span> Mi Perfil</div>
     <div class="navlbl">Inteligencia · Partner</div>
     <div class="nav" data-p="market"><span class="ic">📈</span> Market Intelligence <span class="pro">PRO</span></div>
     <div class="nav" data-p="demand"><span class="ic">🔥</span> Tendencias <span class="pro">PRO</span></div>
@@ -225,6 +279,8 @@
       <div class="panel" id="panel-cal"></div>
       <div class="panel" id="panel-reqs"></div>
       <div class="panel" id="panel-chat"></div>
+      <div class="panel" id="panel-bill"></div>
+      <div class="panel" id="panel-profile"></div>
       <div class="panel" id="panel-market"></div>
       <div class="panel" id="panel-demand"></div>
       <div class="panel" id="panel-news"></div>
@@ -323,9 +379,13 @@ function applyRole(){
   const canPartner = ME.is_admin || isDirector;          // chain-level analytics need a group scope
   show('news', canPartner); show('market', canPartner); show('demand', canPartner);
   if(lbls[1]) lbls[1].style.display = canPartner?'':'none';
-  show('home', ME.is_admin || isDirector);               // consolidated home needs a chain
-  if(isArtist){ setNavLabel('cal','🗓️','Mi agenda'); setNavLabel('chat','💬','Mis chats'); }
-  else if(!ME.is_admin){ setNavLabel('cal','🗓️','Mis actuaciones'); }
+  // Home is the consolidated view for a chain/admin, AND the artist's personal dashboard.
+  show('home', ME.is_admin || isDirector || isArtist);
+  show('bill', isArtist); show('profile', isArtist);     // artist-only self-service
+  if(isArtist){
+    setNavLabel('home','📊','Dashboard'); setNavLabel('cal','🗓️','Mi agenda'); setNavLabel('chat','💬','Mis chats');
+    TITLES.home=["Dashboard","Tu actividad de un vistazo"];
+  } else if(!ME.is_admin){ setNavLabel('cal','🗓️','Mis actuaciones'); }
   document.getElementById('groupWrap').style.display = ME.is_admin ? '' : 'none';
 }
 
@@ -354,6 +414,8 @@ async function reload(){
 
 const TITLES={home:["Resumen","Vista consolidada de la cadena"],cal:["Actuaciones","Agenda de shows por venue"],
   reqs:["Solicitudes","Tablero de pedidos abiertos"],chat:["Chat","Conversaciones hotel · artista"],
+  bill:["Facturación","Historial de facturas por mes"],
+  profile:["Mi Perfil","Tus datos, tarifas y publicaciones"],
   market:["Market Intelligence","Benchmarking de gasto en entretenimiento"],
   demand:["Tendencias de demanda","Lo que más se está pidiendo"],news:["Noticias","Novedades del entretenimiento"]};
 
@@ -380,6 +442,7 @@ const bars = (rows)=> rows.map(r=>`<div class="bar-row"><div class="lbl">${esc(r
 
 const RENDER = {
   async home(box){
+    if(ME.artist_id) return artistHome(box);   // artists get their personal dashboard
     if(!GID){                                  // no chain scope yet -> never call /groups/null/...
       box.innerHTML=`<div class="box" style="text-align:center;padding:48px 24px">
         <div style="font-size:34px;margin-bottom:8px">🏨</div>
@@ -440,6 +503,89 @@ const RENDER = {
         <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
         <div class="ft">${chip(r.status)}<span class="muted">${r.proposals_count} propuesta${r.proposals_count===1?'':'s'}</span></div>
       </div>`).join("") || '<div class="muted">Sin solicitudes.</div>'}</div>`;
+  },
+
+  async bill(box){
+    const bk = await api('/bookings/mine');
+    // an invoice exists once the money is committed (confirmed) and is "paid" once realizada
+    const inv = bk.filter(b=>['confirmed','completed'].includes(b.status))
+                  .sort((a,b)=>b.starts_at.localeCompare(a.starts_at));
+    const sum = f => inv.filter(f).reduce((a,b)=>a+(b.agreed_price||0),0);
+    const now=new Date(), total=sum(()=>true), pagado=sum(b=>b.status==='completed'),
+          pend=sum(b=>b.status==='confirmed'),
+          mes=sum(b=>{const d=new Date(b.starts_at);return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();});
+    // group by year-month, newest first
+    const groups={};
+    inv.forEach(b=>{const d=new Date(b.starts_at);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');(groups[k]=groups[k]||[]).push(b);});
+    const keys=Object.keys(groups).sort().reverse();
+    const monthName=k=>{const[y,m]=k.split('-');return new Date(y,m-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'});};
+    const invNo=b=>{const d=new Date(b.starts_at);return 'INV-'+d.getFullYear()+'-'+String(b.id).padStart(4,'0');};
+    box.innerHTML=`
+      <div class="kpis">
+        <div class="kpi"><div class="orb"></div><div class="k">🧾 Total facturado</div><div class="v">${MXN(total)}</div><div class="d">${inv.length} factura${inv.length===1?'':'s'}</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">✅ Cobrado</div><div class="v">${MXN(pagado)}</div><div class="d">actuaciones realizadas</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">⏳ Por cobrar</div><div class="v">${MXN(pend)}</div><div class="d">confirmadas, aún no realizadas</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">📅 Este mes</div><div class="v">${MXN(mes)}</div><div class="d">${now.toLocaleDateString('es-MX',{month:'long'})}</div></div>
+      </div>
+      ${keys.length? keys.map(k=>{
+        const rows=groups[k]; const st=rows.reduce((a,b)=>a+(b.agreed_price||0),0);
+        return `<div class="box" style="margin-bottom:16px"><h3 style="text-transform:capitalize">${monthName(k)}</h3>
+          <div class="invtot"><b>${MXN(st)}</b><span>· ${rows.length} factura${rows.length===1?'':'s'}</span></div>
+          <table><thead><tr><th>Factura</th><th>Hotel</th><th>Concepto</th><th>Fecha</th><th>Monto</th><th>Estado</th></tr></thead><tbody>
+          ${rows.map(b=>`<tr><td style="font-variant-numeric:tabular-nums">${invNo(b)}</td>
+            <td>${esc(b.company_name||'—')}</td><td class="muted">${esc(showLabel(b))}</td>
+            <td class="muted">${fmtDate(b.starts_at)}</td><td style="font-weight:650">${MXN(b.agreed_price)}</td>
+            <td>${b.status==='completed'?'<span class="chip c-completed">Pagada</span>':'<span class="chip c-pending">Pendiente</span>'}</td></tr>`).join("")}
+          </tbody></table></div>`;
+      }).join("") : `<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no tienes facturas</h3>
+        <p style="max-width:420px;margin:10px auto 0">En cuanto confirmes o realices actuaciones, aquí verás tu historial de facturación mes a mes, con lo cobrado y lo pendiente.</p></div></div>`}`;
+  },
+
+  async profile(box){
+    const p = await api('/me/artist');
+    CACHE.profile=p;
+    let tax={}; try{ tax=await api('/artists/taxonomy'); }catch(e){}
+    CACHE.tax=tax;
+    const sl=p.social_links||{};
+    const partner = p.is_partner
+      ? `<div class="partner"><div class="cr">👑</div><div><b>Eres Partner ✓</b><p>Tienes acceso a Market Intelligence, prioridad en el tablero y tu insignia Partner visible para los hoteles.</p></div></div>`
+      : `<div class="partner"><div class="cr">🚀</div><div style="flex:1"><b>Conviértete en Partner</b><p>Desbloquea Market Intelligence (tu precio vs. mercado, demanda por zona), prioridad en solicitudes y la insignia Partner que ven los hoteles.</p></div><button class="btn" onclick="becomePartner()">Activar Partner</button></div>`;
+    box.innerHTML=`
+      <div style="margin-bottom:16px">${partner}</div>
+      <div class="box" style="margin-bottom:16px">
+        <h3>👤 Datos del perfil</h3><div class="hint">Cómo te ven los hoteles en el catálogo</div>
+        <div class="fgrid">
+          <div class="field"><label>Nombre artístico / proveedor</label><input id="pf_stage" value="${esc(p.stage_name||'')}"></div>
+          <div class="field"><label>Ciudad base</label><input id="pf_city" value="${esc(p.base_city||'')}"></div>
+        </div>
+        <div class="field"><label>Descripción / bio</label><textarea id="pf_bio" placeholder="Cuéntale a los hoteles quién eres, tu experiencia y qué te hace único…">${esc(p.bio||'')}</textarea></div>
+        <div class="fgrid">
+          <div class="field"><label>Teléfono</label><input id="pf_phone" value="${esc(p.phone||'')}"></div>
+          <div class="field"><label>Correo de contacto</label><input id="pf_email" value="${esc(p.email||'')}"></div>
+        </div>
+        <div class="fgrid">
+          <div class="field"><label>Sitio web</label><input id="pf_web" value="${esc(p.website||'')}" placeholder="https://…"></div>
+          <div class="field"><label>Instagram</label><input id="pf_ig" value="${esc(sl.instagram||'')}" placeholder="@usuario"></div>
+        </div>
+        <div class="saverow"><button class="btn" onclick="saveProfile(this)">Guardar cambios</button><span class="saved" id="pf_saved">Guardado ✓</span></div>
+      </div>
+      <div class="box">
+        <h3>🎭 Mis publicaciones</h3><div class="hint">Tus shows en el catálogo · edita tarifas y descripciones, o publica uno nuevo</div>
+        <div id="shows">${p.shows.map(showEditor).join("")||'<div class="muted" style="margin-bottom:14px">Todavía no tienes shows publicados.</div>'}</div>
+        <div style="border-top:1px dashed var(--line);padding-top:16px;margin-top:4px">
+          <div style="font-weight:600;margin-bottom:12px">➕ Publicar un nuevo show</div>
+          <div class="fgrid">
+            <div class="field"><label>Nombre del show</label><input id="ns_name" placeholder="p. ej. Noche Mexicana"></div>
+            <div class="field"><label>Categoría</label><select id="ns_cat" onchange="fillSub('ns_cat','ns_sub')">${Object.keys(tax).map(c=>`<option>${esc(c)}</option>`).join("")}</select></div>
+          </div>
+          <div class="fgrid">
+            <div class="field"><label>Subcategoría</label><select id="ns_sub"></select></div>
+            <div class="field"><label>Tarifa hotel (MXN)</label><input id="ns_price" type="number" placeholder="18000"></div>
+          </div>
+          <button class="btn ghost" onclick="addShow(this)">Publicar show</button>
+        </div>
+      </div>`;
+    fillSub('ns_cat','ns_sub');
   },
 
   async market(box){
@@ -521,6 +667,180 @@ const RENDER = {
       </div></div>`;
   }
 };
+
+/* ---- Artist dashboard + self-service ---- */
+const sameMonth=(iso,d)=>{const x=new Date(iso);return x.getFullYear()===d.getFullYear()&&x.getMonth()===d.getMonth();};
+function showLabel(b){return b.show_name||(b.event_type&&b.event_type!=='solicitud'?b.event_type:'Por asignar');}
+const gv=id=>(document.getElementById(id).value||'').trim();
+const numOrNull=id=>{const v=gv(id);return v===''?null:Number(v);};
+function flash(id){const e=document.getElementById(id);if(!e)return;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1800);}
+async function patch(path,body){
+  const r=await fetch(API+path,{method:'PATCH',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  if(!r.ok) throw new Error(path+' '+r.status); return r.json();
+}
+async function del(path){
+  const r=await fetch(API+path,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}});
+  if(!r.ok) throw new Error(path+' '+r.status);
+}
+
+function artistCal(bk, ref){
+  const y=ref.getFullYear(), m=ref.getMonth();
+  const start=(new Date(y,m,1).getDay()+6)%7;          // Monday-first
+  const days=new Date(y,m+1,0).getDate();
+  const today=new Date();
+  const byDay={};
+  bk.forEach(b=>{const d=new Date(b.starts_at); if(d.getFullYear()===y&&d.getMonth()===m){(byDay[d.getDate()]=byDay[d.getDate()]||[]).push(b.status);}});
+  const cells=[];
+  for(let i=0;i<start;i++) cells.push('<div class="cell out"></div>');
+  for(let dd=1;dd<=days;dd++){
+    const isToday=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===dd;
+    const dots=[...new Set(byDay[dd]||[])].map(s=>`<i class="d-${s}"></i>`).join("");
+    cells.push(`<div class="cell${isToday?' today':''}">${dd}<div class="dts">${dots}</div></div>`);
+  }
+  const head=['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM'].map(h=>`<span>${h}</span>`).join("");
+  return `<div class="cal"><div class="hd">${head}</div><div class="gr">${cells.join("")}</div>
+    <div class="cal-leg"><span><i class="dot d-confirmed"></i>Confirmada</span><span><i class="dot d-pending"></i>Pendiente</span><span><i class="dot d-completed"></i>Realizada</span><span><i class="dot d-cancelled"></i>Cancelada</span></div></div>`;
+}
+
+async function artistHome(box){
+  const [p, bk, convs, openReqs] = await Promise.all([
+    api('/me/artist'), api('/bookings/mine'), api('/conversations/mine'), api('/requests?status=open')
+  ]);
+  const now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const isRev=b=>['confirmed','completed'].includes(b.status);
+  const done=bk.filter(b=>b.status==='completed');
+  const upcoming=bk.filter(b=>['pending','confirmed'].includes(b.status)&&new Date(b.starts_at)>=today).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
+  const totalRev=bk.filter(isRev).reduce((a,b)=>a+(b.agreed_price||0),0);
+  const monthRev=bk.filter(b=>isRev(b)&&sameMonth(b.starts_at,now)).reduce((a,b)=>a+(b.agreed_price||0),0);
+  const score=p.rating?Math.round(p.rating*20):Math.min(98,72+done.length*3);
+  const next=upcoming[0];
+  const unread=convs.reduce((a,c)=>a+(c.unread_for_artist||0),0);
+  const months=[]; for(let i=5;i>=0;i--) months.push(new Date(now.getFullYear(),now.getMonth()-i,1));
+  const monthRows=months.map(d=>({lbl:d.toLocaleDateString('es-MX',{month:'short'}),v:bk.filter(b=>isRev(b)&&sameMonth(b.starts_at,d)).reduce((a,b)=>a+(b.agreed_price||0),0)}));
+  const maxM=Math.max(1,...monthRows.map(m=>m.v));
+  const recent=bk.filter(isRev).sort((a,b)=>b.starts_at.localeCompare(a.starts_at)).slice(0,5);
+  const primary=(p.shows||[])[0];
+  const myPrice=primary?(primary.price_hotel||primary.base_price):null;
+  // market reference = average hotel rate of peer shows in the same category
+  let mktAvg=null;
+  if(primary&&primary.category){ try{
+    const peers=await api(`/shows?category=${encodeURIComponent(primary.category)}`);
+    const prices=peers.filter(s=>s.artist_id!==p.id && s.price_hotel!=null).map(s=>s.price_hotel);
+    if(prices.length) mktAvg=Math.round(prices.reduce((a,b)=>a+b,0)/prices.length);
+  }catch(e){} }
+  const vsMkt=(myPrice!=null&&mktAvg)?Math.round((myPrice-mktAvg)/mktAvg*100):null;
+  const buscando=primary?openReqs.filter(r=>r.category===primary.category).length:openReqs.length;
+
+  box.innerHTML=`
+    <div class="kpis">
+      <div class="kpi"><div class="k">⭐ Mi Score</div>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:10px">
+          <div class="ring" style="background:conic-gradient(var(--acc) ${(score*3.6).toFixed(0)}deg,#ffffff12 0)"><div class="cn"><b>${score}</b><s>/100</s></div></div>
+          <div><div class="star" style="font-size:14px">${'★'.repeat(Math.max(1,Math.round(score/20)))}</div><div class="d">Top ${score>=90?'5':score>=80?'15':'30'}% de artistas</div></div>
+        </div></div>
+      <div class="kpi"><div class="k">🗓️ Próxima actuación</div>
+        ${next?`<div class="v" style="font-size:15.5px;margin-top:9px">${esc(next.company_name||next.show_name||'Actuación')}</div><div class="d">${fmtDate(next.starts_at)}</div><div style="margin-top:8px">${chip(next.status)}</div>`
+        :`<div class="v" style="font-size:15.5px;margin-top:9px">—</div><div class="d">Sin actuaciones próximas</div>`}</div>
+      <div class="kpi"><div class="orb"></div><div class="k">💰 Ganancias este mes</div><div class="v">${MXN(monthRev)}</div><div class="d" style="text-transform:capitalize">${now.toLocaleDateString('es-MX',{month:'long'})}</div></div>
+      <div class="kpi"><div class="orb"></div><div class="k">🎭 Actuaciones</div>
+        <div style="display:flex;gap:26px;margin-top:11px">
+          <div><div style="font-size:23px;font-weight:750">${done.length}</div><div class="d">Realizadas</div></div>
+          <div><div style="font-size:23px;font-weight:750">${upcoming.length}</div><div class="d">Próximas</div></div>
+        </div></div>
+    </div>
+    <div class="grid2">
+      <div class="box"><h3 style="text-transform:capitalize">🗓️ Calendario — ${now.toLocaleDateString('es-MX',{month:'long',year:'numeric'})}</h3><div class="hint">Tus fechas del mes</div>${artistCal(bk,now)}</div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="box"><h3>📣 Solicitudes</h3><div class="hint">Oportunidades y mensajes</div>
+          <div class="srow"><div class="ic2">✨</div><div class="lb">Nuevas oportunidades<s>solicitudes abiertas</s></div><div class="nb">${openReqs.length}</div></div>
+          <div class="srow"><div class="ic2">💬</div><div class="lb">Mensajes sin leer<s>de hoteles</s></div><div class="nb">${unread}</div></div>
+          <div class="srow"><div class="ic2">🎭</div><div class="lb">Actuaciones próximas<s>confirmadas o pendientes</s></div><div class="nb">${upcoming.length}</div></div>
+        </div>
+        <div class="box"><h3>📈 Market Intelligence ${p.is_partner?'':'<span class="pro">PRO</span>'}</h3><div class="hint">Tu posición en el mercado</div>
+          ${mktAvg?`<div class="srow"><div class="ic2">🏷️</div><div class="lb">Tu tarifa vs. mercado<s>${esc(primary.category)}${vsMkt!=null?` · ${vsMkt>=0?'+':''}${vsMkt}% ${vsMkt>=0?'sobre':'bajo'} el promedio`:''}</s></div>
+            <div class="nb" style="text-align:right;line-height:1.2">${myPrice!=null?MXN(myPrice):'—'}<div class="d" style="font-weight:400">prom. ${MXN(mktAvg)}</div></div></div>`
+          :`<div class="hint" style="margin:0 0 4px">Publica un show con tarifa en Mi Perfil para compararte con el mercado.</div>`}
+          <div class="srow"><div class="ic2">🔥</div><div class="lb">Hoteles buscando<s>${primary?'en tu categoría':'en el tablero'}</s></div><div class="nb">${buscando}</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="box"><h3>📊 Rendimiento (6 meses)</h3><div class="hint">Ingresos por mes · ${MXN(totalRev)} acumulado</div>
+        ${bars(monthRows.map(m=>({lbl:m.lbl,pct:Math.round(m.v/maxM*100),val:MXN(m.v)})))}</div>
+      <div class="box"><h3>🧾 Últimos pagos</h3><div class="hint">Facturación reciente</div>
+        <table><tbody>${recent.length?recent.map(b=>`<tr><td><div style="font-weight:600">${esc(b.company_name||'—')}</div><div class="muted" style="font-size:11px">${fmtDate(b.starts_at)}</div></td>
+          <td style="text-align:right"><div style="font-weight:650">${MXN(b.agreed_price)}</div>${b.status==='completed'?'<span class="chip c-completed">Pagada</span>':'<span class="chip c-pending">Pendiente</span>'}</td></tr>`).join("")
+          :'<tr><td class="muted">Sin pagos aún</td></tr>'}</tbody></table></div>
+    </div>
+    <div class="box" style="margin-top:16px"><h3>🗓️ Próximas actuaciones</h3><div class="hint">Tu agenda inmediata</div>
+      <table><thead><tr><th>Fecha</th><th>Hotel</th><th>Show</th><th>Monto</th><th>Estado</th></tr></thead><tbody>
+      ${upcoming.length?upcoming.slice(0,8).map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.company_name||'—')}</td><td class="muted">${esc(showLabel(b))}</td><td>${MXN(b.agreed_price)}</td><td>${chip(b.status)}</td></tr>`).join("")
+        :'<tr><td colspan="5" class="muted">No tienes actuaciones próximas. Revisa el tablero de Solicitudes para conseguir nuevas.</td></tr>'}
+      </tbody></table></div>`;
+}
+
+function showEditor(s){
+  return `<div class="showcard" data-sid="${s.id}">
+    <div class="hh"><div style="font-weight:650">${esc(s.show_name||'Show')}</div><div class="tag2">${esc(s.category||'')}${s.subcategory?' · '+esc(s.subcategory):''}</div></div>
+    <div class="fgrid">
+      <div class="field"><label>Nombre del show</label><input id="sh_name_${s.id}" value="${esc(s.show_name||'')}"></div>
+      <div class="field"><label>Tarifa hotel (MXN)</label><input id="sh_price_${s.id}" type="number" value="${s.price_hotel!=null?s.price_hotel:''}"></div>
+    </div>
+    <div class="field"><label>Descripción</label><textarea id="sh_desc_${s.id}">${esc(s.description||'')}</textarea></div>
+    <div class="fgrid">
+      <div class="field"><label>Duración (min)</label><input id="sh_dur_${s.id}" type="number" value="${s.duration_minutes!=null?s.duration_minutes:''}"></div>
+      <div class="field"><label>Tarifa boda (MXN)</label><input id="sh_pw_${s.id}" type="number" value="${s.price_wedding!=null?s.price_wedding:''}"></div>
+    </div>
+    <div class="saverow"><button class="btn" onclick="saveShow(${s.id},this)">Guardar</button>
+      <button class="btn danger" onclick="delShow(${s.id},this)">Eliminar</button>
+      <span class="saved" id="sh_saved_${s.id}">Guardado ✓</span></div>
+  </div>`;
+}
+function fillSub(catId,subId){
+  const tax=CACHE.tax||{}; const cat=document.getElementById(catId).value; const sel=document.getElementById(subId);
+  const subs=tax[cat]||[]; sel.innerHTML='<option value="">(opcional)</option>'+subs.map(x=>`<option>${esc(x)}</option>`).join("");
+}
+function refreshIdentity(){
+  const p=CACHE.profile; if(!p)return; ME.artist_name=p.stage_name;
+  document.querySelector('.brand span').textContent=p.stage_name||'Artista';
+}
+async function saveProfile(btn){
+  btn.disabled=true;
+  const sl=Object.assign({},(CACHE.profile&&CACHE.profile.social_links)||{});
+  const ig=gv('pf_ig'); if(ig) sl.instagram=ig; else delete sl.instagram;
+  const body={stage_name:gv('pf_stage'),base_city:gv('pf_city')||null,bio:gv('pf_bio')||null,
+    phone:gv('pf_phone')||null,email:gv('pf_email')||null,website:gv('pf_web')||null,social_links:sl};
+  try{ CACHE.profile=await patch('/me/artist',body); flash('pf_saved'); refreshIdentity(); }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
+  btn.disabled=false;
+}
+async function saveShow(id,btn){
+  btn.disabled=true;
+  const body={show_name:gv('sh_name_'+id),description:gv('sh_desc_'+id)||null,
+    price_hotel:numOrNull('sh_price_'+id),duration_minutes:numOrNull('sh_dur_'+id),price_wedding:numOrNull('sh_pw_'+id)};
+  try{ await patch('/me/artist/shows/'+id,body); flash('sh_saved_'+id); }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
+  btn.disabled=false;
+}
+async function delShow(id,btn){
+  if(!confirm('¿Eliminar este show del catálogo?'))return;
+  btn.disabled=true;
+  try{ await del('/me/artist/shows/'+id); show('profile',true); }
+  catch(e){ alert('No se pudo eliminar: '+e.message); btn.disabled=false; }
+}
+async function addShow(btn){
+  const name=gv('ns_name'), cat=document.getElementById('ns_cat').value, sub=document.getElementById('ns_sub').value||null, price=numOrNull('ns_price');
+  if(!name){ alert('Ponle un nombre al show'); return; }
+  btn.disabled=true;
+  try{ await post('/me/artist/shows',{show_name:name,category:cat,subcategory:sub,price_hotel:price}); show('profile',true); }
+  catch(e){ alert('No se pudo publicar: '+e.message); btn.disabled=false; }
+}
+async function becomePartner(){
+  if(!confirm('¿Activar tu plan Partner? Tendrás Market Intelligence y prioridad en el tablero.'))return;
+  try{ CACHE.profile=await patch('/me/artist',{is_partner:true}); refreshIdentity(); show('profile',true); }
+  catch(e){ alert('No se pudo activar: '+e.message); }
+}
+window.saveProfile=saveProfile;window.saveShow=saveShow;window.delShow=delShow;window.addShow=addShow;window.becomePartner=becomePartner;window.fillSub=fillSub;
 
 async function openConv(id,el){
   if(el){document.querySelectorAll('.citem').forEach(x=>x.classList.remove('on'));el.classList.add('on');}
