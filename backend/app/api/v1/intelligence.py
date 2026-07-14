@@ -29,6 +29,8 @@ from app.schemas.intelligence import (
     CategoryTrend,
     DemandIntelligenceOut,
     DemandRow,
+    DestinationStat,
+    DestinationStudyOut,
     MarketIntelligenceOut,
     PropertyIntelligence,
     StarTierStat,
@@ -419,4 +421,127 @@ async def zone_intelligence(
         note=("Mapa de calor por ciudad segun contrataciones + tarifa promedio por "
               "zona. Zona = ciudad del hotel; para un mapa geografico con pines se "
               "agregarian coordenadas mas adelante."),
+    )
+
+
+# --- Destination market study (promedios de todos los hoteles por destino) --
+
+@router.get(
+    "/destinations",
+    response_model=DestinationStudyOut,
+    dependencies=[Depends(require_permission("report.view"))],
+)
+async def destination_study(
+    db: DbSession,
+    year: int | None = None,
+    month: int | None = None,
+    days: int = Query(default=180, ge=1, le=365),
+):
+    """Estudio de mercado por DESTINO: promedia el gasto/habitacion, gasto/huesped,
+    intensidad y ocupacion de TODOS los hoteles de cada ciudad (no compara
+    propiedades individuales - es un benchmark anonimo del mercado). Las metricas
+    de presupuesto son del mes dado; contrataciones y tarifa promedio, de la
+    ventana de `days`."""
+    now = datetime.now(timezone.utc)
+    year = year or now.year
+    month = month or now.month
+    now_naive = now.replace(tzinfo=None)
+    win_start = now_naive - timedelta(days=days)
+
+    # market-wide: every hotel that has a city
+    companies = list(
+        (await db.execute(select(Company).where(Company.city.is_not(None)))).scalars().all()
+    )
+    cids = [c.id for c in companies]
+
+    budgets: dict[int, PropertyBudget] = {}
+    if cids:
+        brows = (
+            await db.execute(
+                select(PropertyBudget).where(
+                    PropertyBudget.company_id.in_(cids),
+                    PropertyBudget.year == year,
+                    PropertyBudget.month == month,
+                )
+            )
+        ).scalars().all()
+        budgets = {b.company_id: b for b in brows}
+
+    # per-hotel budget metrics, bucketed by city
+    by_city: dict[str, list[tuple]] = {}
+    hotels_per_city: dict[str, int] = {}
+    for c in companies:
+        hotels_per_city[c.city] = hotels_per_city.get(c.city, 0) + 1
+        b = budgets.get(c.id)
+        if b is None:
+            continue
+        adr = float(c.avg_daily_rate) if c.avg_daily_rate is not None else None
+        occ = float(b.occupancy_pct) if b.occupancy_pct is not None else None
+        budget_amt = float(b.entertainment_budget) if b.entertainment_budget is not None else None
+        if not (budget_amt and c.rooms):
+            continue
+        per_room = budget_amt / c.rooms
+        est_rev = (c.rooms * adr * (occ / 100) * _DAYS_IN_MONTH) if (adr and occ) else None
+        intensity = (budget_amt / est_rev * 100) if est_rev else None
+        guests = (c.rooms * (occ / 100) * _GUESTS_PER_ROOM) if occ else None
+        per_guest = (budget_amt / guests) if guests else None
+        by_city.setdefault(c.city, []).append((per_room, per_guest, intensity, occ))
+
+    # bookings + tarifa per city over the window
+    booked_price = func.coalesce(
+        func.sum(case((Booking.status.in_(_BOOKED), Booking.agreed_price), else_=0)), 0
+    )
+    booked_cnt = func.coalesce(
+        func.sum(case((Booking.status.in_(_BOOKED), 1), else_=0)), 0
+    )
+    brows2 = (
+        await db.execute(
+            select(Company.city, func.count(Booking.id), booked_price, booked_cnt)
+            .join(Company, Company.id == Booking.company_id)
+            .where(
+                Booking.created_at >= win_start,
+                Booking.created_at < now_naive,
+                Booking.status != BookingStatus.CANCELLED,
+                Company.city.is_not(None),
+            )
+            .group_by(Company.city)
+        )
+    ).all()
+    book_by_city = {city: (int(n), float(sp), int(bc)) for city, n, sp, bc in brows2}
+    total_bookings = sum(n for n, _, _ in book_by_city.values())
+
+    def _avg(rows, idx):
+        vals = [r[idx] for r in rows if r[idx] is not None]
+        return round(sum(vals) / len(vals), 2) if vals else None
+
+    dests: list[DestinationStat] = []
+    for city in hotels_per_city:
+        rows = by_city.get(city, [])
+        n_book, spend, bc = book_by_city.get(city, (0, 0.0, 0))
+        dests.append(DestinationStat(
+            zone=city, hotels=hotels_per_city[city],
+            avg_spend_per_room=_avg(rows, 0), avg_spend_per_guest=_avg(rows, 1),
+            avg_intensity_pct=_avg(rows, 2), avg_occupancy_pct=_avg(rows, 3),
+            bookings=n_book, total_spend=round(spend, 2),
+            avg_price=round(spend / bc, 2) if bc else None,
+            share_pct=_pct(n_book, total_bookings) or 0.0,
+        ))
+    dests.sort(key=lambda d: d.bookings, reverse=True)
+
+    rooms_avgs = [d.avg_spend_per_room for d in dests if d.avg_spend_per_room is not None]
+    guest_avgs = [d.avg_spend_per_guest for d in dests if d.avg_spend_per_guest is not None]
+    price_avgs = [d.avg_price for d in dests if d.avg_price is not None]
+
+    return DestinationStudyOut(
+        year=year, month=month, window_days=days,
+        destinations_count=len(dests), hotels_count=len(companies),
+        guests_per_room=_GUESTS_PER_ROOM,
+        market_avg_spend_per_room=round(sum(rooms_avgs) / len(rooms_avgs), 2) if rooms_avgs else None,
+        market_avg_spend_per_guest=round(sum(guest_avgs) / len(guest_avgs), 2) if guest_avgs else None,
+        market_avg_price=round(sum(price_avgs) / len(price_avgs), 2) if price_avgs else None,
+        total_bookings=total_bookings,
+        destinations=dests,
+        note=("Promedios de todos los hoteles por destino (ciudad). Metricas de "
+              "presupuesto del mes; contrataciones y tarifa de la ventana. Estudio "
+              "de mercado anonimo, sin comparar propiedades individuales."),
     )

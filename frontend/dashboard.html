@@ -423,7 +423,7 @@ const TITLES={home:["Resumen","Vista consolidada de la cadena"],cal:["Actuacione
   reqs:["Solicitudes","Tablero de pedidos abiertos"],chat:["Chat","Conversaciones hotel · artista"],
   bill:["Facturación","Historial de facturas por mes"],
   profile:["Mi Perfil","Tus datos, tarifas y publicaciones"],
-  market:["Market Intelligence","Benchmarking de gasto en entretenimiento"],
+  market:["Market Intelligence","Estudio de mercado por destino"],
   demand:["Tendencias de demanda","Lo que más se está pidiendo"],news:["Noticias","Novedades del entretenimiento"]};
 
 document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>{
@@ -596,65 +596,68 @@ const RENDER = {
   },
 
   async market(box){
-    const m = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
-    let zones=null; try{ zones=await api(`/intelligence/zones?days=180${GID?`&group_id=${GID}`:''}`);}catch(e){}
-    const maxRoom=Math.max(1,...m.properties.map(p=>p.spend_per_room||0));
-    const maxGuest=Math.max(1,...m.properties.map(p=>p.spend_per_guest||0));
-    const maxAbs = Math.max(1,...m.properties.map(p=>Math.abs(p.vs_market_pct||0)));
-    const div = m.properties.filter(p=>p.intensity_pct!=null).map(p=>{
-      const v=p.vs_market_pct||0, w=Math.abs(v)/maxAbs*50;
-      const style = v>=0? `left:50%;width:${w}%;background:var(--ok)` : `right:50%;width:${w}%;background:var(--bad)`;
-      return `<div class="div-row"><div class="lbl">${esc(p.name)} <span class="star">${stars(p.star_rating)}</span></div>
-        <div class="div-wrap"><div class="div-mid"></div><div class="div-bar" style="${style}"></div></div>
-        <div class="val" style="text-align:right">${(v>=0?'+':'')+v.toFixed(1)}%</div></div>`;
-    }).join("");
-    // donut by star
-    const tot=m.by_star_rating.reduce((a,s)=>a+s.spend_share_pct,0)||1; let acc=0; const seg=[];
-    m.by_star_rating.forEach((s,i)=>{const from=acc/tot*360; acc+=s.spend_share_pct; const to=acc/tot*360;
-      seg.push(`${palette[i%palette.length]} ${from}deg ${to}deg`);});
-    const maxc=Math.max(1,...m.spend_by_category.map(c=>c.spend));
+    // Estudio de mercado por DESTINO: promedios de todos los hoteles por ciudad.
+    const study = await api(`/intelligence/destinations?year=${PERIOD.year}&month=${PERIOD.month}&days=180`);
+    let m=null; try{ m=await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}`);}catch(e){}  // market-wide (star split + category trend)
+    const D = study.destinations;
+    const maxRoom=Math.max(1,...D.map(d=>d.avg_spend_per_room||0));
+    const maxGuest=Math.max(1,...D.map(d=>d.avg_spend_per_guest||0));
+    const maxPrice=Math.max(1,...D.map(d=>d.avg_price||0));
+    const maxSh=Math.max(1,...D.map(d=>d.share_pct||0));
+    const byStar=(m&&m.by_star_rating)||[]; const cats=(m&&m.spend_by_category)||[];
+    const tot=byStar.reduce((a,s)=>a+s.spend_share_pct,0)||1; let acc=0; const seg=[];
+    byStar.forEach((s,i)=>{const from=acc/tot*360; acc+=s.spend_share_pct; const to=acc/tot*360; seg.push(`${palette[i%palette.length]} ${from}deg ${to}deg`);});
+    const maxc=Math.max(1,...cats.map(c=>c.spend));
+    const totalSpend=(m&&m.total_entertainment_spend)||0;
     box.innerHTML=`
       <div class="kpis">
-        <div class="kpi"><div class="orb"></div><div class="k">📈 Intensidad prom. mercado</div><div class="v">${m.market_avg_intensity_pct!=null?m.market_avg_intensity_pct.toFixed(1)+'%':'—'}</div><div class="d">gasto / facturación de habitaciones</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">💰 Gasto total</div><div class="v">${MXN(m.total_entertainment_spend)}</div><div class="d">actuaciones del mes</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">🧾 Presupuesto cargado</div><div class="v">${MXN(m.total_entertainment_budget)}</div><div class="d">plan de la cadena</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">🏨 Propiedades</div><div class="v">${m.property_count}</div><div class="d">en el análisis</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">📍 Destinos</div><div class="v">${study.destinations_count}</div><div class="d">ciudades en el estudio</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">🏨 Hoteles</div><div class="v">${study.hotels_count}</div><div class="d">promediados del mercado</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">🛏️ Gasto/hab promedio</div><div class="v">${MXN(study.market_avg_spend_per_room)}</div><div class="d">presupuesto ÷ habitaciones</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">💵 Tarifa promedio</div><div class="v">${MXN(study.market_avg_price)}</div><div class="d">por contratación</div></div>
       </div>
-      <div class="grid2b">
+      <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
+        <h3>📊 Estudio de mercado por destino</h3><div class="hint">Promedio de todos los hoteles de cada ciudad · benchmark anónimo, sin comparar propiedades individuales</div>
+        <table><thead><tr><th>Destino</th><th>Hoteles</th><th>Gasto/hab</th><th>Gasto/huésped</th><th>Intensidad</th><th>Ocupación</th><th>Tarifa prom.</th><th>Contrat.</th></tr></thead><tbody>
+        ${D.map(d=>`<tr><td style="font-weight:600">${esc(d.zone)}</td><td class="muted">${d.hotels}</td>
+          <td>${d.avg_spend_per_room!=null?MXN(d.avg_spend_per_room):'—'}</td>
+          <td>${d.avg_spend_per_guest!=null?MXN(d.avg_spend_per_guest):'—'}</td>
+          <td class="muted">${d.avg_intensity_pct!=null?d.avg_intensity_pct.toFixed(1)+'%':'—'}</td>
+          <td class="muted">${d.avg_occupancy_pct!=null?d.avg_occupancy_pct.toFixed(0)+'%':'—'}</td>
+          <td>${d.avg_price!=null?MXN(d.avg_price):'—'}</td>
+          <td class="muted">${d.bookings}</td></tr>`).join("")||'<tr><td colspan="8" class="muted">Aún no hay hoteles con presupuesto cargado.</td></tr>'}
+        </tbody></table></div>
+      <div class="box" style="margin-top:16px;position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
+        <h3>🗺️ Mapa de calor por destino</h3><div class="hint">Dónde se está contratando más · ${study.total_bookings} contrataciones (últimos ${study.window_days} días)</div>
+        <div class="heat">${D.map(d=>{const o=(0.18+0.62*(d.share_pct/maxSh)).toFixed(2);return `<div class="heatcell" style="background:linear-gradient(135deg,rgba(168,85,247,${o}),rgba(236,72,153,${o}))"><b>${esc(d.zone)}</b><span>${d.bookings} contrataciones · ${d.hotels} hoteles</span><s>${d.share_pct.toFixed(0)}%</s></div>`;}).join("")||'<div class="muted">Sin contrataciones en la ventana.</div>'}</div></div>
+      <div class="grid2b" style="margin-top:16px">
         <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
-          <h3>⚖️ Intensidad vs. mercado</h3><div class="hint">Qué tanto gasta cada propiedad sobre/bajo el promedio</div>${div||'<div class="muted">Carga presupuesto y ocupación para ver el comparativo.</div>'}</div>
+          <h3>🛏️ Gasto por habitación por destino</h3><div class="hint">Presupuesto ÷ habitaciones · promedio de mercado ${MXN(study.market_avg_spend_per_room)}</div>
+          ${bars(D.filter(d=>d.avg_spend_per_room!=null).sort((a,b)=>b.avg_spend_per_room-a.avg_spend_per_room).map(d=>({lbl:d.zone,pct:Math.round(d.avg_spend_per_room/maxRoom*100),val:MXN(d.avg_spend_per_room)})))||'<div class="muted">Carga presupuestos para verlo.</div>'}</div>
         <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
-          <h3>⭐ Gasto por categoría de estrellas</h3><div class="hint">Reparto del gasto del mercado</div>
-          <div class="donut-wrap"><div class="donut" style="background:conic-gradient(${seg.join(",")||'#333 0 360deg'})"><div class="cn"><b>${MXN(m.total_entertainment_spend)}</b><s>total</s></div></div>
-            <div class="leg">${m.by_star_rating.map((s,i)=>`<div><span class="dot" style="background:${palette[i%palette.length]}"></span> ${s.star_rating}★ · ${s.spend_share_pct.toFixed(0)}% <span class="muted">(${MXN(s.total_spend)})</span></div>`).join("")||'<span class="muted">—</span>'}</div>
-          </div>
-        </div>
-      </div>
-      <div class="box" style="margin-top:16px"><h3>🎭 Conceptos que suben y bajan</h3><div class="hint">Gasto por categoría · este mes vs. anterior</div>
-        ${bars(m.spend_by_category.map(c=>({lbl:c.category,pct:Math.round(c.spend/maxc*100),val:MXN(c.spend),col:CATCOL[c.category],trend:c.trend})))||'<div class="muted">Sin datos.</div>'}
+          <h3>🧑‍🤝‍🧑 Gasto por huésped por destino</h3><div class="hint">÷ (habitaciones × ocupación × ${study.guests_per_room}) · promedio ${MXN(study.market_avg_spend_per_guest)}</div>
+          ${bars(D.filter(d=>d.avg_spend_per_guest!=null).sort((a,b)=>b.avg_spend_per_guest-a.avg_spend_per_guest).map(d=>({lbl:d.zone,pct:Math.round(d.avg_spend_per_guest/maxGuest*100),val:MXN(d.avg_spend_per_guest)})))||'<div class="muted">—</div>'}</div>
       </div>
       <div class="grid2b" style="margin-top:16px">
         <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
-          <h3>🛏️ Gasto por habitación</h3><div class="hint">Presupuesto ÷ habitaciones · promedio de mercado ${MXN(m.market_avg_spend_per_room)}</div>
-          ${bars(m.properties.filter(p=>p.spend_per_room!=null).map(p=>({lbl:p.name,pct:Math.round(p.spend_per_room/maxRoom*100),val:MXN(p.spend_per_room)})))||'<div class="muted">Carga presupuesto y ocupación en el perfil del hotel para verlo.</div>'}</div>
+          <h3>💵 Tarifa promedio por destino</h3><div class="hint">Precio promedio de contratación · qué destino es el más caro</div>
+          ${bars(D.filter(d=>d.avg_price!=null).sort((a,b)=>b.avg_price-a.avg_price).map(d=>({lbl:d.zone,pct:Math.round(d.avg_price/maxPrice*100),val:MXN(d.avg_price)})))||'<div class="muted">—</div>'}</div>
         <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
-          <h3>🧑‍🤝‍🧑 Gasto por huésped</h3><div class="hint">Presupuesto ÷ (habitaciones × ocupación × ${m.guests_per_room}) · promedio ${MXN(m.market_avg_spend_per_guest)}</div>
-          ${bars(m.properties.filter(p=>p.spend_per_guest!=null).map(p=>({lbl:p.name,pct:Math.round(p.spend_per_guest/maxGuest*100),val:MXN(p.spend_per_guest)})))||'<div class="muted">Carga presupuesto y ocupación en el perfil del hotel para verlo.</div>'}</div>
+          <h3>⭐ Gasto por categoría de estrellas</h3><div class="hint">Reparto del gasto del mercado</div>
+          <div class="donut-wrap"><div class="donut" style="background:conic-gradient(${seg.join(",")||'#333 0 360deg'})"><div class="cn"><b>${MXN(totalSpend)}</b><s>total</s></div></div>
+            <div class="leg">${byStar.map((s,i)=>`<div><span class="dot" style="background:${palette[i%palette.length]}"></span> ${s.star_rating}★ · ${s.spend_share_pct.toFixed(0)}% <span class="muted">(${MXN(s.total_spend)})</span></div>`).join("")||'<span class="muted">—</span>'}</div>
+          </div></div>
       </div>
-      ${zones&&zones.zones.length?(()=>{const maxSh=Math.max(1,...zones.zones.map(z=>z.share_pct));const maxAvg=Math.max(1,...zones.zones.map(z=>z.avg_price||0));return `
-      <div class="box" style="margin-top:16px;position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
-        <h3>🗺️ Mapa de calor por zona</h3><div class="hint">Dónde se está contratando más · ${zones.total_bookings} contrataciones (últimos ${zones.window_days} días)</div>
-        <div class="heat">${zones.zones.map(z=>{const o=(0.18+0.62*(z.share_pct/maxSh)).toFixed(2);return `<div class="heatcell" style="background:linear-gradient(135deg,rgba(168,85,247,${o}),rgba(236,72,153,${o}))"><b>${esc(z.zone)}</b><span>${z.bookings} contrataciones · ${z.properties} hotel${z.properties===1?'':'es'}</span><s>${z.share_pct.toFixed(0)}%</s></div>`;}).join("")}</div></div>
-      <div class="box" style="margin-top:16px;position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
-        <h3>💵 Tarifa promedio por zona</h3><div class="hint">Precio promedio de contratación · qué zona es la más cara</div>
-        ${bars(zones.zones.filter(z=>z.avg_price!=null).sort((a,b)=>b.avg_price-a.avg_price).map(z=>({lbl:z.zone,pct:Math.round(z.avg_price/maxAvg*100),val:MXN(z.avg_price)})))||'<div class="muted">—</div>'}</div>`;})():''}`;
+      <div class="box" style="margin-top:16px"><h3>🎭 Conceptos que suben y bajan</h3><div class="hint">Gasto del mercado por categoría · este mes vs. anterior</div>
+        ${bars(cats.map(c=>({lbl:c.category,pct:Math.round(c.spend/maxc*100),val:MXN(c.spend),col:CATCOL[c.category],trend:c.trend})))||'<div class="muted">Sin datos.</div>'}
+      </div>`;
   },
 
   async demand(box){
-    const [d, mus, shw] = await Promise.all([
-      api(`/intelligence/demand?days=90&group_id=${GID}`),
-      api(`/intelligence/demand?days=120&category=Musica${GID?`&group_id=${GID}`:''}`),
-      api(`/intelligence/demand?days=120&category=Shows${GID?`&group_id=${GID}`:''}`)
+    const [d, mus, shw] = await Promise.all([        // market-wide (estudio de mercado)
+      api(`/intelligence/demand?days=90`),
+      api(`/intelligence/demand?days=120&category=Musica`),
+      api(`/intelligence/demand?days=120&category=Shows`)
     ]);
     const maxc=Math.max(1,...d.top_categories.map(c=>c.demand_score));
     const maxs=Math.max(1,...d.top_subcategories.map(c=>c.demand_score));

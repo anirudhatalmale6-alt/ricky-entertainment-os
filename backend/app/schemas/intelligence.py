@@ -106,3 +106,35 @@ class ZoneIntelligenceOut(BaseModel):
     total_bookings: int = 0
     zones: list[ZoneStat] = []
     note: str = ""
+
+
+class DestinationStat(BaseModel):
+    """Un destino (ciudad) con los PROMEDIOS de todos sus hoteles - estudio de
+    mercado anonimo, sin señalar propiedades individuales."""
+    zone: str
+    hotels: int = 0                    # hoteles del destino (tamaño de muestra)
+    avg_spend_per_room: float | None = None    # promedio de presupuesto/habitacion
+    avg_spend_per_guest: float | None = None   # promedio de presupuesto/huesped
+    avg_intensity_pct: float | None = None     # promedio de intensidad
+    avg_occupancy_pct: float | None = None
+    bookings: int = 0                  # contrataciones del destino (ventana)
+    total_spend: float = 0.0
+    avg_price: float | None = None     # tarifa promedio de contratacion
+    share_pct: float = 0.0             # % de contrataciones del mercado (heat map)
+
+
+class DestinationStudyOut(BaseModel):
+    """Estudio de mercado por destino: promedios de todos los hoteles por ciudad."""
+    year: int
+    month: int
+    window_days: int
+    currency: str = "MXN"
+    destinations_count: int = 0
+    hotels_count: int = 0
+    guests_per_room: float = 2.1
+    market_avg_spend_per_room: float | None = None
+    market_avg_spend_per_guest: float | None = None
+    market_avg_price: float | None = None
+    total_bookings: int = 0
+    destinations: list[DestinationStat] = []
+    note: str = ""
