@@ -24,8 +24,8 @@ class PropertyIntelligence(BaseModel):
     intensity_pct: float | None = None           # % de la facturacion que va a entretenimiento
     vs_market_pct: float | None = None           # diferencia vs promedio de mercado
     vs_star_peers_pct: float | None = None        # diferencia vs pares de su categoria
-    spend_per_room: float | None = None          # gasto de entretenimiento / habitaciones
-    spend_per_guest: float | None = None         # gasto / (habitaciones * huespedes_por_hab)
+    spend_per_room: float | None = None          # presupuesto / habitaciones
+    spend_per_guest: float | None = None         # presupuesto / (habitaciones * ocupacion * huespedes_por_hab)
     city: str | None = None
     is_partner: bool = False
 

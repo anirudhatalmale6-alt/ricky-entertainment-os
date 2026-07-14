@@ -388,8 +388,9 @@ function applyRole(){
   // Home is the consolidated view for a chain/admin, AND the artist's personal dashboard.
   show('home', ME.is_admin || isDirector || isArtist);
   show('bill', isArtist); show('profile', isArtist);     // artist-only self-service
+  show('cal', !isArtist);                                 // artist agenda now lives inside the Dashboard
   if(isArtist){
-    setNavLabel('home','📊','Dashboard'); setNavLabel('cal','🗓️','Mi agenda'); setNavLabel('chat','💬','Mis chats');
+    setNavLabel('home','📊','Dashboard'); setNavLabel('chat','💬','Mis chats');
     TITLES.home=["Dashboard","Tu actividad de un vistazo"];
   } else if(!ME.is_admin){ setNavLabel('cal','🗓️','Mis actuaciones'); }
   document.getElementById('groupWrap').style.display = ME.is_admin ? '' : 'none';
@@ -634,11 +635,11 @@ const RENDER = {
       </div>
       <div class="grid2b" style="margin-top:16px">
         <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
-          <h3>🛏️ Gasto por habitación</h3><div class="hint">Gasto de entretenimiento ÷ habitaciones · promedio de mercado ${MXN(m.market_avg_spend_per_room)}</div>
-          ${bars(m.properties.filter(p=>p.spend_per_room!=null).map(p=>({lbl:p.name,pct:Math.round(p.spend_per_room/maxRoom*100),val:MXN(p.spend_per_room)})))||'<div class="muted">Carga habitaciones y actuaciones para verlo.</div>'}</div>
+          <h3>🛏️ Gasto por habitación</h3><div class="hint">Presupuesto ÷ habitaciones · promedio de mercado ${MXN(m.market_avg_spend_per_room)}</div>
+          ${bars(m.properties.filter(p=>p.spend_per_room!=null).map(p=>({lbl:p.name,pct:Math.round(p.spend_per_room/maxRoom*100),val:MXN(p.spend_per_room)})))||'<div class="muted">Carga presupuesto y ocupación en el perfil del hotel para verlo.</div>'}</div>
         <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
-          <h3>🧑‍🤝‍🧑 Gasto por huésped</h3><div class="hint">÷ (habitaciones × ${m.guests_per_room} huéspedes) · promedio de mercado ${MXN(m.market_avg_spend_per_guest)}</div>
-          ${bars(m.properties.filter(p=>p.spend_per_guest!=null).map(p=>({lbl:p.name,pct:Math.round(p.spend_per_guest/maxGuest*100),val:MXN(p.spend_per_guest)})))||'<div class="muted">—</div>'}</div>
+          <h3>🧑‍🤝‍🧑 Gasto por huésped</h3><div class="hint">Presupuesto ÷ (habitaciones × ocupación × ${m.guests_per_room}) · promedio ${MXN(m.market_avg_spend_per_guest)}</div>
+          ${bars(m.properties.filter(p=>p.spend_per_guest!=null).map(p=>({lbl:p.name,pct:Math.round(p.spend_per_guest/maxGuest*100),val:MXN(p.spend_per_guest)})))||'<div class="muted">Carga presupuesto y ocupación en el perfil del hotel para verlo.</div>'}</div>
       </div>
       ${zones&&zones.zones.length?(()=>{const maxSh=Math.max(1,...zones.zones.map(z=>z.share_pct));const maxAvg=Math.max(1,...zones.zones.map(z=>z.avg_price||0));return `
       <div class="box" style="margin-top:16px;position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>

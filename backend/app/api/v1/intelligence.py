@@ -149,10 +149,15 @@ async def market_intelligence(
             est_rev = round(c.rooms * adr * (occ / 100) * _DAYS_IN_MONTH, 2)
         intensity = _pct(budget_amt, est_rev) if (budget_amt is not None and est_rev) else None
 
-        # David's cost benchmarks: gasto por habitacion y gasto por huesped
+        # David's cost benchmarks (his corrected formula, 2026-07-14): both are
+        # based on the PRESUPUESTO that each boss loads for the month, so they are
+        # comparable on the same basis.
+        #   gasto por habitacion = presupuesto / habitaciones
+        #   gasto por huesped     = presupuesto / (habitaciones * ocupacion * 2.1)
         c_spend = spend.get(c.id, 0.0)
-        per_room = round(c_spend / c.rooms, 2) if c.rooms else None
-        per_guest = round(c_spend / (c.rooms * _GUESTS_PER_ROOM), 2) if c.rooms else None
+        per_room = round(budget_amt / c.rooms, 2) if (budget_amt and c.rooms) else None
+        guests = (c.rooms * (occ / 100) * _GUESTS_PER_ROOM) if (c.rooms and occ) else None
+        per_guest = round(budget_amt / guests, 2) if (budget_amt and guests) else None
 
         props.append(PropertyIntelligence(
             id=c.id, name=c.name, star_rating=c.star_rating, rooms=c.rooms,
