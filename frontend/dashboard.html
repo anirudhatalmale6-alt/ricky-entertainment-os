@@ -205,61 +205,193 @@
   .newsbar .tag{background:var(--grad);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:5px;letter-spacing:.5px;flex:none}
   .newsbar .tick{overflow:hidden;white-space:nowrap;color:var(--mut)}
 
-  /* login */
-  .login{position:fixed;inset:0;background:radial-gradient(1200px 600px at 70% -10%,#a855f722,transparent),var(--bg);display:grid;place-items:center;z-index:50}
-  .login .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:34px 32px;width:340px;text-align:center;box-shadow:0 10px 40px rgba(24,28,52,.12)}
-  .login .logo{width:52px;height:52px;margin:0 auto 16px;font-size:24px;border-radius:13px}
-  .login h2{font-size:19px;margin-bottom:4px}.login p{color:var(--mut);font-size:12.5px;margin-bottom:20px}
-  .login input{width:100%;background:var(--inp);border:1px solid var(--line);border-radius:9px;padding:11px 13px;color:var(--txt);margin-bottom:11px;outline:none}
-  .login button{width:100%;background:var(--grad);border:0;color:#fff;font-weight:650;padding:12px;border-radius:9px;cursor:pointer;font-size:14px}
-  .login .tabs{display:flex;gap:6px;margin-bottom:16px}
-  .login .tab{flex:1;padding:8px 4px;font-size:11.5px;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--mut);transition:.15s}
-  .login .tab.on{background:var(--grad);color:#fff;border-color:transparent}
-  .login .aform{display:none;flex-direction:column;text-align:left}
-  .login .aform.on{display:flex}
+  /* ===== Login Master (dark, full-screen) — David diseño 2026-07-15 ===== */
+  .lg{position:fixed;inset:0;z-index:50;background:#0b0b13;color:#eef0f7;
+      display:grid;grid-template-columns:minmax(340px,.82fr) 1.18fr;overflow:auto}
+  .lg *{box-sizing:border-box}
+  .lg-hero{position:relative;overflow:hidden;padding:44px 46px;display:flex;flex-direction:column;gap:26px;background:#08080f}
+  .lg-stage{position:absolute;inset:0;z-index:0;background:
+      radial-gradient(50% 46% at 15% 2%, rgba(168,85,247,.60), transparent 68%),
+      radial-gradient(46% 44% at 40% -2%, rgba(236,72,153,.46), transparent 68%),
+      radial-gradient(50% 48% at 68% 0%, rgba(96,165,250,.44), transparent 70%),
+      radial-gradient(42% 40% at 92% 2%, rgba(168,85,247,.42), transparent 70%),
+      linear-gradient(180deg,#0a0a14 0%,#120c1e 48%,#1a0f22 100%)}
+  .lg-beam{display:none}
+  .lg-floor{position:absolute;left:0;right:0;bottom:0;height:40%;z-index:0;
+      background:radial-gradient(92% 120% at 50% 100%, rgba(168,85,247,.34), rgba(236,72,153,.12) 45%, transparent 70%)}
+  .lg-hero>*{position:relative;z-index:1}
+  .lg-brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:3px;font-size:16px}
+  .lg-brand .m{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:16px;
+      background:linear-gradient(135deg,#a855f7,#ec4899);box-shadow:0 6px 20px rgba(168,85,247,.5)}
+  .lg-brand small{display:block;font-size:8.5px;letter-spacing:3.4px;color:#a6a2c4;font-weight:700;margin-top:2px}
+  .lg-mid{margin-top:8vh}
+  .lg-h1{font-size:37px;line-height:1.14;font-weight:800;letter-spacing:-.6px;margin-bottom:18px}
+  .lg-h1 .p{color:#b98bff}
+  .lg-sub{color:#c7c9dc;font-size:14.5px;line-height:1.6;max-width:340px}
+  .lg-bot{display:flex;flex-direction:column;margin-top:auto}
+  .lg-feats{display:flex;gap:24px}
+  .lg-feat{max-width:130px}
+  .lg-feat .fi{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:19px;margin-bottom:11px;
+      background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10)}
+  .lg-feat b{font-size:12.5px;display:block;margin-bottom:4px}
+  .lg-feat span{font-size:11px;color:#9a9cb4;line-height:1.45}
+  .lg-switch{display:flex;align-items:center;gap:13px;margin-top:36px;font-size:12.5px;color:#a6a8c0}
+  .lg-switch button{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:#eef0f7;
+      padding:9px 16px;border-radius:9px;font-weight:600;cursor:pointer;font-size:12.5px;transition:.15s}
+  .lg-switch button:hover{background:rgba(255,255,255,.1)}
+  .lg-forms{background:#101018;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.05)}
+  .lg-cols{flex:1;display:grid;grid-template-columns:1fr 1fr}
+  .lg-pane{padding:50px 46px;display:flex;flex-direction:column;justify-content:center}
+  .lg-pane+.lg-pane{border-left:1px solid rgba(255,255,255,.06)}
+  .lg-pane h2{font-size:23px;font-weight:750;margin-bottom:5px}
+  .lg-pane .lead{color:#9a9cb4;font-size:13px;margin-bottom:24px;line-height:1.5}
+  .lg-lab{font-size:12px;font-weight:600;color:#c9cbdc;margin:13px 0 7px}
+  .lg-in{position:relative}
+  .lg-in input{width:100%;background:#191922;border:1px solid #2b2b39;border-radius:10px;
+      padding:12px 13px;color:#eef0f7;font-size:13.5px;outline:none;font-family:inherit;transition:.15s}
+  .lg-in input:focus{border-color:#7c5cfc;box-shadow:0 0 0 3px rgba(124,92,252,.18)}
+  .lg-in input::placeholder{color:#61637a}
+  .lg-in .eye{position:absolute;right:12px;top:11px;color:#71738c;cursor:pointer;font-size:15px;user-select:none}
+  .lg-tel{display:grid;grid-template-columns:80px 1fr;gap:8px}
+  .lg-tel .cc{background:#191922;border:1px solid #2b2b39;border-radius:10px;display:flex;align-items:center;
+      justify-content:center;gap:5px;font-size:13px;color:#c9cbdc}
+  .lg-row{display:flex;align-items:center;justify-content:space-between;margin:16px 0 22px;font-size:12.5px}
+  .lg-chk{display:flex;align-items:center;gap:8px;color:#c9cbdc;cursor:pointer;user-select:none}
+  .lg-chk input{appearance:none;-webkit-appearance:none;width:16px;height:16px;border:1px solid #3a3a4c;border-radius:5px;cursor:pointer;position:relative;flex:none}
+  .lg-chk input:checked{background:#7c5cfc;border-color:#7c5cfc}
+  .lg-chk input:checked::after{content:"✓";position:absolute;color:#fff;font-size:11px;left:2.5px;top:-2px}
+  .lg-link{color:#9b7bff;cursor:pointer}
+  .lg-btn{width:100%;border:0;border-radius:10px;padding:13px;font-weight:700;font-size:14px;cursor:pointer;
+      color:#fff;background:linear-gradient(135deg,#7c5cfc,#9b6bff);box-shadow:0 8px 24px rgba(124,92,252,.34);transition:.15s;margin-top:4px}
+  .lg-btn:hover{filter:brightness(1.07)}
+  .lg-alt{text-align:center;color:#8688a0;font-size:12.5px;margin-top:20px}
+  .lg-rules{list-style:none;margin:11px 0 18px;padding:0;display:grid;gap:6px}
+  .lg-rules li{font-size:11.5px;color:#71738c;display:flex;align-items:center;gap:8px;transition:.15s}
+  .lg-rules li::before{content:"○";color:#4a4c60;font-size:12px}
+  .lg-rules li.ok{color:#34d399}
+  .lg-rules li.ok::before{content:"✓";color:#34d399}
+  .lg-terms{font-size:11px;color:#71738c;line-height:1.5;text-align:center;margin-top:16px}
+  .lg-trust{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:22px 46px;
+      border-top:1px solid rgba(255,255,255,.06);background:#0c0c14}
+  .lg-trust .t{display:flex;gap:12px;align-items:flex-start}
+  .lg-trust .ti{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none;font-size:15px;
+      background:rgba(124,92,252,.14);border:1px solid rgba(124,92,252,.26);color:#b98bff}
+  .lg-trust b{font-size:12.5px;display:block;margin-bottom:2px}
+  .lg-trust span{font-size:11px;color:#8688a0;line-height:1.4}
+  .lg-hide{display:none!important}
+  @media(max-width:1040px){.lg{grid-template-columns:1fr}.lg-hero{display:none}
+    .lg-cols{grid-template-columns:1fr}.lg-pane+.lg-pane{border-left:0;border-top:1px solid rgba(255,255,255,.06)}}
   .err{color:var(--bad);font-size:12px;min-height:16px;margin-top:6px}
   .load{color:var(--mut);padding:30px;text-align:center}
 </style>
 </head>
 <body>
-<div class="login" id="login">
-  <div class="card">
-    <div class="logo" style="background:var(--grad);display:grid;place-items:center;font-weight:800;color:#fff">R</div>
-    <h2>RICKY Entertainment OS</h2>
-    <p>Entra a tu panel</p>
-    <div class="tabs">
-      <div class="tab on" data-t="login" onclick="authTab('login')">Entrar</div>
-      <div class="tab" data-t="artist" onclick="authTab('artist')">Soy artista</div>
-      <div class="tab" data-t="hotel" onclick="authTab('hotel')">Soy hotel</div>
+<div class="lg" id="login">
+  <!-- HERO -->
+  <aside class="lg-hero">
+    <div class="lg-stage"></div>
+    <div class="lg-beam" style="left:9%"></div>
+    <div class="lg-beam" style="left:30%"></div>
+    <div class="lg-beam" style="left:55%"></div>
+    <div class="lg-beam" style="left:78%"></div>
+    <div class="lg-floor"></div>
+
+    <div class="lg-brand"><div class="m">◆</div><div>SHOWCASE<small id="heroKicker">ARTISTAS</small></div></div>
+    <div class="lg-mid">
+      <h1 class="lg-h1" id="heroTitle">Conecta talento.<br>Crea experiencias.<br><span class="p">Inspira momentos.</span></h1>
+      <p class="lg-sub" id="heroSub">La plataforma líder para encontrar, contratar y gestionar entretenimiento en hoteles y resorts.</p>
+    </div>
+    <div class="lg-bot">
+    <div class="lg-feats">
+      <div class="lg-feat"><div class="fi">👥</div><b>Más oportunidades</b><span>Conéctate con hoteles que buscan tu talento.</span></div>
+      <div class="lg-feat"><div class="fi">🗓️</div><b>Gestiona todo</b><span>Calendario, contratos, pagos y más en un solo lugar.</span></div>
+      <div class="lg-feat"><div class="fi">📈</div><b>Haz crecer tu carrera</b><span>Tu perfil, tus reseñas y tu reputación.</span></div>
+    </div>
+    <div class="lg-switch">
+      <span id="heroSwitchLbl">¿Eres hotel o comprador?</span>
+      <button id="heroSwitchBtn" onclick="toggleAudience()">Ir a Showcase Hoteles</button>
+    </div>
+    </div>
+  </aside>
+
+  <!-- FORMS -->
+  <section class="lg-forms">
+    <div class="lg-cols">
+      <!-- LOGIN -->
+      <div class="lg-pane">
+        <h2>Iniciar sesión</h2>
+        <div class="lead">Bienvenido de nuevo</div>
+        <div class="lg-lab">Correo electrónico</div>
+        <div class="lg-in"><input id="email" type="email" placeholder="tu@correo.com" value="admin@ricky.os"></div>
+        <div class="lg-lab">Contraseña</div>
+        <div class="lg-in"><input id="pass" type="password" placeholder="••••••••" value="Admin123!"><span class="eye" onclick="pwEye('pass',this)">👁</span></div>
+        <input id="otp" placeholder="Código 2FA" class="lg-hide">
+        <div class="lg-row">
+          <label class="lg-chk"><input type="checkbox" checked> Recuérdame</label>
+          <span class="lg-link">¿Olvidaste tu contraseña?</span>
+        </div>
+        <button class="lg-btn" onclick="login()">Iniciar sesión</button>
+        <div class="lg-alt">¿No tienes cuenta? <span class="lg-link" onclick="focusReg()">Regístrate</span></div>
+      </div>
+
+      <!-- REGISTER -->
+      <div class="lg-pane">
+        <h2 id="regTitle">Crear cuenta</h2>
+        <div class="lead" id="regLead">Únete a Showcase y lleva tu talento al siguiente nivel.</div>
+
+        <div id="reg-artist">
+          <div class="lg-lab">Nombre completo</div>
+          <div class="lg-in"><input id="a_name" placeholder="Ej. Alejandro Reyes"></div>
+          <div class="lg-lab">Nombre artístico / Grupo</div>
+          <div class="lg-in"><input id="a_stage" placeholder="Ej. Mariachi Los Reyes"></div>
+          <div class="lg-lab">Correo electrónico</div>
+          <div class="lg-in"><input id="a_email" type="email" placeholder="tu@correo.com"></div>
+          <div class="lg-lab">Teléfono</div>
+          <div class="lg-tel"><div class="cc">📞 +52</div><div class="lg-in"><input id="a_phone" placeholder="55 1234 5678"></div></div>
+          <div class="lg-lab">Contraseña</div>
+          <div class="lg-in"><input id="a_pass" type="password" placeholder="Crea una contraseña segura" oninput="pwRules('a_pass','a_rules')"><span class="eye" onclick="pwEye('a_pass',this)">👁</span></div>
+          <ul class="lg-rules" id="a_rules">
+            <li data-r="len">Al menos 8 caracteres</li>
+            <li data-r="upper">Una letra mayúscula</li>
+            <li data-r="num">Un número</li>
+            <li data-r="spec">Un carácter especial</li>
+          </ul>
+          <input id="a_city" class="lg-hide">
+          <button class="lg-btn" onclick="regArtist()">Crear cuenta</button>
+        </div>
+
+        <div id="reg-hotel" class="lg-hide">
+          <div class="lg-lab">Nombre completo</div>
+          <div class="lg-in"><input id="h_name" placeholder="Ej. Carlos Méndez"></div>
+          <div class="lg-lab">Hotel / Empresa</div>
+          <div class="lg-in"><input id="h_company" placeholder="Ej. Hotel Paradise Cancún"></div>
+          <div class="lg-lab">Puesto (opcional)</div>
+          <div class="lg-in"><input id="h_pos" placeholder="Ej. Director de Entretenimiento"></div>
+          <div class="lg-lab">Correo electrónico</div>
+          <div class="lg-in"><input id="h_email" type="email" placeholder="tu@correo.com"></div>
+          <div class="lg-lab">Contraseña</div>
+          <div class="lg-in"><input id="h_pass" type="password" placeholder="Crea una contraseña segura" oninput="pwRules('h_pass','h_rules')"><span class="eye" onclick="pwEye('h_pass',this)">👁</span></div>
+          <ul class="lg-rules" id="h_rules">
+            <li data-r="len">Al menos 8 caracteres</li>
+            <li data-r="upper">Una letra mayúscula</li>
+            <li data-r="num">Un número</li>
+            <li data-r="spec">Un carácter especial</li>
+          </ul>
+          <button class="lg-btn" onclick="regHotel()">Crear cuenta</button>
+        </div>
+
+        <div class="lg-terms">Al crear tu cuenta, aceptas nuestros <span class="lg-link">Términos y Condiciones</span> y la <span class="lg-link">Política de Privacidad</span>.</div>
+        <div class="err" id="lerr"></div>
+      </div>
     </div>
 
-    <div class="aform on" id="f-login">
-      <input id="email" value="admin@ricky.os" placeholder="Correo">
-      <input id="pass" type="password" value="Admin123!" placeholder="Contraseña">
-      <input id="otp" placeholder="Código 2FA (si tienes activado)" style="display:none">
-      <button onclick="login()">Entrar</button>
+    <!-- TRUST BAR -->
+    <div class="lg-trust">
+      <div class="t"><div class="ti">🛡️</div><div><b>Comunidad verificada</b><span>Artistas y empresas verificadas para tu seguridad.</span></div></div>
+      <div class="t"><div class="ti">💳</div><div><b>Pagos seguros</b><span>Recibe tus pagos de forma rápida y segura.</span></div></div>
+      <div class="t"><div class="ti">🎧</div><div><b>Soporte dedicado</b><span>Estamos aquí para ayudarte en cada paso.</span></div></div>
     </div>
-
-    <div class="aform" id="f-artist">
-      <input id="a_name" placeholder="Tu nombre">
-      <input id="a_stage" placeholder="Nombre artístico / proveedor">
-      <input id="a_city" placeholder="Ciudad base (opcional)">
-      <input id="a_email" placeholder="Correo">
-      <input id="a_pass" type="password" placeholder="Contraseña (mín. 8)">
-      <button onclick="regArtist()">Crear cuenta de artista</button>
-    </div>
-
-    <div class="aform" id="f-hotel">
-      <input id="h_name" placeholder="Tu nombre">
-      <input id="h_company" placeholder="Nombre del hotel / empresa">
-      <input id="h_pos" placeholder="Puesto (opcional)">
-      <input id="h_email" placeholder="Correo">
-      <input id="h_pass" type="password" placeholder="Contraseña (mín. 8)">
-      <button onclick="regHotel()">Crear cuenta de hotel</button>
-    </div>
-
-    <div class="err" id="lerr"></div>
-  </div>
+  </section>
 </div>
 
 <div class="app" id="app" style="display:none">
@@ -385,6 +517,36 @@ async function regHotel(){
     await afterAuth(d.access_token);
   }catch(e){el.textContent="No se pudo conectar al servidor";}
 }
+
+/* ---- Login Master helpers ---- */
+function pwEye(id,el){const i=document.getElementById(id);const hidden=i.type==='password';i.type=hidden?'text':'password';el.textContent=hidden?'🙈':'👁';}
+function pwRules(id,listId){
+  const v=document.getElementById(id).value||"";
+  const t={len:v.length>=8,upper:/[A-Z]/.test(v),num:/[0-9]/.test(v),spec:/[^A-Za-z0-9]/.test(v)};
+  document.querySelectorAll('#'+listId+' li').forEach(li=>li.classList.toggle('ok',!!t[li.dataset.r]));
+}
+let AUD='artist';
+function toggleAudience(){
+  AUD = AUD==='artist' ? 'hotel' : 'artist';
+  const h = AUD==='hotel';
+  document.getElementById('reg-artist').classList.toggle('lg-hide',h);
+  document.getElementById('reg-hotel').classList.toggle('lg-hide',!h);
+  document.getElementById('heroKicker').textContent = h?'HOTELES':'ARTISTAS';
+  document.getElementById('heroTitle').innerHTML = h
+    ? 'Programa tu venue.<br>Controla tu presupuesto.<br><span class="p">Sin complicaciones.</span>'
+    : 'Conecta talento.<br>Crea experiencias.<br><span class="p">Inspira momentos.</span>';
+  document.getElementById('heroSub').textContent = h
+    ? 'Encuentra, contrata y gestiona todo el entretenimiento de tu hotel desde un solo lugar.'
+    : 'La plataforma líder para encontrar, contratar y gestionar entretenimiento en hoteles y resorts.';
+  document.getElementById('regTitle').textContent = h?'Crear cuenta de hotel':'Crear cuenta';
+  document.getElementById('regLead').textContent = h
+    ? 'Registra tu hotel y empieza a programar entretenimiento.'
+    : 'Únete a Showcase y lleva tu talento al siguiente nivel.';
+  document.getElementById('heroSwitchLbl').textContent = h?'¿Eres artista o proveedor?':'¿Eres hotel o comprador?';
+  document.getElementById('heroSwitchBtn').textContent = h?'Ir a Showcase Artistas':'Ir a Showcase Hoteles';
+  document.getElementById('lerr').textContent="";
+}
+function focusReg(){const el=document.getElementById(AUD==='hotel'?'h_name':'a_name');if(el)el.focus();}
 
 function setNavLabel(p,ic,txt){
   const n=document.querySelector(`.nav[data-p='${p}']`);
