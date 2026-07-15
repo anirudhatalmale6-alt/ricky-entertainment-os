@@ -553,6 +553,7 @@ const RENDER = {
         <div class="kpi"><div class="orb"></div><div class="k">⏳ Por cobrar</div><div class="v">${MXN(pend)}</div><div class="d">confirmadas, aún no realizadas</div></div>
         <div class="kpi"><div class="orb"></div><div class="k">📅 Este mes</div><div class="v">${MXN(mes)}</div><div class="d">${now.toLocaleDateString('es-MX',{month:'long'})}</div></div>
       </div>
+      ${keys.length?`<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn ghost" onclick="exportInvoices(this)">⬇ Exportar CSV</button></div>`:''}
       ${keys.length? keys.map(k=>{
         const rows=groups[k]; const st=rows.reduce((a,b)=>a+(b.agreed_price||0),0);
         return `<div class="box" style="margin-bottom:16px"><h3 style="text-transform:capitalize">${monthName(k)}</h3>
@@ -942,6 +943,32 @@ async function sendMsg(){
 function chip(s){const map={pending:'Pendiente',confirmed:'Confirmada',completed:'Realizada',cancelled:'Cancelada',open:'Abierta',fulfilled:'Adjudicada',closed:'Cerrada'};
   return `<span class="chip c-${s}">${map[s]||s}</span>`;}
 function fmtDate(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});}
+// Exporta el historial de facturacion a CSV (compatible con Excel, para contabilidad)
+async function exportInvoices(btn){
+  const csvCell=v=>{const s=(v==null?'':String(v)).replace(/"/g,'""');return /[",\n;]/.test(s)?`"${s}"`:s;};
+  try{
+    if(btn){btn.disabled=true;btn.dataset.t=btn.textContent;btn.textContent='Generando…';}
+    const bk=await api('/bookings/mine');
+    const inv=bk.filter(b=>['confirmed','completed'].includes(b.status))
+                .sort((a,b)=>b.starts_at.localeCompare(a.starts_at));
+    const invNo=b=>{const d=new Date(b.starts_at);return 'INV-'+d.getFullYear()+'-'+String(b.id).padStart(4,'0');};
+    const iso=b=>{const d=new Date(b.starts_at);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+    const estado=s=>s==='completed'?'Pagada':'Pendiente';
+    const head=['Factura','Hotel','Concepto','Fecha','Monto (MXN)','Estado'];
+    const lines=[head.join(',')];
+    inv.forEach(b=>lines.push([invNo(b),b.company_name||'',showLabel(b),iso(b),Math.round(b.agreed_price||0),estado(b.status)].map(csvCell).join(',')));
+    const total=inv.reduce((a,b)=>a+(b.agreed_price||0),0);
+    lines.push(['','','','','','']. join(','));
+    lines.push(['TOTAL','','','',Math.round(total),`${inv.length} facturas`].map(csvCell).join(','));
+    const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    const today=new Date().toISOString().slice(0,10);
+    a.href=url;a.download=`facturacion_${today}.csv`;document.body.appendChild(a);a.click();
+    a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }catch(e){alert('No se pudo exportar: '+e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent=btn.dataset.t||'Exportar CSV';}}
+}
+window.exportInvoices=exportInvoices;
 window.chip=chip;window.fmtDate=fmtDate;window.openConv=openConv;window.sendMsg=sendMsg;window.login=login;window.reload=reload;
 window.authTab=authTab;window.regArtist=regArtist;window.regHotel=regHotel;
 </script>

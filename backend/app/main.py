@@ -59,6 +59,17 @@ async def health():
     return {"status": "ok", "service": settings.PROJECT_NAME, "version": __version__}
 
 
+# The dashboard is a single file that we overwrite on every deploy, so it must
+# never be cached by the LiteSpeed edge (LSCache) — otherwise a stale copy keeps
+# being served after an upload. Send explicit no-store on the HTML entrypoint.
+_NO_CACHE = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "X-LiteSpeed-Cache-Control": "no-cache",
+}
+
+
 @app.get("/", include_in_schema=False)
 async def dashboard():
     """Serve the single-file dashboard and tell it where the API lives, so the
@@ -66,11 +77,12 @@ async def dashboard():
     f = _frontend_file()
     if f is None:
         return HTMLResponse("<h1>RICKY Entertainment OS</h1><p>API activa en "
-                            f"{settings.ROOT_PATH}{settings.API_V1_PREFIX}</p>")
+                            f"{settings.ROOT_PATH}{settings.API_V1_PREFIX}</p>",
+                            headers=_NO_CACHE)
     html = f.read_text(encoding="utf-8")
     inject = f"<script>window.RICKY_API={json.dumps(settings.ROOT_PATH)};</script>"
     if "</head>" in html:
         html = html.replace("</head>", inject + "</head>", 1)
     else:
         html = inject + html
-    return HTMLResponse(html)
+    return HTMLResponse(html, headers=_NO_CACHE)
