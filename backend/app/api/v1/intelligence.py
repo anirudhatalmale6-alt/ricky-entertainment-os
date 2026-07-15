@@ -32,7 +32,11 @@ from app.schemas.intelligence import (
     DestinationStat,
     DestinationStudyOut,
     MarketIntelligenceOut,
+    PriceRange,
+    PriceRangesOut,
     PropertyIntelligence,
+    SeasonalityOut,
+    SeasonMonth,
     StarTierStat,
     ZoneIntelligenceOut,
     ZoneStat,
@@ -43,6 +47,8 @@ router = APIRouter(prefix="/intelligence", tags=["intelligence"])
 _BOOKED = (BookingStatus.CONFIRMED, BookingStatus.COMPLETED)
 _DAYS_IN_MONTH = 30  # room-revenue estimate normalises the monthly budget
 _GUESTS_PER_ROOM = 2.1  # supuesto para "gasto por huesped" (David); configurable
+_MONTHS_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
+              "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 
 def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
@@ -544,4 +550,111 @@ async def destination_study(
         note=("Promedios de todos los hoteles por destino (ciudad). Metricas de "
               "presupuesto del mes; contrataciones y tarifa de la ventana. Estudio "
               "de mercado anonimo, sin comparar propiedades individuales."),
+    )
+
+
+@router.get(
+    "/seasonality",
+    response_model=SeasonalityOut,
+    dependencies=[Depends(require_permission("report.view"))],
+)
+async def seasonality(
+    db: DbSession,
+    months: int = Query(default=12, ge=3, le=24),
+):
+    """Indicador 8 - Estacionalidad de la demanda: cuantas actuaciones (y cuanto
+    gasto) tiene el mercado completo cada mes, para ver la curva del año y saber
+    cuando se contrata mas. Anonimo, agregado de todos los hoteles."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    # build the trailing window of `months` calendar months, oldest first
+    seq: list[tuple[int, int]] = []
+    y, m = now.year, now.month
+    for _ in range(months):
+        seq.append((y, m))
+        y, m = _prev_month(y, m)
+    seq.reverse()
+
+    spend_expr = func.coalesce(
+        func.sum(case((Booking.status.in_(_BOOKED), Booking.agreed_price), else_=0)), 0
+    )
+    out: list[SeasonMonth] = []
+    for yy, mm in seq:
+        start, end = _month_bounds(yy, mm)
+        row = (
+            await db.execute(
+                select(func.count(Booking.id), spend_expr).where(
+                    Booking.starts_at >= start,
+                    Booking.starts_at < end,
+                    Booking.status != BookingStatus.CANCELLED,
+                )
+            )
+        ).one()
+        out.append(SeasonMonth(
+            year=yy, month=mm, label=f"{_MONTHS_ES[mm - 1]} {yy % 100:02d}",
+            bookings=int(row[0] or 0), spend=round(float(row[1] or 0), 2),
+        ))
+
+    with_data = [s for s in out if s.bookings > 0]
+    peak = max(with_data, key=lambda s: s.bookings) if with_data else None
+    low = min(with_data, key=lambda s: s.bookings) if with_data else None
+    return SeasonalityOut(
+        months=out,
+        peak_month=peak.label if peak else None,
+        low_month=low.label if low else None,
+        total_bookings=sum(s.bookings for s in out),
+        note=("Actuaciones por mes en todo el mercado (por fecha del show). "
+              "Muestra en que temporada se concentra la demanda."),
+    )
+
+
+@router.get(
+    "/price-ranges",
+    response_model=PriceRangesOut,
+    dependencies=[Depends(require_permission("report.view"))],
+)
+async def price_ranges(
+    db: DbSession,
+    days: int = Query(default=180, ge=1, le=365),
+):
+    """Indicador 9 - Rango de precios por categoria: minimo, promedio y maximo que
+    paga el mercado por cada tipo de show, para saber si una tarifa esta cara o
+    barata. Anonimo, agregado de todas las contrataciones con precio."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    win_start = now - timedelta(days=days)
+    rows = (
+        await db.execute(
+            select(
+                Show.category,
+                func.count(Booking.id),
+                func.min(Booking.agreed_price),
+                func.avg(Booking.agreed_price),
+                func.max(Booking.agreed_price),
+            )
+            .join(Show, Show.id == Booking.show_id)
+            .where(
+                Booking.created_at >= win_start,
+                Booking.created_at < now,
+                Booking.status.in_(_BOOKED),
+                Booking.agreed_price.is_not(None),
+                Show.category.is_not(None),
+            )
+            .group_by(Show.category)
+        )
+    ).all()
+
+    cats = [
+        PriceRange(
+            category=cat, bookings=int(n or 0),
+            min_price=round(float(mn), 2) if mn is not None else None,
+            avg_price=round(float(av), 2) if av is not None else None,
+            max_price=round(float(mx), 2) if mx is not None else None,
+        )
+        for cat, n, mn, av, mx in rows
+    ]
+    cats.sort(key=lambda c: c.avg_price or 0, reverse=True)
+    return PriceRangesOut(
+        window_days=days,
+        categories=cats,
+        note=("Precios de contratacion por categoria en la ventana. Minimo, "
+              "promedio y maximo del mercado."),
     )

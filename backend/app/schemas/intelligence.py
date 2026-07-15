@@ -138,3 +138,43 @@ class DestinationStudyOut(BaseModel):
     total_bookings: int = 0
     destinations: list[DestinationStat] = []
     note: str = ""
+
+
+# --- Indicador 8: Estacionalidad de la demanda (curva del año) ---
+class SeasonMonth(BaseModel):
+    """Un mes de la curva de estacionalidad (mercado completo)."""
+    year: int
+    month: int              # 1-12
+    label: str              # "Ene 26"
+    bookings: int = 0       # actuaciones (no canceladas) que ocurren ese mes
+    spend: float = 0.0      # $ contratado ese mes (confirmadas + realizadas)
+
+
+class SeasonalityOut(BaseModel):
+    """Estacionalidad de la demanda: en que meses se contrata mas entretenimiento
+    en todo el mercado. Clave para planear a escala nacional."""
+    currency: str = "MXN"
+    months: list[SeasonMonth] = []
+    peak_month: str | None = None      # mes mas alto (label)
+    low_month: str | None = None       # mes mas bajo (label)
+    total_bookings: int = 0
+    note: str = ""
+
+
+# --- Indicador 9: Rango de precios por categoria ---
+class PriceRange(BaseModel):
+    """Rango de precios de contratacion de una categoria/estilo (mercado)."""
+    category: str
+    bookings: int = 0       # muestra (contrataciones con precio)
+    min_price: float | None = None
+    avg_price: float | None = None
+    max_price: float | None = None
+
+
+class PriceRangesOut(BaseModel):
+    """Cuanto cuesta contratar cada tipo de show: minimo, promedio y maximo del
+    mercado, para saber si una tarifa esta cara o barata."""
+    window_days: int
+    currency: str = "MXN"
+    categories: list[PriceRange] = []
+    note: str = ""
