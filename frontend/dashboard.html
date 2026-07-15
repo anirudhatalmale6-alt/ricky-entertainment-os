@@ -303,6 +303,12 @@ const CATCOL = {"Musica":"#a855f7","Shows":"#ec4899","Fotografia y Video":"#60a5
 const palette=["#a855f7","#ec4899","#60a5fa","#34d399","#fbbf24","#f87171"];
 const stars = n => n? '★'.repeat(n):'—';
 const esc = s => (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+// Display-only accent normalization for category/subcategory labels (keeps raw
+// keys intact for filtering & color lookup — only prettifies what the user sees).
+const PRETTY={"Musica":"Música","Produccion":"Producción","Fotografia y Video":"Fotografía y Video",
+  "Trio":"Trío","Tematico o de Temporada":"Temático o de Temporada","Espectaculos Visuales":"Espectáculos Visuales",
+  "Musica en vivo":"Música en vivo","Fotografia":"Fotografía","Iluminacion":"Iluminación"};
+const pretty = s => PRETTY[s]||s||"";
 
 async function api(path){
   const r = await fetch(API+path,{headers:{Authorization:"Bearer "+TOKEN}});
@@ -443,7 +449,7 @@ async function show(p,force){
   catch(e){ box.innerHTML='<div class="load">Error: '+esc(e.message)+'</div>'; }
 }
 
-const bars = (rows)=> rows.map(r=>`<div class="bar-row"><div class="lbl">${esc(r.lbl)}</div>
+const bars = (rows)=> rows.map(r=>`<div class="bar-row"><div class="lbl" title="${esc(r.lbl)}">${esc(r.lbl)}</div>
   <div class="track"><div class="fill" style="width:${r.pct}%;${r.col?'background:'+r.col:''}"></div></div>
   <div class="val">${r.val}${r.trend?`<span class="trend ${r.trend}">${r.trend==='up'?'▲':r.trend==='down'?'▼':'—'}</span>`:''}</div></div>`).join("");
 
@@ -485,7 +491,7 @@ const RENDER = {
           </tbody></table>
         </div>
         <div class="box"><h3>🔥 Lo más pedido</h3><div class="hint">Demanda por categoría (90 días)</div>
-          ${bars(cats.top_categories.slice(0,5).map(c=>({lbl:c.key,pct:Math.round(c.demand_score/maxd*100),val:c.demand_score,col:CATCOL[c.key],trend:c.trend})))}
+          ${bars(cats.top_categories.slice(0,5).map(c=>({lbl:pretty(c.key),pct:Math.round(c.demand_score/maxd*100),val:c.demand_score,col:CATCOL[c.key],trend:c.trend})))}
         </div>
       </div>`;
   },
@@ -506,7 +512,7 @@ const RENDER = {
     box.innerHTML=`<div class="reqs">${rs.map(r=>`
       <div class="reqc"><div class="t">${esc(r.title)}</div>
         <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
-        <div class="meta">🎭 ${esc(r.category||'—')}${r.subcategory?' · '+esc(r.subcategory):''}</div>
+        <div class="meta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
         <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
         <div class="ft">${chip(r.status)}<span class="muted">${r.proposals_count} propuesta${r.proposals_count===1?'':'s'}</span></div>
       </div>`).join("") || '<div class="muted">Sin solicitudes.</div>'}</div>`;
@@ -583,7 +589,7 @@ const RENDER = {
           <div style="font-weight:600;margin-bottom:12px">➕ Publicar un nuevo show</div>
           <div class="fgrid">
             <div class="field"><label>Nombre del show</label><input id="ns_name" placeholder="p. ej. Noche Mexicana"></div>
-            <div class="field"><label>Categoría</label><select id="ns_cat" onchange="fillSub('ns_cat','ns_sub')">${Object.keys(tax).map(c=>`<option>${esc(c)}</option>`).join("")}</select></div>
+            <div class="field"><label>Categoría</label><select id="ns_cat" onchange="fillSub('ns_cat','ns_sub')">${Object.keys(tax).map(c=>`<option value="${esc(c)}">${esc(pretty(c))}</option>`).join("")}</select></div>
           </div>
           <div class="fgrid">
             <div class="field"><label>Subcategoría</label><select id="ns_sub"></select></div>
@@ -649,7 +655,7 @@ const RENDER = {
           </div></div>
       </div>
       <div class="box" style="margin-top:16px"><h3>🎭 Conceptos que suben y bajan</h3><div class="hint">Gasto del mercado por categoría · este mes vs. anterior</div>
-        ${bars(cats.map(c=>({lbl:c.category,pct:Math.round(c.spend/maxc*100),val:MXN(c.spend),col:CATCOL[c.category],trend:c.trend})))||'<div class="muted">Sin datos.</div>'}
+        ${bars(cats.map(c=>({lbl:pretty(c.category),pct:Math.round(c.spend/maxc*100),val:MXN(c.spend),col:CATCOL[c.category],trend:c.trend})))||'<div class="muted">Sin datos.</div>'}
       </div>`;
   },
 
@@ -663,7 +669,7 @@ const RENDER = {
     const maxs=Math.max(1,...d.top_subcategories.map(c=>c.demand_score));
     const maxM=Math.max(1,...mus.top_subcategories.map(c=>c.demand_score));
     const maxS=Math.max(1,...shw.top_subcategories.map(c=>c.demand_score));
-    const trendBars=(rows,max,col)=>bars(rows.map(c=>({lbl:c.key,pct:Math.round(c.demand_score/max*100),val:c.demand_score,col:col,trend:c.trend})));
+    const trendBars=(rows,max,col)=>bars(rows.map(c=>({lbl:pretty(c.key),pct:Math.round(c.demand_score/max*100),val:c.demand_score,col:col,trend:c.trend})));
     box.innerHTML=`
       <div class="kpis" style="grid-template-columns:repeat(2,1fr);max-width:520px">
         <div class="kpi"><div class="orb"></div><div class="k">📣 Solicitudes (90 días)</div><div class="v">${d.total_requests}</div></div>
@@ -671,9 +677,9 @@ const RENDER = {
       </div>
       <div class="grid2b">
         <div class="box"><h3>🔥 Categorías más pedidas</h3><div class="hint">Solicitudes + actuaciones · vs. periodo anterior</div>
-          ${bars(d.top_categories.map(c=>({lbl:c.key,pct:Math.round(c.demand_score/maxc*100),val:c.demand_score,col:CATCOL[c.key],trend:c.trend})))}</div>
+          ${bars(d.top_categories.map(c=>({lbl:pretty(c.key),pct:Math.round(c.demand_score/maxc*100),val:c.demand_score,col:CATCOL[c.key],trend:c.trend})))}</div>
         <div class="box"><h3>🎯 Conceptos específicos</h3><div class="hint">Subcategorías con más demanda</div>
-          ${bars(d.top_subcategories.map((c,i)=>({lbl:c.key,pct:Math.round(c.demand_score/maxs*100),val:c.demand_score,col:palette[i%palette.length],trend:c.trend})))||'<div class="muted">—</div>'}</div>
+          ${bars(d.top_subcategories.map((c,i)=>({lbl:pretty(c.key),pct:Math.round(c.demand_score/maxs*100),val:c.demand_score,col:palette[i%palette.length],trend:c.trend})))||'<div class="muted">—</div>'}</div>
       </div>
       <div class="grid2b" style="margin-top:16px">
         <div class="box"><h3>🎵 Trends Music</h3><div class="hint">Subgéneros de música que más crecen · últimos 120 días</div>
@@ -798,7 +804,7 @@ async function artistHome(box){
           <div class="srow"><div class="ic2">🎭</div><div class="lb">Actuaciones próximas<s>confirmadas o pendientes</s></div><div class="nb">${upcoming.length}</div></div>
         </div>
         <div class="box"><h3>📈 Market Intelligence ${p.is_partner?'':'<span class="pro">PRO</span>'}</h3><div class="hint">Tu posición en el mercado</div>
-          ${mktAvg?`<div class="srow"><div class="ic2">🏷️</div><div class="lb">Tu tarifa vs. mercado<s>${esc(primary.category)}${vsMkt!=null?` · ${vsMkt>=0?'+':''}${vsMkt}% ${vsMkt>=0?'sobre':'bajo'} el promedio`:''}</s></div>
+          ${mktAvg?`<div class="srow"><div class="ic2">🏷️</div><div class="lb">Tu tarifa vs. mercado<s>${esc(pretty(primary.category))}${vsMkt!=null?` · ${vsMkt>=0?'+':''}${vsMkt}% ${vsMkt>=0?'sobre':'bajo'} el promedio`:''}</s></div>
             <div class="nb" style="text-align:right;line-height:1.2">${myPrice!=null?MXN(myPrice):'—'}<div class="d" style="font-weight:400">prom. ${MXN(mktAvg)}</div></div></div>`
           :`<div class="hint" style="margin:0 0 4px">Publica un show con tarifa en Mi Perfil para compararte con el mercado.</div>`}
           <div class="srow"><div class="ic2">🔥</div><div class="lb">Hoteles buscando<s>${primary?'en tu categoría':'en el tablero'}</s></div><div class="nb">${buscando}</div></div>
@@ -822,7 +828,7 @@ async function artistHome(box){
 
 function showEditor(s){
   return `<div class="showcard" data-sid="${s.id}">
-    <div class="hh"><div style="font-weight:650">${esc(s.show_name||'Show')}</div><div class="tag2">${esc(s.category||'')}${s.subcategory?' · '+esc(s.subcategory):''}</div></div>
+    <div class="hh"><div style="font-weight:650">${esc(s.show_name||'Show')}</div><div class="tag2">${esc(pretty(s.category))}${s.subcategory?' · '+esc(pretty(s.subcategory)):''}</div></div>
     <div class="fgrid">
       <div class="field"><label>Nombre del show</label><input id="sh_name_${s.id}" value="${esc(s.show_name||'')}"></div>
       <div class="field"><label>Tarifa hotel (MXN)</label><input id="sh_price_${s.id}" type="number" value="${s.price_hotel!=null?s.price_hotel:''}"></div>
@@ -839,7 +845,7 @@ function showEditor(s){
 }
 function fillSub(catId,subId){
   const tax=CACHE.tax||{}; const cat=document.getElementById(catId).value; const sel=document.getElementById(subId);
-  const subs=tax[cat]||[]; sel.innerHTML='<option value="">(opcional)</option>'+subs.map(x=>`<option>${esc(x)}</option>`).join("");
+  const subs=tax[cat]||[]; sel.innerHTML='<option value="">(opcional)</option>'+subs.map(x=>`<option value="${esc(x)}">${esc(pretty(x))}</option>`).join("");
 }
 function refreshIdentity(){
   const p=CACHE.profile; if(!p)return; ME.artist_name=p.stage_name;
