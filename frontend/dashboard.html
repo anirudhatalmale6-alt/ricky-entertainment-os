@@ -35,7 +35,14 @@
   .nav.on::before{content:"";position:absolute;left:-14px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--grad)}
   .nav .ic{font-size:16px;width:20px;text-align:center}
   .pro{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.6px;color:#fff;background:var(--grad);padding:2px 6px;border-radius:5px}
-  .side .foot{margin-top:auto;font-size:11px;color:var(--mut2);padding:10px}
+  .side .foot{font-size:11px;color:var(--mut2);padding:8px 10px 2px}
+  .side-user{margin-top:auto;display:flex;align-items:center;gap:10px;padding:11px 10px 10px;border-top:1px solid var(--line)}
+  .su-av{width:34px;height:34px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;flex:none}
+  .su-meta{min-width:0;flex:1}
+  .su-meta b{display:block;font-size:12.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .su-meta span{font-size:10.5px;color:var(--mut)}
+  .su-out{background:var(--ov);border:1px solid var(--line);color:var(--mut);height:30px;padding:0 11px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:600;flex:none;transition:.15s;display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .su-out:hover{background:var(--bad);color:#fff;border-color:transparent}
 
   /* Topbar */
   .main{display:flex;flex-direction:column;min-width:0}
@@ -411,7 +418,12 @@
     <div class="nav" data-p="market"><span class="ic">📈</span> Market Intelligence <span class="pro">PRO</span></div>
     <div class="nav" data-p="demand"><span class="ic">🔥</span> Tendencias <span class="pro">PRO</span></div>
     <div class="nav" data-p="news"><span class="ic">📰</span> Noticias <span class="pro">PRO</span></div>
-    <div class="foot">v0.1 · demo</div>
+    <div class="side-user">
+      <div class="su-av" id="suAv">RA</div>
+      <div class="su-meta"><b id="suName">Mi cuenta</b><span id="suRole">ShowCase</span></div>
+      <button class="su-out" onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión">↪ Salir</button>
+    </div>
+    <div class="foot">ShowCase · v0.1</div>
   </aside>
 
   <div class="main">
@@ -547,6 +559,7 @@ function toggleAudience(){
   document.getElementById('lerr').textContent="";
 }
 function focusReg(){const el=document.getElementById(AUD==='hotel'?'h_name':'a_name');if(el)el.focus();}
+function logout(){ TOKEN=null; ME=null; try{document.getElementById('app').style.display='none';}catch(e){} location.reload(); }
 
 function setNavLabel(p,ic,txt){
   const n=document.querySelector(`.nav[data-p='${p}']`);
@@ -560,7 +573,12 @@ function applyRole(){
   // identity in the header + sidebar
   const initials=(ME.full_name||'RA').split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase();
   document.querySelector('.ava').textContent=initials||'RA';
-  document.querySelector('.brand span').textContent = ME.is_admin?'Administración':(isArtist?(ME.artist_name||'Artista'):(ME.company_name||'Contratante'));
+  const roleTxt = ME.is_admin?'Administración':(isArtist?(ME.artist_name||'Artista'):(ME.company_name||'Contratante'));
+  document.querySelector('.brand span').textContent = roleTxt;
+  // sidebar user chip (with Log Out)
+  document.getElementById('suAv').textContent=initials||'RA';
+  document.getElementById('suName').textContent=ME.full_name||'Mi cuenta';
+  document.getElementById('suRole').textContent=roleTxt;
   const show=(p,on)=>{const n=document.querySelector(`.nav[data-p='${p}']`); if(n) n.style.display=on?'':'none';};
   const lbls=document.querySelectorAll('.navlbl');       // [0]=Operación, [1]=Inteligencia·Partner
   const canPartner = ME.is_admin || isDirector;          // chain-level analytics need a group scope
