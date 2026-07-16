@@ -7,11 +7,15 @@ and every write is confined to the profile that belongs to the caller. This is
 what powers the "Mi Perfil" screen where a musician edits their tarifas,
 descripciones and gestiona sus publicaciones (shows).
 """
-from fastapi import APIRouter, HTTPException, status
+import uuid
+
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentScope, DbSession
+from app.core.config import settings
+from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
 from app.models.media import ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
@@ -20,6 +24,10 @@ from app.schemas.artist import ArtistOut, ArtistUpdate
 from app.schemas.show import ShowCreate, ShowOut, ShowUpdate
 
 router = APIRouter(prefix="/me", tags=["me"])
+
+# Images are resized/compressed on the client before upload, so these are small.
+_ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+_MAX_IMAGE_BYTES = 6 * 1024 * 1024
 
 _ARTIST_RELS = (
     selectinload(Artist.shows).selectinload(Show.images),
@@ -89,6 +97,36 @@ async def update_my_profile(payload: ArtistUpdate, scope: CurrentScope, db: DbSe
         setattr(artist, field, value)
     await db.commit()
     return await _load_artist(db, artist_id)
+
+
+# --- Media upload ---------------------------------------------------------
+
+@router.post("/artist/upload-image")
+async def upload_image(scope: CurrentScope, file: UploadFile = File(...)):
+    """Store a show photo and return its URL.
+
+    The image is already resized to ~1600px JPEG on the client, so here we only
+    validate the type/size and write the bytes. The returned URL includes the
+    app's ROOT_PATH so it can be used directly as an <img src> (same origin).
+    """
+    await _require_artist(scope)
+    ext = _ALLOWED_IMAGE_TYPES.get((file.content_type or "").lower())
+    if ext is None:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Formato no admitido. Usa JPG, PNG o WEBP.",
+        )
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archivo vacío.")
+    if len(data) > _MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen es muy grande (máximo 6 MB).",
+        )
+    name = f"{scope.artist_id}_{uuid.uuid4().hex}.{ext}"
+    (ensure_upload_dir() / name).write_bytes(data)
+    return {"url": f"{settings.ROOT_PATH}/uploads/{name}"}
 
 
 # --- Shows (publicaciones) ------------------------------------------------

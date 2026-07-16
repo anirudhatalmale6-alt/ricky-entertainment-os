@@ -7,3 +7,7 @@ venv/
 *.sqlite3
 .pytest_cache/
 .DS_Store
+
+# Runtime user uploads (created by the app)
+backend/static/uploads/
+static/uploads/

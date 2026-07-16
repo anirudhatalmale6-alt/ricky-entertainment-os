@@ -493,8 +493,10 @@ function regErr(d){
     if(Array.isArray(d.detail)&&d.detail[0])return d.detail[0].msg||"Datos inválidos"; }
   return "No se pudo crear la cuenta";
 }
+const BASE = (window.RICKY_API ?? "");   // "" local, "/ricky" live — for page redirects
 async function afterAuth(token){
   TOKEN=token;
+  try{ localStorage.setItem('ricky_token', token); }catch(e){}
   ME = await api("/auth/me");
   document.getElementById('login').style.display="none";
   document.getElementById('app').style.display="grid";
@@ -517,10 +519,13 @@ async function regArtist(){
   const el=document.getElementById('lerr'); el.textContent="";
   try{
     const r = await fetch(API+"/auth/register/artist",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({full_name:val('a_name'),stage_name:val('a_stage'),base_city:val('a_city')||null,email:val('a_email'),password:val('a_pass')})});
+      body:JSON.stringify({full_name:val('a_name'),stage_name:val('a_stage'),phone:val('a_phone')||null,base_city:val('a_city')||null,email:val('a_email'),password:val('a_pass')})});
     const d=await r.json().catch(()=>({}));
     if(!r.ok){el.textContent=regErr(d);return;}
-    await afterAuth(d.access_token);
+    // New artist: save session and go complete the registration hoja (fotos,
+    // precios, redes, datos fiscales) before landing on the dashboard.
+    try{ localStorage.setItem('ricky_token', d.access_token); }catch(e){}
+    location.href = BASE + "/registro";
   }catch(e){el.textContent="No se pudo conectar al servidor";}
 }
 async function regHotel(){
@@ -580,7 +585,16 @@ async function preRegHotel(){
     document.getElementById('reg-hotel-done').classList.remove('lg-hide');
   }catch(e){ el.textContent="No se pudo enviar la solicitud. Intenta de nuevo."; }
 }
-function logout(){ TOKEN=null; ME=null; try{document.getElementById('app').style.display='none';}catch(e){} location.reload(); }
+function logout(){ TOKEN=null; ME=null; try{localStorage.removeItem('ricky_token');}catch(e){} try{document.getElementById('app').style.display='none';}catch(e){} location.reload(); }
+// Restore a saved session on load so a page refresh (or returning from the
+// registration hoja) keeps the user logged in.
+async function restoreSession(){
+  let t=null; try{ t=localStorage.getItem('ricky_token'); }catch(e){}
+  if(!t) return;
+  try{ await afterAuth(t); }
+  catch(e){ try{ localStorage.removeItem('ricky_token'); }catch(_){} }
+}
+document.addEventListener('DOMContentLoaded', restoreSession);
 async function refreshLeadsBadge(){
   if(!ME||!ME.is_admin) return;
   try{ const c=await api('/leads/hotel/count'); const b=document.getElementById('leadsBadge');

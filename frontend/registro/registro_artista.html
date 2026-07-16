@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RICKY · Registro de Artista</title>
+<title>Showcase · Registro de Artista</title>
 <style>
 :root{
   --bg:#f4f5f7; --card:#ffffff; --border:#e7e9ee; --border2:#eef0f3;
@@ -63,8 +63,9 @@ textarea{resize:vertical;min-height:70px}
 
 /* Photo box */
 .photos{display:flex;gap:10px;flex-wrap:wrap}
-.ph{width:74px;height:74px;border-radius:10px;background:linear-gradient(135deg,#e9e7fb,#f2e9fb);border:1px solid var(--border);position:relative;overflow:hidden;flex:none}
+.ph{width:74px;height:74px;border-radius:10px;background:linear-gradient(135deg,#e9e7fb,#f2e9fb);border:1px solid var(--border);position:relative;overflow:hidden;flex:none;background-size:cover;background-position:center}
 .ph.add{display:flex;align-items:center;justify-content:center;cursor:pointer;border:1.5px dashed #cfc9f2;background:#faf9ff;color:var(--violet);font-size:24px}
+.ph.busy{display:flex;align-items:center;justify-content:center;color:var(--violet);font-size:11px}
 .ph .x{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1}
 
 /* Chips */
@@ -152,23 +153,28 @@ textarea{resize:vertical;min-height:70px}
 /* Footer nav */
 .foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
 .btn{border:none;border-radius:10px;padding:11px 22px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:disabled{opacity:.6;cursor:default}
 .btn.prev{background:#fff;border:1px solid var(--border);color:var(--text2)}
 .btn.prev:hover{background:#f6f6f9}
 .btn.next{background:linear-gradient(135deg,var(--violet),var(--violet2));color:#fff;box-shadow:0 8px 18px rgba(124,92,240,.3)}
 .btn.next:hover{background:linear-gradient(135deg,var(--violet-d),var(--violet))}
 .btn.fin{background:linear-gradient(135deg,var(--green),#15a34a);color:#fff;box-shadow:0 8px 18px rgba(22,163,74,.3)}
 .foot-note{text-align:center;font-size:11px;color:var(--text3);margin-top:26px;display:flex;align-items:center;justify-content:center;gap:6px}
+.err{background:#fbeaea;border:1px solid #f3c6c6;color:#b42318;font-size:12.5px;font-weight:600;padding:10px 14px;border-radius:10px;margin-bottom:14px;display:none}
+.err.on{display:block}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top">
     <div class="brand">
-      <div class="logo">R</div>
-      <div><h1>RICK<span>Y</span></h1><p>Registro de artista · plataforma de entretenimiento para hoteles y eventos</p></div>
+      <div class="logo">S</div>
+      <div><h1>SHOW<span>CASE</span></h1><p>Registro de artista · plataforma de entretenimiento para hoteles y eventos</p></div>
     </div>
     <div class="help">Proceso 100% seguro · <b>Tus datos están protegidos</b></div>
   </div>
+
+  <div class="err" id="err"></div>
 
   <div class="steps" id="steps">
     <div class="step active" data-s="0"><div class="num">1</div><div class="lbl"><b>Perfil</b><span>Quién eres</span></div></div>
@@ -183,18 +189,18 @@ textarea{resize:vertical;min-height:70px}
       <h2><span class="ic">👤</span> Perfil personal</h2>
       <div class="sub">Cuéntanos quién eres. Estos datos se registran una sola vez para todo tu catálogo de shows.</div>
       <div class="grid">
-        <label class="f full"><span>Nombre artístico / proveedor <i>*</i></span><input placeholder="Ej. David Producciones"></label>
-        <label class="f"><span>Nombre(s)</span><input placeholder="David"></label>
-        <label class="f"><span>Apellidos</span><input placeholder="Rodríguez"></label>
-        <label class="f"><span>Tipo</span><select><option>Solista</option><option>Dúo / Agrupación</option><option selected>Productora / Proveedor</option></select></label>
-        <label class="f"><span>Años de experiencia</span><input placeholder="10+ años"></label>
-        <label class="f"><span>Teléfono móvil <i>*</i></span><input placeholder="+52 998 123 4567"></label>
-        <label class="f"><span>Correo electrónico <i>*</i></span><input placeholder="hola@correo.com"></label>
-        <label class="f full"><span>Sitio web</span><input placeholder="www.tusitio.com"></label>
+        <label class="f full"><span>Nombre artístico / proveedor <i>*</i></span><input id="p_stage" placeholder="Ej. David Producciones"></label>
+        <label class="f"><span>Nombre(s)</span><input id="p_first" placeholder="David"></label>
+        <label class="f"><span>Apellidos</span><input id="p_last" placeholder="Rodríguez"></label>
+        <label class="f"><span>Tipo</span><select id="p_type"><option>Solista</option><option>Dúo / Agrupación</option><option selected>Productora / Proveedor</option></select></label>
+        <label class="f"><span>Años de experiencia</span><input id="p_years" placeholder="10+ años"></label>
+        <label class="f"><span>Teléfono móvil <i>*</i></span><input id="p_phone" placeholder="+52 998 123 4567"></label>
+        <label class="f"><span>Correo electrónico <i>*</i></span><input id="p_email" placeholder="hola@correo.com"></label>
+        <label class="f full"><span>Sitio web</span><input id="p_web" placeholder="www.tusitio.com"></label>
         <label class="f full"><span>Idiomas que hablas</span>
-          <div class="chips"><span class="chip">Español <b>×</b></span><span class="chip">Inglés <b>×</b></span><span class="chip add">+ Agregar</span></div>
+          <div class="chips" id="langChips"><span class="chip">Español <b onclick="delChip(this)">×</b></span><span class="chip">Inglés <b onclick="delChip(this)">×</b></span><span class="chip add" onclick="addChip('langChips','Idioma')">+ Agregar</span></div>
         </label>
-        <label class="f full"><span>Biografía corta</span><textarea placeholder="Cuéntale al hotel quién eres, tu trayectoria y qué te hace único."></textarea></label>
+        <label class="f full"><span>Biografía corta</span><textarea id="p_bio" placeholder="Cuéntale al hotel quién eres, tu trayectoria y qué te hace único."></textarea></label>
       </div>
     </div>
 
@@ -202,24 +208,24 @@ textarea{resize:vertical;min-height:70px}
       <h2><span class="ic">📍</span> Ubicación y disponibilidad</h2>
       <div class="sub">Dónde estás basado y hasta dónde te mueves.</div>
       <div class="grid three">
-        <label class="f"><span>País</span><input value="México"></label>
-        <label class="f"><span>Estado</span><input placeholder="Quintana Roo"></label>
-        <label class="f"><span>Ciudad base</span><input placeholder="Cancún"></label>
+        <label class="f"><span>País</span><input id="p_country" value="México"></label>
+        <label class="f"><span>Estado</span><input id="p_state" placeholder="Quintana Roo"></label>
+        <label class="f"><span>Ciudad base</span><input id="p_city" placeholder="Cancún"></label>
       </div>
       <div class="grid" style="margin-top:14px">
-        <label class="f"><span>Radio de trabajo (km)</span><input value="100"></label>
+        <label class="f"><span>Radio de trabajo (km)</span><input id="p_radius" value="100"></label>
         <label class="f"><span>Estados donde trabajas</span>
-          <div class="chips"><span class="chip">Quintana Roo <b>×</b></span><span class="chip">Yucatán <b>×</b></span><span class="chip add">+ Agregar</span></div>
+          <div class="chips" id="stateChips"><span class="chip">Quintana Roo <b onclick="delChip(this)">×</b></span><span class="chip">Yucatán <b onclick="delChip(this)">×</b></span><span class="chip add" onclick="addChip('stateChips','Estado')">+ Agregar</span></div>
         </label>
       </div>
       <div class="grid" style="margin-top:14px">
-        <div class="tog"><div class="tt"><b>Disponible para viajar</b></div><label class="sw"><input type="checkbox" checked><i></i></label></div>
-        <div class="tog"><div class="tt"><b>Vehículo propio</b></div><label class="sw"><input type="checkbox" checked><i></i></label></div>
-        <div class="tog"><div class="tt"><b>Pasaporte vigente</b></div><label class="sw"><input type="checkbox"><i></i></label></div>
-        <div class="tog"><div class="tt"><b>Visa USA</b></div><label class="sw"><input type="checkbox"><i></i></label></div>
+        <div class="tog"><div class="tt"><b>Disponible para viajar</b></div><label class="sw"><input type="checkbox" id="t_travel" checked><i></i></label></div>
+        <div class="tog"><div class="tt"><b>Vehículo propio</b></div><label class="sw"><input type="checkbox" id="t_vehicle" checked><i></i></label></div>
+        <div class="tog"><div class="tt"><b>Pasaporte vigente</b></div><label class="sw"><input type="checkbox" id="t_passport"><i></i></label></div>
+        <div class="tog"><div class="tt"><b>Visa USA</b></div><label class="sw"><input type="checkbox" id="t_visa"><i></i></label></div>
       </div>
       <label class="f full" style="margin-top:14px"><span>Redes sociales</span>
-        <div class="grid"><input placeholder="Instagram: @tuusuario"><input placeholder="Facebook: /tupagina"><input placeholder="YouTube: /tucanal"><input placeholder="TikTok: @tuusuario"></div>
+        <div class="grid"><input id="s_instagram" placeholder="Instagram: @tuusuario"><input id="s_facebook" placeholder="Facebook: /tupagina"><input id="s_youtube" placeholder="YouTube: /tucanal"><input id="s_tiktok" placeholder="TikTok: @tuusuario"></div>
       </label>
     </div>
     <div class="foot"><span></span><button class="btn next" onclick="go(1)">Siguiente →</button></div>
@@ -242,15 +248,15 @@ textarea{resize:vertical;min-height:70px}
       <h2><span class="ic">💳</span> Plan de liquidación</h2>
       <div class="sub">¿Cómo quieres recibir tus pagos? Entre más rápido, la plataforma cobra una pequeña comisión por adelantar el pago.</div>
       <div class="plans">
-        <div class="plan sel" onclick="pick(this)"><div class="tick">✓</div><b>Mensual</b><div class="d">Liquidación mensual estándar</div><div class="pct">3.5%</div></div>
-        <div class="plan" onclick="pick(this)"><div class="tick">✓</div><b>Fast</b><div class="d">Pago a 15 días</div><div class="pct">7.5%</div></div>
-        <div class="plan" onclick="pick(this)"><div class="tick">✓</div><b>Express</b><div class="d">Pago a 7 días</div><div class="pct">12%</div></div>
+        <div class="plan sel" data-payout="mensual" onclick="pick(this)"><div class="tick">✓</div><b>Mensual</b><div class="d">Liquidación mensual estándar</div><div class="pct">3.5%</div></div>
+        <div class="plan" data-payout="fast" onclick="pick(this)"><div class="tick">✓</div><b>Fast</b><div class="d">Pago a 15 días</div><div class="pct">7.5%</div></div>
+        <div class="plan" data-payout="express" onclick="pick(this)"><div class="tick">✓</div><b>Express</b><div class="d">Pago a 7 días</div><div class="pct">12%</div></div>
       </div>
       <div class="partner">
         <div class="pic">★</div>
         <div class="pt"><b>Convertirme en Partner</b><span class="badge">Recomendado</span><p>Conecta con otros artistas y empresas, subcontrata talento de la plataforma y obtén el distintivo Partner Verificado que da confianza a los contratantes.</p></div>
         <div class="price">$499<span style="font-size:11px;color:var(--text2)">/mes</span></div>
-        <label class="sw"><input type="checkbox"><i></i></label>
+        <label class="sw"><input type="checkbox" id="t_partner"><i></i></label>
       </div>
     </div>
 
@@ -258,19 +264,19 @@ textarea{resize:vertical;min-height:70px}
       <h2><span class="ic">🧾</span> Información fiscal</h2>
       <div class="sub">Para emitir CFDI y liquidar tus pagos.</div>
       <div class="grid">
-        <label class="f"><span>RFC</span><input placeholder="XAXX010101000"></label>
-        <label class="f"><span>Uso CFDI</span><select><option>G03 - Gastos en general</option><option>P01 - Por definir</option></select></label>
-        <label class="f"><span>Razón social</span><input placeholder="Nombre o razón social"></label>
-        <label class="f"><span>Régimen fiscal</span><input placeholder="612 - Personas Físicas con Actividad Empresarial"></label>
-        <label class="f"><span>Código postal fiscal</span><input placeholder="77500"></label>
+        <label class="f"><span>RFC</span><input id="f_rfc" placeholder="XAXX010101000"></label>
+        <label class="f"><span>Uso CFDI</span><select id="f_cfdi"><option value="G03">G03 - Gastos en general</option><option value="P01">P01 - Por definir</option></select></label>
+        <label class="f"><span>Razón social</span><input id="f_legal" placeholder="Nombre o razón social"></label>
+        <label class="f"><span>Régimen fiscal</span><input id="f_regime" placeholder="612 - Personas Físicas con Actividad Empresarial"></label>
+        <label class="f"><span>Código postal fiscal</span><input id="f_cp" placeholder="77500"></label>
       </div>
       <div class="sec-t">Información bancaria</div>
       <div class="grid">
-        <label class="f"><span>Banco</span><input placeholder="BBVA"></label>
-        <label class="f"><span>Número de cuenta</span><input placeholder="1234 5678 9012"></label>
-        <label class="f"><span>Titular de la cuenta</span><input placeholder="Nombre del titular"></label>
-        <label class="f"><span>CLABE</span><input placeholder="0123 4567 8901 2345 678"></label>
-        <label class="f"><span>Moneda preferida</span><select><option>MXN</option><option>USD</option></select></label>
+        <label class="f"><span>Banco</span><input id="f_bank" placeholder="BBVA"></label>
+        <label class="f"><span>Número de cuenta</span><input id="f_account" placeholder="1234 5678 9012"></label>
+        <label class="f"><span>Titular de la cuenta</span><input id="f_holder" placeholder="Nombre del titular"></label>
+        <label class="f"><span>CLABE</span><input id="f_clabe" placeholder="0123 4567 8901 2345 678"></label>
+        <label class="f"><span>Moneda preferida</span><select id="f_currency"><option>MXN</option><option>USD</option></select></label>
       </div>
     </div>
     <div class="foot"><button class="btn prev" onclick="go(1)">← Anterior</button><button class="btn next" onclick="go(3)">Siguiente →</button></div>
@@ -280,53 +286,84 @@ textarea{resize:vertical;min-height:70px}
   <section class="panel" data-p="3">
     <div class="card">
       <h2><span class="ic">📎</span> Documentos legales</h2>
-      <div class="sub">Sube tus documentos y acepta los términos para finalizar tu registro.</div>
+      <div class="sub">Sube tus documentos y acepta los términos para finalizar tu registro. (La carga de documentos estará disponible desde tu panel una vez dentro.)</div>
       <div class="docs">
         <div class="doc"><div class="di">🆔</div><b>Identificación</b><span>INE / Pasaporte</span></div>
         <div class="doc"><div class="di">🏠</div><b>Comprobante</b><span>de domicilio</span></div>
         <div class="doc"><div class="di">📄</div><b>Constancia SAT</b><span>situación fiscal</span></div>
-        <div class="doc"><div class="di">✍️</div><b>Contrato RICKY</b><span>firmado</span></div>
+        <div class="doc"><div class="di">✍️</div><b>Contrato Showcase</b><span>firmado</span></div>
         <div class="doc"><div class="di">🎚️</div><b>Rider técnico</b><span>PDF</span></div>
         <div class="doc"><div class="di">🛎️</div><b>Rider hospitalidad</b><span>PDF</span></div>
         <div class="doc"><div class="di">📰</div><b>Press Kit</b><span>PDF</span></div>
         <div class="doc"><div class="di">🏦</div><b>Comprobante banco</b><span>PDF</span></div>
       </div>
-      <label class="consent"><input type="checkbox"> He leído y acepto los <a>Términos y Condiciones</a> de RICKY.</label>
-      <label class="consent"><input type="checkbox"> Acepto el <a>Aviso de Privacidad</a>.</label>
-      <label class="consent"><input type="checkbox"> Autorizo el uso de mis datos para fines de operación y promoción.</label>
+      <label class="consent"><input type="checkbox" id="c_terms"> He leído y acepto los <a>Términos y Condiciones</a> de Showcase.</label>
+      <label class="consent"><input type="checkbox" id="c_privacy"> Acepto el <a>Aviso de Privacidad</a>.</label>
+      <label class="consent"><input type="checkbox" id="c_data"> Autorizo el uso de mis datos para fines de operación y promoción.</label>
     </div>
-    <div class="foot"><button class="btn prev" onclick="go(2)">← Anterior</button><button class="btn fin">Finalizar registro ✓</button></div>
+    <div class="foot"><button class="btn prev" onclick="go(2)">← Anterior</button><button class="btn fin" onclick="finalizar(this)">Finalizar registro ✓</button></div>
   </section>
 
-  <div class="foot-note">🔒 Tu información está 100% segura con nosotros · RICKY Entertainment OS</div>
+  <div class="foot-note">🔒 Tu información está 100% segura con nosotros · Showcase Entertainment OS</div>
 </div>
 
 <script>
-// --- Category taxonomy (same source of truth as the backend) ---
-const TAX = {
-  "Música":["Solista","Dúo","Trío","Banda","Orquesta","Mariachi","DJ"],
-  "Shows":["Danza","Magia e Ilusionismo","Circo & Acrobacias","Temático o de Temporada","Infantiles y Familiares","Espectáculos Visuales","Música en vivo","Comedia & Stand Up","Tributos","Variedades"],
-  "Fotografía y Video":["Fotografía","Video"],
-  "Producción":["Audio","Iluminación","Escenarios"]
-};
+// ---- API + session ----
+const API  = (window.RICKY_API ?? "") + "/api/v1";
+const BASE = (window.RICKY_API ?? "");
+const TOKEN = (function(){ try{ return localStorage.getItem('ricky_token'); }catch(e){ return null; } })();
+if(!TOKEN){ location.href = BASE + "/"; }
 
+function authHeaders(json){ const h={Authorization:'Bearer '+TOKEN}; if(json) h['Content-Type']='application/json'; return h; }
+async function errOf(r,p){ let d={}; try{ d=await r.json(); }catch(e){}
+  let m=''; if(d&&d.detail){ m = typeof d.detail==='string' ? d.detail : (Array.isArray(d.detail)&&d.detail[0] ? (d.detail[0].msg||'') : ''); }
+  return new Error(m || (p+' '+r.status)); }
+async function apiGet(p){ const r=await fetch(API+p,{headers:authHeaders()}); if(!r.ok) throw await errOf(r,p); return r.json(); }
+async function apiPatch(p,b){ const r=await fetch(API+p,{method:'PATCH',headers:authHeaders(true),body:JSON.stringify(b)}); if(!r.ok) throw await errOf(r,p); return r.json(); }
+async function apiPost(p,b){ const r=await fetch(API+p,{method:'POST',headers:authHeaders(true),body:JSON.stringify(b)}); if(!r.ok) throw await errOf(r,p); return r.json(); }
+
+function err(m){ const e=document.getElementById('err'); e.textContent=m||''; e.classList.toggle('on',!!m); if(m) window.scrollTo({top:0,behavior:'smooth'}); }
+
+// ---- Category taxonomy (RAW keys = what the API expects; pretty = display) ----
+const TAX = {
+  "Musica":["Solista","Dueto","Trio","Banda","Orquesta","Mariachi","DJ"],
+  "Shows":["Danza","Magia e Ilusionismo","Circo & Acrobacias","Tematico o de Temporada","Infantiles y Familiares","Espectaculos Visuales","Musica en vivo","Comedia & Stand Up","Tributos","Variedades"],
+  "Fotografia y Video":["Fotografia","Video"],
+  "Produccion":["Audio","Iluminacion","Escenarios"]
+};
+const PRETTY={"Musica":"Música","Produccion":"Producción","Fotografia y Video":"Fotografía y Video",
+  "Dueto":"Dúo","Trio":"Trío","Tematico o de Temporada":"Temático o de Temporada",
+  "Espectaculos Visuales":"Espectáculos Visuales","Musica en vivo":"Música en vivo",
+  "Fotografia":"Fotografía","Iluminacion":"Iluminación"};
+const pretty=s=>PRETTY[s]||s;
+const opts=arr=>arr.map(v=>`<option value="${v}">${pretty(v)}</option>`).join('');
+
+// ---- Stepper ----
 function go(n){
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on', +p.dataset.p===n));
-  document.querySelectorAll('.step').forEach(s=>{
-    const i=+s.dataset.s; s.classList.toggle('active',i===n); s.classList.toggle('done',i<n);
-  });
+  document.querySelectorAll('.step').forEach(s=>{ const i=+s.dataset.s; s.classList.toggle('active',i===n); s.classList.toggle('done',i<n); });
   window.scrollTo({top:0,behavior:'smooth'});
 }
 document.querySelectorAll('.step').forEach(s=>s.onclick=()=>go(+s.dataset.s));
-function pick(el){el.parentNode.querySelectorAll('.plan').forEach(p=>p.classList.remove('sel'));el.classList.add('sel');}
+let PAYOUT='mensual';
+function pick(el){ el.parentNode.querySelectorAll('.plan').forEach(p=>p.classList.remove('sel')); el.classList.add('sel'); PAYOUT=el.dataset.payout; }
 
-// --- Shows ---
+// ---- Chips (languages / states) ----
+function delChip(b){ b.parentNode.remove(); }
+function addChip(containerId,label){
+  const v=prompt(label+':'); if(!v) return;
+  const c=document.getElementById(containerId);
+  const chip=document.createElement('span'); chip.className='chip';
+  chip.innerHTML=v.replace(/[<>&]/g,'')+' <b onclick="delChip(this)">×</b>';
+  c.insertBefore(chip, c.querySelector('.add'));
+}
+function chipValues(id){ return [...document.querySelectorAll('#'+id+' .chip:not(.add)')].map(c=>c.firstChild.textContent.trim()).filter(Boolean); }
+
+// ---- Shows ----
 let showN=0;
 function showTpl(n){
-  const cats=Object.keys(TAX).map(c=>`<option>${c}</option>`).join('');
-  const subs=TAX[Object.keys(TAX)[0]].map(s=>`<option>${s}</option>`).join('');
   return `<div class="show open" data-n="${n}">
-    <div class="show-h" onclick="this.parentNode.classList.toggle('open')">
+    <div class="show-h" onclick="if(!event.target.closest('input,select,button')) this.parentNode.classList.toggle('open')">
       <div class="idx">${n}</div>
       <div class="t"><b class="sname">Nuevo show</b><span>Configura la ficha de este show</span></div>
       <span class="cats scat">Música · Solista</span>
@@ -335,48 +372,41 @@ function showTpl(n){
     <div class="show-b">
       <div class="grid">
         <label class="f full"><span>Nombre del espectáculo <i>*</i></span><input class="in-name" oninput="renameShow(${n},this.value)" placeholder="Ej. Sax & Lounge Experience"></label>
-        <label class="f"><span>Categoría <i>*</i></span><select class="in-cat" onchange="fillSub(${n},this.value)">${cats}</select></label>
-        <label class="f"><span>Subcategoría</span><select class="in-sub" onchange="badge(${n})">${subs}</select></label>
-        <label class="f full"><span>Descripción</span><textarea placeholder="De qué trata el show, el ambiente que crea..."></textarea></label>
-        <label class="f"><span>Nº de integrantes</span><input value="1"></label>
-        <label class="f"><span>Duración (min)</span><input placeholder="60"></label>
-        <label class="f"><span>Tiempo de montaje (min)</span><input placeholder="30"></label>
-        <label class="f"><span>Tiempo de desmontaje (min)</span><input placeholder="20"></label>
-        <label class="f"><span>Espacio requerido</span><input placeholder="3x3 m"></label>
-        <label class="f"><span>Consumo eléctrico</span><input placeholder="2 contactos 110v"></label>
-        <label class="f full"><span>Requerimientos / rider</span><textarea placeholder="Escenario, sonido, camerino, etc."></textarea></label>
+        <label class="f"><span>Categoría <i>*</i></span><select class="in-cat" onchange="fillSub(${n},this.value)">${opts(Object.keys(TAX))}</select></label>
+        <label class="f"><span>Subcategoría</span><select class="in-sub" onchange="badge(${n})">${opts(TAX[Object.keys(TAX)[0]])}</select></label>
+        <label class="f full"><span>Descripción</span><textarea class="in-desc" placeholder="De qué trata el show, el ambiente que crea..."></textarea></label>
+        <label class="f"><span>Nº de integrantes</span><input class="in-members" value="1"></label>
+        <label class="f"><span>Duración (min)</span><input class="in-duration" placeholder="60"></label>
+        <label class="f"><span>Tiempo de montaje (min)</span><input class="in-setup" placeholder="30"></label>
+        <label class="f"><span>Tiempo de desmontaje (min)</span><input class="in-teardown" placeholder="20"></label>
+        <label class="f"><span>Espacio requerido</span><input class="in-space" placeholder="3x3 m"></label>
+        <label class="f"><span>Consumo eléctrico</span><input class="in-power" placeholder="2 contactos 110v"></label>
+        <label class="f full"><span>Requerimientos / rider</span><textarea class="in-req" placeholder="Escenario, sonido, camerino, etc."></textarea></label>
       </div>
 
       <div class="sec-t">Fotos y multimedia</div>
-      <div class="photos">
-        <div class="ph"><span class="x">×</span></div><div class="ph"><span class="x">×</span></div>
-        <div class="ph add" onclick="addPhoto(this)">＋</div>
-      </div>
-      <div class="hint">Máximo 5 fotos por show.</div>
+      <div class="photos"><div class="ph add" onclick="pickPhotos(${n})">＋</div></div>
+      <input type="file" class="photo-input" accept="image/*" multiple style="display:none" onchange="onPhotos(${n},this)">
+      <div class="hint">Máximo 5 fotos por show. La primera será la portada.</div>
       <div class="grid" style="margin-top:12px">
-        <label class="f"><span>Video promocional</span><input placeholder="YouTube / Vimeo"></label>
-        <label class="f"><span>Audio</span><input placeholder="Spotify / SoundCloud"></label>
+        <label class="f"><span>Video promocional</span><input class="in-video" placeholder="YouTube / Vimeo"></label>
+        <label class="f"><span>Audio</span><input class="in-audio" placeholder="Spotify / SoundCloud"></label>
       </div>
 
       <div class="sec-t">Tarifas base por tipo de evento (MXN)</div>
       <div class="grid three">
-        <label class="f"><span>Precio hotel</span><input placeholder="$ 10,000"></label>
-        <label class="f"><span>Evento corporativo</span><input placeholder="$ 12,000"></label>
-        <label class="f"><span>Boda</span><input placeholder="$ 14,000"></label>
-        <label class="f"><span>Evento privado</span><input placeholder="$ 11,000"></label>
-        <label class="f"><span>Restaurante / lounge</span><input placeholder="$ 8,000"></label>
-        <label class="f"><span>Festival / público</span><input placeholder="$ —"></label>
-        <label class="f"><span>Hora adicional</span><input placeholder="$ 2,000"></label>
-        <label class="f"><span>Traslado (desde)</span><input placeholder="$ 1,000"></label>
-        <label class="f"><span>Hospedaje / Alimentación / Viáticos</span><input placeholder="A acordar"></label>
-      </div>
-      <div class="bench">
-        <h3>ⓘ Precio promedio de referencia</h3>
-        <p>Precios promedio en tu zona para shows similares. Úsalo como guía para fijar tus tarifas.</p>
-        <div class="val">$8,000 – $12,000</div>
+        <label class="f"><span>Precio hotel</span><input class="p-hotel" placeholder="$ 10,000"></label>
+        <label class="f"><span>Evento corporativo</span><input class="p-corp" placeholder="$ 12,000"></label>
+        <label class="f"><span>Boda</span><input class="p-wedding" placeholder="$ 14,000"></label>
+        <label class="f"><span>Evento privado</span><input class="p-private" placeholder="$ 11,000"></label>
+        <label class="f"><span>Restaurante / lounge</span><input class="p-restaurant" placeholder="$ 8,000"></label>
+        <label class="f"><span>Festival / público</span><input class="p-festival" placeholder="$ —"></label>
+        <label class="f"><span>Hora adicional</span><input class="p-extrahour" placeholder="$ 2,000"></label>
+        <label class="f"><span>Traslado (desde)</span><input class="p-transport" placeholder="$ 1,000"></label>
+        <label class="f"><span>Hospedaje / Alimentación / Viáticos</span><input class="p-lodging" placeholder="A acordar"></label>
       </div>
 
-      <div class="sec-t">Tarifas por temporada <span style="font-weight:400;text-transform:none;color:var(--text3)">(ajuste % sobre tu precio base — tú defines los periodos)</span></div>
+      <div class="sec-t">Tarifas por temporada <span style="font-weight:400;text-transform:none;color:var(--text3)">(ajuste % sobre tu precio base — indica fechas para guardar)</span></div>
       <table class="season">
         <thead><tr><th>Periodo</th><th>Desde</th><th>Hasta</th><th>Ajuste %</th><th></th></tr></thead>
         <tbody class="seasonBody">
@@ -386,21 +416,130 @@ function showTpl(n){
       </table>
       <button class="addrow" onclick="addRow(this)">＋ Añadir periodo</button>
 
-      <div class="tog" style="margin-top:16px"><div class="tt"><b>Ofrezco audición</b><span>Los contratantes pueden solicitar una audición de este show.</span></div><label class="sw"><input type="checkbox"><i></i></label></div>
+      <div class="tog" style="margin-top:16px"><div class="tt"><b>Ofrezco audición</b><span>Los contratantes pueden solicitar una audición de este show.</span></div><label class="sw"><input type="checkbox" class="chk-audition"><i></i></label></div>
 
       <div style="text-align:right;margin-top:6px"><button class="show-del" onclick="delShow(${n})">Eliminar este show</button></div>
     </div>
   </div>`;
 }
-function addShow(){showN++;document.getElementById('showList').insertAdjacentHTML('beforeend',showTpl(showN));}
-function delShow(n){const el=document.querySelector('.show[data-n="'+n+'"]');if(document.querySelectorAll('.show').length>1)el.remove();}
-function renameShow(n,v){document.querySelector('.show[data-n="'+n+'"] .sname').textContent=v||'Nuevo show';}
-function fillSub(n,cat){const el=document.querySelector('.show[data-n="'+n+'"]');el.querySelector('.in-sub').innerHTML=TAX[cat].map(s=>`<option>${s}</option>`).join('');badge(n);}
-function badge(n){const el=document.querySelector('.show[data-n="'+n+'"]');el.querySelector('.scat').textContent=el.querySelector('.in-cat').value+' · '+el.querySelector('.in-sub').value;}
-function addRow(btn){btn.previousElementSibling.querySelector('.seasonBody').insertAdjacentHTML('beforeend','<tr><td><input placeholder="Ej. Halloween"></td><td><input type="date"></td><td><input type="date"></td><td><input placeholder="+150"></td><td class="del" onclick="this.closest(\'tr\').remove()">×</td></tr>');}
-function addPhoto(btn){const row=btn.parentNode;if(row.querySelectorAll('.ph:not(.add)').length>=5){btn.style.display='none';return;}btn.insertAdjacentHTML('beforebegin','<div class="ph"><span class="x">×</span></div>');if(row.querySelectorAll('.ph:not(.add)').length>=5)btn.style.display='none';}
-document.addEventListener('click',e=>{if(e.target.classList.contains('x')){const row=e.target.closest('.photos');e.target.parentNode.remove();const add=row&&row.querySelector('.ph.add');if(add)add.style.display='flex';}if(e.target.classList.contains('chip')&&e.target.classList.contains('add')){/*noop demo*/}});
-addShow(); // first show
+function addShow(){ showN++; document.getElementById('showList').insertAdjacentHTML('beforeend',showTpl(showN)); }
+function delShow(n){ const el=document.querySelector('.show[data-n="'+n+'"]'); if(document.querySelectorAll('.show').length>1) el.remove(); }
+function renameShow(n,v){ document.querySelector('.show[data-n="'+n+'"] .sname').textContent=v||'Nuevo show'; }
+function fillSub(n,cat){ const el=document.querySelector('.show[data-n="'+n+'"]'); el.querySelector('.in-sub').innerHTML=opts(TAX[cat]); badge(n); }
+function badge(n){ const el=document.querySelector('.show[data-n="'+n+'"]'); const c=el.querySelector('.in-cat'), s=el.querySelector('.in-sub'); el.querySelector('.scat').textContent=pretty(c.value)+' · '+pretty(s.value); }
+function addRow(btn){ btn.previousElementSibling.querySelector('.seasonBody').insertAdjacentHTML('beforeend','<tr><td><input placeholder="Ej. Halloween"></td><td><input type="date"></td><td><input type="date"></td><td><input placeholder="+150"></td><td class="del" onclick="this.closest(\'tr\').remove()">×</td></tr>'); }
+
+// ---- Photo upload (client resize -> upload) ----
+function pickPhotos(n){ document.querySelector('.show[data-n="'+n+'"] .photo-input').click(); }
+function photoCount(row){ return row.querySelectorAll('.ph:not(.add)').length; }
+async function resizeToBlob(file,max=1600,q=0.85){
+  const url=URL.createObjectURL(file);
+  const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('img')); i.src=url; });
+  let w=img.naturalWidth, h=img.naturalHeight;
+  if(w>max||h>max){ const s=Math.min(max/w,max/h); w=Math.round(w*s); h=Math.round(h*s); }
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  c.getContext('2d').drawImage(img,0,0,w,h); URL.revokeObjectURL(url);
+  return await new Promise(res=>c.toBlob(res,'image/jpeg',q));
+}
+async function onPhotos(n,input){
+  const row=document.querySelector('.show[data-n="'+n+'"] .photos');
+  const add=row.querySelector('.ph.add');
+  const files=[...input.files]; input.value='';
+  for(const file of files){
+    if(photoCount(row)>=5){ err('Máximo 5 fotos por show.'); break; }
+    const tile=document.createElement('div'); tile.className='ph busy'; tile.textContent='…';
+    row.insertBefore(tile,add);
+    try{
+      const blob=await resizeToBlob(file);
+      const fd=new FormData(); fd.append('file',blob,'photo.jpg');
+      const r=await fetch(API+'/me/artist/upload-image',{method:'POST',headers:authHeaders(),body:fd});
+      if(!r.ok) throw await errOf(r,'upload'); const d=await r.json();
+      tile.className='ph';
+      tile.dataset.url=d.url;
+      tile.style.backgroundImage="url('"+d.url+"')";
+      tile.innerHTML='<span class="x" onclick="delPhoto(this,'+n+')">×</span>';
+    }catch(e){ tile.remove(); err('No se pudo subir una foto: '+e.message); }
+  }
+  if(photoCount(row)>=5) add.style.display='none';
+}
+function delPhoto(x,n){
+  const row=x.closest('.photos'); x.parentNode.remove();
+  const add=row.querySelector('.ph.add'); if(add) add.style.display='flex';
+}
+
+// ---- Collect + submit ----
+const numOf=s=>{ const x=(s||'').replace(/[^0-9.]/g,''); return x?parseFloat(x):null; };
+const intOf=s=>{ const x=(s||'').replace(/[^0-9]/g,''); return x?parseInt(x,10):null; };
+
+function collectProfile(){
+  const v=id=>{ const n=document.getElementById(id); return n?n.value.trim():''; };
+  const chk=id=>{ const n=document.getElementById(id); return n?n.checked:false; };
+  const social={}; ['instagram','facebook','youtube','tiktok'].forEach(k=>{ const x=v('s_'+k); if(x) social[k]=x; });
+  return {
+    stage_name:v('p_stage'), first_name:v('p_first')||null, last_name:v('p_last')||null,
+    artist_type:v('p_type')||null, years_experience:v('p_years')||null,
+    phone:v('p_phone')||null, email:v('p_email')||null, website:v('p_web')||null, bio:v('p_bio')||null,
+    languages_spoken:chipValues('langChips'), social_links:social,
+    country:v('p_country')||null, region:v('p_state')||null, base_city:v('p_city')||null, city:v('p_city')||null,
+    work_radius_km:intOf(v('p_radius')), states_worked:chipValues('stateChips'),
+    available_to_travel:chk('t_travel'), own_vehicle:chk('t_vehicle'), valid_passport:chk('t_passport'), usa_visa:chk('t_visa'),
+    payout_speed:PAYOUT, is_partner:chk('t_partner'), partner_monthly_fee:chk('t_partner')?499:null,
+    rfc:v('f_rfc')||null, cfdi_use:v('f_cfdi')||null, legal_name:v('f_legal')||null, tax_regime:v('f_regime')||null,
+    fiscal_postal_code:v('f_cp')||null, bank_name:v('f_bank')||null, bank_account:v('f_account')||null,
+    bank_account_holder:v('f_holder')||null, bank_clabe:v('f_clabe')||null, preferred_currency:v('f_currency')||'MXN',
+    accepted_terms:chk('c_terms'), accepted_privacy:chk('c_privacy'), authorized_data_use:chk('c_data')
+  };
+}
+function collectShow(el){
+  const q=s=>el.querySelector(s); const v=s=>{ const n=q(s); return n?n.value.trim():''; };
+  const name=v('.in-name'); if(!name) return null;
+  const imgs=[...el.querySelectorAll('.ph[data-url]')].map((p,i)=>({url:p.dataset.url,is_profile:i===0}));
+  const seasons=[...el.querySelectorAll('.seasonBody tr')].map(tr=>{
+    const c=tr.querySelectorAll('input'); const label=c[0].value.trim();
+    const sd=c[1].value, ed=c[2].value; if(!label||!sd||!ed) return null;
+    const adj=parseFloat((c[3].value||'0').replace(/[^0-9.\-]/g,''))||0;
+    return {label,start_date:sd,end_date:ed,adjustment_pct:adj};
+  }).filter(Boolean);
+  const hotel=numOf(v('.p-hotel'));
+  return {
+    show_name:name, category:v('.in-cat'), subcategory:v('.in-sub')||null, description:v('.in-desc')||null,
+    members:intOf(v('.in-members'))||1, duration_minutes:intOf(v('.in-duration')), setup_minutes:intOf(v('.in-setup')),
+    teardown_minutes:intOf(v('.in-teardown')), space_required:v('.in-space')||null, power_required:v('.in-power')||null,
+    requirements:v('.in-req')||null, video_url:v('.in-video')||null, audio_url:v('.in-audio')||null,
+    base_price:hotel, price_hotel:hotel, price_corporate:numOf(v('.p-corp')), price_wedding:numOf(v('.p-wedding')),
+    price_private:numOf(v('.p-private')), price_restaurant:numOf(v('.p-restaurant')), price_festival:numOf(v('.p-festival')),
+    extra_hour_price:numOf(v('.p-extrahour')), transport_from_price:numOf(v('.p-transport')), lodging_price:numOf(v('.p-lodging')),
+    offers_audition:q('.chk-audition').checked, images:imgs, seasonal_rates:seasons
+  };
+}
+async function finalizar(btn){
+  err('');
+  const chk=id=>document.getElementById(id).checked;
+  if(!chk('c_terms')||!chk('c_privacy')||!chk('c_data')){ go(3); err('Debes aceptar los términos, el aviso de privacidad y el uso de datos.'); return; }
+  const prof=collectProfile();
+  if(!prof.stage_name){ go(0); err('El nombre artístico es obligatorio.'); return; }
+  const shows=[...document.querySelectorAll('.show')].map(collectShow).filter(Boolean);
+  btn.disabled=true; const t0=btn.textContent; btn.textContent='Guardando…';
+  try{
+    await apiPatch('/me/artist',prof);
+    for(const s of shows){ await apiPost('/me/artist/shows',s); }
+    btn.textContent='¡Listo! Entrando…';
+    location.href = BASE + '/';
+  }catch(e){ btn.disabled=false; btn.textContent=t0; err('No se pudo guardar: '+e.message); }
+}
+
+// ---- Init: prefill from the just-created profile ----
+(async function init(){
+  addShow();
+  try{
+    const a=await apiGet('/me/artist');
+    const set=(id,val)=>{ const n=document.getElementById(id); if(n&&val) n.value=val; };
+    set('p_stage',a.stage_name); set('p_email',a.email); set('p_phone',a.phone); set('p_city',a.base_city);
+    if(a.first_name) set('p_first',a.first_name); if(a.last_name) set('p_last',a.last_name);
+  }catch(e){
+    if(String(e).indexOf('401')>-1){ try{ localStorage.removeItem('ricky_token'); }catch(_){} location.href=BASE+'/'; }
+  }
+})();
 </script>
 </body>
 </html>
