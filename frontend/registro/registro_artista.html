@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RICKY · Registro de Artista</title>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#ffffff; --border:#e7e9ee; --border2:#eef0f3;
+  --text:#1e2430; --text2:#6b7280; --text3:#9099a6;
+  --violet:#6a5cf0; --violet2:#8b5cf6; --violet-d:#5b4de0; --violet-soft:#efe9fc;
+  --green:#16a34a; --green-bg:#e8f5ec; --amber:#d97706; --amber-bg:#fbf1de;
+  --red:#dc2626; --radius:14px;
+  --shadow:0 1px 3px rgba(20,25,40,.05),0 1px 2px rgba(20,25,40,.03);
+  --shadow-lg:0 12px 34px rgba(60,50,130,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding:26px 22px 60px}
+
+/* Header */
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--violet),var(--violet2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:21px;box-shadow:0 8px 20px rgba(124,92,240,.34)}
+.brand h1{font-size:20px;font-weight:800;letter-spacing:.3px}
+.brand h1 span{color:var(--violet)}
+.brand p{font-size:12px;color:var(--text2);margin-top:1px}
+.help{font-size:12.5px;color:var(--text2);display:flex;align-items:center;gap:7px}
+.help b{color:var(--green)}
+
+/* Stepper */
+.steps{display:flex;gap:10px;margin:0 0 24px}
+.step{flex:1;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s;box-shadow:var(--shadow)}
+.step:hover{border-color:#d6d3f2}
+.step.active{border-color:var(--violet);box-shadow:0 6px 18px rgba(124,92,240,.16)}
+.step .num{width:30px;height:30px;border-radius:50%;background:var(--border2);color:var(--text3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;transition:.15s}
+.step.active .num{background:linear-gradient(135deg,var(--violet),var(--violet2));color:#fff}
+.step.done .num{background:var(--green);color:#fff}
+.step .lbl b{display:block;font-size:13px;font-weight:700}
+.step .lbl span{font-size:11px;color:var(--text2)}
+@media(max-width:820px){.steps{flex-wrap:wrap}.step{min-width:46%}.step .lbl span{display:none}}
+
+/* Panels */
+.panel{display:none;animation:fade .25s ease}
+.panel.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow);margin-bottom:18px}
+.card h2{font-size:15px;font-weight:800;display:flex;align-items:center;gap:9px;margin-bottom:3px}
+.card h2 .ic{width:26px;height:26px;border-radius:8px;background:var(--violet-soft);color:var(--violet);display:flex;align-items:center;justify-content:center;font-size:14px}
+.card .sub{font-size:12.5px;color:var(--text2);margin-bottom:18px}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.grid.three{grid-template-columns:1fr 1fr 1fr}
+.full{grid-column:1/-1}
+@media(max-width:720px){.grid,.grid.three{grid-template-columns:1fr}}
+label.f{display:block}
+label.f>span{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px}
+label.f>span i{color:var(--red);font-style:normal}
+input,select,textarea{width:100%;border:1px solid var(--border);background:#fff;border-radius:9px;padding:9px 11px;font-size:13.5px;color:var(--text);font-family:inherit;transition:.15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(124,92,240,.12)}
+textarea{resize:vertical;min-height:70px}
+.hint{font-size:11px;color:var(--text3);margin-top:4px}
+
+/* Photo box */
+.photos{display:flex;gap:10px;flex-wrap:wrap}
+.ph{width:74px;height:74px;border-radius:10px;background:linear-gradient(135deg,#e9e7fb,#f2e9fb);border:1px solid var(--border);position:relative;overflow:hidden;flex:none}
+.ph.add{display:flex;align-items:center;justify-content:center;cursor:pointer;border:1.5px dashed #cfc9f2;background:#faf9ff;color:var(--violet);font-size:24px}
+.ph .x{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1}
+
+/* Chips */
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
+.chip{background:var(--violet-soft);color:var(--violet-d);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
+.chip b{cursor:pointer;opacity:.6}
+.chip.add{background:#fff;border:1px dashed #cfc9f2;color:var(--violet);cursor:pointer}
+
+/* Shows */
+.show{border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.show-h{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;background:#fbfbfd}
+.show-h .idx{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--violet),var(--violet2));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.show-h .t{flex:1}
+.show-h .t b{display:block;font-size:14px;font-weight:700;margin-bottom:1px}
+.show-h .t span{font-size:12px;color:var(--text2)}
+.show-h .cats{font-size:11.5px;color:var(--violet-d);background:var(--violet-soft);padding:3px 9px;border-radius:20px;font-weight:600}
+.show-h .caret{color:var(--text3);transition:.2s}
+.show.open .caret{transform:rotate(90deg)}
+.show-b{display:none;padding:18px 16px;border-top:1px solid var(--border2)}
+.show.open .show-b{display:block}
+.show-del{color:var(--red);font-size:12px;font-weight:600;cursor:pointer;background:none;border:none;padding:4px 8px;border-radius:6px}
+.show-del:hover{background:var(--red-bg,#fbeaea)}
+.sec-t{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin:16px 0 10px;border-bottom:1px solid var(--border2);padding-bottom:6px}
+.addshow{width:100%;border:1.5px dashed #cfc9f2;background:#faf9ff;color:var(--violet-d);border-radius:12px;padding:13px;font-weight:700;font-size:13.5px;cursor:pointer;transition:.15s}
+.addshow:hover{background:#f3f0ff;border-color:var(--violet)}
+
+/* Benchmark box */
+.bench{background:linear-gradient(135deg,#fff7ed,#fef2e6);border:1px solid #f6d9b0;border-radius:12px;padding:15px 17px;margin:6px 0 4px}
+.bench h3{font-size:13px;color:var(--amber);font-weight:800;display:flex;align-items:center;gap:7px}
+.bench p{font-size:11.5px;color:#9a6a1e;margin:5px 0 8px}
+.bench .val{font-size:20px;font-weight:800;color:#b45309}
+
+/* Seasonal table */
+.season{width:100%;border-collapse:collapse;margin-top:4px}
+.season th{text-align:left;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 8px}
+.season td{padding:5px 6px}
+.season input{padding:7px 9px;font-size:12.5px}
+.season .del{color:var(--red);cursor:pointer;font-size:15px;text-align:center}
+.addrow{margin-top:8px;font-size:12.5px;color:var(--violet-d);font-weight:600;cursor:pointer;background:none;border:none}
+
+/* Toggle rows */
+.tog{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px}
+.tog .tt b{font-size:13px;font-weight:700}
+.tog .tt span{font-size:11.5px;color:var(--text2);display:block;margin-top:1px}
+.sw{position:relative;width:44px;height:25px;flex:none}
+.sw input{opacity:0;width:0;height:0}
+.sw i{position:absolute;inset:0;background:#d5d8e0;border-radius:20px;transition:.2s;cursor:pointer}
+.sw i:before{content:"";position:absolute;width:19px;height:19px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.sw input:checked + i{background:linear-gradient(135deg,var(--violet),var(--violet2))}
+.sw input:checked + i:before{transform:translateX(19px)}
+
+/* Plan de cobro */
+.plans{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:720px){.plans{grid-template-columns:1fr}}
+.plan{border:1.5px solid var(--border);border-radius:12px;padding:15px;cursor:pointer;transition:.15s;position:relative}
+.plan:hover{border-color:#cfc9f2}
+.plan.sel{border-color:var(--violet);background:#faf9ff;box-shadow:0 6px 16px rgba(124,92,240,.14)}
+.plan b{font-size:14px;font-weight:800}
+.plan .d{font-size:11.5px;color:var(--text2);margin:4px 0 8px}
+.plan .pct{font-size:18px;font-weight:800;color:var(--violet-d)}
+.plan .tick{position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px}
+.plan.sel .tick{background:var(--violet);border-color:var(--violet)}
+
+/* Partner */
+.partner{background:linear-gradient(135deg,#f6f3ff,#efe9fc);border:1px solid #d9cffa;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px;margin-top:14px}
+.partner .pic{width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,var(--violet),var(--violet2));color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.partner .pt{flex:1}
+.partner .pt b{font-size:14px;font-weight:800}
+.partner .pt .badge{background:var(--green-bg);color:var(--green);font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px}
+.partner .pt p{font-size:11.5px;color:#6d5fa8;margin-top:3px}
+.partner .price{font-size:15px;font-weight:800;color:var(--violet-d);white-space:nowrap}
+
+/* Docs */
+.docs{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+@media(max-width:720px){.docs{grid-template-columns:1fr 1fr}}
+.doc{border:1.5px dashed #d7d3ee;border-radius:11px;padding:14px 10px;text-align:center;cursor:pointer;transition:.15s;background:#fcfbff}
+.doc:hover{border-color:var(--violet);background:#f6f3ff}
+.doc .di{font-size:20px;color:var(--violet);margin-bottom:6px}
+.doc b{font-size:11.5px;display:block;font-weight:600}
+.doc span{font-size:10px;color:var(--text3)}
+.consent{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:var(--text2);margin-top:11px}
+.consent input{width:16px;height:16px;margin-top:1px;accent-color:var(--violet)}
+.consent a{color:var(--violet-d);font-weight:600}
+
+/* Footer nav */
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.btn{border:none;border-radius:10px;padding:11px 22px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.btn.prev{background:#fff;border:1px solid var(--border);color:var(--text2)}
+.btn.prev:hover{background:#f6f6f9}
+.btn.next{background:linear-gradient(135deg,var(--violet),var(--violet2));color:#fff;box-shadow:0 8px 18px rgba(124,92,240,.3)}
+.btn.next:hover{background:linear-gradient(135deg,var(--violet-d),var(--violet))}
+.btn.fin{background:linear-gradient(135deg,var(--green),#15a34a);color:#fff;box-shadow:0 8px 18px rgba(22,163,74,.3)}
+.foot-note{text-align:center;font-size:11px;color:var(--text3);margin-top:26px;display:flex;align-items:center;justify-content:center;gap:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <div class="logo">R</div>
+      <div><h1>RICK<span>Y</span></h1><p>Registro de artista · plataforma de entretenimiento para hoteles y eventos</p></div>
+    </div>
+    <div class="help">Proceso 100% seguro · <b>Tus datos están protegidos</b></div>
+  </div>
+
+  <div class="steps" id="steps">
+    <div class="step active" data-s="0"><div class="num">1</div><div class="lbl"><b>Perfil</b><span>Quién eres</span></div></div>
+    <div class="step" data-s="1"><div class="num">2</div><div class="lbl"><b>Mis Shows</b><span>Tu catálogo</span></div></div>
+    <div class="step" data-s="2"><div class="num">3</div><div class="lbl"><b>Plan de cobro</b><span>Fiscal y banco</span></div></div>
+    <div class="step" data-s="3"><div class="num">4</div><div class="lbl"><b>Documentos</b><span>Revisión final</span></div></div>
+  </div>
+
+  <!-- STEP 1: PROFILE -->
+  <section class="panel on" data-p="0">
+    <div class="card">
+      <h2><span class="ic">👤</span> Perfil personal</h2>
+      <div class="sub">Cuéntanos quién eres. Estos datos se registran una sola vez para todo tu catálogo de shows.</div>
+      <div class="grid">
+        <label class="f full"><span>Nombre artístico / proveedor <i>*</i></span><input placeholder="Ej. David Producciones"></label>
+        <label class="f"><span>Nombre(s)</span><input placeholder="David"></label>
+        <label class="f"><span>Apellidos</span><input placeholder="Rodríguez"></label>
+        <label class="f"><span>Tipo</span><select><option>Solista</option><option>Dúo / Agrupación</option><option selected>Productora / Proveedor</option></select></label>
+        <label class="f"><span>Años de experiencia</span><input placeholder="10+ años"></label>
+        <label class="f"><span>Teléfono móvil <i>*</i></span><input placeholder="+52 998 123 4567"></label>
+        <label class="f"><span>Correo electrónico <i>*</i></span><input placeholder="hola@correo.com"></label>
+        <label class="f full"><span>Sitio web</span><input placeholder="www.tusitio.com"></label>
+        <label class="f full"><span>Idiomas que hablas</span>
+          <div class="chips"><span class="chip">Español <b>×</b></span><span class="chip">Inglés <b>×</b></span><span class="chip add">+ Agregar</span></div>
+        </label>
+        <label class="f full"><span>Biografía corta</span><textarea placeholder="Cuéntale al hotel quién eres, tu trayectoria y qué te hace único."></textarea></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="ic">📍</span> Ubicación y disponibilidad</h2>
+      <div class="sub">Dónde estás basado y hasta dónde te mueves.</div>
+      <div class="grid three">
+        <label class="f"><span>País</span><input value="México"></label>
+        <label class="f"><span>Estado</span><input placeholder="Quintana Roo"></label>
+        <label class="f"><span>Ciudad base</span><input placeholder="Cancún"></label>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <label class="f"><span>Radio de trabajo (km)</span><input value="100"></label>
+        <label class="f"><span>Estados donde trabajas</span>
+          <div class="chips"><span class="chip">Quintana Roo <b>×</b></span><span class="chip">Yucatán <b>×</b></span><span class="chip add">+ Agregar</span></div>
+        </label>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <div class="tog"><div class="tt"><b>Disponible para viajar</b></div><label class="sw"><input type="checkbox" checked><i></i></label></div>
+        <div class="tog"><div class="tt"><b>Vehículo propio</b></div><label class="sw"><input type="checkbox" checked><i></i></label></div>
+        <div class="tog"><div class="tt"><b>Pasaporte vigente</b></div><label class="sw"><input type="checkbox"><i></i></label></div>
+        <div class="tog"><div class="tt"><b>Visa USA</b></div><label class="sw"><input type="checkbox"><i></i></label></div>
+      </div>
+      <label class="f full" style="margin-top:14px"><span>Redes sociales</span>
+        <div class="grid"><input placeholder="Instagram: @tuusuario"><input placeholder="Facebook: /tupagina"><input placeholder="YouTube: /tucanal"><input placeholder="TikTok: @tuusuario"></div>
+      </label>
+    </div>
+    <div class="foot"><span></span><button class="btn next" onclick="go(1)">Siguiente →</button></div>
+  </section>
+
+  <!-- STEP 2: SHOWS -->
+  <section class="panel" data-p="1">
+    <div class="card">
+      <h2><span class="ic">🎭</span> Mis Shows</h2>
+      <div class="sub">Aquí va tu catálogo. Puedes tener varios shows completamente distintos, cada uno con su propia categoría, rider, fotos y precios. En el marketplace cada show aparece como su propia tarjeta.</div>
+      <div id="showList"></div>
+      <button class="addshow" onclick="addShow()">＋ Añadir otro show</button>
+    </div>
+    <div class="foot"><button class="btn prev" onclick="go(0)">← Anterior</button><button class="btn next" onclick="go(2)">Siguiente →</button></div>
+  </section>
+
+  <!-- STEP 3: PLAN DE COBRO + FISCAL -->
+  <section class="panel" data-p="2">
+    <div class="card">
+      <h2><span class="ic">💳</span> Plan de liquidación</h2>
+      <div class="sub">¿Cómo quieres recibir tus pagos? Entre más rápido, la plataforma cobra una pequeña comisión por adelantar el pago.</div>
+      <div class="plans">
+        <div class="plan sel" onclick="pick(this)"><div class="tick">✓</div><b>Mensual</b><div class="d">Liquidación mensual estándar</div><div class="pct">3.5%</div></div>
+        <div class="plan" onclick="pick(this)"><div class="tick">✓</div><b>Fast</b><div class="d">Pago a 15 días</div><div class="pct">7.5%</div></div>
+        <div class="plan" onclick="pick(this)"><div class="tick">✓</div><b>Express</b><div class="d">Pago a 7 días</div><div class="pct">12%</div></div>
+      </div>
+      <div class="partner">
+        <div class="pic">★</div>
+        <div class="pt"><b>Convertirme en Partner</b><span class="badge">Recomendado</span><p>Conecta con otros artistas y empresas, subcontrata talento de la plataforma y obtén el distintivo Partner Verificado que da confianza a los contratantes.</p></div>
+        <div class="price">$499<span style="font-size:11px;color:var(--text2)">/mes</span></div>
+        <label class="sw"><input type="checkbox"><i></i></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="ic">🧾</span> Información fiscal</h2>
+      <div class="sub">Para emitir CFDI y liquidar tus pagos.</div>
+      <div class="grid">
+        <label class="f"><span>RFC</span><input placeholder="XAXX010101000"></label>
+        <label class="f"><span>Uso CFDI</span><select><option>G03 - Gastos en general</option><option>P01 - Por definir</option></select></label>
+        <label class="f"><span>Razón social</span><input placeholder="Nombre o razón social"></label>
+        <label class="f"><span>Régimen fiscal</span><input placeholder="612 - Personas Físicas con Actividad Empresarial"></label>
+        <label class="f"><span>Código postal fiscal</span><input placeholder="77500"></label>
+      </div>
+      <div class="sec-t">Información bancaria</div>
+      <div class="grid">
+        <label class="f"><span>Banco</span><input placeholder="BBVA"></label>
+        <label class="f"><span>Número de cuenta</span><input placeholder="1234 5678 9012"></label>
+        <label class="f"><span>Titular de la cuenta</span><input placeholder="Nombre del titular"></label>
+        <label class="f"><span>CLABE</span><input placeholder="0123 4567 8901 2345 678"></label>
+        <label class="f"><span>Moneda preferida</span><select><option>MXN</option><option>USD</option></select></label>
+      </div>
+    </div>
+    <div class="foot"><button class="btn prev" onclick="go(1)">← Anterior</button><button class="btn next" onclick="go(3)">Siguiente →</button></div>
+  </section>
+
+  <!-- STEP 4: DOCS -->
+  <section class="panel" data-p="3">
+    <div class="card">
+      <h2><span class="ic">📎</span> Documentos legales</h2>
+      <div class="sub">Sube tus documentos y acepta los términos para finalizar tu registro.</div>
+      <div class="docs">
+        <div class="doc"><div class="di">🆔</div><b>Identificación</b><span>INE / Pasaporte</span></div>
+        <div class="doc"><div class="di">🏠</div><b>Comprobante</b><span>de domicilio</span></div>
+        <div class="doc"><div class="di">📄</div><b>Constancia SAT</b><span>situación fiscal</span></div>
+        <div class="doc"><div class="di">✍️</div><b>Contrato RICKY</b><span>firmado</span></div>
+        <div class="doc"><div class="di">🎚️</div><b>Rider técnico</b><span>PDF</span></div>
+        <div class="doc"><div class="di">🛎️</div><b>Rider hospitalidad</b><span>PDF</span></div>
+        <div class="doc"><div class="di">📰</div><b>Press Kit</b><span>PDF</span></div>
+        <div class="doc"><div class="di">🏦</div><b>Comprobante banco</b><span>PDF</span></div>
+      </div>
+      <label class="consent"><input type="checkbox"> He leído y acepto los <a>Términos y Condiciones</a> de RICKY.</label>
+      <label class="consent"><input type="checkbox"> Acepto el <a>Aviso de Privacidad</a>.</label>
+      <label class="consent"><input type="checkbox"> Autorizo el uso de mis datos para fines de operación y promoción.</label>
+    </div>
+    <div class="foot"><button class="btn prev" onclick="go(2)">← Anterior</button><button class="btn fin">Finalizar registro ✓</button></div>
+  </section>
+
+  <div class="foot-note">🔒 Tu información está 100% segura con nosotros · RICKY Entertainment OS</div>
+</div>
+
+<script>
+// --- Category taxonomy (same source of truth as the backend) ---
+const TAX = {
+  "Música":["Solista","Dúo","Trío","Banda","Orquesta","Mariachi","DJ"],
+  "Shows":["Danza","Magia e Ilusionismo","Circo & Acrobacias","Temático o de Temporada","Infantiles y Familiares","Espectáculos Visuales","Música en vivo","Comedia & Stand Up","Tributos","Variedades"],
+  "Fotografía y Video":["Fotografía","Video"],
+  "Producción":["Audio","Iluminación","Escenarios"]
+};
+
+function go(n){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on', +p.dataset.p===n));
+  document.querySelectorAll('.step').forEach(s=>{
+    const i=+s.dataset.s; s.classList.toggle('active',i===n); s.classList.toggle('done',i<n);
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('.step').forEach(s=>s.onclick=()=>go(+s.dataset.s));
+function pick(el){el.parentNode.querySelectorAll('.plan').forEach(p=>p.classList.remove('sel'));el.classList.add('sel');}
+
+// --- Shows ---
+let showN=0;
+function showTpl(n){
+  const cats=Object.keys(TAX).map(c=>`<option>${c}</option>`).join('');
+  const subs=TAX[Object.keys(TAX)[0]].map(s=>`<option>${s}</option>`).join('');
+  return `<div class="show open" data-n="${n}">
+    <div class="show-h" onclick="this.parentNode.classList.toggle('open')">
+      <div class="idx">${n}</div>
+      <div class="t"><b class="sname">Nuevo show</b><span>Configura la ficha de este show</span></div>
+      <span class="cats scat">Música · Solista</span>
+      <span class="caret">▸</span>
+    </div>
+    <div class="show-b">
+      <div class="grid">
+        <label class="f full"><span>Nombre del espectáculo <i>*</i></span><input class="in-name" oninput="renameShow(${n},this.value)" placeholder="Ej. Sax & Lounge Experience"></label>
+        <label class="f"><span>Categoría <i>*</i></span><select class="in-cat" onchange="fillSub(${n},this.value)">${cats}</select></label>
+        <label class="f"><span>Subcategoría</span><select class="in-sub" onchange="badge(${n})">${subs}</select></label>
+        <label class="f full"><span>Descripción</span><textarea placeholder="De qué trata el show, el ambiente que crea..."></textarea></label>
+        <label class="f"><span>Nº de integrantes</span><input value="1"></label>
+        <label class="f"><span>Duración (min)</span><input placeholder="60"></label>
+        <label class="f"><span>Tiempo de montaje (min)</span><input placeholder="30"></label>
+        <label class="f"><span>Tiempo de desmontaje (min)</span><input placeholder="20"></label>
+        <label class="f"><span>Espacio requerido</span><input placeholder="3x3 m"></label>
+        <label class="f"><span>Consumo eléctrico</span><input placeholder="2 contactos 110v"></label>
+        <label class="f full"><span>Requerimientos / rider</span><textarea placeholder="Escenario, sonido, camerino, etc."></textarea></label>
+      </div>
+
+      <div class="sec-t">Fotos y multimedia</div>
+      <div class="photos">
+        <div class="ph"><span class="x">×</span></div><div class="ph"><span class="x">×</span></div>
+        <div class="ph add" onclick="addPhoto(this)">＋</div>
+      </div>
+      <div class="hint">Máximo 5 fotos por show.</div>
+      <div class="grid" style="margin-top:12px">
+        <label class="f"><span>Video promocional</span><input placeholder="YouTube / Vimeo"></label>
+        <label class="f"><span>Audio</span><input placeholder="Spotify / SoundCloud"></label>
+      </div>
+
+      <div class="sec-t">Tarifas base por tipo de evento (MXN)</div>
+      <div class="grid three">
+        <label class="f"><span>Precio hotel</span><input placeholder="$ 10,000"></label>
+        <label class="f"><span>Evento corporativo</span><input placeholder="$ 12,000"></label>
+        <label class="f"><span>Boda</span><input placeholder="$ 14,000"></label>
+        <label class="f"><span>Evento privado</span><input placeholder="$ 11,000"></label>
+        <label class="f"><span>Restaurante / lounge</span><input placeholder="$ 8,000"></label>
+        <label class="f"><span>Festival / público</span><input placeholder="$ —"></label>
+        <label class="f"><span>Hora adicional</span><input placeholder="$ 2,000"></label>
+        <label class="f"><span>Traslado (desde)</span><input placeholder="$ 1,000"></label>
+        <label class="f"><span>Hospedaje / Alimentación / Viáticos</span><input placeholder="A acordar"></label>
+      </div>
+      <div class="bench">
+        <h3>ⓘ Precio promedio de referencia</h3>
+        <p>Precios promedio en tu zona para shows similares. Úsalo como guía para fijar tus tarifas.</p>
+        <div class="val">$8,000 – $12,000</div>
+      </div>
+
+      <div class="sec-t">Tarifas por temporada <span style="font-weight:400;text-transform:none;color:var(--text3)">(ajuste % sobre tu precio base — tú defines los periodos)</span></div>
+      <table class="season">
+        <thead><tr><th>Periodo</th><th>Desde</th><th>Hasta</th><th>Ajuste %</th><th></th></tr></thead>
+        <tbody class="seasonBody">
+          <tr><td><input value="Navidad / Fin de año"></td><td><input type="date"></td><td><input type="date"></td><td><input value="+300"></td><td class="del" onclick="this.closest('tr').remove()">×</td></tr>
+          <tr><td><input value="Temporada baja"></td><td><input type="date"></td><td><input type="date"></td><td><input value="-10"></td><td class="del" onclick="this.closest('tr').remove()">×</td></tr>
+        </tbody>
+      </table>
+      <button class="addrow" onclick="addRow(this)">＋ Añadir periodo</button>
+
+      <div class="tog" style="margin-top:16px"><div class="tt"><b>Ofrezco audición</b><span>Los contratantes pueden solicitar una audición de este show.</span></div><label class="sw"><input type="checkbox"><i></i></label></div>
+
+      <div style="text-align:right;margin-top:6px"><button class="show-del" onclick="delShow(${n})">Eliminar este show</button></div>
+    </div>
+  </div>`;
+}
+function addShow(){showN++;document.getElementById('showList').insertAdjacentHTML('beforeend',showTpl(showN));}
+function delShow(n){const el=document.querySelector('.show[data-n="'+n+'"]');if(document.querySelectorAll('.show').length>1)el.remove();}
+function renameShow(n,v){document.querySelector('.show[data-n="'+n+'"] .sname').textContent=v||'Nuevo show';}
+function fillSub(n,cat){const el=document.querySelector('.show[data-n="'+n+'"]');el.querySelector('.in-sub').innerHTML=TAX[cat].map(s=>`<option>${s}</option>`).join('');badge(n);}
+function badge(n){const el=document.querySelector('.show[data-n="'+n+'"]');el.querySelector('.scat').textContent=el.querySelector('.in-cat').value+' · '+el.querySelector('.in-sub').value;}
+function addRow(btn){btn.previousElementSibling.querySelector('.seasonBody').insertAdjacentHTML('beforeend','<tr><td><input placeholder="Ej. Halloween"></td><td><input type="date"></td><td><input type="date"></td><td><input placeholder="+150"></td><td class="del" onclick="this.closest(\'tr\').remove()">×</td></tr>');}
+function addPhoto(btn){const row=btn.parentNode;if(row.querySelectorAll('.ph:not(.add)').length>=5){btn.style.display='none';return;}btn.insertAdjacentHTML('beforebegin','<div class="ph"><span class="x">×</span></div>');if(row.querySelectorAll('.ph:not(.add)').length>=5)btn.style.display='none';}
+document.addEventListener('click',e=>{if(e.target.classList.contains('x')){const row=e.target.closest('.photos');e.target.parentNode.remove();const add=row&&row.querySelector('.ph.add');if(add)add.style.display='flex';}if(e.target.classList.contains('chip')&&e.target.classList.contains('add')){/*noop demo*/}});
+addShow(); // first show
+</script>
+</body>
+</html>

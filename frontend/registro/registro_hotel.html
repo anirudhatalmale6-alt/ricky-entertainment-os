@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RICKY · Registro de Contratante</title>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#ffffff; --border:#e7e9ee; --border2:#eef0f3;
+  --text:#1e2430; --text2:#6b7280; --text3:#9099a6;
+  --violet:#6a5cf0; --violet2:#8b5cf6; --violet-d:#5b4de0; --violet-soft:#efe9fc;
+  --green:#16a34a; --green-bg:#e8f5ec; --amber:#d97706; --amber-bg:#fbf1de;
+  --red:#dc2626; --red-bg:#fbeaea; --radius:14px;
+  --shadow:0 1px 3px rgba(20,25,40,.05),0 1px 2px rgba(20,25,40,.03);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding:26px 22px 60px}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--violet),var(--violet2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:21px;box-shadow:0 8px 20px rgba(124,92,240,.34)}
+.brand h1{font-size:20px;font-weight:800;letter-spacing:.3px}
+.brand h1 span{color:var(--violet)}
+.brand p{font-size:12px;color:var(--text2);margin-top:1px}
+.help{font-size:12.5px;color:var(--text2)}.help b{color:var(--green)}
+.steps{display:flex;gap:10px;margin:0 0 24px}
+.step{flex:1;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s;box-shadow:var(--shadow)}
+.step:hover{border-color:#d6d3f2}
+.step.active{border-color:var(--violet);box-shadow:0 6px 18px rgba(124,92,240,.16)}
+.step .num{width:30px;height:30px;border-radius:50%;background:var(--border2);color:var(--text3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;transition:.15s}
+.step.active .num{background:linear-gradient(135deg,var(--violet),var(--violet2));color:#fff}
+.step.done .num{background:var(--green);color:#fff}
+.step .lbl b{display:block;font-size:13px;font-weight:700}
+.step .lbl span{font-size:11px;color:var(--text2)}
+@media(max-width:820px){.steps{flex-wrap:wrap}.step{min-width:46%}.step .lbl span{display:none}}
+.panel{display:none;animation:fade .25s ease}.panel.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow);margin-bottom:18px}
+.card h2{font-size:15px;font-weight:800;display:flex;align-items:center;gap:9px;margin-bottom:3px}
+.card h2 .ic{width:26px;height:26px;border-radius:8px;background:var(--violet-soft);color:var(--violet);display:flex;align-items:center;justify-content:center;font-size:14px}
+.card .sub{font-size:12.5px;color:var(--text2);margin-bottom:18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.grid.three{grid-template-columns:1fr 1fr 1fr}
+.full{grid-column:1/-1}
+@media(max-width:720px){.grid,.grid.three{grid-template-columns:1fr}}
+label.f{display:block}
+label.f>span{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px}
+label.f>span i{color:var(--red);font-style:normal}
+input,select,textarea{width:100%;border:1px solid var(--border);background:#fff;border-radius:9px;padding:9px 11px;font-size:13.5px;color:var(--text);font-family:inherit;transition:.15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(124,92,240,.12)}
+textarea{resize:vertical;min-height:64px}
+.hint{font-size:11px;color:var(--text3);margin-top:4px}
+.logo-up{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.logo-box{width:74px;height:74px;border-radius:12px;border:1.5px dashed #cfc9f2;background:#faf9ff;display:flex;align-items:center;justify-content:center;color:var(--violet);font-size:22px;cursor:pointer;flex:none}
+.logo-up .lt b{font-size:13px}.logo-up .lt p{font-size:11.5px;color:var(--text2)}
+.sec-t{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin:16px 0 10px;border-bottom:1px solid var(--border2);padding-bottom:6px}
+/* Venues */
+.venue{border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.venue-h{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;background:#fbfbfd}
+.venue-h .idx{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--violet),var(--violet2));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.venue-h .t{flex:1}.venue-h .t b{display:block;font-size:14px;font-weight:700}.venue-h .t span{font-size:12px;color:var(--text2)}
+.venue-h .cap{font-size:11.5px;color:var(--violet-d);background:var(--violet-soft);padding:3px 9px;border-radius:20px;font-weight:600}
+.venue-h .caret{color:var(--text3);transition:.2s}.venue.open .caret{transform:rotate(90deg)}
+.venue-b{display:none;padding:18px 16px;border-top:1px solid var(--border2)}.venue.open .venue-b{display:block}
+.venue-del{color:var(--red);font-size:12px;font-weight:600;cursor:pointer;background:none;border:none;padding:4px 8px;border-radius:6px}.venue-del:hover{background:var(--red-bg)}
+.addvenue{width:100%;border:1.5px dashed #cfc9f2;background:#faf9ff;color:var(--violet-d);border-radius:12px;padding:13px;font-weight:700;font-size:13.5px;cursor:pointer;transition:.15s}
+.addvenue:hover{background:#f3f0ff;border-color:var(--violet)}
+/* Map */
+.map{height:150px;border-radius:11px;border:1px solid var(--border);margin-top:6px;position:relative;overflow:hidden;
+  background:
+   linear-gradient(rgba(124,92,240,.05),rgba(124,92,240,.05)),
+   repeating-linear-gradient(0deg,#eef1f6 0 22px,#e7ebf2 22px 23px),
+   repeating-linear-gradient(90deg,#eef1f6 0 22px,#e7ebf2 22px 23px)}
+.map .road{position:absolute;background:#dfe4ec}
+.map .r1{top:64px;left:0;right:0;height:9px}.map .r2{top:0;bottom:0;left:120px;width:9px}.map .r3{top:0;bottom:0;right:90px;width:6px;background:#e6eaf1}
+.map .pin{position:absolute;top:44px;left:112px;font-size:26px;filter:drop-shadow(0 3px 3px rgba(0,0,0,.25))}
+.map .tag{position:absolute;bottom:8px;left:8px;background:rgba(255,255,255,.92);border:1px solid var(--border);border-radius:7px;padding:4px 9px;font-size:11px;color:var(--text2)}
+.navbtns{display:flex;gap:10px;margin-top:10px}
+.navb{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:9px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;border:1px solid var(--border);text-decoration:none}
+.navb.g{background:#e8f0fe;color:#1a73e8;border-color:#cfe0fb}
+.navb.w{background:#e6f7fb;color:#0aa5c6;border-color:#c4ecf3}
+/* Risk cards */
+.plans{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+@media(max-width:720px){.plans{grid-template-columns:1fr 1fr}}
+.plan{border:1.5px solid var(--border);border-radius:12px;padding:15px;cursor:pointer;transition:.15s;position:relative;text-align:center}
+.plan:hover{border-color:#cfc9f2}
+.plan.sel{border-color:var(--violet);background:#faf9ff;box-shadow:0 6px 16px rgba(124,92,240,.14)}
+.plan .tier{font-size:22px;font-weight:800}
+.plan .d{font-size:11px;color:var(--text2);margin:3px 0 8px;min-height:28px}
+.plan .pct{font-size:16px;font-weight:800;color:var(--violet-d)}
+.plan .tag{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;font-size:9.5px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.info{background:var(--amber-bg);border:1px solid #f6d9b0;border-radius:10px;padding:11px 14px;font-size:12px;color:#8a5a12;margin-top:14px;display:flex;gap:8px}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.btn{border:none;border-radius:10px;padding:11px 22px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.btn.prev{background:#fff;border:1px solid var(--border);color:var(--text2)}.btn.prev:hover{background:#f6f6f9}
+.btn.next{background:linear-gradient(135deg,var(--violet),var(--violet2));color:#fff;box-shadow:0 8px 18px rgba(124,92,240,.3)}
+.btn.next:hover{background:linear-gradient(135deg,var(--violet-d),var(--violet))}
+.btn.fin{background:linear-gradient(135deg,var(--green),#15a34a);color:#fff;box-shadow:0 8px 18px rgba(22,163,74,.3)}
+.foot-note{text-align:center;font-size:11px;color:var(--text3);margin-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <div class="logo">R</div>
+      <div><h1>RICK<span>Y</span></h1><p>Registro de contratante · hoteles, restaurantes y centros de eventos</p></div>
+    </div>
+    <div class="help">Proceso 100% seguro · <b>Tus datos están protegidos</b></div>
+  </div>
+
+  <div class="steps" id="steps">
+    <div class="step active" data-s="0"><div class="num">1</div><div class="lbl"><b>La empresa</b><span>Datos y contacto</span></div></div>
+    <div class="step" data-s="1"><div class="num">2</div><div class="lbl"><b>Venues</b><span>Tus espacios</span></div></div>
+    <div class="step" data-s="2"><div class="num">3</div><div class="lbl"><b>Condiciones</b><span>Pago y comisión</span></div></div>
+  </div>
+
+  <!-- STEP 1 -->
+  <section class="panel on" data-p="0">
+    <div class="card">
+      <h2><span class="ic">🏨</span> Datos de la empresa</h2>
+      <div class="sub">Los datos generales del hotel, restaurante o centro de eventos.</div>
+      <div class="logo-up">
+        <div class="logo-box">＋</div>
+        <div class="lt"><b>Logo de la empresa</b><p>JPG o PNG, máx 5MB</p></div>
+      </div>
+      <div class="grid">
+        <label class="f"><span>Nombre comercial <i>*</i></span><input placeholder="Ej. Hotel Paraíso"></label>
+        <label class="f"><span>Tipo <i>*</i></span><select><option>Hotel</option><option>Restaurante</option><option>Salón de eventos</option><option>Bar / Lounge</option><option>Cadena hotelera</option><option>Centro de convenciones</option></select></label>
+        <label class="f full"><span>Grupo / cadena (opcional)</span><input placeholder="Ej. Grupo Hotelero Paraíso — déjalo vacío si es una propiedad independiente">
+          <div class="hint">Si esta propiedad pertenece a una cadena, escríbela aquí. El director del grupo podrá ver todas sus propiedades juntas en un dashboard consolidado.</div>
+        </label>
+        <label class="f full"><span>Razón social</span><input placeholder="Paraíso SA de CV"></label>
+        <label class="f"><span>RFC</span><input placeholder="HPA900101AAA"></label>
+        <label class="f"><span>Uso CFDI</span><select><option>G03 - Gastos en general</option><option>P01 - Por definir</option></select></label>
+        <label class="f full"><span>Régimen fiscal</span><input placeholder="601 - General de Ley Personas Morales"></label>
+      </div>
+      <div class="sec-t">Contacto</div>
+      <div class="grid">
+        <label class="f"><span>Persona responsable de entretenimiento</span><input placeholder="Nombre del responsable"></label>
+        <label class="f"><span>Teléfono</span><input placeholder="+52 998 000 0000"></label>
+        <label class="f"><span>Correo</span><input placeholder="eventos@hotel.com"></label>
+        <label class="f"><span>WhatsApp</span><input placeholder="+52 998 111 2222"></label>
+        <label class="f"><span>Sitio web</span><input placeholder="www.hotel.com"></label>
+        <label class="f"><span>Redes sociales</span><input placeholder="@hotel"></label>
+      </div>
+      <div class="sec-t">Ubicación</div>
+      <div class="grid">
+        <label class="f full"><span>Dirección</span><input placeholder="Blvd. Kukulcán Km 9, Zona Hotelera"></label>
+        <label class="f"><span>Ciudad</span><input placeholder="Cancún"></label>
+        <label class="f"><span>Estado</span><input placeholder="Quintana Roo"></label>
+        <label class="f"><span>País</span><input value="México"></label>
+        <label class="f"><span>Código postal</span><input placeholder="77500"></label>
+      </div>
+    </div>
+    <div class="foot"><span></span><button class="btn next" onclick="go(1)">Siguiente →</button></div>
+  </section>
+
+  <!-- STEP 2: VENUES -->
+  <section class="panel" data-p="1">
+    <div class="card">
+      <h2><span class="ic">📍</span> Venues / Espacios</h2>
+      <div class="sub">Un mismo hotel suele tener varios espacios. Agrega cada uno con su capacidad y su ubicación exacta, para que el artista pueda llegar con Google Maps o Waze. Sobre cada venue se programan las actuaciones.</div>
+      <div id="venueList"></div>
+      <button class="addvenue" onclick="addVenue()">＋ Añadir otro venue</button>
+    </div>
+    <div class="foot"><button class="btn prev" onclick="go(0)">← Anterior</button><button class="btn next" onclick="go(2)">Siguiente →</button></div>
+  </section>
+
+  <!-- STEP 3: CONDICIONES -->
+  <section class="panel" data-p="2">
+    <div class="card">
+      <h2><span class="ic">🤝</span> Condiciones comerciales</h2>
+      <div class="sub">Categoría de riesgo de pago. Define la comisión que cobra la plataforma según el comportamiento de pago.</div>
+      <div class="plans">
+        <div class="plan" onclick="pick(this)"><div class="tag">Premio</div><div class="tier">A+</div><div class="d">Paga en menos de 15 días</div><div class="pct">5.6%</div></div>
+        <div class="plan sel" onclick="pick(this)"><div class="tag">Inicio</div><div class="tier">A</div><div class="d">Paga entre 15 y 30 días</div><div class="pct">7.4%</div></div>
+        <div class="plan" onclick="pick(this)"><div class="tier">B</div><div class="d">Paga en más de 30 días</div><div class="pct">11%</div></div>
+        <div class="plan" onclick="pick(this)"><div class="tier">B++</div><div class="d">Paga en más de 40 días</div><div class="pct">18%</div></div>
+      </div>
+      <div class="info">ℹ️ Todos los contratantes inician en categoría A. La categoría se ajusta sola con el comportamiento real de pago tras 3 meses, o se puede negociar desde el alta si la empresa ya sabe que pagará a plazos más largos.</div>
+      <div class="grid" style="margin-top:16px">
+        <label class="f"><span>Días de pago acordados</span><input value="30"></label>
+        <label class="f"><span>Método de pago preferido</span><select><option>Transferencia</option><option>Tarjeta</option><option>Crédito a plazo</option></select></label>
+      </div>
+    </div>
+    <div class="foot"><button class="btn prev" onclick="go(1)">← Anterior</button><button class="btn fin">Finalizar registro ✓</button></div>
+  </section>
+
+  <div class="foot-note">🔒 Tu información está 100% segura con nosotros · RICKY Entertainment OS</div>
+</div>
+
+<script>
+function go(n){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on', +p.dataset.p===n));
+  document.querySelectorAll('.step').forEach(s=>{const i=+s.dataset.s;s.classList.toggle('active',i===n);s.classList.toggle('done',i<n);});
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('.step').forEach(s=>s.onclick=()=>go(+s.dataset.s));
+function pick(el){el.parentNode.querySelectorAll('.plan').forEach(p=>p.classList.remove('sel'));el.classList.add('sel');}
+
+let vN=0;
+function venueTpl(n){
+  return `<div class="venue open" data-n="${n}">
+    <div class="venue-h" onclick="this.parentNode.classList.toggle('open')">
+      <div class="idx">${n}</div>
+      <div class="t"><b class="vname">Nuevo venue</b><span>Configura el espacio y su ubicación</span></div>
+      <span class="cap vcap">Capacidad —</span>
+      <span class="caret">▸</span>
+    </div>
+    <div class="venue-b">
+      <div class="grid">
+        <label class="f"><span>Nombre del venue <i>*</i></span><input oninput="rename(${n},this.value)" placeholder="Lobby Bar, Beach Club, Teatro..."></label>
+        <label class="f"><span>Capacidad de personas</span><input oninput="cap(${n},this.value)" placeholder="200"></label>
+        <label class="f"><span>Tipo de ambiente</span><select><option>Interior</option><option>Exterior</option><option>Lounge</option><option>Escenario / Teatro</option><option>Terraza</option><option>Salón</option></select></label>
+        <label class="f"><span>Horario habitual</span><input placeholder="18:00 - 00:00"></label>
+      </div>
+      <div class="sec-t">Ubicación (para que el artista llegue)</div>
+      <label class="f"><span>Dirección exacta del venue</span><input placeholder="Blvd. Kukulcán Km 9, Cancún, QR"></label>
+      <div class="map">
+        <div class="road r1"></div><div class="road r2"></div><div class="road r3"></div>
+        <div class="pin">📍</div>
+        <div class="tag">Toca para marcar el punto exacto</div>
+      </div>
+      <div class="grid" style="margin-top:10px">
+        <label class="f"><span>Latitud</span><input placeholder="21.161908"></label>
+        <label class="f"><span>Longitud</span><input placeholder="-86.851528"></label>
+      </div>
+      <div class="navbtns">
+        <a class="navb g">🗺️ Abrir en Google Maps</a>
+        <a class="navb w">🚗 Abrir en Waze</a>
+      </div>
+      <div style="text-align:right;margin-top:12px"><button class="venue-del" onclick="delVenue(${n})">Eliminar este venue</button></div>
+    </div>
+  </div>`;
+}
+function addVenue(){vN++;document.getElementById('venueList').insertAdjacentHTML('beforeend',venueTpl(vN));}
+function delVenue(n){if(document.querySelectorAll('.venue').length>1)document.querySelector('.venue[data-n="'+n+'"]').remove();}
+function rename(n,v){document.querySelector('.venue[data-n="'+n+'"] .vname').textContent=v||'Nuevo venue';}
+function cap(n,v){document.querySelector('.venue[data-n="'+n+'"] .vcap').textContent='Capacidad '+(v?v+' pers.':'—');}
+// seed with 3 example venues collapsed + 1 open
+addVenue();
+</script>
+</body>
+</html>
