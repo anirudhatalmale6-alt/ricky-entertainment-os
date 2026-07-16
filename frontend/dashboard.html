@@ -251,10 +251,17 @@
   .lg-pane .lead{color:#9a9cb4;font-size:13px;margin-bottom:24px;line-height:1.5}
   .lg-lab{font-size:12px;font-weight:600;color:#c9cbdc;margin:13px 0 7px}
   .lg-in{position:relative}
-  .lg-in input{width:100%;background:#191922;border:1px solid #2b2b39;border-radius:10px;
+  .lg-in input,.lg-in textarea{width:100%;background:#191922;border:1px solid #2b2b39;border-radius:10px;
       padding:12px 13px;color:#eef0f7;font-size:13.5px;outline:none;font-family:inherit;transition:.15s}
-  .lg-in input:focus{border-color:#7c5cfc;box-shadow:0 0 0 3px rgba(124,92,252,.18)}
-  .lg-in input::placeholder{color:#61637a}
+  .lg-in textarea{resize:vertical;min-height:44px;line-height:1.4}
+  .lg-in input:focus,.lg-in textarea:focus{border-color:#7c5cfc;box-shadow:0 0 0 3px rgba(124,92,252,.18)}
+  .lg-in input::placeholder,.lg-in textarea::placeholder{color:#61637a}
+  .lg-note{font-size:11.5px;color:#8688a0;text-align:center;margin-top:12px;line-height:1.5}
+  .lg-done{text-align:center;padding:8px 0}
+  .lg-done-ic{width:56px;height:56px;border-radius:50%;margin:0 auto 16px;display:grid;place-items:center;
+      font-size:26px;color:#fff;background:linear-gradient(135deg,#34d399,#10b981);box-shadow:0 8px 24px rgba(16,185,129,.34)}
+  .lg-done h3{font-size:20px;font-weight:750;margin-bottom:8px}
+  .lg-done p{color:#9a9cb4;font-size:13px;line-height:1.6;max-width:340px;margin:0 auto}
   .lg-in .eye{position:absolute;right:12px;top:11px;color:#71738c;cursor:pointer;font-size:15px;user-select:none}
   .lg-tel{display:grid;grid-template-columns:80px 1fr;gap:8px}
   .lg-tel .cc{background:#191922;border:1px solid #2b2b39;border-radius:10px;display:flex;align-items:center;
@@ -369,15 +376,17 @@
           <div class="lg-in"><input id="h_pos" placeholder="Ej. Director de Entretenimiento"></div>
           <div class="lg-lab">Correo electrónico</div>
           <div class="lg-in"><input id="h_email" type="email" placeholder="tu@correo.com"></div>
-          <div class="lg-lab">Contraseña</div>
-          <div class="lg-in"><input id="h_pass" type="password" placeholder="Crea una contraseña segura" oninput="pwRules('h_pass','h_rules')"><span class="eye" onclick="pwEye('h_pass',this)">👁</span></div>
-          <ul class="lg-rules" id="h_rules">
-            <li data-r="len">Al menos 8 caracteres</li>
-            <li data-r="upper">Una letra mayúscula</li>
-            <li data-r="num">Un número</li>
-            <li data-r="spec">Un carácter especial</li>
-          </ul>
-          <button class="lg-btn" onclick="regHotel()">Crear cuenta</button>
+          <div class="lg-lab">Teléfono</div>
+          <div class="lg-tel"><div class="cc">📞 +52</div><div class="lg-in"><input id="h_phone" placeholder="55 1234 5678"></div></div>
+          <div class="lg-lab">¿Qué buscas? (opcional)</div>
+          <div class="lg-in"><textarea id="h_msg" rows="2" placeholder="Cuéntanos qué entretenimiento necesitas, horarios, etc."></textarea></div>
+          <button class="lg-btn" onclick="preRegHotel()">Solicitar acceso</button>
+          <div class="lg-note">Nuestro equipo revisará tu solicitud y te contactará para activar tu cuenta.</div>
+        </div>
+        <div id="reg-hotel-done" class="lg-hide lg-done">
+          <div class="lg-done-ic">✓</div>
+          <h3>¡Solicitud recibida!</h3>
+          <p>Gracias por tu interés en ShowCase. Revisaremos tus datos y te contactaremos muy pronto para activar tu cuenta y coordinar una llamada.</p>
         </div>
 
         <div class="lg-terms">Al crear tu cuenta, aceptas nuestros <span class="lg-link">Términos y Condiciones</span> y la <span class="lg-link">Política de Privacidad</span>.</div>
@@ -404,6 +413,7 @@
     <div class="nav on" data-p="home"><span class="ic">📊</span> Resumen</div>
     <div class="nav" data-p="cal"><span class="ic">🗓️</span> Actuaciones</div>
     <div class="nav" data-p="reqs"><span class="ic">📣</span> Solicitudes</div>
+    <div class="nav" data-p="leads" style="display:none"><span class="ic">📇</span> Prospectos <span class="badge" id="leadsBadge" style="display:none"></span></div>
     <div class="nav" data-p="chat"><span class="ic">💬</span> Chat</div>
     <div class="nav" data-p="bill" style="display:none"><span class="ic">🧾</span> Facturación</div>
     <div class="nav" data-p="profile" style="display:none"><span class="ic">👤</span> Mi Perfil</div>
@@ -434,6 +444,7 @@
       <div class="panel on" id="panel-home"><div class="load">Cargando…</div></div>
       <div class="panel" id="panel-cal"></div>
       <div class="panel" id="panel-reqs"></div>
+      <div class="panel" id="panel-leads"></div>
       <div class="panel" id="panel-chat"></div>
       <div class="panel" id="panel-bill"></div>
       <div class="panel" id="panel-profile"></div>
@@ -536,6 +547,7 @@ function toggleAudience(){
   const h = AUD==='hotel';
   document.getElementById('reg-artist').classList.toggle('lg-hide',h);
   document.getElementById('reg-hotel').classList.toggle('lg-hide',!h);
+  document.getElementById('reg-hotel-done').classList.add('lg-hide');   // reset success view
   document.getElementById('heroKicker').textContent = h?'HOTELES':'ARTISTAS';
   document.getElementById('heroTitle').innerHTML = h
     ? 'Programa tu venue.<br>Controla tu presupuesto.<br><span class="p">Sin complicaciones.</span>'
@@ -543,16 +555,43 @@ function toggleAudience(){
   document.getElementById('heroSub').textContent = h
     ? 'Encuentra, contrata y gestiona todo el entretenimiento de tu hotel desde un solo lugar.'
     : 'La plataforma líder para encontrar, contratar y gestionar entretenimiento en hoteles y resorts.';
-  document.getElementById('regTitle').textContent = h?'Crear cuenta de hotel':'Crear cuenta';
+  document.getElementById('regTitle').textContent = h?'Solicita tu acceso':'Crear cuenta';
   document.getElementById('regLead').textContent = h
-    ? 'Registra tu hotel y empieza a programar entretenimiento.'
+    ? 'Déjanos tus datos y te contactamos para activar tu cuenta.'
     : 'Únete a Showcase y lleva tu talento al siguiente nivel.';
   document.getElementById('heroSwitchLbl').textContent = h?'¿Eres artista o proveedor?':'¿Eres hotel o comprador?';
   document.getElementById('heroSwitchBtn').textContent = h?'Ir a Showcase Artistas':'Ir a Showcase Hoteles';
   document.getElementById('lerr').textContent="";
 }
 function focusReg(){const el=document.getElementById(AUD==='hotel'?'h_name':'a_name');if(el)el.focus();}
+async function preRegHotel(){
+  const el=document.getElementById('lerr'); el.textContent="";
+  const name=val('h_name'), company=val('h_company'), email=val('h_email');
+  if(name.length<2||company.length<2||email.length<5||!email.includes('@')){
+    el.textContent="Completa tu nombre, hotel y un correo válido."; return;
+  }
+  try{
+    const r=await fetch(API+"/leads/hotel",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({full_name:name,company_name:company,position:val('h_pos')||null,
+        email:email,phone:val('h_phone')||null,message:val('h_msg')||null})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ el.textContent=regErr(d); return; }
+    document.getElementById('reg-hotel').classList.add('lg-hide');
+    document.getElementById('reg-hotel-done').classList.remove('lg-hide');
+  }catch(e){ el.textContent="No se pudo enviar la solicitud. Intenta de nuevo."; }
+}
 function logout(){ TOKEN=null; ME=null; try{document.getElementById('app').style.display='none';}catch(e){} location.reload(); }
+async function refreshLeadsBadge(){
+  if(!ME||!ME.is_admin) return;
+  try{ const c=await api('/leads/hotel/count'); const b=document.getElementById('leadsBadge');
+    if(c.new>0){ b.textContent=c.new; b.style.display=''; } else { b.style.display='none'; }
+  }catch(e){}
+}
+async function markLead(id,status){
+  try{ await patch('/leads/hotel/'+id,{status}); await refreshLeadsBadge();
+    const box=document.getElementById('panel-leads'); box.dataset.loaded=""; await show('leads',true);
+  }catch(e){ alert('No se pudo actualizar: '+e.message); }
+}
 
 function setNavLabel(p,ic,txt){
   const n=document.querySelector(`.nav[data-p='${p}']`);
@@ -580,6 +619,8 @@ function applyRole(){
   // Home is the consolidated view for a chain/admin, AND the artist's personal dashboard.
   show('home', ME.is_admin || isDirector || isArtist);
   show('bill', isArtist); show('profile', isArtist);     // artist-only self-service
+  show('leads', ME.is_admin);                            // admin: hotel pre-registro prospectos
+  if(ME.is_admin) refreshLeadsBadge();
   show('cal', !isArtist);                                 // artist agenda now lives inside the Dashboard
   if(isArtist){
     setNavLabel('home','📊','Dashboard'); setNavLabel('chat','💬','Mis chats');
@@ -613,6 +654,7 @@ async function reload(){
 
 const TITLES={home:["Resumen","Vista consolidada de la cadena"],cal:["Actuaciones","Agenda de shows por venue"],
   reqs:["Solicitudes","Tablero de pedidos abiertos"],chat:["Chat","Conversaciones hotel · artista"],
+  leads:["Prospectos","Hoteles que solicitaron acceso"],
   bill:["Facturación","Historial de facturas por mes"],
   profile:["Mi Perfil","Tus datos, tarifas y publicaciones"],
   market:["Market Intelligence","Estudio de mercado por destino"],
@@ -640,6 +682,39 @@ const bars = (rows)=> rows.map(r=>`<div class="bar-row"><div class="lbl" title="
   <div class="val">${r.val}${r.trend?`<span class="trend ${r.trend}">${r.trend==='up'?'▲':r.trend==='down'?'▼':'—'}</span>`:''}</div></div>`).join("");
 
 const RENDER = {
+  async leads(box){
+    const rows = await api('/leads/hotel');
+    if(!rows.length){
+      box.innerHTML=`<div class="box" style="text-align:center;padding:48px 24px">
+        <div style="font-size:34px;margin-bottom:8px">📇</div>
+        <h3 style="margin:0 0 6px">Aún no hay prospectos</h3>
+        <div class="hint">Cuando un hotel solicite acceso desde el registro, aparecerá aquí con sus datos para que lo contactes.</div></div>`;
+      return;
+    }
+    const st = s => s==='new'?['Nuevo','#ec4899']:s==='contacted'?['Contactado','#3b82f6']:s==='converted'?['Convertido','#10b981']:['Descartado','#9aa0b6'];
+    box.innerHTML = `<div class="box"><h3>📇 Prospectos de hoteles</h3><div class="hint">${rows.length} solicitud(es) · más recientes primero</div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+      ${rows.map(l=>{const [lbl,col]=st(l.status);return `
+        <div style="border:1px solid var(--line);border-radius:11px;padding:14px 16px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <b style="font-size:14px">${esc(l.company_name)}</b>
+            <span class="chip" style="background:${col}22;color:${col}">${lbl}</span>
+            <span class="hint" style="margin-left:auto">${fmtDate(l.created_at)}</span>
+          </div>
+          <div class="hint" style="margin-top:4px">${esc(l.full_name)}${l.position?' · '+esc(l.position):''}</div>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:12.5px">
+            <span>✉️ <a href="mailto:${esc(l.email)}" style="color:var(--info)">${esc(l.email)}</a></span>
+            ${l.phone?`<span>📞 ${esc(l.phone)}</span>`:''}
+          </div>
+          ${l.message?`<div style="margin-top:8px;font-size:12.5px;background:var(--ov);padding:9px 11px;border-radius:8px">“${esc(l.message)}”</div>`:''}
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            ${l.status==='new'?`<button class="btn" onclick="markLead(${l.id},'contacted')">Marcar contactado</button>`:''}
+            ${l.status!=='converted'?`<button class="btn ghost" onclick="markLead(${l.id},'converted')">Marcar convertido</button>`:''}
+            ${l.status!=='discarded'?`<button class="btn ghost" onclick="markLead(${l.id},'discarded')">Descartar</button>`:''}
+          </div>
+        </div>`;}).join("")}
+      </div></div>`;
+  },
   async home(box){
     if(ME.artist_id) return artistHome(box);   // artists get their personal dashboard
     if(!GID){                                  // no chain scope yet -> never call /groups/null/...

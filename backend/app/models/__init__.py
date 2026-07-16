@@ -12,6 +12,7 @@ from app.models.media import ShowImage, ArtistDocument
 from app.models.booking import Booking
 from app.models.product_request import ProductRequest, RequestProposal
 from app.models.conversation import Conversation, Message
+from app.models.hotel_lead import HotelLead
 from app.models.enums import (
     PayoutSpeed,
     RiskTier,
@@ -49,6 +50,7 @@ __all__ = [
     "RequestProposal",
     "Conversation",
     "Message",
+    "HotelLead",
     "PayoutSpeed",
     "RiskTier",
     "BookingStatus",
