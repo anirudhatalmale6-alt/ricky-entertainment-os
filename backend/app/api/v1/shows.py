@@ -3,6 +3,8 @@
 A show belongs to an artist profile (one profile -> many shows). The marketplace
 browses and benchmarks SHOWS, since a hotel books a show, not a person.
 """
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
@@ -89,6 +91,60 @@ async def price_benchmark(
         min_price=float(mn) if mn is not None else None,
         max_price=float(mx) if mx is not None else None,
     )
+
+
+@router.get("/shows/novedades")
+async def novedades(
+    db: DbSession,
+    _: CurrentUser,
+    days: int = Query(7, ge=1, le=60, description="Antigüedad máxima en días"),
+    limit: int = Query(12, ge=1, le=50),
+):
+    """Recently published shows — 'Novedades'. Powers the hotel dashboard's
+    suggestions and the "Novedad" tag on new listings (David: los artistas recién
+    registrados aparecen para facilitar que los contraten aunque acaben de empezar)."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    cutoff = now - timedelta(days=days)
+    stmt = (
+        select(Show)
+        .options(*_SHOW_RELS)
+        .join(Artist, Show.artist_id == Artist.id)
+        .where(Show.is_active.is_(True), Show.created_at >= cutoff)
+        .order_by(Show.created_at.desc())
+        .limit(limit)
+    )
+    shows = list((await db.execute(stmt)).scalars().unique().all())
+    artist_ids = {s.artist_id for s in shows}
+    names: dict[int, str] = {}
+    if artist_ids:
+        rows = (await db.execute(select(Artist.id, Artist.stage_name).where(Artist.id.in_(artist_ids)))).all()
+        names = {aid: nm for aid, nm in rows}
+
+    def _image(s: Show) -> str | None:
+        imgs = list(s.images or [])
+        if not imgs:
+            return None
+        profile = next((i for i in imgs if i.is_profile), None)
+        return (profile or imgs[0]).url
+
+    out = []
+    for s in shows:
+        created = s.created_at
+        days_ago = (now - created).days if created else None
+        out.append({
+            "id": s.id,
+            "show_name": s.show_name,
+            "category": s.category,
+            "subcategory": s.subcategory,
+            "artist_id": s.artist_id,
+            "artist_name": names.get(s.artist_id),
+            "base_price": float(s.base_price) if s.base_price is not None else None,
+            "price_hotel": float(s.price_hotel) if s.price_hotel is not None else None,
+            "image_url": _image(s),
+            "created_at": created.isoformat() if created else None,
+            "days_ago": days_ago,
+        })
+    return {"days": days, "count": len(out), "novedades": out}
 
 
 @router.get("/shows/{show_id}", response_model=ShowOut)
