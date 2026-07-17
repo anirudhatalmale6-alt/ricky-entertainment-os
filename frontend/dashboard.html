@@ -35,21 +35,24 @@
   .nav{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--s-txt);cursor:pointer;font-weight:500;font-size:13.5px;position:relative;transition:.15s}
   .nav:hover{background:var(--s-hov);color:#fff}
   .nav.on{background:var(--grad);color:#fff;box-shadow:0 8px 20px rgba(56,44,161,.35);font-weight:600}
-  .nav .ic{font-size:16px;width:20px;text-align:center}
+  .nav .ic{width:20px;display:flex;align-items:center;justify-content:center;color:inherit;opacity:.9}
+  .nav .ic svg{width:18px;height:18px;stroke:currentColor;fill:none}
+  .nav.on .ic{opacity:1}
   .nav .badge{margin-left:auto;font-size:10px;font-weight:700;background:rgba(255,255,255,.14);color:#fff;padding:1px 7px;border-radius:20px}
   .nav.on .badge{background:rgba(255,255,255,.25)}
   .pro{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.6px;color:#fff;background:linear-gradient(135deg,#4b3ec9,#382ca1);padding:2px 6px;border-radius:5px}
   .side .foot{font-size:10.5px;color:var(--s-mut);padding:9px 10px 2px;opacity:.7}
   /* Sidebar promo card (Top Performer / IA RICKY) */
-  .promo{margin-top:14px;border-radius:14px;padding:15px 14px;background:linear-gradient(160deg,#382ca1,#2c2280);
-    color:#fff;text-align:center;box-shadow:0 10px 26px rgba(56,44,161,.32);position:relative;overflow:hidden}
-  .promo::after{content:"";position:absolute;inset:0;background:radial-gradient(120px 60px at 50% -10%,rgba(255,255,255,.22),transparent)}
-  .promo .pi{font-size:22px}
-  .promo b{display:block;font-size:13.5px;font-weight:750;margin:5px 0 3px}
-  .promo p{font-size:10.8px;line-height:1.45;color:#e7e1ff;margin-bottom:11px}
-  .promo button{width:100%;border:0;background:rgba(255,255,255,.18);backdrop-filter:blur(4px);color:#fff;
+  .promo{margin-top:14px;border-radius:14px;padding:16px 14px;background:#182437;border:1px solid #26324b;
+    color:#fff;text-align:center;box-shadow:0 8px 20px rgba(0,0,0,.28);position:relative;overflow:hidden}
+  .promo::after{content:"";position:absolute;inset:0;background:radial-gradient(120px 60px at 50% -10%,rgba(56,44,161,.35),transparent)}
+  .promo .pi{color:#c3cae0}
+  .promo .pi svg{width:26px;height:26px}
+  .promo b{display:block;font-size:13.5px;font-weight:750;margin:6px 0 3px;position:relative}
+  .promo p{font-size:10.8px;line-height:1.45;color:#aeb6cc;margin-bottom:12px;position:relative}
+  .promo button{position:relative;width:100%;border:0;background:var(--acc);color:#fff;
     font-weight:650;font-size:12px;padding:9px;border-radius:9px;cursor:pointer;transition:.15s}
-  .promo button:hover{background:rgba(255,255,255,.28)}
+  .promo button:hover{background:#2c2280}
   .side-user{margin-top:14px;display:flex;align-items:center;gap:10px;padding:13px 8px 4px;border-top:1px solid var(--s-line)}
   .su-av{width:36px;height:36px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;flex:none}
   .su-meta{min-width:0;flex:1}
@@ -699,6 +702,32 @@ function regErr(d){
     if(Array.isArray(d.detail)&&d.detail[0])return d.detail[0].msg||"Datos inválidos"; }
   return "No se pudo crear la cuenta";
 }
+
+// Monochrome line icons (white/gray, no fill) for the sidebar — David 2026-07-17:
+// "iconos sin colores tipo dibujo, solo el icono en blanco/gris".
+const SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">';
+const NAVICON={
+  home:SVG+'<path d="M4 11 12 4l8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>',
+  artists:SVG+'<rect x="9" y="3.5" width="6" height="10" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.3"/><path d="M9 20.3h6"/></svg>',
+  cal:SVG+'<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17"/><path d="M8 3.3v3.5M16 3.3v3.5"/></svg>',
+  reqs:SVG+'<rect x="5" y="4.5" width="14" height="16" rx="2"/><rect x="9" y="3" width="6" height="3.4" rx="1.2"/><path d="M8.5 11h7M8.5 14.5h7"/></svg>',
+  leads:SVG+'<circle cx="9.5" cy="8" r="3.3"/><path d="M4 20c0-3 2.5-5.4 5.5-5.4S15 17 15 20"/><path d="M18.5 9v5M16 11.5h5"/></svg>',
+  chat:SVG+'<path d="M20 11.5a7 7 0 0 1-10.2 6.2L5 19l1.3-4A7 7 0 1 1 20 11.5Z"/></svg>',
+  budget:SVG+'<path d="M4 8A1.5 1.5 0 0 1 5.5 6.5H18V9"/><rect x="4" y="8" width="16" height="11.5" rx="2"/><path d="M16 12.8h3.5v3.6H16a1.8 1.8 0 0 1 0-3.6Z"/></svg>',
+  bill:SVG+'<path d="M6 3.5h12v17l-2.2-1.4-2 1.4-2-1.4-2 1.4L6 20.5V3.5Z"/><path d="M9 8h6M9 11.5h6M9 15h4"/></svg>',
+  reports:SVG+'<path d="M4 20h16"/><rect x="5.4" y="11" width="3.2" height="7" rx="1"/><rect x="10.4" y="6" width="3.2" height="12" rx="1"/><rect x="15.4" y="13.5" width="3.2" height="4.5" rx="1"/></svg>',
+  profile:SVG+'<circle cx="12" cy="8" r="3.6"/><path d="M5.5 20c0-3.4 2.9-5.8 6.5-5.8S18.5 16.6 18.5 20"/></svg>',
+  market:SVG+'<path d="M4 5v14h16"/><path d="M7.5 15l3.3-3.8 3 2.1 4.4-5.8"/></svg>',
+  demand:SVG+'<path d="M12 3.5c.6 2.6 2.3 3.7 3.5 5.3A5.6 5.6 0 1 1 7 12.6c0-1.1.4-1.9.9-2.5.3.8 1 1.3 1.8 1.3-1-2.3.3-5.4 2.3-7.9Z"/></svg>',
+  news:SVG+'<path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H16v13.5a1.5 1.5 0 0 0 1.5 1.5H6a2 2 0 0 1-2-2V6.5Z"/><path d="M16 8.5h2.5A1.5 1.5 0 0 1 20 10v8a2 2 0 0 1-2 2"/><path d="M7 9h6M7 12h6M7 15h4"/></svg>',
+};
+const PROMOICON={
+  robot:SVG+'<rect x="5.5" y="8" width="13" height="9.5" rx="2.5"/><path d="M12 8V5.2M9 4h6"/><circle cx="9.6" cy="12.7" r="1.15"/><circle cx="14.4" cy="12.7" r="1.15"/><path d="M4 12.2v2.4M20 12.2v2.4"/></svg>',
+  crown:SVG+'<path d="M4 8.5l3.6 3L12 5l4.4 6.5L20 8.5l-1.4 9.5H5.4L4 8.5Z"/></svg>',
+};
+function paintNavIcons(){
+  document.querySelectorAll('.side .nav').forEach(n=>{ const k=n.dataset.p; const ic=n.querySelector('.ic'); if(ic&&NAVICON[k]) ic.innerHTML=NAVICON[k]; });
+}
 const BASE = (window.RICKY_API ?? "");   // "" local, "/ricky" live — for page redirects
 async function afterAuth(token){
   TOKEN=token;
@@ -815,7 +844,7 @@ async function markLead(id,status){
 
 function setNavLabel(p,ic,txt){
   const n=document.querySelector(`.nav[data-p='${p}']`);
-  if(n) n.innerHTML=`<span class="ic">${ic}</span> ${txt}`;
+  if(n) n.innerHTML=`<span class="ic">${NAVICON[p]||ic}</span> ${txt}`;
 }
 function applyRole(){
   SELF = !ME.is_admin;                       // artist / contratante -> scoped /mine views
@@ -831,13 +860,14 @@ function applyRole(){
   if(isArtist){ brandLogo.textContent='S'; brandLogo.classList.remove('gold'); brandName.textContent='SHOWCASE'; brandSub.textContent='Artistas'; document.title='SHOWCASE · Artistas'; }
   else { brandLogo.textContent='R'; brandLogo.classList.add('gold'); brandName.textContent='RICKY'; brandSub.textContent='Entertainment OS'; document.title='RICKY Entertainment OS'; }
   // Sidebar promo card
+  paintNavIcons();
   const promo=document.getElementById('sidePromo');
   if(isArtist){
-    promo.style.display=''; promo.innerHTML='<div class="pi">👑</div><b>Top Performer</b>'
+    promo.style.display=''; promo.innerHTML='<div class="pi">'+PROMOICON.crown+'</div><b>Top Performer</b>'
       +'<p>Publica más shows y mantén tu perfil completo para subir en las búsquedas.</p>'
       +'<button onclick="show(\'market\')">Ver beneficios</button>';
   } else if(ME.is_admin || isDirector){
-    promo.style.display=''; promo.innerHTML='<div class="pi">🤖</div><b>IA RICKY</b>'
+    promo.style.display=''; promo.innerHTML='<div class="pi">'+PROMOICON.robot+'</div><b>IA RICKY</b>'
       +'<p>Tu asistente para programación, sugerencias de talento y más.</p>'
       +'<button onclick="show(\'demand\')">Ver sugerencias</button>';
   } else { promo.style.display='none'; }
@@ -1012,7 +1042,9 @@ const ymd = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+
 const isoLocal = d => { const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())+':00'; };
 function maestroVenues(bk){
   const m=new Map();
-  bk.forEach(b=>{ if(!b.venue_id) return; const id=b.venue_id; if(!m.has(id)||(!m.get(id).name&&b.venue_name)) m.set(id,{id:id,name:b.venue_name||'Sin venue'}); });
+  // require a real venue name: a booking whose venue was deleted may keep a dangling
+  // venue_id (no name) — those must not spawn a "Sin venue" row.
+  bk.forEach(b=>{ if(!b.venue_id||!b.venue_name) return; if(!m.has(b.venue_id)) m.set(b.venue_id,{id:b.venue_id,name:b.venue_name}); });
   return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name));
 }
 // Per-venue colour identity (base tints from David's model palette + extra distinct
@@ -1303,7 +1335,9 @@ const RENDER = {
     // Serial (not Promise.all): the prod host runs on a tiny LSAPI worker pool
     // over sqlite; firing many concurrent requests per dashboard load saturates it.
     const dash = await api(`/groups/${GID}/dashboard`);
-    const bk   = await api(`/bookings?group_id=${GID}`);
+    // Exclude bookings whose venue was deleted (dangling venue_id, no venue_name) so the
+    // KPIs and the Calendario Maestro stay in sync — no "phantom" acts in an absent venue.
+    const bk   = (await api(`/bookings?group_id=${GID}`)).filter(b=>!(b.venue_id && !b.venue_name));
     const reqs = await api(`/requests?status=open`);
     const mkt  = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
     let AMAP={}; try{ (await api('/artists')||[]).forEach(a=>{AMAP[a.id]=a.stage_name;}); }catch(e){}
