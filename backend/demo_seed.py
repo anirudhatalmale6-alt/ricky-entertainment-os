@@ -47,11 +47,11 @@ async def main():
         g = (await c.post("/api/v1/groups", json={"name": "Grupo Paraíso"}, headers=h)).json()["id"]
 
         hotels_spec = [
-            ("Paraíso Cancún", "Cancún", 220, 3200, 5, True, 180000, 82,
+            ("Paraíso Cancún", "Cancún", 220, 3200, 5, True, 380000, 82,
              [("Teatro", 400), ("Lobby Bar", 120), ("Beach Club", 250)]),
-            ("Paraíso Tulum", "Tulum", 140, 2600, 4, False, 90000, 74,
+            ("Paraíso Tulum", "Tulum", 140, 2600, 4, False, 220000, 74,
              [("Cenote Stage", 200), ("Pool Bar", 90)]),
-            ("Paraíso Playa", "Playa del Carmen", 300, 4100, 5, True, 240000, 88,
+            ("Paraíso Playa", "Playa del Carmen", 300, 4100, 5, True, 300000, 88,
              [("Gran Salón", 600), ("Sky Lounge", 150)]),
         ]
         hotels = {}
@@ -116,6 +116,66 @@ async def main():
                     "headcount_start": hc[0], "headcount_end": hc[1]}, headers=h)
             if action == "cancel":
                 await c.post(f"/api/v1/bookings/{bid}/cancel?reason=Clima", headers=h)
+
+        # ---- Resident low-cost acts, one per venue, so the Calendario Maestro
+        #      fills up like the approved mockup (bar / lounge / pool / teatro
+        #      residents that play most nights, plus the premium shows above). --
+        from datetime import date
+
+        residents_spec = [
+            ("Sax & Soul",     "Sax Lounge",       "Musica", "Solista", 2500),
+            ("Claudia Rivas",  "Piano Bar",        "Musica", "Solista", 2000),
+            ("DJ Nova",        "Sunset Chill",     "Musica", "DJ",      2200),
+            ("Trío Armonía",   "Bossa & Jazz",     "Musica", "Trio",    3000),
+            ("Dúo Costa",      "Acústico",         "Musica", "Dueto",   2600),
+            ("Ritmo Tropical", "Noche Tropical",   "Musica", "Banda",   3200),
+            ("Ballet Paraíso", "Folclor Mexicano", "Shows",  "Danza",   6500),
+        ]
+        rshow = {}
+        for aname, sn, cat, sub, price in residents_spec:
+            aid = (await c.post("/api/v1/artists", json={"stage_name": aname}, headers=h)).json()["id"]
+            sid = (await c.post(f"/api/v1/artists/{aid}/shows", json={
+                "show_name": sn, "category": cat, "subcategory": sub,
+                "price_hotel": price, "duration_minutes": 90}, headers=h)).json()["id"]
+            rshow[sn] = (sid, price)
+
+        # venue -> (resident show, start hour)
+        venue_plan = [
+            ("Paraíso Cancún", "Lobby Bar",   "Piano Bar",        20),
+            ("Paraíso Cancún", "Beach Club",  "Acústico",         18),
+            ("Paraíso Cancún", "Teatro",      "Folclor Mexicano", 20),
+            ("Paraíso Tulum",  "Cenote Stage","Sax Lounge",       19),
+            ("Paraíso Tulum",  "Pool Bar",    "Sunset Chill",     17),
+            ("Paraíso Playa",  "Gran Salón",  "Bossa & Jazz",     21),
+            ("Paraíso Playa",  "Sky Lounge",  "Noche Tropical",   20),
+        ]
+
+        def cap_of(hotel, vn):
+            return next(v["capacity"] for v in hotels[hotel]["venues"] if v["name"] == vn)
+
+        TODAY = date(2026, 7, 17)
+        # Two visible weeks: 13-19 Jul (current, densest) and 20-26 Jul.
+        week_days = [date(2026, 7, d) for d in range(13, 20)] + [date(2026, 7, d) for d in range(20, 27)]
+        for vi, (hotel, vn, sn, hour) in enumerate(venue_plan):
+            sid, price = rshow[sn]
+            cap = cap_of(hotel, vn)
+            for i, dd in enumerate(week_days):
+                # leave one gap per venue per week so it reads like a real agenda
+                if (i + vi) % 7 == 6:
+                    continue
+                r = await c.post("/api/v1/bookings", json={
+                    "show_id": sid, "venue_id": venue(hotel, vn),
+                    "starts_at": iso(dd.year, dd.month, dd.day, hour),
+                    "agreed_price": price}, headers=h)
+                if r.status_code != 201:
+                    continue
+                bid = r.json()["id"]
+                await c.post(f"/api/v1/bookings/{bid}/confirm", headers=h)
+                if dd < TODAY:  # past nights -> realizadas (con asistencia real)
+                    ret = 0.95 if (i + vi) % 3 == 0 else (0.88 if (i + vi) % 3 == 1 else 0.92)
+                    start = max(10, int(cap * 0.9)); end = max(8, int(start * ret))
+                    await c.post(f"/api/v1/bookings/{bid}/attendance", json={
+                        "headcount_start": start, "headcount_end": end}, headers=h)
 
         reqs = [
             ("Paraíso Playa", "Show de fuego para la playa", "Shows", "Espectaculos Visuales", "Playa del Carmen", 20000, 35000),

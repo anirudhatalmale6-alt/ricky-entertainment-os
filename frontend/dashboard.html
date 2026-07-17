@@ -9,8 +9,8 @@
     /* Light theme (David 2026-07-15: diseños claros para facilidad de lectura, iconos con color) */
     --bg:#f4f5fa; --bg2:#ffffff; --card:#ffffff; --card2:#ffffff00;
     --line:#e6e8f0; --txt:#1b1f2e; --mut:#697089; --mut2:#9aa0b6;
-    --acc:#a855f7; --acc2:#ec4899; --ok:#10b981; --warn:#f59e0b; --bad:#ef4444; --info:#3b82f6;
-    --grad:linear-gradient(135deg,#a855f7,#ec4899);
+    --acc:#7c5cf0; --acc2:#9d7bf5; --ok:#10b981; --warn:#f59e0b; --bad:#ef4444; --info:#3b82f6;
+    --grad:linear-gradient(135deg,#8b6cf0,#6d4de0);
     --inp:#f1f3f9;                    /* input / field surface */
     --ov:rgba(24,28,52,.045);         /* subtle overlay surface */
     --ov2:rgba(24,28,52,.08);         /* stronger overlay / track */
@@ -28,6 +28,7 @@
     --s-txt:#c3cae0; --s-mut:#7c86a4; --s-line:rgba(255,255,255,.08); --s-hov:rgba(255,255,255,.06)}
   .brand{display:flex;align-items:center;gap:11px;padding:4px 6px 20px}
   .logo{width:36px;height:36px;border-radius:10px;background:var(--grad);display:grid;place-items:center;font-weight:800;font-size:18px;color:#fff;box-shadow:0 6px 16px rgba(124,92,240,.4);flex:none}
+  .logo.gold{background:linear-gradient(135deg,#f6b73c,#e0912a);box-shadow:0 6px 16px rgba(224,145,42,.42)}
   .brand b{font-size:15.5px;letter-spacing:.4px;color:#fff;font-weight:750}
   .brand span{display:block;font-size:9.5px;color:var(--s-mut);letter-spacing:2px;text-transform:uppercase;margin-top:1px}
   .navlbl{font-size:9.5px;color:#59627e;text-transform:uppercase;letter-spacing:1.3px;padding:15px 10px 7px;font-weight:600}
@@ -37,7 +38,7 @@
   .nav .ic{font-size:16px;width:20px;text-align:center}
   .nav .badge{margin-left:auto;font-size:10px;font-weight:700;background:rgba(255,255,255,.14);color:#fff;padding:1px 7px;border-radius:20px}
   .nav.on .badge{background:rgba(255,255,255,.25)}
-  .pro{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.6px;color:#fff;background:linear-gradient(135deg,#f0a,#a855f7);padding:2px 6px;border-radius:5px}
+  .pro{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.6px;color:#fff;background:linear-gradient(135deg,#8b6cf0,#6d4de0);padding:2px 6px;border-radius:5px}
   .side .foot{font-size:10.5px;color:var(--s-mut);padding:9px 10px 2px;opacity:.7}
   /* Sidebar promo card (Top Performer / IA RICKY) */
   .promo{margin-top:14px;border-radius:14px;padding:15px 14px;background:linear-gradient(160deg,#7c5cf0,#5b3fd6);
@@ -87,7 +88,7 @@
   .box{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px;box-shadow:var(--shadow)}
   .box h3{font-size:13.5px;font-weight:650;margin-bottom:3px;display:flex;align-items:center;gap:8px}
   .box .hint{font-size:11.5px;color:var(--mut);margin-bottom:15px}
-  .box.pro{border-color:#a855f74d}
+  .box.pro{border-color:#7c5cf04d}
   .box.pro::after{content:"PARTNER";position:absolute}
 
   table{width:100%;border-collapse:collapse}
@@ -102,7 +103,7 @@
   .c-completed{background:#34d3991f;color:var(--ok)}
   .c-cancelled{background:#f871711f;color:var(--bad)}
   .c-open{background:#34d3991f;color:var(--ok)}
-  .c-fulfilled{background:#a855f71f;color:var(--acc)}
+  .c-fulfilled{background:#7c5cf01f;color:var(--acc)}
   .star{color:var(--warn);font-size:12px}
 
   /* bars */
@@ -169,7 +170,7 @@
   .cal .gr{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
   .cal .cell{aspect-ratio:1;border:1px solid var(--line);border-radius:8px;padding:5px 6px;font-size:12px;position:relative;min-height:40px}
   .cal .cell.out{opacity:.28}
-  .cal .cell.today{border-color:var(--acc);background:#a855f712}
+  .cal .cell.today{border-color:var(--acc);background:#7c5cf012}
   .cal .cell .dts{position:absolute;bottom:5px;left:6px;display:flex;gap:3px}
   .cal .cell .dts i{width:6px;height:6px;border-radius:50%;display:block}
   .cal-leg{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:11.5px;color:var(--mut)}
@@ -184,7 +185,7 @@
   .srow .nb{margin-left:auto;font-size:17px;font-weight:700}
 
   /* partner CTA */
-  .partner{background:linear-gradient(135deg,#a855f71f,#ec48991f);border:1px solid #a855f74d;border-radius:13px;padding:18px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .partner{background:linear-gradient(135deg,#7c5cf01f,#6d4de01f);border:1px solid #7c5cf04d;border-radius:13px;padding:18px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
   .partner .cr{font-size:30px}
   .partner b{font-size:15px}.partner p{font-size:12.5px;color:var(--mut);margin-top:2px;max-width:520px}
 
@@ -224,7 +225,7 @@
 
   .soon{text-align:center;padding:46px 20px;color:var(--mut)}
   .soon .big{font-size:40px;margin-bottom:12px}
-  .newsbar{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#a855f71a,#ec48991a);border:1px solid #a855f733;border-radius:11px;padding:12px 16px;margin-bottom:16px}
+  .newsbar{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#7c5cf01a,#6d4de01a);border:1px solid #7c5cf033;border-radius:11px;padding:12px 16px;margin-bottom:16px}
   .newsbar .tag{background:var(--grad);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:5px;letter-spacing:.5px;flex:none}
   .newsbar .tick{overflow:hidden;white-space:nowrap;color:var(--mut);flex:1}
   .newsbar .tick span{display:inline-block;animation:ticker 90s linear infinite;will-change:transform}
@@ -233,11 +234,11 @@
   .newslist{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
   @media(max-width:820px){.newslist{grid-template-columns:1fr}}
   .newsitem{display:block;padding:11px 13px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:inherit;transition:.15s;background:var(--card)}
-  .newsitem:hover{border-color:#a855f7aa;box-shadow:0 4px 14px rgba(168,85,247,.10);transform:translateY(-1px)}
+  .newsitem:hover{border-color:#7c5cf0aa;box-shadow:0 4px 14px rgba(124,92,240,.10);transform:translateY(-1px)}
   .newsitem .ni-t{font-size:12.8px;font-weight:600;line-height:1.35;margin-bottom:5px;color:var(--txt);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .newsitem .ni-m{font-size:11px;color:var(--mut)}
-  .datochip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;background:#a855f71a;color:#c084fc;border:1px solid #a855f733}
-  .datochip b{color:#e879f9}
+  .datochip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;background:#7c5cf01a;color:#a99bf5;border:1px solid #7c5cf033}
+  .datochip b{color:#7c5cf0}
   /* Calendario Maestro (executive hotel dashboard) */
   .mtoolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
   .mnav{display:inline-flex;align-items:center;gap:2px}
@@ -253,7 +254,7 @@
   .vname{display:flex;flex-direction:column;justify-content:center;padding:8px 11px;background:var(--inp);border-radius:9px;font-size:12px;font-weight:650;line-height:1.25}
   .vname span{font-size:10px;color:var(--mut);font-weight:400;margin-top:1px}
   .mcell{min-height:66px;border:1.5px dashed var(--line);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:5px;transition:.12s}
-  .mcell.over{background:rgba(168,85,247,.09);border-color:var(--acc);border-style:solid}
+  .mcell.over{background:rgba(124,92,240,.09);border-color:var(--acc);border-style:solid}
   .mcard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:7px;padding:6px 7px;font-size:11px;cursor:grab;box-shadow:0 1px 2px rgba(24,28,52,.06);user-select:none}
   .mcard:hover{box-shadow:0 4px 12px rgba(124,92,240,.16)}
   .mcard.pending{border-left-color:var(--warn)} .mcard.confirmed{border-left-color:var(--ok)}
@@ -286,7 +287,7 @@
   /* KPI cards: colored icon chip top-right + optional mini bar / stars / breakdown */
   .kpi .kh{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
   .kpi .kc{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-size:20px;flex:none}
-  .kpi .kc.violet{background:#a855f71f;color:#a855f7}.kpi .kc.green{background:#10b9811f;color:#10b981}
+  .kpi .kc.violet{background:#7c5cf01f;color:#7c5cf0}.kpi .kc.green{background:#10b9811f;color:#10b981}
   .kpi .kc.blue{background:#3b82f61f;color:#3b82f6}.kpi .kc.amber{background:#f59e0b1f;color:#f59e0b}
   .kbar{height:8px;border-radius:6px;background:var(--ov2);overflow:hidden;margin-top:11px}
   .kbar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#10b981,#34d399)}
@@ -300,7 +301,7 @@
   .mtabs{display:inline-flex;background:var(--inp);border-radius:9px;padding:3px}
   .mtabs button{border:0;background:transparent;font-size:12.5px;font-weight:600;color:var(--mut);padding:6px 13px;border-radius:7px;cursor:pointer}
   .mtabs button.on{background:var(--card);color:var(--txt);box-shadow:0 1px 3px rgba(24,28,52,.1)}
-  .addvenue{border:1px dashed var(--acc);color:var(--acc);background:#a855f70d;border-radius:9px;height:30px;padding:0 12px;font-weight:600;font-size:12.5px;cursor:pointer}
+  .addvenue{border:1px dashed var(--acc);color:var(--acc);background:#7c5cf00d;border-radius:9px;height:30px;padding:0 12px;font-weight:600;font-size:12.5px;cursor:pointer}
   /* split: maestro (wide) + right column */
   .splitH{display:grid;grid-template-columns:1.75fr 1fr;gap:16px;align-items:start}
   @media(max-width:1100px){.splitH{grid-template-columns:1fr}}
@@ -335,11 +336,11 @@
   /* bottom quick toolbar */
   .qbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}
   .qbar button{flex:1;min-width:118px;border:1px solid var(--line);background:var(--bg2);border-radius:10px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--txt);transition:.15s}
-  .qbar button:hover{border-color:var(--acc);color:var(--acc);background:#a855f708}
+  .qbar button:hover{border-color:var(--acc);color:var(--acc);background:#7c5cf008}
   .qbar button .qi{font-size:18px}
   /* hotel selector (sidebar) */
   .hotelsel{display:flex;align-items:center;gap:10px;background:var(--s-hov);border:1px solid var(--s-line);border-radius:12px;padding:9px 10px;margin:0 0 6px;position:relative}
-  .hotelsel .hthumb{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#a855f7,#ec4899);flex:none;display:grid;place-items:center;font-size:18px}
+  .hotelsel .hthumb{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#f6b73c,#e0912a);flex:none;display:grid;place-items:center;font-size:18px}
   .hotelsel .hz{flex:1;min-width:0}
   .hotelsel .hz b{font-size:12.5px;color:#fff;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
   .hotelsel .hz span{font-size:10.5px;color:var(--s-mut)}
@@ -359,9 +360,9 @@
   .acard:hover{box-shadow:0 12px 28px rgba(124,92,240,.17);transform:translateY(-2px)}
   .acard .ph{height:158px;position:relative;background:linear-gradient(135deg,#6a5cf0,#8b5cf6);background-size:cover;background-position:center}
   .acard .ph .av-badge{position:absolute;top:10px;left:10px;background:#10b981;color:#fff;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px}
-  .acard .ph .nv-badge{position:absolute;top:10px;left:10px;background:#ec4899;color:#fff;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px}
+  .acard .ph .nv-badge{position:absolute;top:10px;left:10px;background:#7c5cf0;color:#fff;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px}
   .acard .ph .heart{position:absolute;top:9px;right:10px;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.32);display:grid;place-items:center;font-size:14px;color:#fff}
-  .acard .ph .play{position:absolute;left:12px;bottom:12px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;font-size:15px;color:#a855f7}
+  .acard .ph .play{position:absolute;left:12px;bottom:12px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;font-size:15px;color:#7c5cf0}
   .acard .ab{padding:13px 14px 15px}
   .acard .ab .arow{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
   .acard .ab h4{font-size:14px;font-weight:700;margin:0}
@@ -407,11 +408,11 @@
   .lg-hero .lg-scrim{position:absolute;inset:0;z-index:0;background:linear-gradient(90deg,rgba(8,8,15,.93) 0%,rgba(8,8,15,.66) 27%,rgba(8,8,15,.18) 63%,rgba(8,8,15,.03) 100%),linear-gradient(180deg,rgba(8,8,15,.10) 0%,rgba(8,8,15,.10) 52%,rgba(8,8,15,.52) 80%,rgba(8,8,15,.88) 100%)}
   .lg-beam{display:none}
   .lg-floor{position:absolute;left:0;right:0;bottom:0;height:40%;z-index:0;
-      background:radial-gradient(92% 120% at 50% 100%, rgba(168,85,247,.34), rgba(236,72,153,.12) 45%, transparent 70%)}
+      background:radial-gradient(92% 120% at 50% 100%, rgba(124,92,240,.34), rgba(236,72,153,.12) 45%, transparent 70%)}
   .lg-hero>*{position:relative;z-index:1}
   .lg-brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:3px;font-size:16px}
   .lg-brand .m{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:16px;
-      background:linear-gradient(135deg,#a855f7,#ec4899);box-shadow:0 6px 20px rgba(168,85,247,.5)}
+      background:linear-gradient(135deg,#7c5cf0,#7c5cf0);box-shadow:0 6px 20px rgba(124,92,240,.5)}
   .lg-brand small{display:block;font-size:8.5px;letter-spacing:3.4px;color:#a6a2c4;font-weight:700;margin-top:2px}
   .lg-mid{margin-top:8vh}
   .lg-h1{font-size:37px;line-height:1.14;font-weight:800;letter-spacing:-.6px;margin-bottom:18px;text-shadow:0 2px 18px rgba(0,0,0,.85),0 1px 4px rgba(0,0,0,.9)}
@@ -659,8 +660,8 @@ const API = (window.RICKY_API ?? "http://localhost:8000") + "/api/v1";  // "" = 
 const PERIOD = {year:2026, month:7};
 let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company";
 const MXN = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n||0);
-const CATCOL = {"Musica":"#a855f7","Shows":"#ec4899","Fotografia y Video":"#60a5fa","Produccion":"#34d399"};
-const palette=["#a855f7","#ec4899","#60a5fa","#34d399","#fbbf24","#f87171"];
+const CATCOL = {"Musica":"#7c5cf0","Shows":"#f59e0b","Fotografia y Video":"#3b82f6","Produccion":"#10b981"};
+const palette=["#7c5cf0","#3b82f6","#10b981","#f59e0b","#06b6d4","#ef4444"];
 const stars = n => n? '★'.repeat(n):'—';
 const esc = s => (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 // Display-only accent normalization for category/subcategory labels (keeps raw
@@ -821,8 +822,8 @@ function applyRole(){
   const roleTxt = ME.is_admin?'Administración':(isArtist?(ME.artist_name||'Artista'):(ME.company_name||'Contratante'));
   // Brand: artists -> SHOWCASE, hoteles/admin -> Entertainment OS
   const brandLogo=document.getElementById('brandLogo'), brandName=document.getElementById('brandName'), brandSub=document.getElementById('brandSub');
-  if(isArtist){ brandLogo.textContent='S'; brandName.textContent='SHOWCASE'; brandSub.textContent='Artistas'; document.title='SHOWCASE · Artistas'; }
-  else { brandLogo.textContent='R'; brandName.textContent='RICKY'; brandSub.textContent='Entertainment OS'; document.title='RICKY Entertainment OS'; }
+  if(isArtist){ brandLogo.textContent='S'; brandLogo.classList.remove('gold'); brandName.textContent='SHOWCASE'; brandSub.textContent='Artistas'; document.title='SHOWCASE · Artistas'; }
+  else { brandLogo.textContent='R'; brandLogo.classList.add('gold'); brandName.textContent='RICKY'; brandSub.textContent='Entertainment OS'; document.title='RICKY Entertainment OS'; }
   // Sidebar promo card
   const promo=document.getElementById('sidePromo');
   if(isArtist){
@@ -939,7 +940,7 @@ function novCard(n){
     : `<div style="height:104px;background:linear-gradient(135deg,#6a5cf0,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:30px">🎭</div>`;
   const price = n.price_hotel || n.base_price;
   return `<div style="flex:0 0 200px;border:1px solid var(--line);border-radius:12px;overflow:hidden;position:relative;background:var(--ov)">
-    <span class="chip" style="position:absolute;top:8px;left:8px;background:#ec489922;color:#ec4899;font-weight:700;z-index:1">✨ Novedad</span>
+    <span class="chip" style="position:absolute;top:8px;left:8px;background:#7c5cf022;color:#7c5cf0;font-weight:700;z-index:1">✨ Novedad</span>
     ${img}
     <div style="padding:10px 12px">
       <b style="font-size:13px;display:block">${esc(n.show_name)}</b>
@@ -1226,7 +1227,7 @@ const RENDER = {
         <div class="hint">Cuando un hotel solicite acceso desde el registro, aparecerá aquí con sus datos para que lo contactes.</div></div>`;
       return;
     }
-    const st = s => s==='new'?['Nuevo','#ec4899']:s==='contacted'?['Contactado','#3b82f6']:s==='converted'?['Convertido','#10b981']:['Descartado','#9aa0b6'];
+    const st = s => s==='new'?['Nuevo','#7c5cf0']:s==='contacted'?['Contactado','#3b82f6']:s==='converted'?['Convertido','#10b981']:['Descartado','#9aa0b6'];
     box.innerHTML = `<div class="box"><h3>📇 Prospectos de hoteles</h3><div class="hint">${rows.length} solicitud(es) · más recientes primero</div>
       <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
       ${rows.map(l=>{const [lbl,col]=st(l.status);return `
@@ -1633,7 +1634,7 @@ const RENDER = {
         </tbody></table></div>
       <div class="box" style="margin-top:16px;position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
         <h3>🗺️ Mapa de calor por destino</h3><div class="hint">Dónde se está contratando más · ${study.total_bookings} contrataciones (últimos ${study.window_days} días)</div>
-        <div class="heat">${D.map(d=>{const o=(0.18+0.62*(d.share_pct/maxSh)).toFixed(2);return `<div class="heatcell" style="background:linear-gradient(135deg,rgba(168,85,247,${o}),rgba(236,72,153,${o}))"><b>${esc(d.zone)}</b><span>${d.bookings} contrataciones · ${d.hotels} hoteles</span><s>${d.share_pct.toFixed(0)}%</s></div>`;}).join("")||'<div class="muted">Sin contrataciones en la ventana.</div>'}</div></div>
+        <div class="heat">${D.map(d=>{const o=(0.18+0.62*(d.share_pct/maxSh)).toFixed(2);return `<div class="heatcell" style="background:linear-gradient(135deg,rgba(124,92,240,${o}),rgba(236,72,153,${o}))"><b>${esc(d.zone)}</b><span>${d.bookings} contrataciones · ${d.hotels} hoteles</span><s>${d.share_pct.toFixed(0)}%</s></div>`;}).join("")||'<div class="muted">Sin contrataciones en la ventana.</div>'}</div></div>
       <div class="grid2b" style="margin-top:16px">
         <div class="box" style="position:relative"><span class="pro" style="position:absolute;top:16px;right:16px">PARTNER</span>
           <h3>🛏️ Gasto por habitación por destino</h3><div class="hint">Presupuesto ÷ habitaciones · promedio de mercado ${MXN(study.market_avg_spend_per_room)}</div>
