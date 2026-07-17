@@ -245,7 +245,7 @@
   .mbtn:hover{background:var(--inp)}
   .mbtn.today{color:var(--acc)}
   .maestro{overflow-x:auto;padding-bottom:4px}
-  .mgrid{display:grid;grid-template-columns:150px repeat(7,minmax(118px,1fr));gap:6px;min-width:900px}
+  .mgrid{display:grid;grid-template-columns:116px repeat(7,minmax(84px,1fr));gap:5px;min-width:0}
   .mhd{font-size:10.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;text-align:center;padding:4px 0}
   .mhd.today{color:#fff;background:var(--grad);border-radius:7px}
   .mhd .dn{font-size:14px;font-weight:800;display:block;color:var(--txt)}
@@ -281,6 +281,122 @@
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#1b1f2e;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 12px 32px rgba(0,0,0,.32);opacity:0;pointer-events:none;transition:.25s;z-index:9999}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .toast.bad{background:var(--bad)}
+
+  /* ===== Faithful hotel screens (David "Diseño Visual" mockups 3-6) ===== */
+  /* KPI cards: colored icon chip top-right + optional mini bar / stars / breakdown */
+  .kpi .kh{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .kpi .kc{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-size:20px;flex:none}
+  .kpi .kc.violet{background:#a855f71f;color:#a855f7}.kpi .kc.green{background:#10b9811f;color:#10b981}
+  .kpi .kc.blue{background:#3b82f61f;color:#3b82f6}.kpi .kc.amber{background:#f59e0b1f;color:#f59e0b}
+  .kbar{height:8px;border-radius:6px;background:var(--ov2);overflow:hidden;margin-top:11px}
+  .kbar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#10b981,#34d399)}
+  .kbreak{display:flex;gap:13px;margin-top:9px;font-size:11px;color:var(--mut);flex-wrap:wrap}
+  .kbreak span{display:inline-flex;align-items:center;gap:5px}
+  .kbreak i{width:7px;height:7px;border-radius:50%;display:inline-block}
+  .kstars{color:#f59e0b;font-size:15px;letter-spacing:1.5px;margin-top:7px}
+  .kstars small{color:var(--mut);font-size:11px;margin-left:7px;letter-spacing:0}
+  .ktrend{color:var(--ok);font-weight:700}
+  /* Maestro tabs + añadir lugar */
+  .mtabs{display:inline-flex;background:var(--inp);border-radius:9px;padding:3px}
+  .mtabs button{border:0;background:transparent;font-size:12.5px;font-weight:600;color:var(--mut);padding:6px 13px;border-radius:7px;cursor:pointer}
+  .mtabs button.on{background:var(--card);color:var(--txt);box-shadow:0 1px 3px rgba(24,28,52,.1)}
+  .addvenue{border:1px dashed var(--acc);color:var(--acc);background:#a855f70d;border-radius:9px;height:30px;padding:0 12px;font-weight:600;font-size:12.5px;cursor:pointer}
+  /* split: maestro (wide) + right column */
+  .splitH{display:grid;grid-template-columns:1.75fr 1fr;gap:16px;align-items:start}
+  @media(max-width:1100px){.splitH{grid-template-columns:1fr}}
+  .rcol{display:flex;flex-direction:column;gap:16px}
+  /* sugerencias de IA */
+  .sugg{display:flex;gap:11px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+  .sugg:first-of-type{border-top:0}
+  .sugg .sav{width:42px;height:42px;border-radius:11px;background:var(--grad) center/cover;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px}
+  .sugg .sz{flex:1;min-width:0}
+  .sugg .sz b{font-size:12.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sugg .sz span{font-size:11px;color:var(--mut)}
+  .sugg .rt{color:#f59e0b;font-weight:700;font-size:11px}
+  .sugg .asg{border:0;background:var(--grad);color:#fff;border-radius:8px;font-size:11.5px;font-weight:600;padding:8px 13px;cursor:pointer;flex:none}
+  .sugg .asg:hover{opacity:.9}
+  /* 4-col bottom row */
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
+  @media(max-width:1150px){.grid4{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:620px){.grid4{grid-template-columns:1fr}}
+  .bhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+  .bhead a{font-size:11.5px;color:var(--acc);cursor:pointer;font-weight:600}
+  /* reportes rápidos */
+  .rep{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:12.5px}
+  .rep:first-of-type{border-top:0}
+  .rep .rl{display:flex;align-items:center;gap:9px;color:var(--txt);min-width:0}
+  .rep .ri{width:28px;height:28px;border-radius:8px;background:var(--inp);display:grid;place-items:center;font-size:14px;flex:none}
+  .rep .rv{font-weight:700;text-align:right;white-space:nowrap}
+  /* facturación mini (dashboard card) */
+  .invmini{text-align:center;padding:6px 0 2px}
+  .invmini .im-ico{width:46px;height:46px;border-radius:50%;background:#10b9811f;color:#10b981;display:grid;place-items:center;font-size:20px;margin:0 auto 10px}
+  .invmini .im-v{font-size:24px;font-weight:800;letter-spacing:-.5px}
+  .invmini .im-s{font-size:11.5px;color:var(--mut);margin-top:2px}
+  /* bottom quick toolbar */
+  .qbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}
+  .qbar button{flex:1;min-width:118px;border:1px solid var(--line);background:var(--bg2);border-radius:10px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--txt);transition:.15s}
+  .qbar button:hover{border-color:var(--acc);color:var(--acc);background:#a855f708}
+  .qbar button .qi{font-size:18px}
+  /* hotel selector (sidebar) */
+  .hotelsel{display:flex;align-items:center;gap:10px;background:var(--s-hov);border:1px solid var(--s-line);border-radius:12px;padding:9px 10px;margin:0 0 6px;position:relative}
+  .hotelsel .hthumb{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#a855f7,#ec4899);flex:none;display:grid;place-items:center;font-size:18px}
+  .hotelsel .hz{flex:1;min-width:0}
+  .hotelsel .hz b{font-size:12.5px;color:#fff;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+  .hotelsel .hz span{font-size:10.5px;color:var(--s-mut)}
+  .hotelsel select{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+  .hotelsel .chev{color:var(--s-mut);font-size:11px}
+  /* Buscar Artistas (screen 4) */
+  .filters{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px 16px 14px;box-shadow:var(--shadow);margin-bottom:18px}
+  .filtrow{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:12px}
+  @media(max-width:1000px){.filtrow{grid-template-columns:1fr 1fr}}
+  .filtrow2{display:flex;align-items:center;gap:16px;margin-top:13px;flex-wrap:wrap}
+  .artlayout{display:grid;grid-template-columns:1fr 250px;gap:18px;align-items:start}
+  @media(max-width:1000px){.artlayout{grid-template-columns:1fr}}
+  .agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:1250px){.agrid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.agrid{grid-template-columns:1fr}}
+  .acard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);transition:.16s;cursor:pointer}
+  .acard:hover{box-shadow:0 12px 28px rgba(124,92,240,.17);transform:translateY(-2px)}
+  .acard .ph{height:158px;position:relative;background:linear-gradient(135deg,#6a5cf0,#8b5cf6);background-size:cover;background-position:center}
+  .acard .ph .av-badge{position:absolute;top:10px;left:10px;background:#10b981;color:#fff;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px}
+  .acard .ph .nv-badge{position:absolute;top:10px;left:10px;background:#ec4899;color:#fff;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px}
+  .acard .ph .heart{position:absolute;top:9px;right:10px;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.32);display:grid;place-items:center;font-size:14px;color:#fff}
+  .acard .ph .play{position:absolute;left:12px;bottom:12px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;font-size:15px;color:#a855f7}
+  .acard .ab{padding:13px 14px 15px}
+  .acard .ab .arow{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .acard .ab h4{font-size:14px;font-weight:700;margin:0}
+  .acard .ab .rt{font-size:11.5px;color:#f59e0b;font-weight:700;white-space:nowrap}
+  .acard .ab .ty{font-size:11.5px;color:var(--mut);margin-top:2px}
+  .acard .ab .from{font-size:12.5px;font-weight:700;color:var(--acc);margin-top:6px}
+  .acard .tgs{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+  .acard .tgs span{font-size:10.5px;background:var(--inp);color:var(--mut);padding:3px 8px;border-radius:6px}
+  .acard .loc{font-size:11px;color:var(--mut);margin-top:9px;display:flex;gap:12px;flex-wrap:wrap}
+  .catbox{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px;box-shadow:var(--shadow);margin-bottom:16px}
+  .catbox h4{font-size:12.5px;font-weight:700;margin-bottom:10px}
+  .catrow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font-size:12.5px;cursor:pointer;color:var(--txt)}
+  .catrow.on{color:var(--acc);font-weight:700}
+  .catrow span{color:var(--mut);font-size:11.5px}
+  .catrow.on span{color:var(--acc)}
+  /* Presupuesto matrix (screen 5) */
+  .bmatrix{overflow-x:auto}
+  .bmatrix table{min-width:760px}
+  .bmatrix th,.bmatrix td{font-size:11.5px;text-align:right;padding:9px 8px;white-space:nowrap}
+  .bmatrix th:first-child,.bmatrix td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}
+  .bmatrix tr.tot td{font-weight:800;border-top:2px solid var(--line)}
+  .bmatrix td.hot{color:var(--acc);font-weight:700}
+  .barchart{display:flex;align-items:flex-end;gap:8px;height:150px;padding-top:10px}
+  .barchart .bc{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end}
+  .barchart .bc .bb{display:flex;flex-direction:row;align-items:flex-end;justify-content:center;gap:3px;height:130px}
+  .barchart .bc .bb i{display:block;width:12px;border-radius:3px 3px 0 0}
+  .barchart .bc small{font-size:9.5px;color:var(--mut)}
+  /* Facturación (screen 6) */
+  .inv-status{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+  .is-paid{background:#10b9811f;color:#10b981}.is-sent{background:#3b82f61f;color:#3b82f6}.is-overdue{background:#ef44441f;color:#ef4444}
+  .invdetail .idr{display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0}
+  .invdetail .idr.tot{border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-weight:800;font-size:14px;color:var(--acc)}
+  .qact{display:flex;flex-direction:column;gap:2px}
+  .qact a{display:flex;align-items:center;gap:9px;padding:9px 0;font-size:12.5px;color:var(--info);cursor:pointer;border-top:1px solid var(--line)}
+  .qact a:first-child{border-top:0}
 
   /* ===== Login Master (dark, full-screen) — David diseño 2026-07-15 ===== */
   .lg{position:fixed;inset:0;z-index:50;background:#0b0b13;color:#eef0f7;
@@ -479,13 +595,22 @@
       <div class="logo" id="brandLogo">R</div>
       <div><b id="brandName">RICKY</b><span id="brandSub">Entertainment OS</span></div>
     </div>
+    <div class="hotelsel" id="hotelSel" style="display:none">
+      <div class="hthumb">🏨</div>
+      <div class="hz"><b id="hotelName">Cadena</b><span id="hotelCity">Grupo hotelero</span></div>
+      <span class="chev">▾</span>
+      <select id="groupSel" onchange="reload()"></select>
+    </div>
     <div class="navlbl">Operación</div>
-    <div class="nav on" data-p="home"><span class="ic">📊</span> Resumen</div>
+    <div class="nav on" data-p="home"><span class="ic">🏠</span> Dashboard</div>
+    <div class="nav" data-p="artists" style="display:none"><span class="ic">🎭</span> Artistas</div>
     <div class="nav" data-p="cal"><span class="ic">🗓️</span> Actuaciones</div>
     <div class="nav" data-p="reqs"><span class="ic">📣</span> Solicitudes</div>
     <div class="nav" data-p="leads" style="display:none"><span class="ic">📇</span> Prospectos <span class="badge" id="leadsBadge" style="display:none"></span></div>
     <div class="nav" data-p="chat"><span class="ic">💬</span> Chat</div>
+    <div class="nav" data-p="budget" style="display:none"><span class="ic">💰</span> Presupuesto</div>
     <div class="nav" data-p="bill" style="display:none"><span class="ic">🧾</span> Facturación</div>
+    <div class="nav" data-p="reports" style="display:none"><span class="ic">📊</span> Reportes</div>
     <div class="nav" data-p="profile" style="display:none"><span class="ic">👤</span> Mi Perfil</div>
     <div class="navlbl">Inteligencia · Partner</div>
     <div class="nav" data-p="market"><span class="ic">📈</span> Market Intelligence <span class="pro">PRO</span></div>
@@ -507,18 +632,20 @@
         <div class="sub" id="psub">Vista consolidada</div>
       </div>
       <div class="spacer"></div>
-      <div class="ctrl" id="groupWrap">🏨 <select id="groupSel" onchange="reload()"></select></div>
       <div class="ctrl" id="monthCtrl">📅 Julio 2026</div>
       <div class="bell" title="Notificaciones">🔔<span class="dot"></span></div>
       <div class="ava" id="topAva">RA</div>
     </div>
     <div class="wrap">
       <div class="panel on" id="panel-home"><div class="load">Cargando…</div></div>
+      <div class="panel" id="panel-artists"></div>
       <div class="panel" id="panel-cal"></div>
       <div class="panel" id="panel-reqs"></div>
       <div class="panel" id="panel-leads"></div>
       <div class="panel" id="panel-chat"></div>
+      <div class="panel" id="panel-budget"></div>
       <div class="panel" id="panel-bill"></div>
+      <div class="panel" id="panel-reports"></div>
       <div class="panel" id="panel-profile"></div>
       <div class="panel" id="panel-market"></div>
       <div class="panel" id="panel-demand"></div>
@@ -714,19 +841,39 @@ function applyRole(){
   const show=(p,on)=>{const n=document.querySelector(`.nav[data-p='${p}']`); if(n) n.style.display=on?'':'none';};
   const lbls=document.querySelectorAll('.navlbl');       // [0]=Operación, [1]=Inteligencia·Partner
   const canPartner = ME.is_admin || isDirector;          // chain-level analytics need a group scope
+  const isHotel = !isArtist;                             // admin or contratante/hotel side
   show('news', canPartner); show('market', canPartner); show('demand', canPartner);
   if(lbls[1]) lbls[1].style.display = canPartner?'':'none';
   // Home is the consolidated view for a chain/admin, AND the artist's personal dashboard.
   show('home', ME.is_admin || isDirector || isArtist);
-  show('bill', isArtist); show('profile', isArtist);     // artist-only self-service
+  show('artists', isHotel);                              // hotels browse the talent catalog
+  show('budget', canPartner);                            // presupuesto (chain scope)
+  show('reports', canPartner);                           // reportes
+  show('bill', isArtist || canPartner);                 // facturación (artist self / hotel)
+  show('profile', isArtist);                            // artist-only self-service
   show('leads', ME.is_admin);                            // admin: hotel pre-registro prospectos
   if(ME.is_admin) refreshLeadsBadge();
-  show('cal', !isArtist);                                 // artist agenda now lives inside the Dashboard
+  show('cal', true);                                     // actuaciones / historial de agenda
   if(isArtist){
-    setNavLabel('home','📊','Dashboard'); setNavLabel('chat','💬','Mis chats');
+    setNavLabel('home','🏠','Dashboard'); setNavLabel('cal','🗓️','Mis actuaciones'); setNavLabel('chat','💬','Mis chats');
     TITLES.home=["Dashboard","Tu actividad de un vistazo"];
-  } else if(!ME.is_admin){ setNavLabel('cal','🗓️','Mis actuaciones'); }
-  document.getElementById('groupWrap').style.display = ME.is_admin ? '' : 'none';
+  } else {
+    setNavLabel('home','🏠','Dashboard'); setNavLabel('cal','🗓️','Actuaciones'); setNavLabel('chat','💬','Chat');
+    TITLES.home=["Dashboard Ejecutivo","Resumen de entretenimiento"];
+  }
+  // Sidebar hotel selector card (replaces the old top-bar group dropdown)
+  const hs=document.getElementById('hotelSel');
+  if(isArtist){ if(hs) hs.style.display='none'; }
+  else if(hs){ hs.style.display=''; document.getElementById('groupSel').style.display = ME.is_admin?'':'none'; syncHotelCard(); }
+}
+function syncHotelCard(){
+  const nm=document.getElementById('hotelName'), ct=document.getElementById('hotelCity'); if(!nm||!ME) return;
+  if(ME.is_admin){
+    const sel=document.getElementById('groupSel'); const opt=sel&&sel.selectedOptions&&sel.selectedOptions[0];
+    nm.textContent = opt? opt.textContent : (GROUPS[0]?GROUPS[0].name:'Cadena'); ct.textContent='Grupo hotelero';
+  } else {
+    nm.textContent = ME.group_name || ME.company_name || 'Tu cadena'; ct.textContent = ME.city || 'Grupo hotelero';
+  }
 }
 
 async function boot(){
@@ -738,6 +885,7 @@ async function boot(){
   } else {
     GID = ME.group_id || null;
   }
+  syncHotelCard();
   // land on the first visible section (home is hidden for artists / single hotels)
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));
   const first=[...document.querySelectorAll('.nav')].find(n=>n.style.display!=='none');
@@ -745,17 +893,20 @@ async function boot(){
   if(first){ first.classList.add('on'); await show(first.dataset.p,true); }
 }
 async function reload(){
-  if(ME&&ME.is_admin) GID = document.getElementById('groupSel').value || GID;
+  if(ME&&ME.is_admin){ GID = document.getElementById('groupSel').value || GID; syncHotelCard(); }
   CACHE={};
   document.querySelectorAll('.panel').forEach(x=>{x.dataset.loaded="";});
   const active=document.querySelector('.nav.on').dataset.p;
   await show(active,true);
 }
 
-const TITLES={home:["Resumen","Vista consolidada de la cadena"],cal:["Actuaciones","Agenda de shows por venue"],
+const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Actuaciones","Agenda de shows por venue"],
+  artists:["Buscar Artistas","Encuentra y contrata el talento ideal para tu hotel"],
   reqs:["Solicitudes","Tablero de pedidos abiertos"],chat:["Chat","Conversaciones hotel · artista"],
   leads:["Prospectos","Hoteles que solicitaron acceso"],
-  bill:["Facturación","Historial de facturas por mes"],
+  budget:["Presupuesto","Planifica y controla el gasto de entretenimiento"],
+  bill:["Facturación","Todas tus facturas en un solo lugar"],
+  reports:["Reportes","Indicadores clave de tu operación"],
   profile:["Mi Perfil","Tus datos, tarifas y publicaciones"],
   market:["Market Intelligence","Estudio de mercado por destino"],
   demand:["Tendencias de demanda","Lo que más se está pidiendo"],news:["Noticias","Novedades del entretenimiento"]};
@@ -882,7 +1033,7 @@ function renderMaestro(){
     });
   });
   if(!venues.length) html+=`<div style="grid-column:1/-1;padding:26px;text-align:center" class="muted">Aún no hay actuaciones programadas en esta cadena.</div>`;
-  grid.innerHTML=html; wireMaestroDnD();
+  grid.innerHTML=html; wireMaestroDnD(); updateWeekKpi();
   const lbl=document.getElementById('maestroWeek');
   if(lbl){ const e=days[6]; lbl.textContent=`${mon.getDate()} ${mon.toLocaleDateString('es-MX',{month:'short'})} – ${e.getDate()} ${e.toLocaleDateString('es-MX',{month:'short'})}`; }
 }
@@ -929,6 +1080,141 @@ function budgetDonut(gastado,comprometido,disponible){
     </div></div>`;
 }
 function toast(msg,bad){ let t=document.getElementById('toast'); if(!t){ t=document.createElement('div'); t.id='toast'; document.body.appendChild(t); } t.textContent=msg; t.className='toast show'+(bad?' bad':''); clearTimeout(window._tt); window._tt=setTimeout(()=>{t.className='toast';},2600); }
+// "Actuaciones esta semana" KPI — tied to the week the Calendario Maestro is showing.
+function updateWeekKpi(){
+  const el=document.getElementById('kpiWeekVal'); if(!el) return;
+  const bk=CACHE.homeBk||[]; const mon=mondayOf(MAESTRO_REF||new Date());
+  const end=new Date(mon); end.setDate(mon.getDate()+7);
+  const wk=bk.filter(b=>{const d=new Date(b.starts_at); return d>=mon&&d<end;});
+  const c=s=>wk.filter(b=>b.status===s).length;
+  const conf=c('confirmed')+c('completed');
+  el.textContent=wk.length;
+  const br=document.getElementById('kpiWeekBreak');
+  if(br) br.innerHTML=`<span><i style="background:var(--ok)"></i>${conf} Confirmadas</span>`
+    +`<span><i style="background:var(--warn)"></i>${c('pending')} Pendientes</span>`
+    +`<span><i style="background:var(--bad)"></i>${c('cancelled')} Canceladas</span>`;
+}
+const starRow = v => { const f=Math.round(v||0); let s=''; for(let i=1;i<=5;i++) s+=(i<=f?'★':'☆'); return s; };
+function suggAsignar(name){ toast('Le enviaremos tu interés a '+(name||'este artista')+' ✓'); }
+function qtool(label){ toast(label+' — módulo en preparación'); }
+/* ---- Buscar Artistas (screen 4) ---- */
+let AF={cat:''};
+function artGrad(cat){ const c=CATCOL[cat]||'#7c5cf0'; return `linear-gradient(135deg,${c},#8b5cf6)`; }
+function artistCard(i){
+  const badge=i.isNew?`<span class="nv-badge">✨ Novedad</span>`:`<span class="av-badge">● Disponible</span>`;
+  const ph=i.img?`style="background-image:url('${i.img}')"`:`style="background:${artGrad(i.cat)}"`;
+  const tags=(i.sub?[pretty(i.sub)]:[]).concat((i.genres||[]).slice(0,2)).slice(0,3);
+  return `<div class="acard" onclick="suggAsignar('${esc((i.name||'').replace(/'/g,''))}')">
+    <div class="ph" ${ph}>${badge}<div class="heart">♡</div><div class="play">▶</div></div>
+    <div class="ab">
+      <div class="arow"><h4>${esc(i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
+      <div class="ty">${esc(i.show)} · ${esc(pretty(i.cat))}</div>
+      ${i.price?`<div class="from">Desde ${MXN(i.price)}</div>`:''}
+      <div class="tgs">${tags.map(g=>`<span>${esc(g)}</span>`).join('')}</div>
+      <div class="loc"><span>📍 ${esc(i.city||'México')}</span>${i.langs&&i.langs.length?`<span>🗣 ${esc(i.langs.slice(0,2).join(', '))}</span>`:''}</div>
+    </div></div>`;
+}
+function applyArtistFilters(){
+  const items=CACHE.artistItems||[];
+  const q=((document.getElementById('af_q')||{}).value||'').toLowerCase().trim();
+  const sort=((document.getElementById('af_sort')||{}).value)||'best';
+  const maxEl=document.getElementById('af_max'); const max=maxEl?+maxEl.value:60000;
+  let r=items.filter(i=>{
+    if(AF.cat && i.cat!==AF.cat) return false;
+    if(max<60000 && i.price && i.price>max) return false;
+    if(q){ const hay=(i.name+' '+i.show+' '+i.cat+' '+(i.sub||'')+' '+(i.genres||[]).join(' ')).toLowerCase(); if(!hay.includes(q)) return false; }
+    return true;
+  });
+  if(sort==='price') r.sort((a,b)=>(a.price||1e9)-(b.price||1e9));
+  else if(sort==='new') r.sort((a,b)=>(b.isNew?1:0)-(a.isNew?1:0));
+  const grid=document.getElementById('af_grid'); if(grid) grid.innerHTML=r.map(artistCard).join('')||'<div class="muted" style="grid-column:1/-1;padding:34px;text-align:center">No hay artistas que coincidan con tu búsqueda.</div>';
+  const cnt=document.getElementById('af_count'); if(cnt) cnt.textContent=r.length+(r.length===1?' artista encontrado':' artistas encontrados');
+  document.querySelectorAll('.catrow').forEach(el=>el.classList.toggle('on', (el.dataset.cat||'')===AF.cat));
+}
+function pickArtCat(c){ AF.cat=c; const s=document.getElementById('af_cat'); if(s) s.value=c; applyArtistFilters(); }
+/* ---- Facturación hoteles (screen 6): agrupa actuaciones facturables por hotel+mes ---- */
+async function hotelBill(box){
+  const bk=await api(`/bookings?group_id=${GID}`);
+  let AMAP={}; try{ (await api('/artists')||[]).forEach(a=>{AMAP[a.id]=a.stage_name;}); }catch(e){}
+  const num=x=>+x||0; const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null; const today=new Date();
+  const invb=bk.filter(b=>['confirmed','completed'].includes(b.status));
+  const g={};
+  invb.forEach(b=>{const d=new Date(b.starts_at);const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');const k=(b.company_id||0)+'|'+ym;(g[k]=g[k]||{company:b.company_name||'—',ym,rows:[]}).rows.push(b);});
+  const invoices=Object.entries(g).map(([k,v])=>{
+    const subtotal=v.rows.reduce((a,b)=>a+num(b.agreed_price),0);
+    const feePct=avg(v.rows.map(b=>b.commission_pct).filter(x=>x!=null))||5.2;
+    const fee=subtotal*feePct/100, iva=subtotal*0.16, total=subtotal+iva;
+    const allDone=v.rows.every(b=>b.status==='completed');
+    const anyOverdue=v.rows.some(b=>b.status==='confirmed'&&new Date(b.starts_at)<today);
+    const status=allDone?'paid':(anyOverdue?'overdue':'sent');
+    const d=new Date(v.ym+'-01T00:00:00'); const due=new Date(d); due.setMonth(due.getMonth()+1); due.setDate(14);
+    return {company:v.company,ym:v.ym,period:d.toLocaleDateString('es-MX',{month:'long',year:'numeric'}),rows:v.rows,
+      subtotal,feePct,fee,iva,total,status,
+      issue:d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}),
+      due:due.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})};
+  }).sort((a,b)=>b.ym.localeCompare(a.ym));
+  invoices.forEach((inv,i)=>{inv.no='INV-'+inv.ym.replace('-','')+'-'+String(i+1).padStart(3,'0');});
+  CACHE.invoices=invoices; CACHE.AMAP=AMAP;
+  const sum=f=>invoices.filter(f).reduce((a,b)=>a+b.total,0);
+  const total=sum(()=>true), pagado=sum(x=>x.status==='paid'), pend=sum(x=>x.status==='sent'), venc=sum(x=>x.status==='overdue');
+  const vencN=invoices.filter(x=>x.status==='overdue').length;
+  const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
+  if(!invoices.length){ box.innerHTML=`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no hay facturas</h3><p style="max-width:440px;margin:10px auto 0">En cuanto confirmes o realices actuaciones en tu cadena, aquí verás la facturación agrupada por hotel y mes, con la comisión RICKY y el IVA.</p></div></div>`; return; }
+  box.innerHTML=`
+    <div class="kpis">
+      <div class="kpi"><div class="kh"><div><div class="k">Total facturado</div><div class="v">${MXN(total)}</div><div class="d">${invoices.length} factura${invoices.length===1?'':'s'}</div></div><div class="kc violet">🧾</div></div></div>
+      <div class="kpi"><div class="kh"><div><div class="k">Pagado</div><div class="v">${MXN(pagado)}</div><div class="d">${total>0?Math.round(pagado/total*100):0}% del total</div></div><div class="kc green">✅</div></div></div>
+      <div class="kpi"><div class="kh"><div><div class="k">Por cobrar</div><div class="v">${MXN(pend)}</div><div class="d">${total>0?Math.round(pend/total*100):0}% del total</div></div><div class="kc amber">⏳</div></div></div>
+      <div class="kpi"><div class="kh"><div><div class="k">Vencido</div><div class="v">${MXN(venc)}</div><div class="d">${vencN} factura${vencN===1?'':'s'}</div></div><div class="kc blue">⚠️</div></div></div>
+    </div>
+    <div class="grid2">
+      <div class="box"><div class="bhead"><h3 style="margin:0">Facturas</h3><span class="hint" style="margin:0">${invoices.length} · más recientes primero</span></div>
+        <table id="invTable"><thead><tr><th>Factura</th><th>Periodo</th><th>Hotel</th><th>Total</th><th>Estado</th></tr></thead><tbody>
+        ${invoices.map((inv,i)=>`<tr data-i="${i}" onclick="selectInvoice(${i})" style="cursor:pointer">
+          <td style="font-variant-numeric:tabular-nums">${inv.no}</td><td class="muted" style="text-transform:capitalize">${inv.period}</td>
+          <td>${esc(inv.company)}</td><td style="font-weight:650">${MXN(inv.total)}</td>
+          <td><span class="inv-status ${STL[inv.status][1]}">${STL[inv.status][0]}</span></td></tr>`).join('')}
+        </tbody></table>
+        <div style="margin-top:12px"><button class="btn ghost" onclick="exportInvoices&&exportInvoices(this)">⬇ Exportar CSV</button></div>
+      </div>
+      <div>
+        <div class="box" style="margin-bottom:16px"><div class="bhead"><h3 style="margin:0">Factura seleccionada</h3></div><div id="invDetail"></div></div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Acciones</h3></div>
+          <div class="qact">
+            <a onclick="qtool('Descargar PDF')">⬇ Descargar factura (PDF)</a>
+            <a onclick="qtool('Enviar por chat')">✉ Enviar al hotel por chat</a>
+            <a onclick="qtool('Marcar como pagada')">✓ Marcar como pagada</a>
+            <a onclick="qtool('Nota de crédito')">📝 Crear nota de crédito</a>
+          </div></div>
+      </div>
+    </div>
+    <div class="box" style="margin-top:16px"><div class="bhead"><h3 style="margin:0">Detalle de la factura</h3></div><div id="invLines"></div></div>`;
+  selectInvoice(0);
+}
+function selectInvoice(i){
+  const inv=(CACHE.invoices||[])[i]; if(!inv) return;
+  const AMAP=CACHE.AMAP||{}; const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
+  document.querySelectorAll('#invTable tr[data-i]').forEach(r=>{r.style.background=(+r.dataset.i===i)?'var(--ov)':'';});
+  document.getElementById('invDetail').innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><b style="font-variant-numeric:tabular-nums">${inv.no}</b><span class="inv-status ${STL[inv.status][1]}">${STL[inv.status][0]}</span></div>
+    <div class="invdetail">
+      <div class="idr"><span class="muted">Hotel</span><b>${esc(inv.company)}</b></div>
+      <div class="idr"><span class="muted">Periodo</span><span style="text-transform:capitalize">${inv.period}</span></div>
+      <div class="idr"><span class="muted">Emitida</span><span>${inv.issue}</span></div>
+      <div class="idr"><span class="muted">Vence</span><span>${inv.due}</span></div>
+      <div class="idr"><span class="muted">Subtotal</span><span>${MXN(inv.subtotal)}</span></div>
+      <div class="idr"><span class="muted">Comisión RICKY (${inv.feePct.toFixed(1)}%)</span><span>${MXN(inv.fee)}</span></div>
+      <div class="idr"><span class="muted">IVA (16%)</span><span>${MXN(inv.iva)}</span></div>
+      <div class="idr tot"><span>Total</span><span>${MXN(inv.total)}</span></div>
+    </div>`;
+  document.getElementById('invLines').innerHTML=`
+    <table><thead><tr><th>Fecha</th><th>Show</th><th>Artista</th><th>Venue</th><th>Importe</th><th>Comisión</th></tr></thead><tbody>
+    ${inv.rows.map(b=>`<tr><td class="muted">${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
+      <td class="muted">${esc(b.artist_name||AMAP[b.artist_id]||'—')}</td><td class="muted">${esc(b.venue_name||'—')}</td>
+      <td style="font-weight:600">${MXN(b.agreed_price)}</td><td class="muted">${MXN((+b.agreed_price||0)*(b.commission_pct||inv.feePct)/100)}</td></tr>`).join('')}
+    <tr class="tot" style="font-weight:800"><td colspan="4" style="text-align:right">Subtotal</td><td>${MXN(inv.subtotal)}</td><td></td></tr>
+    </tbody></table>`;
+}
 
 const RENDER = {
   async leads(box){
@@ -966,69 +1252,241 @@ const RENDER = {
   },
   async home(box){
     if(ME.artist_id) return artistHome(box);   // artists get their personal dashboard
-    let nov=[]; try{ const nv=await api('/shows/novedades?days=7&limit=8'); nov=nv.novedades||[]; }catch(e){}
+    let nov=[]; try{ const nv=await api('/shows/novedades?days=30&limit=8'); nov=nv.novedades||[]; }catch(e){}
     if(!GID){                                  // no chain scope yet -> never call /groups/null/...
       box.innerHTML=`<div class="box" style="text-align:center;padding:48px 24px">
         <div style="font-size:34px;margin-bottom:8px">🏨</div>
         <h3 style="margin:0 0 6px">Aún no hay propiedades en tu cadena</h3>
         <div class="hint">En cuanto se registren hoteles o venues en tu grupo, aquí verás el Dashboard Ejecutivo consolidado: actuaciones, gasto, ocupación y solicitudes de toda la cadena.</div>
-      </div>${novStrip(nov)}`;
+      </div>`;
       return;
     }
     // Serial (not Promise.all): the prod host runs on a tiny LSAPI worker pool
-    // over sqlite; firing 5 concurrent requests per dashboard load saturates it
-    // (503s). One at a time keeps each load to a single busy worker.
+    // over sqlite; firing many concurrent requests per dashboard load saturates it.
     const dash = await api(`/groups/${GID}/dashboard`);
     const bk   = await api(`/bookings?group_id=${GID}`);
-    const cats = await api(`/intelligence/demand?days=90&group_id=${GID}`);
     const reqs = await api(`/requests?status=open`);
     const mkt  = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
-    const occs = mkt.properties.map(p=>p.occupancy_pct).filter(v=>v!=null);
-    const occ = occs.length? (occs.reduce((a,b)=>a+b,0)/occs.length):null;
-    const num = x => +x||0;
+    let AMAP={}; try{ (await api('/artists')||[]).forEach(a=>{AMAP[a.id]=a.stage_name;}); }catch(e){}
+    const num = x => +x||0; const avg = a => a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
     const budget = num(mkt.total_entertainment_budget);
     const gastado = bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
     const comprometido = bk.filter(b=>b.status==='confirmed').reduce((a,b)=>a+num(b.agreed_price),0);
     const usado = gastado+comprometido;
     const disponible = Math.max(0, budget-usado);
     const ahorro = budget-usado;
-    const usadoPct = budget>0? Math.round(usado/budget*100):null;
+    const usadoPct = budget>0? Math.round(usado/budget*100):0;
+    const ahorroPct = budget>0? Math.round(ahorro/budget*100):0;
+    // satisfacción media -> de la permanencia real del público (asistencia) sobre 5
+    const comp = bk.filter(b=>b.status==='completed');
+    const satPct = avg(comp.map(b=>b.retention_pct).filter(v=>v!=null)) ?? avg(comp.map(b=>b.occupancy_pct).filter(v=>v!=null));
+    const sat5 = satPct!=null? Math.min(5, satPct/20) : null;
+    // top artistas
     const am=new Map();
-    bk.forEach(b=>{ if(!b.artist_name) return; const o=am.get(b.artist_name)||{name:b.artist_name,count:0,sum:0}; o.count++; o.sum+=num(b.agreed_price); am.set(b.artist_name,o); });
+    bk.forEach(b=>{ const nm=b.artist_name||AMAP[b.artist_id]||b.show_name; if(!nm) return;
+      const o=am.get(nm)||{name:nm,count:0,sum:0}; o.count++; o.sum+=num(b.agreed_price); am.set(nm,o); });
     const topArt=[...am.values()].sort((a,b)=>b.count-a.count).slice(0,5);
-    const maxd = Math.max(...cats.top_categories.map(c=>c.demand_score),1);
-    CACHE.homeBk = bk; MAESTRO_REF = MAESTRO_REF || new Date();
+    // facturación (mes más reciente con actuaciones facturables)
+    const invb = bk.filter(b=>['confirmed','completed'].includes(b.status));
+    const bm={}; invb.forEach(b=>{const d=new Date(b.starts_at);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');(bm[k]=bm[k]||[]).push(b);});
+    const latestK=Object.keys(bm).sort().reverse()[0]; const latestRows=latestK?bm[latestK]:[];
+    const facTot=latestRows.reduce((a,b)=>a+num(b.agreed_price),0);
+    const facMonth=latestK? new Date(+latestK.split('-')[0],+latestK.split('-')[1]-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'}) : '—';
+    const priced=invb.filter(b=>b.agreed_price); const avgCost=priced.length? Math.round(priced.reduce((a,b)=>a+num(b.agreed_price),0)/priced.length):0;
+    const cancel=bk.filter(b=>b.status==='cancelled').length;
+    // Default the Maestro to the busiest week so the grid lands populated.
+    const wc={}; bk.forEach(b=>{const k=ymd(mondayOf(new Date(b.starts_at)));wc[k]=(wc[k]||0)+1;});
+    let bestW=null,bestN=-1; for(const k in wc){ if(wc[k]>bestN){bestN=wc[k];bestW=k;} }
+    CACHE.homeBk = bk; if(!MAESTRO_REF) MAESTRO_REF = bestW? new Date(bestW+'T00:00:00') : new Date();
     box.innerHTML=`
       <div class="kpis">
-        <div class="kpi"><div class="orb"></div><div class="k">🎭 Actuaciones (mes)</div><div class="v">${dash.total_bookings}</div><div class="d">confirmadas + realizadas</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">💳 Presupuesto utilizado</div><div class="v">${MXN(usado)}</div><div class="d">${budget>0?'de '+MXN(budget)+' · '+usadoPct+'%':'sin presupuesto cargado'}</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">🏨 Ocupación prom.</div><div class="v">${occ!=null?occ.toFixed(0)+'%':'—'}</div><div class="d">${dash.property_count} propiedades</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">💵 Ahorro vs presupuesto</div><div class="v">${budget>0?MXN(ahorro):'—'}</div><div class="d">${budget>0?(ahorro>=0?'dentro de presupuesto':'presupuesto excedido'):'—'}</div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Actuaciones esta semana</div><div class="v" id="kpiWeekVal">0</div></div><div class="kc violet">🗓️</div></div>
+          <div class="kbreak" id="kpiWeekBreak"></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Presupuesto utilizado</div><div class="v">${MXN(usado)}</div><div class="d">${budget>0?'de '+MXN(budget):'sin presupuesto cargado'}</div></div><div class="kc green">💲</div></div>
+          ${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto anual</div>`:''}</div>
+        <div class="kpi"><div class="kh"><div><div class="k">Satisfacción media</div><div class="v">${sat5!=null?sat5.toFixed(1)+' / 5':'—'}</div></div><div class="kc blue">🙂</div></div>
+          <div class="kstars">${sat5!=null?starRow(sat5):'☆☆☆☆☆'}<small>según asistencia real</small></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Ahorro vs presupuesto</div><div class="v">${budget>0?MXN(Math.abs(ahorro)):'—'}</div></div><div class="kc amber">📊</div></div>
+          <div class="d" style="margin-top:8px">${budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—'}</div></div>
+      </div>
+      <div class="splitH">
+        <div class="box">
+          <div class="mtoolbar">
+            <h3 style="margin:0;flex:1">Calendario Maestro</h3>
+            <div class="mnav"><button class="mbtn" onclick="maestroWeek(-1)">‹</button><button class="mbtn today" onclick="maestroWeek(0)">Hoy</button><button class="mbtn" onclick="maestroWeek(1)">›</button></div>
+            <div class="mtabs"><button class="on">Semana</button><button onclick="show('cal')">Agenda</button></div>
+            <button class="addvenue" onclick="qtool('Añadir lugar')">+ Añadir lugar</button>
+          </div>
+          <div class="hint" id="maestroWeek" style="margin:-4px 0 10px"></div>
+          <div class="maestro"><div class="mgrid" id="maestroGrid"></div></div>
+          <div class="hint" style="margin:10px 0 0">Arrastra una actuación a otro día o venue para reprogramarla — el cambio se guarda al instante.</div>
+        </div>
+        <div class="rcol">
+          <div class="box">
+            <div class="bhead"><h3 style="margin:0">Solicitudes</h3><a onclick="show('reqs')">Ver todas</a></div>
+            ${reqs.length? reqs.slice(0,3).map(r=>`<div class="listrow"><div class="lz"><b>${esc(r.title)}</b><span>${esc(r.company_name||'—')} · ${esc(pretty(r.category)||'—')}</span></div><span class="chip c-pending">Pendiente</span></div>`).join('') : '<div class="muted" style="padding:6px 0">Sin solicitudes abiertas.</div>'}
+            <button class="btn ghost" style="width:100%;margin-top:12px" onclick="show('reqs')">+ Nueva solicitud</button>
+          </div>
+          <div class="box">
+            <div class="bhead"><h3 style="margin:0">Sugerencias de IA</h3><a onclick="show('artists')">Ver todas</a></div>
+            ${nov.length? nov.slice(0,3).map(n=>`<div class="sugg">
+              <div class="sav" ${n.image_url?`style="background-image:url('${n.image_url}')"`:''}>${n.image_url?'':'🎭'}</div>
+              <div class="sz"><b>${esc(n.show_name)}</b><span>${esc(n.artist_name||pretty(n.category))}</span><span style="color:var(--ok)">● Disponible${n.price_hotel?' · '+MXN(n.price_hotel):''}</span></div>
+              <button class="asg" onclick="suggAsignar('${esc((n.artist_name||'').replace(/'/g,''))}')">Asignar</button></div>`).join('') : '<div class="muted" style="padding:6px 0">Sin sugerencias por ahora.</div>'}
+            <div style="margin-top:11px;text-align:center"><a onclick="show('demand')" style="color:var(--acc);font-size:12px;font-weight:600;cursor:pointer">Ver más opciones con IA ⚡</a></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid4">
+        <div class="box"><div class="bhead"><h3 style="margin:0">Presupuesto</h3><a onclick="show('budget')">Ver detalle</a></div>
+          ${budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>'}</div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Top Artistas</h3><a onclick="show('reports')">Ver todas</a></div>
+          ${topArt.length? topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} actuación${a.count===1?'':'es'}</span></div><b>${MXN(a.sum)}</b></div>`).join('') : '<div class="muted">Sin datos aún.</div>'}</div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Facturación</h3><a onclick="show('bill')">Ver facturas</a></div>
+          <div class="invmini"><div class="im-ico">💲</div><div class="im-s" style="text-transform:capitalize">${facMonth}</div><div class="im-v">${MXN(facTot)}</div><div class="im-s">${latestRows.length} actuación${latestRows.length===1?'':'es'}</div>
+            <button class="btn" style="width:100%;margin-top:12px" onclick="show('bill')">Ver facturación</button></div></div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Reportes rápidos</h3><a onclick="show('reports')">Ver todas</a></div>
+          <div class="rep"><div class="rl"><div class="ri">💵</div>Costo por actuación</div><div class="rv">${MXN(avgCost)} <span class="muted" style="font-weight:400">prom.</span></div></div>
+          <div class="rep"><div class="rl"><div class="ri">🏆</div>Artista más usado</div><div class="rv">${topArt[0]?esc(topArt[0].name):'—'}</div></div>
+          <div class="rep"><div class="rl"><div class="ri">🎭</div>Actuaciones totales</div><div class="rv">${dash.total_bookings}</div></div>
+          <div class="rep"><div class="rl"><div class="ri">🚫</div>Cancelaciones</div><div class="rv">${cancel}</div></div>
+          <div class="rep"><div class="rl"><div class="ri">😊</div>Satisfacción huéspedes</div><div class="rv">${sat5!=null?sat5.toFixed(1)+' / 5':'—'}</div></div></div>
+      </div>
+      <div class="qbar">
+        <button onclick="qtool('Plantillas')"><span class="qi">📋</span>Plantillas</button>
+        <button onclick="show('home')"><span class="qi">🗓️</span>Programación</button>
+        <button onclick="qtool('Reglas')"><span class="qi">⚙️</span>Reglas</button>
+        <button onclick="qtool('Sustituciones')"><span class="qi">🔄</span>Sustituciones</button>
+        <button onclick="show('demand')"><span class="qi">🤖</span>IA Planner</button>
+        <button onclick="show('cal')"><span class="qi">🕓</span>Histórico</button>
+      </div>`;
+    renderMaestro();
+  },
+
+  async artists(box){
+    const shows = await api('/shows');
+    let amap={}; try{ (await api('/artists')||[]).forEach(a=>{amap[a.id]={name:a.stage_name,city:a.base_city||a.city,partner:a.is_partner,langs:a.languages_spoken||[]};}); }catch(e){}
+    const now=Date.now(); const seen=new Set(); const items=[];
+    (shows||[]).filter(s=>s.is_active!==false).forEach(s=>{
+      const key=(s.artist_id||'')+'|'+s.show_name; if(seen.has(key))return; seen.add(key);
+      const a=amap[s.artist_id]||{}; const img=(s.images&&s.images[0]&&s.images[0].url)||null;
+      items.push({id:s.id,name:a.name||s.show_name,show:s.show_name,cat:s.category,sub:s.subcategory,
+        price:s.price_hotel||s.base_price||null,rating:s.rating,img,city:a.city,partner:a.partner,langs:a.langs,
+        isNew:s.created_at?(now-new Date(s.created_at).getTime())<7*864e5:false,genres:s.genres||[]});
+    });
+    CACHE.artistItems=items; AF={cat:''};
+    const catCount={}; items.forEach(i=>{catCount[i.cat]=(catCount[i.cat]||0)+1;});
+    const cats=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
+    box.innerHTML=`
+      <div class="filters">
+        <div class="filtrow">
+          <div class="field" style="margin:0"><label>Buscar</label><input id="af_q" oninput="applyArtistFilters()" placeholder="Nombre, tipo de show, instrumento…"></div>
+          <div class="field" style="margin:0"><label>Categoría</label><select id="af_cat" onchange="AF.cat=this.value;applyArtistFilters()"><option value="">Todas las categorías</option>${cats.map(([c])=>`<option value="${esc(c)}">${esc(pretty(c))}</option>`).join('')}</select></div>
+          <div class="field" style="margin:0"><label>Presupuesto máx.</label><input id="af_max" type="range" min="5000" max="60000" step="1000" value="60000" oninput="document.getElementById('af_maxv').textContent=(+this.value>=60000?'Sin límite':MXN(+this.value));applyArtistFilters()"><span id="af_maxv" class="hint" style="margin-top:4px">Sin límite</span></div>
+          <div class="field" style="margin:0"><label>Ordenar por</label><select id="af_sort" onchange="applyArtistFilters()"><option value="best">Mejor coincidencia</option><option value="price">Menor precio</option><option value="new">Novedades primero</option></select></div>
+        </div>
+      </div>
+      <div class="artlayout">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px"><b id="af_count"></b></div>
+          <div class="agrid" id="af_grid"></div>
+        </div>
+        <div>
+          <div class="catbox"><h4>Categorías</h4>
+            <div class="catrow" data-cat="" onclick="pickArtCat('')">Todas<span>${items.length}</span></div>
+            ${cats.map(([c,n])=>`<div class="catrow" data-cat="${esc(c)}" onclick="pickArtCat('${esc(c)}')">${esc(pretty(c))}<span>${n}</span></div>`).join('')}
+          </div>
+          <div class="catbox"><h4>¿No encuentras lo que buscas?</h4>
+            <div class="hint" style="margin-bottom:11px">Cuéntanos qué necesitas y nuestro equipo te ayuda a encontrar el talento ideal.</div>
+            <button class="btn" style="width:100%" onclick="show('reqs')">＋ Crear solicitud</button></div>
+        </div>
+      </div>`;
+    applyArtistFilters();
+  },
+
+  async budget(box){
+    const bk    = await api(`/bookings?group_id=${GID}`);
+    const mkt   = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
+    const shows = await api('/shows');
+    const num=x=>+x||0; const scat={}; (shows||[]).forEach(s=>{scat[s.id]=s.category;});
+    const budget=num(mkt.total_entertainment_budget);
+    const gastado=bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
+    const comprometido=bk.filter(b=>b.status==='confirmed').reduce((a,b)=>a+num(b.agreed_price),0);
+    const usado=gastado+comprometido; const disp=Math.max(0,budget-usado);
+    const usadoPct=budget>0?Math.round(usado/budget*100):0;
+    const inv=bk.filter(b=>['completed','confirmed'].includes(b.status));
+    const catset=[...new Set(inv.map(b=>scat[b.show_id]||'Otros'))];
+    const cell={}; catset.forEach(c=>cell[c]=Array(12).fill(0));
+    const monthAct=Array(12).fill(0);
+    inv.forEach(b=>{const c=scat[b.show_id]||'Otros'; const mo=new Date(b.starts_at).getMonth(); cell[c][mo]+=num(b.agreed_price); monthAct[mo]+=num(b.agreed_price);});
+    const catTot=c=>cell[c].reduce((a,b)=>a+b,0);
+    const orderedCats=catset.sort((a,b)=>catTot(b)-catTot(a));
+    const MN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const monthBudget=budget/12; const maxBar=Math.max(monthBudget,...monthAct,1);
+    const money0=v=>'$'+Math.round(v).toLocaleString('es-MX');
+    box.innerHTML=`
+      <div class="kpis">
+        <div class="kpi"><div class="kh"><div><div class="k">Presupuesto anual</div><div class="v">${MXN(budget)}</div><div class="d">de toda la cadena</div></div><div class="kc violet">📦</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Utilizado (realizado)</div><div class="v">${MXN(gastado)}</div><div class="d">${budget>0?Math.round(gastado/budget*100):0}% del anual</div></div><div class="kc green">✅</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Comprometido</div><div class="v">${MXN(comprometido)}</div><div class="d">${budget>0?Math.round(comprometido/budget*100):0}% del anual</div></div><div class="kc amber">⏳</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Disponible</div><div class="v">${MXN(disp)}</div><div class="d">${budget>0?Math.round(disp/budget*100):0}% del anual</div></div><div class="kc blue">📊</div></div></div>
       </div>
       <div class="box" style="margin-bottom:16px">
-        <div class="mtoolbar">
-          <h3 style="margin:0;flex:1">🗓️ Calendario Maestro</h3>
-          <span class="hint" id="maestroWeek" style="margin:0"></span>
-          <div class="mnav"><button class="mbtn" onclick="maestroWeek(-1)">‹</button><button class="mbtn today" onclick="maestroWeek(0)">Hoy</button><button class="mbtn" onclick="maestroWeek(1)">›</button></div>
-        </div>
-        <div class="hint" style="margin:-6px 0 12px">Arrastra una actuación a otro día o venue para reprogramarla — el cambio se guarda al instante.</div>
-        <div class="maestro"><div class="mgrid" id="maestroGrid"></div></div>
+        <div class="bhead"><h3 style="margin:0">Presupuesto por categoría y mes</h3><span class="hint" style="margin:0">Gasto real (comprometido + realizado) · ${PERIOD.year}</span></div>
+        <div class="bmatrix"><table><thead><tr><th>Categoría</th>${MN.map(m=>`<th>${m}</th>`).join('')}<th>Total</th></tr></thead><tbody>
+          ${orderedCats.map(c=>`<tr><td>${esc(pretty(c))}</td>${cell[c].map(v=>`<td class="${v>0?'hot':''}">${v>0?money0(v):'—'}</td>`).join('')}<td>${money0(catTot(c))}</td></tr>`).join('')||`<tr><td colspan="14" class="muted" style="text-align:center;padding:20px">Aún no hay gasto registrado.</td></tr>`}
+          ${orderedCats.length?`<tr class="tot"><td>Total</td>${monthAct.map(v=>`<td>${v>0?money0(v):'—'}</td>`).join('')}<td>${money0(usado)}</td></tr>`:''}
+        </tbody></table></div>
       </div>
       <div class="grid2">
-        <div class="box"><h3>💰 Presupuesto</h3><div class="hint">Gasto de entretenimiento del mes</div>
-          ${budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad para ver el desglose.</div>'}</div>
-        <div class="box"><h3>🔥 Lo más pedido</h3><div class="hint">Demanda por categoría (90 días)</div>
-          ${bars(cats.top_categories.slice(0,5).map(c=>({lbl:pretty(c.key),pct:Math.round(c.demand_score/maxd*100),val:c.demand_score,col:CATCOL[c.key],trend:c.trend})))}</div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Presupuesto vs. real (mensual)</h3></div>
+          <div class="hint" style="margin:2px 0 6px"><span style="color:var(--mut2)">▉</span> Presupuesto &nbsp; <span style="color:var(--acc)">▉</span> Real</div>
+          <div class="barchart">${MN.map((m,i)=>`<div class="bc" title="${m}: real ${money0(monthAct[i])} / ppto ${money0(monthBudget)}"><div class="bb"><i style="height:${Math.round(monthAct[i]/maxBar*130)}px;background:var(--acc)"></i><i style="height:${Math.round(monthBudget/maxBar*130)}px;background:var(--ov2)"></i></div><small>${m}</small></div>`).join('')}</div>
+        </div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Distribución del gasto</h3></div>
+          ${budget>0? budgetDonut(gastado,comprometido,disp) : ''}
+          <div style="margin-top:14px">${bars(orderedCats.map(c=>({lbl:pretty(c),pct:Math.round(catTot(c)/Math.max(usado,1)*100),val:money0(catTot(c)),col:CATCOL[c]})))}</div>
+        </div>
+      </div>`;
+  },
+
+  async reports(box){
+    const bk   = await api(`/bookings?group_id=${GID}`);
+    const dash = await api(`/groups/${GID}/dashboard`);
+    let AMAP={}; try{ (await api('/artists')||[]).forEach(a=>{AMAP[a.id]=a.stage_name;}); }catch(e){}
+    const num=x=>+x||0; const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+    const done=bk.filter(b=>['completed','confirmed'].includes(b.status));
+    const priced=done.filter(b=>b.agreed_price);
+    const avgCost=priced.length?priced.reduce((a,b)=>a+num(b.agreed_price),0)/priced.length:0;
+    const cancel=bk.filter(b=>b.status==='cancelled').length;
+    const cancelPct=bk.length?Math.round(cancel/bk.length*100):0;
+    const comp=bk.filter(b=>b.status==='completed');
+    const satPct=avg(comp.map(b=>b.retention_pct).filter(v=>v!=null))??avg(comp.map(b=>b.occupancy_pct).filter(v=>v!=null));
+    const sat5=satPct!=null?Math.min(5,satPct/20):null;
+    const occ=avg(comp.map(b=>b.occupancy_pct).filter(v=>v!=null));
+    // artistas más usados
+    const am=new Map();
+    bk.forEach(b=>{const nm=b.artist_name||AMAP[b.artist_id]||b.show_name; if(!nm)return; const o=am.get(nm)||{name:nm,count:0,sum:0}; o.count++; o.sum+=num(b.agreed_price); am.set(nm,o);});
+    const topArt=[...am.values()].sort((a,b)=>b.count-a.count).slice(0,6);
+    // comparativa mensual (últimos 6 meses con datos)
+    const mm={}; done.forEach(b=>{const d=new Date(b.starts_at);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');mm[k]=(mm[k]||0)+num(b.agreed_price);});
+    const mk=Object.keys(mm).sort().slice(-6); const maxM=Math.max(...mk.map(k=>mm[k]),1);
+    const mlab=k=>{const[y,m]=k.split('-');return new Date(y,m-1,1).toLocaleDateString('es-MX',{month:'short'});};
+    const money0=v=>'$'+Math.round(v).toLocaleString('es-MX');
+    box.innerHTML=`
+      <div class="kpis">
+        <div class="kpi"><div class="kh"><div><div class="k">Costo por actuación</div><div class="v">${MXN(avgCost)}</div><div class="d">promedio de la cadena</div></div><div class="kc violet">💵</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Actuaciones totales</div><div class="v">${dash.total_bookings}</div><div class="d">${dash.property_count} propiedades · ${dash.total_venues} venues</div></div><div class="kc green">🎭</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Cancelaciones</div><div class="v">${cancel}</div><div class="d">${cancelPct}% del total</div></div><div class="kc amber">🚫</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Satisfacción huéspedes</div><div class="v">${sat5!=null?sat5.toFixed(1)+' / 5':'—'}</div></div><div class="kc blue">😊</div></div>
+          <div class="kstars">${sat5!=null?starRow(sat5):'☆☆☆☆☆'}<small>${occ!=null?'ocupación '+occ.toFixed(0)+'%':''}</small></div></div>
       </div>
-      <div class="grid2" style="margin-top:16px">
-        <div class="box"><h3>🏆 Top Artistas</h3><div class="hint">Más contratados en la cadena</div>
-          ${topArt.length? topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} actuación${a.count===1?'':'es'}</span></div><b>${MXN(a.sum)}</b></div>`).join('') : '<div class="muted">Sin datos aún.</div>'}</div>
-        <div class="box"><h3>📣 Solicitudes abiertas</h3><div class="hint">${reqs.length} en el tablero</div>
-          ${reqs.length? reqs.slice(0,5).map(r=>`<div class="listrow"><div class="lz"><b>${esc(r.title)}</b><span>${esc(r.company_name||'—')} · ${esc(pretty(r.category)||'—')}</span></div><span class="hint">${r.budget_min?MXN(r.budget_min):''}</span></div>`).join('') : '<div class="muted">Sin solicitudes abiertas.</div>'}
-          <div style="margin-top:11px"><button class="mbtn" onclick="show('reqs')">Ver todas →</button></div></div>
-      </div>
-      ${novStrip(nov)}`;
-    renderMaestro();
+      <div class="grid2">
+        <div class="box"><div class="bhead"><h3 style="margin:0">Artistas más utilizados</h3></div>
+          ${topArt.length?topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} actuación${a.count===1?'':'es'}</span></div><b>${MXN(a.sum)}</b></div>`).join(''):'<div class="muted">Sin datos aún.</div>'}</div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Comparativa mensual</h3><span class="hint" style="margin:0">Gasto por mes</span></div>
+          <div class="barchart" style="height:170px">${mk.map(k=>`<div class="bc" title="${mlab(k)}: ${money0(mm[k])}"><div class="bb"><i style="height:${Math.round(mm[k]/maxM*140)}px;background:var(--acc)"></i></div><small>${mlab(k)}</small></div>`).join('')||'<div class="muted">Sin datos.</div>'}</div></div>
+      </div>`;
   },
 
   async cal(box){
@@ -1054,6 +1512,7 @@ const RENDER = {
   },
 
   async bill(box){
+    if(!ME.artist_id) return hotelBill(box);   // hotels/admin -> invoicing screen (screen 6)
     const bk = await api('/bookings/mine');
     // an invoice exists once the money is committed (confirmed) and is "paid" once realizada
     const inv = bk.filter(b=>['confirmed','completed'].includes(b.status))
