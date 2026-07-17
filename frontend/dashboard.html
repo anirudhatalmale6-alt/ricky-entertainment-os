@@ -22,26 +22,39 @@
   a{color:inherit;text-decoration:none}
   .app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
 
-  /* Sidebar */
-  .side{background:var(--bg2);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:6px}
-  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
-  .logo{width:34px;height:34px;border-radius:9px;background:var(--grad);display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff}
-  .brand b{font-size:15px;letter-spacing:.3px}
-  .brand span{display:block;font-size:10.5px;color:var(--mut);letter-spacing:1.4px;text-transform:uppercase}
-  .navlbl{font-size:10px;color:var(--mut2);text-transform:uppercase;letter-spacing:1.2px;padding:14px 10px 6px}
-  .nav{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:var(--mut);cursor:pointer;font-weight:500;position:relative}
-  .nav:hover{background:var(--ov);color:var(--txt)}
-  .nav.on{background:var(--ov2);color:var(--txt)}
-  .nav.on::before{content:"";position:absolute;left:-14px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--grad)}
+  /* Sidebar — dark navy shell (SHOWCASE / Entertainment OS) */
+  .side{background:linear-gradient(185deg,#151c31 0%,#0e1424 55%,#0b0f1c 100%);
+    border-right:1px solid #1f273f;padding:20px 14px;display:flex;flex-direction:column;gap:5px;
+    --s-txt:#c3cae0; --s-mut:#7c86a4; --s-line:rgba(255,255,255,.08); --s-hov:rgba(255,255,255,.06)}
+  .brand{display:flex;align-items:center;gap:11px;padding:4px 6px 20px}
+  .logo{width:36px;height:36px;border-radius:10px;background:var(--grad);display:grid;place-items:center;font-weight:800;font-size:18px;color:#fff;box-shadow:0 6px 16px rgba(124,92,240,.4);flex:none}
+  .brand b{font-size:15.5px;letter-spacing:.4px;color:#fff;font-weight:750}
+  .brand span{display:block;font-size:9.5px;color:var(--s-mut);letter-spacing:2px;text-transform:uppercase;margin-top:1px}
+  .navlbl{font-size:9.5px;color:#59627e;text-transform:uppercase;letter-spacing:1.3px;padding:15px 10px 7px;font-weight:600}
+  .nav{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--s-txt);cursor:pointer;font-weight:500;font-size:13.5px;position:relative;transition:.15s}
+  .nav:hover{background:var(--s-hov);color:#fff}
+  .nav.on{background:var(--grad);color:#fff;box-shadow:0 8px 20px rgba(124,92,240,.35);font-weight:600}
   .nav .ic{font-size:16px;width:20px;text-align:center}
-  .pro{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.6px;color:#fff;background:var(--grad);padding:2px 6px;border-radius:5px}
-  .side .foot{font-size:11px;color:var(--mut2);padding:8px 10px 2px}
-  .side-user{margin-top:auto;display:flex;align-items:center;gap:10px;padding:11px 10px 10px;border-top:1px solid var(--line)}
-  .su-av{width:34px;height:34px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;flex:none}
+  .nav .badge{margin-left:auto;font-size:10px;font-weight:700;background:rgba(255,255,255,.14);color:#fff;padding:1px 7px;border-radius:20px}
+  .nav.on .badge{background:rgba(255,255,255,.25)}
+  .pro{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.6px;color:#fff;background:linear-gradient(135deg,#f0a,#a855f7);padding:2px 6px;border-radius:5px}
+  .side .foot{font-size:10.5px;color:var(--s-mut);padding:9px 10px 2px;opacity:.7}
+  /* Sidebar promo card (Top Performer / IA RICKY) */
+  .promo{margin-top:14px;border-radius:14px;padding:15px 14px;background:linear-gradient(160deg,#7c5cf0,#5b3fd6);
+    color:#fff;text-align:center;box-shadow:0 10px 26px rgba(124,92,240,.32);position:relative;overflow:hidden}
+  .promo::after{content:"";position:absolute;inset:0;background:radial-gradient(120px 60px at 50% -10%,rgba(255,255,255,.22),transparent)}
+  .promo .pi{font-size:22px}
+  .promo b{display:block;font-size:13.5px;font-weight:750;margin:5px 0 3px}
+  .promo p{font-size:10.8px;line-height:1.45;color:#e7e1ff;margin-bottom:11px}
+  .promo button{width:100%;border:0;background:rgba(255,255,255,.18);backdrop-filter:blur(4px);color:#fff;
+    font-weight:650;font-size:12px;padding:9px;border-radius:9px;cursor:pointer;transition:.15s}
+  .promo button:hover{background:rgba(255,255,255,.28)}
+  .side-user{margin-top:14px;display:flex;align-items:center;gap:10px;padding:13px 8px 4px;border-top:1px solid var(--s-line)}
+  .su-av{width:36px;height:36px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;flex:none}
   .su-meta{min-width:0;flex:1}
-  .su-meta b{display:block;font-size:12.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .su-meta span{font-size:10.5px;color:var(--mut)}
-  .su-out{background:var(--ov);border:1px solid var(--line);color:var(--mut);height:30px;padding:0 11px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:600;flex:none;transition:.15s;display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .su-meta b{display:block;font-size:12.5px;line-height:1.2;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .su-meta span{font-size:10.5px;color:var(--s-mut)}
+  .su-out{background:rgba(255,255,255,.06);border:1px solid var(--s-line);color:var(--s-txt);height:30px;padding:0 11px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:600;flex:none;transition:.15s;display:flex;align-items:center;gap:5px;white-space:nowrap}
   .su-out:hover{background:var(--bad);color:#fff;border-color:transparent}
 
   /* Topbar */
@@ -52,7 +65,10 @@
   .spacer{flex:1}
   .ctrl{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);padding:7px 11px;border-radius:9px;font-size:13px;color:var(--txt)}
   .ctrl select{background:transparent;border:0;color:var(--txt);font-size:13px;outline:none}
-  .ava{width:34px;height:34px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:13px}
+  .ava{width:34px;height:34px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff}
+  .bell{position:relative;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;font-size:16px;cursor:pointer;transition:.15s}
+  .bell:hover{background:var(--inp)}
+  .bell .dot{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--acc2);border:1.5px solid var(--card)}
 
   .wrap{padding:24px 26px;max-width:1240px}
   .panel{display:none}.panel.on{display:block}
@@ -417,8 +433,8 @@
 <div class="app" id="app" style="display:none">
   <aside class="side">
     <div class="brand">
-      <div class="logo">R</div>
-      <div><b>RICKY</b><span>Entertainment OS</span></div>
+      <div class="logo" id="brandLogo">R</div>
+      <div><b id="brandName">RICKY</b><span id="brandSub">Entertainment OS</span></div>
     </div>
     <div class="navlbl">Operación</div>
     <div class="nav on" data-p="home"><span class="ic">📊</span> Resumen</div>
@@ -432,6 +448,7 @@
     <div class="nav" data-p="market"><span class="ic">📈</span> Market Intelligence <span class="pro">PRO</span></div>
     <div class="nav" data-p="demand"><span class="ic">🔥</span> Tendencias <span class="pro">PRO</span></div>
     <div class="nav" data-p="news"><span class="ic">📰</span> Noticias <span class="pro">PRO</span></div>
+    <div class="promo" id="sidePromo" style="display:none"></div>
     <div class="side-user">
       <div class="su-av" id="suAv">RA</div>
       <div class="su-meta"><b id="suName">Mi cuenta</b><span id="suRole">ShowCase</span></div>
@@ -449,7 +466,8 @@
       <div class="spacer"></div>
       <div class="ctrl" id="groupWrap">🏨 <select id="groupSel" onchange="reload()"></select></div>
       <div class="ctrl" id="monthCtrl">📅 Julio 2026</div>
-      <div class="ava">RA</div>
+      <div class="bell" title="Notificaciones">🔔<span class="dot"></span></div>
+      <div class="ava" id="topAva">RA</div>
     </div>
     <div class="wrap">
       <div class="panel on" id="panel-home"><div class="load">Cargando…</div></div>
@@ -631,7 +649,21 @@ function applyRole(){
   const initials=(ME.full_name||'RA').split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase();
   document.querySelector('.ava').textContent=initials||'RA';
   const roleTxt = ME.is_admin?'Administración':(isArtist?(ME.artist_name||'Artista'):(ME.company_name||'Contratante'));
-  document.querySelector('.brand span').textContent = roleTxt;
+  // Brand: artists -> SHOWCASE, hoteles/admin -> Entertainment OS
+  const brandLogo=document.getElementById('brandLogo'), brandName=document.getElementById('brandName'), brandSub=document.getElementById('brandSub');
+  if(isArtist){ brandLogo.textContent='S'; brandName.textContent='SHOWCASE'; brandSub.textContent='Artistas'; document.title='SHOWCASE · Artistas'; }
+  else { brandLogo.textContent='R'; brandName.textContent='RICKY'; brandSub.textContent='Entertainment OS'; document.title='RICKY Entertainment OS'; }
+  // Sidebar promo card
+  const promo=document.getElementById('sidePromo');
+  if(isArtist){
+    promo.style.display=''; promo.innerHTML='<div class="pi">👑</div><b>Top Performer</b>'
+      +'<p>Publica más shows y mantén tu perfil completo para subir en las búsquedas.</p>'
+      +'<button onclick="show(\'market\')">Ver beneficios</button>';
+  } else if(ME.is_admin || isDirector){
+    promo.style.display=''; promo.innerHTML='<div class="pi">🤖</div><b>IA RICKY</b>'
+      +'<p>Tu asistente para programación, sugerencias de talento y más.</p>'
+      +'<button onclick="show(\'demand\')">Ver sugerencias</button>';
+  } else { promo.style.display='none'; }
   // sidebar user chip (with Log Out)
   document.getElementById('suAv').textContent=initials||'RA';
   document.getElementById('suName').textContent=ME.full_name||'Mi cuenta';
