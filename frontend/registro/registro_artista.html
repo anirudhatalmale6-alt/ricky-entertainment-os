@@ -200,7 +200,7 @@ textarea{resize:vertical;min-height:70px}
         <label class="f full"><span>Idiomas que hablas</span>
           <div class="chips" id="langChips"><span class="chip">Español <b onclick="delChip(this)">×</b></span><span class="chip">Inglés <b onclick="delChip(this)">×</b></span><span class="chip add" onclick="addChip('langChips','Idioma')">+ Agregar</span></div>
         </label>
-        <label class="f full"><span>Biografía corta</span><textarea id="p_bio" placeholder="Cuéntale al hotel quién eres, tu trayectoria y qué te hace único."></textarea></label>
+        <label class="f full"><span>Biografía corta <i>*</i></span><textarea id="p_bio" placeholder="Cuéntale al hotel quién eres, tu trayectoria y qué te hace único."></textarea></label>
       </div>
     </div>
 
@@ -209,8 +209,8 @@ textarea{resize:vertical;min-height:70px}
       <div class="sub">Dónde estás basado y hasta dónde te mueves.</div>
       <div class="grid three">
         <label class="f"><span>País</span><input id="p_country" value="México"></label>
-        <label class="f"><span>Estado</span><input id="p_state" placeholder="Quintana Roo"></label>
-        <label class="f"><span>Ciudad base</span><input id="p_city" placeholder="Cancún"></label>
+        <label class="f"><span>Estado <i>*</i></span><input id="p_state" placeholder="Quintana Roo"></label>
+        <label class="f"><span>Ciudad base <i>*</i></span><input id="p_city" placeholder="Cancún"></label>
       </div>
       <div class="grid" style="margin-top:14px">
         <label class="f"><span>Radio de trabajo (km)</span><input id="p_radius" value="100"></label>
@@ -262,20 +262,20 @@ textarea{resize:vertical;min-height:70px}
 
     <div class="card">
       <h2><span class="ic">🧾</span> Información fiscal</h2>
-      <div class="sub">Para emitir CFDI y liquidar tus pagos.</div>
+      <div class="sub">Para emitir CFDI y liquidar tus pagos. Estos datos son obligatorios: sin ellos no podemos facturar ni pagarte.</div>
       <div class="grid">
-        <label class="f"><span>RFC</span><input id="f_rfc" placeholder="XAXX010101000"></label>
+        <label class="f"><span>RFC <i>*</i></span><input id="f_rfc" placeholder="XAXX010101000"></label>
         <label class="f"><span>Uso CFDI</span><select id="f_cfdi"><option value="G03">G03 - Gastos en general</option><option value="P01">P01 - Por definir</option></select></label>
         <label class="f"><span>Razón social</span><input id="f_legal" placeholder="Nombre o razón social"></label>
         <label class="f"><span>Régimen fiscal</span><input id="f_regime" placeholder="612 - Personas Físicas con Actividad Empresarial"></label>
         <label class="f"><span>Código postal fiscal</span><input id="f_cp" placeholder="77500"></label>
       </div>
-      <div class="sec-t">Información bancaria</div>
+      <div class="sec-t">Información bancaria · para tus pagos</div>
       <div class="grid">
-        <label class="f"><span>Banco</span><input id="f_bank" placeholder="BBVA"></label>
+        <label class="f"><span>Banco <i>*</i></span><input id="f_bank" placeholder="BBVA"></label>
         <label class="f"><span>Número de cuenta</span><input id="f_account" placeholder="1234 5678 9012"></label>
-        <label class="f"><span>Titular de la cuenta</span><input id="f_holder" placeholder="Nombre del titular"></label>
-        <label class="f"><span>CLABE</span><input id="f_clabe" placeholder="0123 4567 8901 2345 678"></label>
+        <label class="f"><span>Titular de la cuenta <i>*</i></span><input id="f_holder" placeholder="Nombre del titular"></label>
+        <label class="f"><span>CLABE interbancaria <i>*</i></span><input id="f_clabe" placeholder="18 dígitos" inputmode="numeric"></label>
         <label class="f"><span>Moneda preferida</span><select id="f_currency"><option>MXN</option><option>USD</option></select></label>
       </div>
     </div>
@@ -384,10 +384,10 @@ function showTpl(n){
         <label class="f full"><span>Requerimientos / rider</span><textarea class="in-req" placeholder="Escenario, sonido, camerino, etc."></textarea></label>
       </div>
 
-      <div class="sec-t">Fotos y multimedia</div>
+      <div class="sec-t">Fotos y multimedia <i style="color:var(--red);font-style:normal">*</i></div>
       <div class="photos"><div class="ph add" onclick="pickPhotos(${n})">＋</div></div>
       <input type="file" class="photo-input" accept="image/*" multiple style="display:none" onchange="onPhotos(${n},this)">
-      <div class="hint">Máximo 5 fotos por show. La primera será la portada.</div>
+      <div class="hint">Al menos 1 foto (máximo 5). La primera será la portada. Sin foto el show no se puede mostrar a los hoteles.</div>
       <div class="grid" style="margin-top:12px">
         <label class="f"><span>Video promocional</span><input class="in-video" placeholder="YouTube / Vimeo"></label>
         <label class="f"><span>Audio</span><input class="in-audio" placeholder="Spotify / SoundCloud"></label>
@@ -395,7 +395,7 @@ function showTpl(n){
 
       <div class="sec-t">Tarifas base por tipo de evento (MXN)</div>
       <div class="grid three">
-        <label class="f"><span>Precio hotel</span><input class="p-hotel" placeholder="$ 10,000"></label>
+        <label class="f"><span>Precio hotel <i style="color:var(--red);font-style:normal">*</i></span><input class="p-hotel" placeholder="$ 10,000"></label>
         <label class="f"><span>Evento corporativo</span><input class="p-corp" placeholder="$ 12,000"></label>
         <label class="f"><span>Boda</span><input class="p-wedding" placeholder="$ 14,000"></label>
         <label class="f"><span>Evento privado</span><input class="p-private" placeholder="$ 11,000"></label>
@@ -512,12 +512,41 @@ function collectShow(el){
     offers_audition:q('.chk-audition').checked, images:imgs, seasonal_rates:seasons
   };
 }
+// ---- Validation: only complete, hireable & payable profiles can finish ----
+const digitsOf=s=>(s||'').replace(/[^0-9]/g,'');
+function focusId(id){ const n=document.getElementById(id); if(n) setTimeout(()=>{ try{ n.focus(); }catch(e){} },320); }
+function openShow(el){ el.classList.add('open'); el.scrollIntoView({behavior:'smooth',block:'center'}); }
+function validate(prof){
+  // --- Perfil profesional ---
+  if(!prof.stage_name){ go(0); err('Escribe tu nombre artístico o de proveedor.'); focusId('p_stage'); return false; }
+  if(!prof.phone){ go(0); err('El teléfono es obligatorio para poder contactarte.'); focusId('p_phone'); return false; }
+  if(!prof.email || !/.+@.+\..+/.test(prof.email)){ go(0); err('Escribe un correo electrónico válido.'); focusId('p_email'); return false; }
+  if(!prof.region){ go(0); err('Indica el estado donde estás basado.'); focusId('p_state'); return false; }
+  if(!prof.base_city){ go(0); err('Indica tu ciudad base.'); focusId('p_city'); return false; }
+  if(!prof.bio || prof.bio.length<20){ go(0); err('Agrega una biografía breve (mínimo 20 caracteres) para tu perfil profesional.'); focusId('p_bio'); return false; }
+  // --- Al menos un show contratable (nombre + precio + foto) ---
+  let anyShow=false;
+  for(const el of document.querySelectorAll('.show')){
+    const val=s=>{ const n=el.querySelector(s); return n?n.value.trim():''; };
+    const name=val('.in-name'); if(!name) continue;
+    if(numOf(val('.p-hotel'))==null){ go(1); openShow(el); err('El show "'+name+'" necesita un precio para hotel; sin precio no se puede contratar.'); return false; }
+    if(el.querySelectorAll('.ph[data-url]').length===0){ go(1); openShow(el); err('Sube al menos una foto del show "'+name+'".'); return false; }
+    anyShow=true;
+  }
+  if(!anyShow){ go(1); err('Registra al menos un show con nombre, precio y foto.'); return false; }
+  // --- Datos fiscales y bancarios (para poder pagarte) ---
+  if(!prof.rfc){ go(2); err('El RFC es obligatorio para poder facturar y pagarte.'); focusId('f_rfc'); return false; }
+  if(!prof.bank_name){ go(2); err('Indica tu banco para recibir pagos.'); focusId('f_bank'); return false; }
+  if(!prof.bank_account_holder){ go(2); err('Indica el titular de la cuenta bancaria.'); focusId('f_holder'); return false; }
+  if(digitsOf(prof.bank_clabe).length!==18){ go(2); err('La CLABE interbancaria debe tener 18 dígitos; es la que usamos para pagarte.'); focusId('f_clabe'); return false; }
+  return true;
+}
 async function finalizar(btn){
   err('');
   const chk=id=>document.getElementById(id).checked;
-  if(!chk('c_terms')||!chk('c_privacy')||!chk('c_data')){ go(3); err('Debes aceptar los términos, el aviso de privacidad y el uso de datos.'); return; }
   const prof=collectProfile();
-  if(!prof.stage_name){ go(0); err('El nombre artístico es obligatorio.'); return; }
+  if(!validate(prof)) return;
+  if(!chk('c_terms')||!chk('c_privacy')||!chk('c_data')){ go(3); err('Debes aceptar los términos, el aviso de privacidad y el uso de datos.'); return; }
   const shows=[...document.querySelectorAll('.show')].map(collectShow).filter(Boolean);
   btn.disabled=true; const t0=btn.textContent; btn.textContent='Guardando…';
   try{
