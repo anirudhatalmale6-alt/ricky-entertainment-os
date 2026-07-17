@@ -259,8 +259,39 @@
   .vname .vx{position:absolute;top:6px;right:6px;width:17px;height:17px;border-radius:50%;border:0;background:rgba(24,28,52,.06);color:var(--mut);font-size:12px;line-height:1;cursor:pointer;display:none;place-items:center;padding:0}
   .vname:hover .vx{display:grid}
   .vname .vx:hover{background:var(--bad);color:#fff}
-  .mcell{min-height:66px;border:1.5px dashed var(--line);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:5px;transition:.12s}
+  .mcell{position:relative;min-height:66px;border:1.5px dashed var(--line);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:5px;transition:.12s}
   .mcell.over{background:rgba(56,44,161,.09);border-color:var(--acc);border-style:solid}
+  /* "+" to add an actuación (search artist) into this venue+day */
+  .cadd{position:absolute;border:0;cursor:pointer;display:grid;place-items:center;line-height:1;padding:0;font-weight:600}
+  .mcell.empty .cadd{inset:0;margin:auto;width:26px;height:26px;border-radius:50%;background:var(--ov);color:var(--mut2);font-size:18px;border:1px dashed var(--line);transition:.12s}
+  .mcell.empty:hover .cadd{background:#382ca114;color:var(--acc);border-color:var(--acc)}
+  .mcell:not(.empty) .cadd{bottom:4px;right:4px;width:19px;height:19px;border-radius:50%;background:var(--acc);color:#fff;font-size:14px;box-shadow:0 2px 6px rgba(56,44,161,.35);opacity:0;transform:scale(.7);transition:.12s}
+  .mcell:not(.empty):hover .cadd{opacity:1;transform:scale(1)}
+  /* Add-actuación modal */
+  .mov{position:fixed;inset:0;background:rgba(12,16,30,.55);backdrop-filter:blur(2px);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px}
+  .amod{background:var(--card);border-radius:16px;width:100%;max-width:460px;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(12,16,30,.4);overflow:hidden}
+  .amod .ah{padding:16px 18px;border-bottom:1px solid var(--line)}
+  .amod .ah b{font-size:15px;font-weight:750}
+  .amod .ah .as{display:block;font-size:12px;color:var(--mut);margin-top:2px}
+  .amod .ax{position:absolute;top:14px;right:16px;background:var(--ov);border:0;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:15px;color:var(--mut)}
+  .amod .asrch{margin:14px 18px 8px;position:relative}
+  .amod .asrch input{width:100%;border:1px solid var(--line);background:var(--inp);border-radius:10px;padding:10px 12px 10px 34px;font-size:13.5px;color:var(--txt)}
+  .amod .asrch .ai{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mut2)}
+  .amod .alist{flex:1;overflow-y:auto;padding:4px 10px 8px}
+  .arow2{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:11px;cursor:pointer;border:1.5px solid transparent}
+  .arow2:hover{background:var(--ov)}
+  .arow2.sel{border-color:var(--acc);background:#382ca10d}
+  .arow2 .aav{width:40px;height:40px;border-radius:10px;flex:none;background-size:cover;background-position:center;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px}
+  .arow2 .az{min-width:0;flex:1}
+  .arow2 .az b{display:block;font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .arow2 .az span{font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .arow2 .ap{font-size:12.5px;font-weight:700;color:var(--acc);flex:none}
+  .amod .af{border-top:1px solid var(--line);padding:13px 18px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .amod .af .fld{display:flex;flex-direction:column;gap:4px}
+  .amod .af .fld label{font-size:10.5px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .amod .af .fld input{border:1px solid var(--line);background:var(--inp);border-radius:9px;padding:8px 10px;font-size:13px;color:var(--txt);width:100px}
+  .amod .af .ago{margin-left:auto;background:var(--grad);border:0;color:#fff;font-weight:650;font-size:13px;padding:10px 18px;border-radius:10px;cursor:pointer}
+  .amod .af .ago:disabled{opacity:.45;cursor:not-allowed}
   .mcard{position:relative;background:var(--mc-bg,var(--card));border:1px solid rgba(24,28,52,.06);border-left:4px solid var(--mc-bd,var(--acc));border-radius:7px;padding:6px 7px 6px 9px;font-size:11px;cursor:grab;box-shadow:0 1px 2px rgba(24,28,52,.05);user-select:none}
   .mcard:hover{box-shadow:0 4px 12px rgba(56,44,161,.16)}
   .mcard.completed{opacity:.74} .mcard.cancelled{opacity:.5}
@@ -1087,7 +1118,7 @@ function renderMaestro(){
     days.forEach(d=>{
       const ds=ymd(d);
       const cards=bk.filter(b=>(b.venue_id||0)===(v.id||0)&&ymd(new Date(b.starts_at))===ds).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
-      html+=`<div class="mcell" data-vid="${v.id||''}" data-date="${ds}">${cards.map(b=>maestroCard(b,vi)).join('')}</div>`;
+      html+=`<div class="mcell${cards.length?'':' empty'}" data-vid="${v.id||''}" data-date="${ds}">${cards.map(b=>maestroCard(b,vi)).join('')}<button class="cadd" title="Agregar actuación" onclick="openAddAct(${v.id},'${ds}')">+</button></div>`;
     });
   });
   if(!venues.length) html+=`<div style="grid-column:1/-1;padding:26px;text-align:center" class="muted">Aún no hay actuaciones programadas en esta cadena.</div>`;
@@ -1137,6 +1168,81 @@ async function delVenue(id,name,count){
     renderMaestro();
     toast('Venue eliminado ✓');
   }catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
+}
+
+/* ---- "+" Agregar actuación: buscar artista desde el venue y agendarlo ---- */
+let ADDACT={venueId:null,venueName:'',date:'',showId:null,price:0};
+async function ensureShows(){
+  if(CACHE.shows) return CACHE.shows;
+  try{ CACHE.shows=(await api('/shows?active_only=true'))||[]; }catch(e){ CACHE.shows=[]; }
+  return CACHE.shows;
+}
+async function openAddAct(venueId,dateStr){
+  if(!venueId){ toast('Este bloque no tiene venue asignado.',true); return; }
+  const bk=CACHE.homeBk||[]; const vb=bk.find(b=>(b.venue_id||0)===venueId&&b.venue_name);
+  ADDACT={venueId,venueName:vb?vb.venue_name:'Venue',date:dateStr,showId:null,price:0};
+  let ov=document.getElementById('actMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='actMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) actClose(); }); }
+  const d=new Date(dateStr+'T00:00:00');
+  const dl=d.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'});
+  ov.innerHTML=`<div class="amod" style="position:relative">
+    <button class="ax" onclick="actClose()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Agregar actuación</b><span class="as">${esc(ADDACT.venueName)} · ${dl}</span></div>
+    <div class="asrch"><span class="ai">🔎</span><input id="actQ" placeholder="Buscar artista, show o categoría…" oninput="actRender()" autocomplete="off"></div>
+    <div class="alist" id="actList"><div class="muted" style="padding:16px;text-align:center">Cargando artistas…</div></div>
+    <div class="af">
+      <div class="fld"><label>Hora</label><input id="actTime" type="time" value="20:00"></div>
+      <div class="fld"><label>Precio (MXN)</label><input id="actPrice" type="number" min="0" step="100" value="" oninput="ADDACT.price=+this.value||0"></div>
+      <button class="ago" id="actGo" onclick="actConfirm()" disabled>Agregar</button>
+    </div></div>`;
+  ov.style.display='flex';
+  await ensureShows(); actRender();
+}
+function actClose(){ const ov=document.getElementById('actMov'); if(ov) ov.style.display='none'; }
+function actRender(){
+  const list=document.getElementById('actList'); if(!list) return;
+  const q=(document.getElementById('actQ')?.value||'').trim().toLowerCase();
+  let items=CACHE.shows||[];
+  if(q) items=items.filter(s=>((s.show_name||'')+' '+(s.artist_name||'')+' '+pretty(s.category||'')+' '+pretty(s.subcategory||'')).toLowerCase().includes(q));
+  items=items.slice(0,60);
+  if(!items.length){ list.innerHTML='<div class="muted" style="padding:16px;text-align:center">Sin resultados.</div>'; return; }
+  list.innerHTML=items.map(s=>{
+    const col=CATCOL[s.category]||'#382ca1';
+    const av=s.image_url?`style="background-image:url('${s.image_url}')"`:`style="background:linear-gradient(135deg,${col},#8b5cf6)"`;
+    const cat=[pretty(s.category)].concat(s.subcategory?[pretty(s.subcategory)]:[]).filter(Boolean).join(' · ');
+    const who=s.artist_name&&s.artist_name!=='—'?esc(s.artist_name):'';
+    const meta=[who,esc(cat)].filter(Boolean).join(' · ')||'Show';
+    return `<div class="arow2${ADDACT.showId===s.id?' sel':''}" onclick="actPick(${s.id})">
+      <div class="aav" ${av}>${s.image_url?'':'🎭'}</div>
+      <div class="az"><b>${esc(s.show_name||'Show')}</b><span>${meta}</span></div>
+      ${s.price_hotel?`<span class="ap">${MXN(s.price_hotel)}</span>`:''}</div>`;
+  }).join('');
+}
+function actPick(showId){
+  const s=(CACHE.shows||[]).find(x=>x.id===showId); if(!s) return;
+  ADDACT.showId=showId; ADDACT.price=+s.price_hotel||0;
+  const pf=document.getElementById('actPrice'); if(pf&&!pf.value) pf.value=ADDACT.price||'';
+  const go=document.getElementById('actGo'); if(go) go.disabled=false;
+  actRender();
+}
+async function actConfirm(){
+  if(!ADDACT.showId){ toast('Elige un artista primero.',true); return; }
+  const t=document.getElementById('actTime')?.value||'20:00';
+  const price=+document.getElementById('actPrice')?.value||ADDACT.price||null;
+  const go=document.getElementById('actGo'); if(go){ go.disabled=true; go.textContent='Agregando…'; }
+  try{
+    const r=await fetch(API+'/bookings',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({show_id:ADDACT.showId,venue_id:ADDACT.venueId,starts_at:`${ADDACT.date}T${t}:00`,agreed_price:price,currency:'MXN'})});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){ const dt=data&&data.detail; throw new Error((typeof dt==='string'?dt:(Array.isArray(dt)&&dt[0]&&dt[0].msg))||('Error '+r.status)); }
+    (CACHE.homeBk=CACHE.homeBk||[]).push(data);
+    actClose(); renderMaestro();
+    toast('Actuación agregada ✓');
+  }catch(e){
+    if(go){ go.disabled=false; go.textContent='Agregar'; }
+    toast(e.message||'No se pudo agregar',true);
+  }
 }
 function budgetDonut(gastado,comprometido,disponible){
   const tot=Math.max(1,gastado+comprometido+disponible);
