@@ -269,6 +269,12 @@ async def update_booking(booking_id: int, payload: BookingUpdate, db: DbSession)
             raise HTTPException(status_code=422, detail="ends_at must be after starts_at")
         if booking.artist_id:
             await _check_travel_buffer(db, booking.artist_id, new_start, new_end, exclude_id=booking.id)
+    # moving to another venue (drag on the Calendario Maestro): re-derive the property scope
+    if data.get("venue_id") is not None and data["venue_id"] != booking.venue_id:
+        new_venue = await db.get(Venue, data["venue_id"])
+        if new_venue is None:
+            raise HTTPException(status_code=404, detail="Venue not found")
+        booking.company_id = new_venue.company_id
     for field, value in data.items():
         setattr(booking, field, value)
     await db.commit()

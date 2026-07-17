@@ -238,6 +238,49 @@
   .newsitem .ni-m{font-size:11px;color:var(--mut)}
   .datochip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;background:#a855f71a;color:#c084fc;border:1px solid #a855f733}
   .datochip b{color:#e879f9}
+  /* Calendario Maestro (executive hotel dashboard) */
+  .mtoolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .mnav{display:inline-flex;align-items:center;gap:2px}
+  .mbtn{border:1px solid var(--line);background:var(--card);border-radius:8px;height:30px;min-width:30px;padding:0 10px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--txt);display:inline-flex;align-items:center;justify-content:center}
+  .mbtn:hover{background:var(--inp)}
+  .mbtn.today{color:var(--acc)}
+  .maestro{overflow-x:auto;padding-bottom:4px}
+  .mgrid{display:grid;grid-template-columns:150px repeat(7,minmax(118px,1fr));gap:6px;min-width:900px}
+  .mhd{font-size:10.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;text-align:center;padding:4px 0}
+  .mhd.today{color:#fff;background:var(--grad);border-radius:7px}
+  .mhd .dn{font-size:14px;font-weight:800;display:block;color:var(--txt)}
+  .mhd.today .dn{color:#fff}
+  .vname{display:flex;flex-direction:column;justify-content:center;padding:8px 11px;background:var(--inp);border-radius:9px;font-size:12px;font-weight:650;line-height:1.25}
+  .vname span{font-size:10px;color:var(--mut);font-weight:400;margin-top:1px}
+  .mcell{min-height:66px;border:1.5px dashed var(--line);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:5px;transition:.12s}
+  .mcell.over{background:rgba(168,85,247,.09);border-color:var(--acc);border-style:solid}
+  .mcard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:7px;padding:6px 7px;font-size:11px;cursor:grab;box-shadow:0 1px 2px rgba(24,28,52,.06);user-select:none}
+  .mcard:hover{box-shadow:0 4px 12px rgba(124,92,240,.16)}
+  .mcard.pending{border-left-color:var(--warn)} .mcard.confirmed{border-left-color:var(--ok)}
+  .mcard.completed{border-left-color:var(--info);opacity:.72} .mcard.cancelled{border-left-color:var(--bad);opacity:.5}
+  .mcard.fixed{cursor:default}
+  .mcard b{display:block;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mcard .mt{color:var(--mut);font-size:10px;display:flex;justify-content:space-between;gap:6px}
+  .mcard.dragging{opacity:.35}
+  /* Budget donut */
+  .donutwrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .donut{width:132px;height:132px;border-radius:50%;flex:none;display:grid;place-items:center;position:relative}
+  .donut::after{content:"";position:absolute;width:88px;height:88px;border-radius:50%;background:var(--card)}
+  .donut .dc{position:relative;z-index:1;text-align:center}
+  .donut .dc b{font-size:16px;font-weight:800;display:block}
+  .donut .dc span{font-size:9.5px;color:var(--mut)}
+  .dlegend{display:flex;flex-direction:column;gap:9px;font-size:12px}
+  .dlegend .dl{display:flex;align-items:center;gap:8px}
+  .dlegend .dot{width:10px;height:10px;border-radius:3px;flex:none}
+  .dlegend .dl b{margin-left:auto;font-variant-numeric:tabular-nums}
+  .listrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .listrow:last-child{border-bottom:0}
+  .listrow .rank{width:22px;height:22px;border-radius:6px;background:var(--inp);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--mut);flex:none}
+  .listrow .lz{min-width:0;flex:1}.listrow .lz b{font-size:12.5px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .listrow .lz span{font-size:11px;color:var(--mut)}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#1b1f2e;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 12px 32px rgba(0,0,0,.32);opacity:0;pointer-events:none;transition:.25s;z-index:9999}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.bad{background:var(--bad)}
 
   /* ===== Login Master (dark, full-screen) — David diseño 2026-07-15 ===== */
   .lg{position:fixed;inset:0;z-index:50;background:#0b0b13;color:#eef0f7;
@@ -803,6 +846,90 @@ async function loadNewsFeed(){
 }
 function fmtNewsDate(s){ try{ const d=new Date(s); if(isNaN(d.getTime())) return ""; return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'}); }catch(e){ return ""; } }
 
+/* ---- Executive hotel dashboard: Calendario Maestro (drag to reschedule) ---- */
+let MAESTRO_REF = null;   // any Date within the displayed week
+let DRAG_BID = null;
+const mondayOf = d => { const x=new Date(d); const wd=(x.getDay()+6)%7; x.setHours(0,0,0,0); x.setDate(x.getDate()-wd); return x; };
+const ymd = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const isoLocal = d => { const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())+':00'; };
+function maestroVenues(bk){
+  const m=new Map();
+  bk.forEach(b=>{ const id=b.venue_id||0; if(!m.has(id)||(!m.get(id).name&&b.venue_name)) m.set(id,{id:b.venue_id||null,name:b.venue_name||'Sin venue'}); });
+  return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name));
+}
+function maestroCard(b){
+  const st=new Date(b.starts_at); const hh=String(st.getHours()).padStart(2,'0')+':'+String(st.getMinutes()).padStart(2,'0');
+  const fixed=['completed','cancelled'].includes(b.status);
+  return `<div class="mcard ${b.status}${fixed?' fixed':''}" ${fixed?'':'draggable="true"'} data-bid="${b.id}" data-vid="${b.venue_id||''}">
+    <b>${esc(b.show_name||b.artist_name||'Actuación')}</b>
+    <div class="mt"><span>${hh}</span><span>${b.agreed_price?MXN(b.agreed_price):''}</span></div></div>`;
+}
+function renderMaestro(){
+  const grid=document.getElementById('maestroGrid'); if(!grid) return;
+  const bk=CACHE.homeBk||[]; const venues=maestroVenues(bk);
+  const mon=mondayOf(MAESTRO_REF||new Date());
+  const days=[...Array(7)].map((_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+  const todayStr=ymd(new Date()); const DN=['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM'];
+  let html='<div class="mhd"></div>';
+  days.forEach((d,i)=>{ const t=ymd(d)===todayStr; html+=`<div class="mhd${t?' today':''}">${DN[i]}<span class="dn">${d.getDate()}</span></div>`; });
+  venues.forEach(v=>{
+    const vc=bk.filter(b=>(b.venue_id||0)===(v.id||0)).length;
+    html+=`<div class="vname">${esc(v.name)}<span>${vc} actuación${vc===1?'':'es'}</span></div>`;
+    days.forEach(d=>{
+      const ds=ymd(d);
+      const cards=bk.filter(b=>(b.venue_id||0)===(v.id||0)&&ymd(new Date(b.starts_at))===ds).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
+      html+=`<div class="mcell" data-vid="${v.id||''}" data-date="${ds}">${cards.map(maestroCard).join('')}</div>`;
+    });
+  });
+  if(!venues.length) html+=`<div style="grid-column:1/-1;padding:26px;text-align:center" class="muted">Aún no hay actuaciones programadas en esta cadena.</div>`;
+  grid.innerHTML=html; wireMaestroDnD();
+  const lbl=document.getElementById('maestroWeek');
+  if(lbl){ const e=days[6]; lbl.textContent=`${mon.getDate()} ${mon.toLocaleDateString('es-MX',{month:'short'})} – ${e.getDate()} ${e.toLocaleDateString('es-MX',{month:'short'})}`; }
+}
+function maestroWeek(delta){ const r=new Date(MAESTRO_REF||new Date()); if(delta===0) MAESTRO_REF=new Date(); else { r.setDate(r.getDate()+delta*7); MAESTRO_REF=r; } renderMaestro(); }
+function wireMaestroDnD(){
+  const grid=document.getElementById('maestroGrid'); if(!grid) return;
+  grid.querySelectorAll('.mcard[draggable="true"]').forEach(c=>{
+    c.ondragstart=e=>{ DRAG_BID=c.dataset.bid; c.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; try{e.dataTransfer.setData('text/plain',c.dataset.bid);}catch(_){} };
+    c.ondragend=()=>{ c.classList.remove('dragging'); grid.querySelectorAll('.mcell.over').forEach(x=>x.classList.remove('over')); };
+  });
+  grid.querySelectorAll('.mcell').forEach(cell=>{
+    cell.ondragover=e=>{ e.preventDefault(); cell.classList.add('over'); };
+    cell.ondragleave=()=>cell.classList.remove('over');
+    cell.ondrop=async e=>{ e.preventDefault(); cell.classList.remove('over'); await dropBooking(cell.dataset.vid,cell.dataset.date); };
+  });
+}
+async function dropBooking(vid,date){
+  const bid=DRAG_BID; DRAG_BID=null; if(!bid) return;
+  const bk=CACHE.homeBk||[]; const b=bk.find(x=>String(x.id)===String(bid)); if(!b) return;
+  const old=new Date(b.starts_at); const [Y,M,D]=date.split('-').map(Number);
+  const nd=new Date(Y,M-1,D,old.getHours(),old.getMinutes(),0,0);
+  const newVid=vid?Number(vid):null;
+  if(ymd(old)===date && (b.venue_id||null)===newVid) return;   // dropped where it already was
+  const body={starts_at:isoLocal(nd)}; if(newVid!==(b.venue_id||null)) body.venue_id=newVid;
+  try{
+    const upd=await patch('/bookings/'+bid,body);
+    b.starts_at=upd.starts_at||isoLocal(nd);
+    b.venue_id=(upd.venue_id!==undefined?upd.venue_id:newVid);
+    if(upd.venue_name) b.venue_name=upd.venue_name;
+    else { const sib=bk.find(x=>x.id!==b.id&&(x.venue_id||0)===(newVid||0)&&x.venue_name); if(sib) b.venue_name=sib.venue_name; }
+    renderMaestro(); toast('Actuación reprogramada ✓');
+  }catch(e){ renderMaestro(); toast('No se pudo mover: '+(e.message||''),true); }
+}
+function budgetDonut(gastado,comprometido,disponible){
+  const tot=Math.max(1,gastado+comprometido+disponible);
+  const g=gastado/tot*100, c=comprometido/tot*100;
+  const bg=`conic-gradient(var(--acc) 0 ${g}%, var(--acc2) ${g}% ${g+c}%, var(--ov2) ${g+c}% 100%)`;
+  return `<div class="donutwrap">
+    <div class="donut" style="background:${bg}"><div class="dc"><b>${Math.round((gastado+comprometido)/tot*100)}%</b><span>usado</span></div></div>
+    <div class="dlegend">
+      <div class="dl"><span class="dot" style="background:var(--acc)"></span>Gastado <b>${MXN(gastado)}</b></div>
+      <div class="dl"><span class="dot" style="background:var(--acc2)"></span>Comprometido <b>${MXN(comprometido)}</b></div>
+      <div class="dl"><span class="dot" style="background:var(--ov2)"></span>Disponible <b>${MXN(disponible)}</b></div>
+    </div></div>`;
+}
+function toast(msg,bad){ let t=document.getElementById('toast'); if(!t){ t=document.createElement('div'); t.id='toast'; document.body.appendChild(t); } t.textContent=msg; t.className='toast show'+(bad?' bad':''); clearTimeout(window._tt); window._tt=setTimeout(()=>{t.className='toast';},2600); }
+
 const RENDER = {
   async leads(box){
     const rows = await api('/leads/hotel');
@@ -848,37 +975,60 @@ const RENDER = {
       </div>${novStrip(nov)}`;
       return;
     }
-    const [dash, cats, reqs, bk] = await Promise.all([
-      api(`/groups/${GID}/dashboard`),
-      api(`/intelligence/demand?days=90&group_id=${GID}`),
-      api(`/requests?status=open`),
-      api(`/bookings?group_id=${GID}`)
-    ]);
-    const mkt = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
+    // Serial (not Promise.all): the prod host runs on a tiny LSAPI worker pool
+    // over sqlite; firing 5 concurrent requests per dashboard load saturates it
+    // (503s). One at a time keeps each load to a single busy worker.
+    const dash = await api(`/groups/${GID}/dashboard`);
+    const bk   = await api(`/bookings?group_id=${GID}`);
+    const cats = await api(`/intelligence/demand?days=90&group_id=${GID}`);
+    const reqs = await api(`/requests?status=open`);
+    const mkt  = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
     const occs = mkt.properties.map(p=>p.occupancy_pct).filter(v=>v!=null);
     const occ = occs.length? (occs.reduce((a,b)=>a+b,0)/occs.length):null;
-    const now=new Date();
-    const upcoming = bk.filter(b=>['pending','confirmed'].includes(b.status)).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)).slice(0,6);
+    const num = x => +x||0;
+    const budget = num(mkt.total_entertainment_budget);
+    const gastado = bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
+    const comprometido = bk.filter(b=>b.status==='confirmed').reduce((a,b)=>a+num(b.agreed_price),0);
+    const usado = gastado+comprometido;
+    const disponible = Math.max(0, budget-usado);
+    const ahorro = budget-usado;
+    const usadoPct = budget>0? Math.round(usado/budget*100):null;
+    const am=new Map();
+    bk.forEach(b=>{ if(!b.artist_name) return; const o=am.get(b.artist_name)||{name:b.artist_name,count:0,sum:0}; o.count++; o.sum+=num(b.agreed_price); am.set(b.artist_name,o); });
+    const topArt=[...am.values()].sort((a,b)=>b.count-a.count).slice(0,5);
     const maxd = Math.max(...cats.top_categories.map(c=>c.demand_score),1);
+    CACHE.homeBk = bk; MAESTRO_REF = MAESTRO_REF || new Date();
     box.innerHTML=`
       <div class="kpis">
         <div class="kpi"><div class="orb"></div><div class="k">🎭 Actuaciones (mes)</div><div class="v">${dash.total_bookings}</div><div class="d">confirmadas + realizadas</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">💰 Gasto entretenimiento</div><div class="v">${MXN(dash.total_spend)}</div><div class="d">consolidado de la cadena</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">💳 Presupuesto utilizado</div><div class="v">${MXN(usado)}</div><div class="d">${budget>0?'de '+MXN(budget)+' · '+usadoPct+'%':'sin presupuesto cargado'}</div></div>
         <div class="kpi"><div class="orb"></div><div class="k">🏨 Ocupación prom.</div><div class="v">${occ!=null?occ.toFixed(0)+'%':'—'}</div><div class="d">${dash.property_count} propiedades</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">📣 Solicitudes abiertas</div><div class="v">${reqs.length}</div><div class="d">en el tablero</div></div>
+        <div class="kpi"><div class="orb"></div><div class="k">💵 Ahorro vs presupuesto</div><div class="v">${budget>0?MXN(ahorro):'—'}</div><div class="d">${budget>0?(ahorro>=0?'dentro de presupuesto':'presupuesto excedido'):'—'}</div></div>
+      </div>
+      <div class="box" style="margin-bottom:16px">
+        <div class="mtoolbar">
+          <h3 style="margin:0;flex:1">🗓️ Calendario Maestro</h3>
+          <span class="hint" id="maestroWeek" style="margin:0"></span>
+          <div class="mnav"><button class="mbtn" onclick="maestroWeek(-1)">‹</button><button class="mbtn today" onclick="maestroWeek(0)">Hoy</button><button class="mbtn" onclick="maestroWeek(1)">›</button></div>
+        </div>
+        <div class="hint" style="margin:-6px 0 12px">Arrastra una actuación a otro día o venue para reprogramarla — el cambio se guarda al instante.</div>
+        <div class="maestro"><div class="mgrid" id="maestroGrid"></div></div>
       </div>
       <div class="grid2">
-        <div class="box"><h3>🗓️ Próximas actuaciones</h3><div class="hint">Agenda inmediata de la cadena</div>
-          <table><thead><tr><th>Show</th><th>Venue</th><th>Fecha</th><th>Estado</th></tr></thead><tbody>
-          ${upcoming.length? upcoming.map(b=>`<tr><td>${esc(b.show_name||'—')}</td><td class="muted">${esc(b.venue_name||'—')}</td>
-            <td class="muted">${fmtDate(b.starts_at)}</td><td>${chip(b.status)}</td></tr>`).join(""):`<tr><td colspan="4" class="muted">Sin actuaciones próximas</td></tr>`}
-          </tbody></table>
-        </div>
+        <div class="box"><h3>💰 Presupuesto</h3><div class="hint">Gasto de entretenimiento del mes</div>
+          ${budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad para ver el desglose.</div>'}</div>
         <div class="box"><h3>🔥 Lo más pedido</h3><div class="hint">Demanda por categoría (90 días)</div>
-          ${bars(cats.top_categories.slice(0,5).map(c=>({lbl:pretty(c.key),pct:Math.round(c.demand_score/maxd*100),val:c.demand_score,col:CATCOL[c.key],trend:c.trend})))}
-        </div>
+          ${bars(cats.top_categories.slice(0,5).map(c=>({lbl:pretty(c.key),pct:Math.round(c.demand_score/maxd*100),val:c.demand_score,col:CATCOL[c.key],trend:c.trend})))}</div>
+      </div>
+      <div class="grid2" style="margin-top:16px">
+        <div class="box"><h3>🏆 Top Artistas</h3><div class="hint">Más contratados en la cadena</div>
+          ${topArt.length? topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} actuación${a.count===1?'':'es'}</span></div><b>${MXN(a.sum)}</b></div>`).join('') : '<div class="muted">Sin datos aún.</div>'}</div>
+        <div class="box"><h3>📣 Solicitudes abiertas</h3><div class="hint">${reqs.length} en el tablero</div>
+          ${reqs.length? reqs.slice(0,5).map(r=>`<div class="listrow"><div class="lz"><b>${esc(r.title)}</b><span>${esc(r.company_name||'—')} · ${esc(pretty(r.category)||'—')}</span></div><span class="hint">${r.budget_min?MXN(r.budget_min):''}</span></div>`).join('') : '<div class="muted">Sin solicitudes abiertas.</div>'}
+          <div style="margin-top:11px"><button class="mbtn" onclick="show('reqs')">Ver todas →</button></div></div>
       </div>
       ${novStrip(nov)}`;
+    renderMaestro();
   },
 
   async cal(box){

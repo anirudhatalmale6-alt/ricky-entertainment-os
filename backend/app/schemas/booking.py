@@ -45,6 +45,7 @@ class BookingUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     starts_at: datetime | None = None
     ends_at: datetime | None = None
+    venue_id: int | None = None
     event_type: str | None = None
     agreed_price: float | None = None
     currency: str | None = None
