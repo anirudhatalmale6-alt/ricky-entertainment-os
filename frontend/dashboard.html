@@ -1548,6 +1548,8 @@ const LOCACIONES=['Alberca','Playa','Rooftop','Salones','Lobby-Bar','Restaurante
 const TAMANOS=['Íntimo (hasta 30 pax)','Pequeño (30-80)','Mediano (80-200)','Grande (200-500)','Masivo (+500)'];
 const TURNOS=['Mañana','Tarde','Noche'];
 const TIMES=(()=>{const a=[];for(let h=0;h<24;h++)for(const m of['00','30'])a.push(String(h).padStart(2,'0')+':'+m);return a;})();
+const DURACIONES=[{v:60,t:'1 h'},{v:90,t:'1 h 30 min'},{v:120,t:'2 h'},{v:150,t:'2 h 30 min'},{v:180,t:'3 h'},{v:210,t:'3 h 30 min'},{v:240,t:'4 h'},{v:300,t:'5 h'},{v:360,t:'6 h'}];
+function timeAdd(hhmm,mins){ const [h,m]=hhmm.split(':').map(Number); let t=(h*60+m+mins)%(24*60); if(t<0)t+=24*60; return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); }
 // Locación (varias) y Tamaño (una) se guardan como líneas estructuradas al inicio de la descripción,
 // p.ej. "Locación: Playa, Rooftop\nTamaño: Mediano (80-200)". Así no tocamos la base de datos y se
 // lee bien aunque no se procese. "Espacio:" se acepta como alias antiguo -> Locación.
@@ -1592,7 +1594,7 @@ async function openReqForm(){
       <div class="fgrid fg3">
         <div class="field"><label>Turno</label><select id="rq_turno"><option value="">—</option>${TURNOS.map(t=>`<option>${t}</option>`).join('')}</select></div>
         <div class="field"><label>Hora inicio</label><select id="rq_hini"><option value="">—</option>${TIMES.map(t=>`<option>${t}</option>`).join('')}</select></div>
-        <div class="field"><label>Hora fin</label><select id="rq_hfin"><option value="">—</option>${TIMES.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>Duración</label><select id="rq_dur"><option value="">—</option>${DURACIONES.map(d=>`<option value="${d.v}">${d.t}</option>`).join('')}</select></div>
       </div>
       <div class="fgrid">
         <div class="field"><label>Presupuesto mín. (MXN)</label><input id="rq_bmin" type="number" min="0" step="500" placeholder="Opcional"></div>
@@ -1618,12 +1620,14 @@ async function submitReq(btn){
   if(!title){ toast('Ponle un título a la solicitud.',true); return; }
   const locs=[...document.querySelectorAll('#rq_loc .spchip.on')].map(b=>b.dataset.v);
   const sizeEl=document.querySelector('#rq_size .spchip.on'); const size=sizeEl?sizeEl.dataset.v:'';
-  const turno=g('rq_turno').value, hini=g('rq_hini').value, hfin=g('rq_hfin').value;
-  if(hini&&hfin&&hfin<hini){ toast('La hora de fin debe ser posterior a la de inicio.',true); return; }
+  const turno=g('rq_turno').value, hini=g('rq_hini').value, durMin=+(g('rq_dur').value||0);
+  const durLabel = durMin ? (DURACIONES.find(d=>d.v===durMin)||{}).t : '';
   const hparts=[];
   if(turno) hparts.push(turno);
-  if(hini) hparts.push(hini+(hfin?('–'+hfin):' en adelante'));
-  else if(hfin) hparts.push('hasta '+hfin);
+  if(hini){
+    if(durMin) hparts.push(`${hini}–${timeAdd(hini,durMin)} (${durLabel})`);
+    else hparts.push(hini+' en adelante');
+  } else if(durMin){ hparts.push('Duración '+durLabel); }
   let desc=(g('rq_desc').value||'').trim();
   const head=[];
   if(locs.length) head.push(`Locación: ${locs.join(', ')}`);
