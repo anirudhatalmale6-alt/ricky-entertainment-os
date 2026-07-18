@@ -1856,7 +1856,7 @@ const RENDER = {
       <div class="kpis">
         <div class="kpi"><div class="kh"><div><div class="k">Actuaciones esta semana</div><div class="v" id="kpiWeekVal">0</div></div><div class="kc violet">🗓️</div></div>
           <div class="kbreak" id="kpiWeekBreak"></div></div>
-        <div class="kpi"><div class="kh"><div><div class="k">Presupuesto utilizado</div><div class="v" id="kUsadoV">${MXN(usado)}</div><div class="d" id="kUsadoD">${budget>0?'de '+MXN(budget):'sin presupuesto cargado'}</div></div><div class="kc green">💲</div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Presupuesto mensual</div><div class="v" id="kUsadoV">${MXN(usado)}</div><div class="d" id="kUsadoD">${budget>0?'de '+MXN(budget):'sin presupuesto cargado'}</div></div><div class="kc green">💲</div></div>
           <div id="kUsadoBar">${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto del mes</div>`:''}</div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Satisfacción media</div><div class="v">${sat5!=null?sat5.toFixed(1)+' / 5':'—'}</div></div><div class="kc blue">🙂</div></div>
           <div class="kstars">${sat5!=null?starRow(sat5):'☆☆☆☆☆'}<small>según asistencia real</small></div></div>
@@ -1972,15 +1972,22 @@ const RENDER = {
     const comprometido=bk.filter(b=>b.status==='confirmed'||b.status==='pending').reduce((a,b)=>a+num(b.agreed_price),0);
     const usado=gastado+comprometido; const disp=Math.max(0,budget-usado);
     const usadoPct=budget>0?Math.round(usado/budget*100):0;
-    const inv=bk.filter(b=>['completed','confirmed'].includes(b.status));
+    // "gasto agendado" = todo lo no cancelado (realizado + comprometido + pendiente),
+    // así el total de la matriz y del comparativo coincide con Utilizado + Comprometido.
+    const inv=bk.filter(b=>b.status!=='cancelled');
     const catset=[...new Set(inv.map(b=>scat[b.show_id]||'Otros'))];
     const cell={}; catset.forEach(c=>cell[c]=Array(12).fill(0));
     const monthAct=Array(12).fill(0);
-    inv.forEach(b=>{const c=scat[b.show_id]||'Otros'; const mo=new Date(b.starts_at).getMonth(); cell[c][mo]+=num(b.agreed_price); monthAct[mo]+=num(b.agreed_price);});
+    inv.forEach(b=>{const d=new Date(b.starts_at); if(d.getFullYear()!==PERIOD.year) return; const c=scat[b.show_id]||'Otros'; const mo=d.getMonth(); cell[c][mo]+=num(b.agreed_price); monthAct[mo]+=num(b.agreed_price);});
     const catTot=c=>cell[c].reduce((a,b)=>a+b,0);
     const orderedCats=catset.sort((a,b)=>catTot(b)-catTot(a));
     const MN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-    const monthBudget=budget/12; const maxBar=Math.max(monthBudget,...monthAct,1);
+    // Presupuesto CARGADO por mes (año en curso) — para el comparativo/control anual.
+    const budByMonth=Array(12).fill(0);
+    brows.forEach(b=>{ if(+b.year===PERIOD.year && b.month>=1 && b.month<=12) budByMonth[b.month-1]+=num(b.entertainment_budget); });
+    const yearBudget=budByMonth.reduce((a,b)=>a+b,0);
+    const yearSpend=monthAct.reduce((a,b)=>a+b,0);
+    const maxBar=Math.max(...budByMonth,...monthAct,1);
     const money0=v=>'$'+Math.round(v).toLocaleString('es-MX');
     box.innerHTML=`
       <div class="kpis">
@@ -2006,13 +2013,22 @@ const RENDER = {
         <div class="bhead"><h3 style="margin:0">Presupuesto por categoría y mes</h3><span class="hint" style="margin:0">Gasto real (comprometido + realizado) · ${PERIOD.year}</span></div>
         <div class="bmatrix"><table><thead><tr><th>Categoría</th>${MN.map(m=>`<th>${m}</th>`).join('')}<th>Total</th></tr></thead><tbody>
           ${orderedCats.map(c=>`<tr><td>${esc(pretty(c))}</td>${cell[c].map(v=>`<td class="${v>0?'hot':''}">${v>0?money0(v):'—'}</td>`).join('')}<td>${money0(catTot(c))}</td></tr>`).join('')||`<tr><td colspan="14" class="muted" style="text-align:center;padding:20px">Aún no hay gasto registrado.</td></tr>`}
-          ${orderedCats.length?`<tr class="tot"><td>Total</td>${monthAct.map(v=>`<td>${v>0?money0(v):'—'}</td>`).join('')}<td>${money0(usado)}</td></tr>`:''}
+          ${orderedCats.length?`<tr class="tot"><td>Total</td>${monthAct.map(v=>`<td>${v>0?money0(v):'—'}</td>`).join('')}<td>${money0(yearSpend)}</td></tr>`:''}
+        </tbody></table></div>
+      </div>
+      <div class="box" style="margin-bottom:16px">
+        <div class="bhead"><h3 style="margin:0">Control anual ${PERIOD.year}</h3><span class="hint" style="margin:0">Presupuesto cargado vs. gasto agendado, mes a mes</span></div>
+        <div class="bmatrix" style="margin-top:12px"><table><thead><tr><th>Mes</th><th style="text-align:right">Presupuesto</th><th style="text-align:right">Gasto</th><th style="text-align:right">Diferencia</th><th style="text-align:right">% Utilizado</th></tr></thead><tbody>
+          ${MESES.map((mn,i)=>{const bd=budByMonth[i], sp=monthAct[i]; if(!bd&&!sp) return ''; const dif=bd-sp; const pct=bd>0?Math.round(sp/bd*100):(sp>0?null:0);
+            return `<tr><td>${mn}</td><td style="text-align:right">${bd?money0(bd):'—'}</td><td style="text-align:right">${sp?money0(sp):'—'}</td><td style="text-align:right;font-weight:650;color:${dif>=0?'var(--ok)':'var(--bad)'}">${(dif>=0?'+':'')+money0(dif)}</td><td style="text-align:right;${pct!=null&&pct>100?'color:var(--bad);font-weight:650':''}">${pct!=null?pct+'%':(bd?'0%':'s/ppto')}</td></tr>`;
+          }).join('')||`<tr><td colspan="5" class="muted" style="text-align:center;padding:18px">Carga presupuestos por mes para ver el control anual.</td></tr>`}
+          ${(yearBudget||yearSpend)?`<tr class="tot"><td>Total ${PERIOD.year}</td><td style="text-align:right">${money0(yearBudget)}</td><td style="text-align:right">${money0(yearSpend)}</td><td style="text-align:right;font-weight:700;color:${(yearBudget-yearSpend)>=0?'var(--ok)':'var(--bad)'}">${((yearBudget-yearSpend)>=0?'+':'')+money0(yearBudget-yearSpend)}</td><td style="text-align:right">${yearBudget>0?Math.round(yearSpend/yearBudget*100)+'%':'—'}</td></tr>`:''}
         </tbody></table></div>
       </div>
       <div class="grid2">
         <div class="box"><div class="bhead"><h3 style="margin:0">Presupuesto vs. real (mensual)</h3></div>
-          <div class="hint" style="margin:2px 0 6px"><span style="color:var(--mut2)">▉</span> Presupuesto &nbsp; <span style="color:var(--acc)">▉</span> Real</div>
-          <div class="barchart">${MN.map((m,i)=>`<div class="bc" title="${m}: real ${money0(monthAct[i])} / ppto ${money0(monthBudget)}"><div class="bb"><i style="height:${Math.round(monthAct[i]/maxBar*130)}px;background:var(--acc)"></i><i style="height:${Math.round(monthBudget/maxBar*130)}px;background:var(--ov2)"></i></div><small>${m}</small></div>`).join('')}</div>
+          <div class="hint" style="margin:2px 0 6px"><span style="color:var(--ov2)">▉</span> Presupuesto &nbsp; <span style="color:var(--acc)">▉</span> Gasto</div>
+          <div class="barchart">${MN.map((m,i)=>`<div class="bc" title="${MESES[i]}: gasto ${money0(monthAct[i])} / ppto ${money0(budByMonth[i])}"><div class="bb"><i style="height:${Math.round(monthAct[i]/maxBar*130)}px;background:var(--acc)"></i><i style="height:${Math.round(budByMonth[i]/maxBar*130)}px;background:var(--ov2)"></i></div><small>${m}</small></div>`).join('')}</div>
         </div>
         <div class="box"><div class="bhead"><h3 style="margin:0">Distribución del gasto</h3></div>
           ${budget>0? budgetDonut(gastado,comprometido,disp) : ''}
