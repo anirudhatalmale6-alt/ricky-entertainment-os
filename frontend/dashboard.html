@@ -153,6 +153,13 @@
   .reqc .t{font-weight:650;font-size:14px;margin-bottom:8px}
   .reqc .meta{font-size:12px;color:var(--mut);margin:3px 0}
   .reqc .ft{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+  .reqc .spc{display:flex;flex-wrap:wrap;gap:5px;margin:7px 0 3px}
+  .reqc .spc span{font-size:11px;padding:2px 9px;border-radius:20px;background:var(--ov);color:var(--acc);border:1px solid var(--line);font-weight:600}
+  /* space chip picker (form) */
+  .chipset{display:flex;flex-wrap:wrap;gap:7px}
+  .spchip{padding:6px 12px;border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--txt);font-size:12.5px;cursor:pointer;transition:.12s}
+  .spchip:hover{border-color:var(--acc2)}
+  .spchip.on{background:var(--grad);color:#fff;border-color:transparent}
 
   /* chat */
   .chat{display:grid;grid-template-columns:280px 1fr;gap:0;height:560px;background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden;box-shadow:var(--shadow)}
@@ -1520,6 +1527,16 @@ function suggAsignar(name){ toast('Le enviaremos tu interés a '+(name||'este ar
 function qtool(label){ toast(label+' — módulo en preparación'); }
 
 /* ---- Crear solicitud (desde la pantalla Solicitudes) ---- */
+const SPACES=['Al aire libre','Salón de eventos','Alberca','Playa','Terraza','Jardín','Lobby','Restaurante','Bar / Lounge','Rooftop','Auditorio / Teatro','Cubierto / Techado'];
+// El "espacio" se guarda como primera línea estructurada de la descripción: "Espacio: Playa, Terraza".
+// Así no necesitamos tocar la base de datos y se lee bien aunque no se procese.
+function parseSpace(desc){
+  if(!desc) return {tags:[],rest:''};
+  const m=desc.match(/^Espacio:\s*(.+?)(?:\r?\n|$)/);
+  if(!m) return {tags:[],rest:desc};
+  const tags=m[1].split(',').map(s=>s.trim()).filter(Boolean);
+  return {tags, rest:desc.slice(m[0].length).replace(/^\s+/,'')};
+}
 async function openReqForm(){
   let tax=CACHE.tax; if(!tax){ try{ tax=await api('/artists/taxonomy'); CACHE.tax=tax; }catch(e){ tax={}; } }
   let comps=[]; try{ if(GID){ const d=await api(`/groups/${GID}/dashboard`); comps=d.properties||[]; } }catch(e){}
@@ -1545,6 +1562,9 @@ async function openReqForm(){
         <div class="field"><label>Presupuesto mín. (MXN)</label><input id="rq_bmin" type="number" min="0" step="500" placeholder="Opcional"></div>
         <div class="field"><label>Presupuesto máx. (MXN)</label><input id="rq_bmax" type="number" min="0" step="500" placeholder="Opcional"></div>
       </div>
+      <div class="field"><label>Espacio del evento <span class="muted" style="font-weight:400">(dónde se realizará · opcional)</span></label>
+        <div class="chipset" id="rq_space">${SPACES.map(s=>`<button type="button" class="spchip" data-v="${esc(s)}" onclick="this.classList.toggle('on')">${esc(s)}</button>`).join('')}</div>
+      </div>
       <div class="field"><label>Descripción</label><textarea id="rq_desc" placeholder="Detalles del evento, horario, requisitos…"></textarea></div>
     </div>
     <div class="af"><button class="ago" id="rq_go" onclick="submitReq(this)">Publicar solicitud</button></div>
@@ -1557,8 +1577,11 @@ async function submitReq(btn){
   const g=id=>document.getElementById(id);
   const title=(g('rq_title').value||'').trim();
   if(!title){ toast('Ponle un título a la solicitud.',true); return; }
+  const spaces=[...document.querySelectorAll('#rq_space .spchip.on')].map(b=>b.dataset.v);
+  let desc=(g('rq_desc').value||'').trim();
+  if(spaces.length){ desc=`Espacio: ${spaces.join(', ')}`+(desc?`\n\n${desc}`:''); }
   const body={ title, currency:'MXN',
-    description:(g('rq_desc').value||'').trim()||null,
+    description:desc||null,
     category:g('rq_cat').value||null,
     subcategory:g('rq_sub').value||null,
     city:(g('rq_city').value||'').trim()||null };
@@ -2207,6 +2230,7 @@ const RENDER = {
         <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
         <div class="meta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
         <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
+        ${(()=>{const sp=parseSpace(r.description);return sp.tags.length?`<div class="spc">🎪 ${sp.tags.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`:'';})()}
         <div class="ft">${chip(r.status)}<span class="muted">${r.proposals_count} propuesta${r.proposals_count===1?'':'s'}</span></div>
       </div>`).join("") || '<div class="muted">Aún no hay solicitudes. Pulsa "Crear solicitud" para publicar la primera.</div>'}</div>`;
   },
