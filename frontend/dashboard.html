@@ -1479,6 +1479,18 @@ async function submitReq(btn){
 
 /* ---- Cargar presupuesto mensual (perfil de presupuesto) ---- */
 const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+// Suma TODOS los presupuestos cargados (todos los meses, todas las propiedades del grupo)
+// -> ese es el presupuesto total contra el que se compara el gasto. Antes solo se contaba el
+// mes en curso, por eso "no sumaba" al cargar otros meses.
+async function loadGroupBudgets(){
+  let comps=[]; try{ comps=(await api('/companies')||[]).filter(c=>!GID||c.group_id===GID); }catch(e){}
+  const rows=[];
+  for(const c of comps){ try{ const bs=await api(`/companies/${c.id}/budgets`); (bs||[]).forEach(b=>rows.push({...b,company_name:c.name,city:c.city,rooms:c.rooms})); }catch(e){} }
+  rows.sort((a,b)=> (b.year-a.year)||(b.month-a.month)||(a.company_name||'').localeCompare(b.company_name||''));
+  const total=rows.reduce((a,b)=>a+(+b.entertainment_budget||0),0);
+  CACHE.budgetComps=comps; CACHE.budgetRows=rows; CACHE.budgetTotal=total;
+  return {comps,rows,total};
+}
 function openBudgetForm(){
   const comps=CACHE.budgetComps||[];
   if(!comps.length){ toast('Primero registra una propiedad en tu cadena.',true); return; }
@@ -1785,10 +1797,12 @@ const RENDER = {
     // KPIs and the Calendario Maestro stay in sync — no "phantom" acts in an absent venue.
     const bk   = (await api(`/bookings?group_id=${GID}`)).filter(b=>!(b.venue_id && !b.venue_name));
     const reqs = await api(`/requests?status=open`);
-    const mkt  = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
+    // Presupuesto total = suma de TODOS los meses cargados de todas las propiedades
+    // del grupo (no solo el mes en curso), para que sume al cargar datos nuevos.
+    const gb   = await loadGroupBudgets();
     let AMAP={}; try{ (await api('/artists')||[]).forEach(a=>{AMAP[a.id]=a.stage_name;}); }catch(e){}
     const num = x => +x||0; const avg = a => a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
-    const budget = num(mkt.total_entertainment_budget);
+    const budget = gb.total;
     const gastado = bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
     // "comprometido" = todo lo agendado que aún no se realiza (confirmadas + pendientes),
     // para que el Presupuesto utilizado se mueva en cuanto agregas o quitas actuaciones.
@@ -1928,16 +1942,12 @@ const RENDER = {
 
   async budget(box){
     const bk    = await api(`/bookings?group_id=${GID}`);
-    const mkt   = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
     const shows = await api('/shows');
-    // Propiedades de la cadena + presupuestos cargados (para la carga manual + histórico).
-    let comps=[]; try{ comps=(await api('/companies')||[]).filter(c=>!GID||c.group_id===GID); }catch(e){}
-    CACHE.budgetComps=comps;
-    let brows=[];
-    for(const c of comps){ try{ const bs=await api(`/companies/${c.id}/budgets`); (bs||[]).forEach(b=>brows.push({...b,company_name:c.name,city:c.city,rooms:c.rooms})); }catch(e){} }
-    brows.sort((a,b)=> (b.year-a.year)||(b.month-a.month)||(a.company_name||'').localeCompare(b.company_name||''));
+    // Propiedades de la cadena + TODOS los presupuestos cargados (todos los meses).
+    const gb = await loadGroupBudgets();
+    const comps = gb.comps, brows = gb.rows;
     const num=x=>+x||0; const scat={}; (shows||[]).forEach(s=>{scat[s.id]=s.category;});
-    const budget=num(mkt.total_entertainment_budget);
+    const budget=gb.total;
     const gastado=bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
     // igual que el Dashboard: comprometido = agendado no realizado (confirmadas + pendientes)
     const comprometido=bk.filter(b=>b.status==='confirmed'||b.status==='pending').reduce((a,b)=>a+num(b.agreed_price),0);
