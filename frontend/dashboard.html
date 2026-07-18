@@ -1148,6 +1148,8 @@ const ymd = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+
 const isoLocal = d => { const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())+':00'; };
 function maestroVenues(bk){
   const m=new Map();
+  // Venues reales de la cadena -> así los lugares vacíos/nuevos también salen como fila.
+  (CACHE.venues||[]).forEach(v=>{ if(v&&v.id) m.set(v.id,{id:v.id,name:v.name}); });
   // require a real venue name: a booking whose venue was deleted may keep a dangling
   // venue_id (no name) — those must not spawn a "Sin venue" row.
   bk.forEach(b=>{ if(!b.venue_id||!b.venue_name) return; if(!m.has(b.venue_id)) m.set(b.venue_id,{id:b.venue_id,name:b.venue_name}); });
@@ -1191,7 +1193,7 @@ function renderMaestro(){
   venues.forEach((v,vi)=>{
     const vc=bk.filter(b=>(b.venue_id||0)===(v.id||0)).length;
     const th=cellTheme(vi);
-    html+=`<div class="vname" style="--vc:${th.bd};--vc-bg:${th.bg};--vc-hd:${th.hd}">${v.id?`<button class="vx" title="Eliminar venue" onclick="delVenue(${v.id},'${esc(v.name).replace(/'/g,"\\'")}',${vc})">✕</button>`:''}${esc(v.name)}<span>${vc} actuación${vc===1?'':'es'}</span></div>`;
+    html+=`<div class="vname" style="--vc:${th.bd};--vc-bg:${th.bg};--vc-hd:${th.hd}">${v.id?`<button class="vx" title="Eliminar venue" onclick="delVenue(${v.id},'${esc(v.name).replace(/'/g,"\\'")}',${vc})">✕</button>`:''}${esc(v.name)}<span>${vc} ${vc===1?'actuación':'actuaciones'}</span></div>`;
     days.forEach(d=>{
       const ds=ymd(d);
       const cards=bk.filter(b=>(b.venue_id||0)===(v.id||0)&&ymd(new Date(b.starts_at))===ds).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
@@ -1322,16 +1324,61 @@ async function dropBooking(vid,date){
 }
 async function delVenue(id,name,count){
   const warn = count>0
-    ? `¿Eliminar el venue "${name}"?\n\nSus ${count} actuación${count===1?'':'es'} quedarán sin lugar asignado (no se borran, las puedes reasignar a otro venue).`
+    ? `¿Eliminar el venue "${name}"?\n\nSus ${count} ${count===1?'actuación':'actuaciones'} quedarán sin lugar asignado (no se borran, las puedes reasignar a otro venue).`
     : `¿Eliminar el venue "${name}"?`;
   if(!confirm(warn)) return;
   try{
     await del('/companies/venues/'+id);
     const bk=CACHE.homeBk||[];
     bk.forEach(b=>{ if((b.venue_id||0)===id){ b.venue_id=null; b.venue_name=null; } });
+    CACHE.venues=(CACHE.venues||[]).filter(v=>v.id!==id);
     renderMaestro();
     toast('Venue eliminado ✓');
   }catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
+}
+
+/* ---- "+ Añadir lugar": registrar un nuevo venue en una propiedad ---- */
+async function openAddVenue(){
+  let comps=CACHE.budgetComps;
+  if(!comps||!comps.length){ try{ comps=(await api('/companies')||[]).filter(c=>!GID||c.group_id===GID); CACHE.budgetComps=comps; }catch(e){ comps=[]; } }
+  if(!comps.length){ toast('Primero registra una propiedad en tu cadena.',true); return; }
+  let ov=document.getElementById('venMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='venMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) venClose(); }); }
+  ov.innerHTML=`<div class="amod rqmod" style="position:relative">
+    <button class="ax" onclick="venClose()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Añadir lugar</b><span class="as">Registra un nuevo venue en tu propiedad</span></div>
+    <div class="rqbody">
+      <div class="field"><label>Propiedad *</label><select id="vn_comp">${comps.map(c=>`<option value="${c.id}">${esc(c.name)}${c.city?' · '+esc(c.city):''}</option>`).join('')}</select></div>
+      <div class="field"><label>Nombre del lugar *</label><input id="vn_name" placeholder="p. ej. Terraza, Lobby Bar, Salón Principal"></div>
+      <div class="fgrid">
+        <div class="field"><label>Aforo</label><input id="vn_cap" type="number" min="0" step="10" placeholder="Personas"></div>
+        <div class="field"><label>Ambiente</label><input id="vn_amb" placeholder="p. ej. Bar, Restaurante, Salón"></div>
+      </div>
+      <div class="field"><label>Horario habitual</label><input id="vn_sch" placeholder="p. ej. 20:00 – 00:00"></div>
+    </div>
+    <div class="af"><button class="ago" id="vn_go" onclick="submitVenue(this)">Guardar lugar</button></div>
+  </div>`;
+  ov.style.display='flex';
+}
+function venClose(){ const ov=document.getElementById('venMov'); if(ov) ov.style.display='none'; }
+async function submitVenue(btn){
+  const g=id=>document.getElementById(id);
+  const cid=+g('vn_comp').value;
+  const name=(g('vn_name').value||'').trim();
+  if(!cid){ toast('Elige una propiedad.',true); return; }
+  if(!name){ toast('Ponle un nombre al lugar.',true); return; }
+  const body={name};
+  const cap=g('vn_cap').value; if(cap!=='') body.capacity=+cap;
+  const amb=(g('vn_amb').value||'').trim(); if(amb) body.ambiance_type=amb;
+  const sch=(g('vn_sch').value||'').trim(); if(sch) body.usual_schedule=sch;
+  btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    const v=await post(`/companies/${cid}/venues`,body);
+    (CACHE.venues=CACHE.venues||[]).push({id:v.id,name:v.name||name,company_id:cid});
+    venClose(); toast('Lugar añadido ✓');
+    renderMaestro();   // el nuevo lugar aparece como fila vacía, lista para agregar actuaciones con "+"
+  }catch(e){ btn.disabled=false; btn.textContent='Guardar lugar'; toast('No se pudo guardar: '+(e.message||''),true); }
 }
 async function delBooking(id,name){
   if(!confirm(`¿Quitar "${name}" del calendario?\n\nSe eliminará esta actuación del tablero.`)) return;
@@ -1353,7 +1400,8 @@ async function ensureShows(){
 async function openAddAct(venueId,dateStr){
   if(!venueId){ toast('Este bloque no tiene venue asignado.',true); return; }
   const bk=CACHE.homeBk||[]; const vb=bk.find(b=>(b.venue_id||0)===venueId&&b.venue_name);
-  ADDACT={venueId,venueName:vb?vb.venue_name:'Venue',date:dateStr,showId:null,price:0};
+  const vc=(CACHE.venues||[]).find(v=>v.id===venueId);   // cubre venues nuevos/vacíos
+  ADDACT={venueId,venueName:vb?vb.venue_name:(vc?vc.name:'Venue'),date:dateStr,showId:null,price:0};
   let ov=document.getElementById('actMov');
   if(!ov){ ov=document.createElement('div'); ov.id='actMov'; ov.className='mov'; document.body.appendChild(ov);
     ov.addEventListener('click',e=>{ if(e.target===ov) actClose(); }); }
@@ -1899,6 +1947,8 @@ const RENDER = {
     // Default the Maestro to the busiest week so the grid lands populated.
     const wc={}; bk.forEach(b=>{const k=ymd(mondayOf(new Date(b.starts_at)));wc[k]=(wc[k]||0)+1;});
     let bestW=null,bestN=-1; for(const k in wc){ if(wc[k]>bestN){bestN=wc[k];bestW=k;} }
+    // Lista real de venues de la cadena (para mostrar también los vacíos/nuevos en el Maestro).
+    CACHE.venues = (gb.comps||[]).flatMap(c=>(c.venues||[]).map(v=>({id:v.id,name:v.name,company_id:c.id,company_name:c.name})));
     CACHE.homeBk = bk; CACHE.homeBudget = budget; if(!MAESTRO_REF) MAESTRO_REF = bestW? new Date(bestW+'T00:00:00') : new Date();
     box.innerHTML=`
       <div class="kpis">
@@ -1917,7 +1967,7 @@ const RENDER = {
             <h3 style="margin:0;flex:1">Calendario Maestro</h3>
             <div class="mnav"><button class="mbtn" onclick="maestroWeek(-1)">‹</button><button class="mbtn today" onclick="maestroWeek(0)">Hoy</button><button class="mbtn" onclick="maestroWeek(1)">›</button></div>
             <div class="mtabs"><button class="on">Semana</button><button onclick="show('cal')">Agenda</button></div>
-            <button class="addvenue" onclick="qtool('Añadir lugar')">+ Añadir lugar</button>
+            <button class="addvenue" onclick="openAddVenue()">+ Añadir lugar</button>
             <button class="notifybtn" id="notifyBtn" onclick="saveAndNotify()" title="Notifica a los artistas los cambios que hiciste" disabled>Guardar y notificar<span class="nb-badge" id="notifyCount" style="display:none">0</span></button>
           </div>
           <div class="hint" id="maestroWeek" style="margin:-4px 0 10px"></div>
@@ -1931,7 +1981,7 @@ const RENDER = {
             <button class="btn ghost" style="width:100%;margin-top:12px" onclick="show('reqs')">+ Nueva solicitud</button>
           </div>
           <div class="box">
-            <div class="bhead"><h3 style="margin:0">Sugerencias de IA</h3><a onclick="show('artists')">Ver todas</a></div>
+            <div class="bhead"><h3 style="margin:0">Novedades</h3><a onclick="show('artists')">Ver todas</a></div>
             ${nov.length? nov.slice(0,3).map(n=>`<div class="sugg">
               <div class="sav" ${n.image_url?`style="background-image:url('${n.image_url}')"`:''}>${n.image_url?'':'🎭'}</div>
               <div class="sz"><b>${esc(n.show_name)}</b><span>${esc(n.artist_name||pretty(n.category))}</span><span style="color:var(--ok)">● Disponible${n.price_hotel?' · '+MXN(n.price_hotel):''}</span></div>
@@ -1944,9 +1994,9 @@ const RENDER = {
         <div class="box"><div class="bhead"><h3 style="margin:0">Presupuesto</h3><a onclick="show('budget')">Ver detalle</a></div>
           <div id="budgetMini">${budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>'}</div></div>
         <div class="box"><div class="bhead"><h3 style="margin:0">Top Artistas</h3><a onclick="show('reports')">Ver todas</a></div>
-          ${topArt.length? topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} actuación${a.count===1?'':'es'}</span></div><b>${MXN(a.sum)}</b></div>`).join('') : '<div class="muted">Sin datos aún.</div>'}</div>
+          ${topArt.length? topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} ${a.count===1?'actuación':'actuaciones'}</span></div><b>${MXN(a.sum)}</b></div>`).join('') : '<div class="muted">Sin datos aún.</div>'}</div>
         <div class="box"><div class="bhead"><h3 style="margin:0">Facturación</h3><a onclick="show('bill')">Ver facturas</a></div>
-          <div class="invmini"><div class="im-ico">💲</div><div class="im-s" style="text-transform:capitalize">${facMonth}</div><div class="im-v">${MXN(facTot)}</div><div class="im-s">${latestRows.length} actuación${latestRows.length===1?'':'es'}</div>
+          <div class="invmini"><div class="im-ico">💲</div><div class="im-s" style="text-transform:capitalize">${facMonth}</div><div class="im-v">${MXN(facTot)}</div><div class="im-s">${latestRows.length} ${latestRows.length===1?'actuación':'actuaciones'}</div>
             <button class="btn" style="width:100%;margin-top:12px" onclick="show('bill')">Ver facturación</button></div></div>
         <div class="box"><div class="bhead"><h3 style="margin:0">Reportes rápidos</h3><a onclick="show('reports')">Ver todas</a></div>
           <div class="rep"><div class="rl"><div class="ri">💵</div>Costo por actuación</div><div class="rv">${MXN(avgCost)} <span class="muted" style="font-weight:400">prom.</span></div></div>
@@ -2118,7 +2168,7 @@ const RENDER = {
       </div>
       <div class="grid2">
         <div class="box"><div class="bhead"><h3 style="margin:0">Artistas más utilizados</h3></div>
-          ${topArt.length?topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} actuación${a.count===1?'':'es'}</span></div><b>${MXN(a.sum)}</b></div>`).join(''):'<div class="muted">Sin datos aún.</div>'}</div>
+          ${topArt.length?topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} ${a.count===1?'actuación':'actuaciones'}</span></div><b>${MXN(a.sum)}</b></div>`).join(''):'<div class="muted">Sin datos aún.</div>'}</div>
         <div class="box"><div class="bhead"><h3 style="margin:0">Comparativa mensual</h3><span class="hint" style="margin:0">Gasto por mes</span></div>
           <div class="barchart" style="height:170px">${mk.map(k=>`<div class="bc" title="${mlab(k)}: ${money0(mm[k])}"><div class="bb"><i style="height:${Math.round(mm[k]/maxM*140)}px;background:var(--acc)"></i></div><small>${mlab(k)}</small></div>`).join('')||'<div class="muted">Sin datos.</div>'}</div></div>
       </div>`;
