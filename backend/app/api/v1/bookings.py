@@ -14,11 +14,13 @@ rewrites past money.
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.api.deps import CurrentScope, DbSession, require_permission
 from app.models.booking import Booking
 from app.models.company import Company
+from app.models.notification import ArtistNotification
 from app.models.enums import (
     CANCELLATION_CUTOFF_HOURS,
     RISK_COMMISSION,
@@ -362,3 +364,59 @@ async def delete_booking(booking_id: int, db: DbSession):
     booking = await _get_or_404(db, booking_id)
     await db.delete(booking)
     await db.commit()
+
+
+class NotifyItem(BaseModel):
+    booking_id: int
+    kind: str = "new_booking"  # new_booking | reschedule
+
+
+class NotifyIn(BaseModel):
+    items: list[NotifyItem]
+
+
+@router.post(
+    "/notify",
+    dependencies=[Depends(require_permission("booking.manage"))],
+)
+async def notify_artists(payload: NotifyIn, db: DbSession):
+    """"Guardar y notificar": create an in-app aviso for each affected artist.
+
+    Called from the Calendario Maestro when the hotel finishes arranging the
+    week. One notification per booking; the artist sees them in their bell
+    inbox. WhatsApp/email is a later channel (David 2026-07-18).
+    """
+    notified = 0
+    artists: set[int] = set()
+    for item in payload.items:
+        booking = await db.get(Booking, item.booking_id)
+        if booking is None or not booking.artist_id:
+            continue
+        show = await db.get(Show, booking.show_id) if booking.show_id else None
+        venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
+        st = booking.starts_at
+        when = _naive(st).strftime("%d/%m/%Y a las %H:%M") if st else "una fecha por confirmar"
+        show_name = (show.show_name if show else None) or "tu actuación"
+        venue_name = (venue.name if venue else None) or "el venue"
+        if item.kind == "reschedule":
+            title = f"Cambio de horario: {show_name}"
+            body = f"Tu actuación en {venue_name} se movió a {when}."
+        else:
+            title = f"Nueva actuación: {show_name}"
+            body = (
+                f"Fuiste agendado en {venue_name} para el {when}. "
+                "Queda pendiente de tu confirmación."
+            )
+        db.add(ArtistNotification(
+            artist_id=booking.artist_id,
+            booking_id=booking.id,
+            kind=item.kind if item.kind in ("new_booking", "reschedule") else "new_booking",
+            title=title,
+            body=body,
+            starts_at=st,
+            is_read=False,
+        ))
+        notified += 1
+        artists.add(booking.artist_id)
+    await db.commit()
+    return {"notified": notified, "artists": len(artists)}

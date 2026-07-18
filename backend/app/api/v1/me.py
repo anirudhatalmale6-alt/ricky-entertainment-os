@@ -10,13 +10,14 @@ descripciones and gestiona sus publicaciones (shows).
 import uuid
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentScope, DbSession
 from app.core.config import settings
 from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
+from app.models.notification import ArtistNotification
 from app.models.media import ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
@@ -169,3 +170,45 @@ async def delete_my_show(show_id: int, scope: CurrentScope, db: DbSession):
     show = await _own_show_or_404(db, artist_id, show_id)
     await db.delete(show)
     await db.commit()
+
+
+@router.get("/artist/notifications")
+async def my_notifications(scope: CurrentScope, db: DbSession):
+    """The logged-in artist's bell inbox (avisos de actuaciones)."""
+    artist_id = getattr(scope, "artist_id", None)
+    if not artist_id:
+        return {"unread": 0, "items": []}
+    rows = (await db.execute(
+        select(ArtistNotification)
+        .where(ArtistNotification.artist_id == artist_id)
+        .order_by(ArtistNotification.created_at.desc())
+        .limit(50)
+    )).scalars().all()
+    return {
+        "unread": sum(1 for r in rows if not r.is_read),
+        "items": [{
+            "id": r.id,
+            "kind": r.kind,
+            "title": r.title,
+            "body": r.body,
+            "starts_at": r.starts_at.isoformat() if r.starts_at else None,
+            "is_read": r.is_read,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        } for r in rows],
+    }
+
+
+@router.post("/artist/notifications/read", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_notifications_read(scope: CurrentScope, db: DbSession):
+    """Mark all of the artist's notifications as read (opened the bell)."""
+    artist_id = getattr(scope, "artist_id", None)
+    if artist_id:
+        await db.execute(
+            update(ArtistNotification)
+            .where(
+                ArtistNotification.artist_id == artist_id,
+                ArtistNotification.is_read.is_(False),
+            )
+            .values(is_read=True)
+        )
+        await db.commit()

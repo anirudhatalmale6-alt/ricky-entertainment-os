@@ -346,6 +346,22 @@
   .mtabs button{border:0;background:transparent;font-size:12.5px;font-weight:600;color:var(--mut);padding:6px 13px;border-radius:7px;cursor:pointer}
   .mtabs button.on{background:var(--card);color:var(--txt);box-shadow:0 1px 3px rgba(24,28,52,.1)}
   .addvenue{border:1px dashed var(--acc);color:var(--acc);background:#382ca10d;border-radius:9px;height:30px;padding:0 12px;font-weight:600;font-size:12.5px;cursor:pointer}
+  /* Guardar y notificar */
+  .notifybtn{border:0;background:var(--grad);color:#fff;border-radius:9px;height:30px;padding:0 14px;font-weight:650;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;box-shadow:0 3px 10px rgba(56,44,161,.28);transition:.15s}
+  .notifybtn:disabled{background:var(--ov2);color:var(--mut2);box-shadow:none;cursor:default}
+  .notifybtn .nb-badge{background:rgba(255,255,255,.28);border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;min-width:18px;text-align:center}
+  /* Bell inbox */
+  .bellpanel{position:absolute;top:52px;right:20px;width:330px;max-height:420px;overflow-y:auto;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(12,16,30,.28);z-index:80;display:none}
+  .bellpanel.open{display:block}
+  .bellpanel .bph{padding:13px 16px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px;display:flex;align-items:center;justify-content:space-between}
+  .bellitem{padding:11px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px}
+  .bellitem:last-child{border-bottom:0}
+  .bellitem .bi-i{width:30px;height:30px;border-radius:9px;flex:none;display:grid;place-items:center;background:#382ca114;color:var(--acc)}
+  .bellitem.unread{background:#382ca10a}
+  .bellitem b{display:block;font-size:12.5px;font-weight:650;margin-bottom:2px}
+  .bellitem span{font-size:11.5px;color:var(--mut);line-height:1.35}
+  .bellitem .bi-t{font-size:10.5px;color:var(--mut2);margin-top:3px;display:block}
+  .bellempty{padding:26px 16px;text-align:center;color:var(--mut);font-size:12.5px}
   /* split: maestro (wide) + right column */
   .splitH{display:grid;grid-template-columns:2.7fr 1fr;gap:16px;align-items:start}
   @media(max-width:1100px){.splitH{grid-template-columns:1fr}}
@@ -569,7 +585,6 @@
           <span class="lg-link">¿Olvidaste tu contraseña?</span>
         </div>
         <button class="lg-btn" onclick="login()">Iniciar sesión</button>
-        <div class="lg-alt">¿No tienes cuenta? <span class="lg-link" onclick="focusReg()">Regístrate</span></div>
       </div>
 
       <!-- REGISTER -->
@@ -678,9 +693,10 @@
       </div>
       <div class="spacer"></div>
       <div class="ctrl" id="monthCtrl">📅 Julio 2026</div>
-      <div class="bell" title="Notificaciones">🔔<span class="dot"></span></div>
+      <div class="bell" id="bellBtn" title="Notificaciones" onclick="toggleBell(event)">🔔<span class="dot" id="bellDot" style="display:none"></span></div>
       <div class="ava" id="topAva">RA</div>
     </div>
+    <div class="bellpanel" id="bellPanel"></div>
     <div class="wrap">
       <div class="panel on" id="panel-home"><div class="load">Cargando…</div></div>
       <div class="panel" id="panel-artists"></div>
@@ -702,7 +718,7 @@
 <script>
 const API = (window.RICKY_API ?? "http://localhost:8000") + "/api/v1";  // "" = same-origin root deploy
 const PERIOD = {year:2026, month:7};
-let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company";
+let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company", NOTIF_CACHE=[];
 const MXN = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n||0);
 const CATCOL = {"Musica":"#382ca1","Shows":"#f59e0b","Fotografia y Video":"#3b82f6","Produccion":"#10b981"};
 const palette=["#382ca1","#3b82f6","#10b981","#f59e0b","#06b6d4","#ef4444"];
@@ -923,8 +939,7 @@ function applyRole(){
   show('reports', canPartner);                           // reportes
   show('bill', isArtist || canPartner);                 // facturación (artist self / hotel)
   show('profile', isArtist);                            // artist-only self-service
-  show('leads', ME.is_admin);                            // admin: hotel pre-registro prospectos
-  if(ME.is_admin) refreshLeadsBadge();
+  show('leads', false);                                  // Prospectos moved to the future admin/control panel (hidden from hotel menu)
   show('cal', true);                                     // actuaciones / historial de agenda
   if(isArtist){
     setNavLabel('home','🏠','Dashboard'); setNavLabel('cal','🗓️','Mis actuaciones'); setNavLabel('chat','💬','Mis chats');
@@ -963,6 +978,7 @@ async function boot(){
   const first=[...document.querySelectorAll('.nav')].find(n=>n.style.display!=='none');
   document.querySelectorAll('.panel').forEach(x=>{x.dataset.loaded="";});
   if(first){ first.classList.add('on'); await show(first.dataset.p,true); }
+  loadNotifications();
 }
 async function reload(){
   if(ME&&ME.is_admin){ GID = document.getElementById('groupSel').value || GID; syncHotelCard(); }
@@ -1128,7 +1144,7 @@ function renderMaestro(){
     });
   });
   if(!venues.length) html+=`<div style="grid-column:1/-1;padding:26px;text-align:center" class="muted">Aún no hay actuaciones programadas en esta cadena.</div>`;
-  grid.innerHTML=html; wireMaestroDnD(); updateWeekKpi();
+  grid.innerHTML=html; wireMaestroDnD(); updateWeekKpi(); updateNotifyBtn();
   const lbl=document.getElementById('maestroWeek');
   if(lbl){ const e=days[6]; lbl.textContent=`${mon.getDate()} ${mon.toLocaleDateString('es-MX',{month:'short'})} – ${e.getDate()} ${e.toLocaleDateString('es-MX',{month:'short'})}`; }
 }
@@ -1145,6 +1161,64 @@ function wireMaestroDnD(){
     cell.ondrop=async e=>{ e.preventDefault(); cell.classList.remove('over'); await dropBooking(cell.dataset.vid,cell.dataset.date); };
   });
 }
+// ---- Guardar y notificar: track changes since last notify, then avisar a los artistas ----
+let NOTIFY_PENDING=new Map();   // booking_id -> 'new_booking' | 'reschedule'
+function notifyMark(bid,kind){
+  bid=Number(bid); if(!bid) return;
+  if(NOTIFY_PENDING.get(bid)==='new_booking') return;   // a brand-new act stays "new" even if later moved
+  NOTIFY_PENDING.set(bid,kind); updateNotifyBtn();
+}
+function updateNotifyBtn(){
+  const btn=document.getElementById('notifyBtn'), cnt=document.getElementById('notifyCount'); if(!btn) return;
+  const n=NOTIFY_PENDING.size; btn.disabled=n===0;
+  if(cnt){ cnt.textContent=n; cnt.style.display=n?'':'none'; }
+}
+async function saveAndNotify(){
+  if(!NOTIFY_PENDING.size) return;
+  const items=[...NOTIFY_PENDING.entries()].map(([booking_id,kind])=>({booking_id,kind}));
+  const btn=document.getElementById('notifyBtn'); if(btn) btn.disabled=true;
+  try{
+    const r=await post('/bookings/notify',{items});
+    NOTIFY_PENDING.clear(); updateNotifyBtn();
+    const a=r&&r.artists||0;
+    toast(a? `${a} artista${a===1?'':'s'} notificado${a===1?'':'s'} ✓` : 'Cambios guardados ✓');
+  }catch(e){ updateNotifyBtn(); toast('No se pudo notificar: '+(e.message||''),true); }
+}
+// ---- Bell inbox (artist notifications) ----
+async function loadNotifications(){
+  try{
+    const d=await api('/me/artist/notifications');
+    NOTIF_CACHE=(d&&d.items)||[];
+    const dot=document.getElementById('bellDot');
+    if(dot) dot.style.display=(d&&d.unread>0)?'':'none';
+    renderBellPanel();
+  }catch(_){ /* not an artist / not logged in — leave bell empty */ }
+}
+function fmtNotifTime(iso){ if(!iso) return ''; try{ const d=new Date(iso); return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}); }catch(_){ return ''; } }
+function renderBellPanel(){
+  const p=document.getElementById('bellPanel'); if(!p) return;
+  const items=NOTIF_CACHE||[];
+  const ic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
+  const unread=items.some(n=>!n.is_read);
+  p.innerHTML=`<div class="bph">Notificaciones${unread?` <a onclick="clearBell()" style="font-size:11.5px;color:var(--acc);cursor:pointer;font-weight:600">Marcar leídas</a>`:''}</div>`
+    + (items.length? items.map(n=>`<div class="bellitem${n.is_read?'':' unread'}"><div class="bi-i">${ic}</div><div><b>${esc(n.title||'')}</b><span>${esc(n.body||'')}</span><span class="bi-t">${fmtNotifTime(n.created_at)}</span></div></div>`).join('')
+      : `<div class="bellempty">No tienes notificaciones por ahora.</div>`);
+}
+function _markNotifRead(){
+  (NOTIF_CACHE||[]).forEach(n=>n.is_read=true);
+  const dot=document.getElementById('bellDot'); if(dot) dot.style.display='none';
+  renderBellPanel();
+  fetch(API+'/me/artist/notifications/read',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:'{}'}).catch(()=>{});
+}
+function clearBell(){ _markNotifRead(); }
+function toggleBell(e){
+  if(e) e.stopPropagation();
+  const p=document.getElementById('bellPanel'); if(!p) return;
+  const open=p.classList.toggle('open');
+  if(open){ renderBellPanel(); if((NOTIF_CACHE||[]).some(n=>!n.is_read)) _markNotifRead(); }
+}
+document.addEventListener('click',e=>{ const p=document.getElementById('bellPanel'),b=document.getElementById('bellBtn'); if(p&&p.classList.contains('open')&&!p.contains(e.target)&&b&&!b.contains(e.target)) p.classList.remove('open'); });
+
 async function dropBooking(vid,date){
   const bid=DRAG_BID; DRAG_BID=null; if(!bid) return;
   const bk=CACHE.homeBk||[]; const b=bk.find(x=>String(x.id)===String(bid)); if(!b) return;
@@ -1159,7 +1233,7 @@ async function dropBooking(vid,date){
     b.venue_id=(upd.venue_id!==undefined?upd.venue_id:newVid);
     if(upd.venue_name) b.venue_name=upd.venue_name;
     else { const sib=bk.find(x=>x.id!==b.id&&(x.venue_id||0)===(newVid||0)&&x.venue_name); if(sib) b.venue_name=sib.venue_name; }
-    renderMaestro(); toast('Actuación reprogramada ✓');
+    renderMaestro(); notifyMark(bid,'reschedule'); toast('Actuación reprogramada ✓');
   }catch(e){ renderMaestro(); toast('No se pudo mover: '+(e.message||''),true); }
 }
 async function delVenue(id,name,count){
@@ -1252,6 +1326,7 @@ async function actConfirm(){
     const data=await r.json().catch(()=>({}));
     if(!r.ok){ const dt=data&&data.detail; throw new Error((typeof dt==='string'?dt:(Array.isArray(dt)&&dt[0]&&dt[0].msg))||('Error '+r.status)); }
     (CACHE.homeBk=CACHE.homeBk||[]).push(data);
+    if(data&&data.id) notifyMark(data.id,'new_booking');
     actClose(); renderMaestro();
     toast('Actuación agregada ✓');
   }catch(e){
@@ -1510,10 +1585,11 @@ const RENDER = {
             <div class="mnav"><button class="mbtn" onclick="maestroWeek(-1)">‹</button><button class="mbtn today" onclick="maestroWeek(0)">Hoy</button><button class="mbtn" onclick="maestroWeek(1)">›</button></div>
             <div class="mtabs"><button class="on">Semana</button><button onclick="show('cal')">Agenda</button></div>
             <button class="addvenue" onclick="qtool('Añadir lugar')">+ Añadir lugar</button>
+            <button class="notifybtn" id="notifyBtn" onclick="saveAndNotify()" title="Notifica a los artistas los cambios que hiciste" disabled>Guardar y notificar<span class="nb-badge" id="notifyCount" style="display:none">0</span></button>
           </div>
           <div class="hint" id="maestroWeek" style="margin:-4px 0 10px"></div>
           <div class="maestro"><div class="mgrid" id="maestroGrid"></div></div>
-          <div class="hint" style="margin:10px 0 0">Arrastra una actuación a otro día o venue para reprogramarla — el cambio se guarda al instante.</div>
+          <div class="hint" style="margin:10px 0 0">Arrastra una actuación a otro día o venue para reprogramarla, o usa la "X" / el "+" de cada tarjeta. Cuando termines de acomodar la semana, pulsa "Guardar y notificar" para avisar a los artistas afectados de su fecha, hora y venue.</div>
         </div>
         <div class="rcol">
           <div class="box">
