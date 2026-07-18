@@ -154,7 +154,7 @@
   .msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
   .msg{max-width:70%;padding:9px 13px;border-radius:13px;font-size:13px}
   .msg.them{background:var(--card);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
-  .msg.me{background:var(--grad);align-self:flex-end;border-bottom-right-radius:4px}
+  .msg.me{background:var(--grad);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
   .msg .tm{font-size:9.5px;opacity:.6;margin-top:4px}
   .cbar{padding:13px 16px;border-top:1px solid var(--line);display:flex;gap:10px}
   .cbar input{flex:1;background:var(--inp);border:1px solid var(--line);border-radius:9px;padding:10px 13px;color:var(--txt);outline:none}
@@ -408,6 +408,9 @@
   .hotelsel .chev{color:var(--s-mut);font-size:11px}
   /* Buscar Artistas (screen 4) */
   .filters{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px 16px 14px;box-shadow:var(--shadow);margin-bottom:18px}
+  .agfilt{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .agfilt .field{min-width:140px;margin-bottom:0}
+  .agfilt .btn.ghost{white-space:nowrap}
   .filtrow{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:12px}
   @media(max-width:1000px){.filtrow{grid-template-columns:1fr 1fr}}
   .filtrow2{display:flex;align-items:center;gap:16px;margin-top:13px;flex-wrap:wrap}
@@ -1368,7 +1371,7 @@ function qtool(label){ toast(label+' — módulo en preparación'); }
 let AF={cat:''};
 function artGrad(cat){ const c=CATCOL[cat]||'#382ca1'; return `linear-gradient(135deg,${c},#8b5cf6)`; }
 function artistCard(i){
-  const badge=i.isNew?`<span class="nv-badge">✨ Novedad</span>`:`<span class="av-badge">● Disponible</span>`;
+  const badge=`<span class="av-badge">● Disponible</span>`;
   const ph=i.img?`style="background-image:url('${i.img}')"`:`style="background:${artGrad(i.cat)}"`;
   const tags=(i.sub?[pretty(i.sub)]:[]).concat((i.genres||[]).slice(0,2)).slice(0,3);
   return `<div class="acard" onclick="suggAsignar('${esc((i.name||'').replace(/'/g,''))}')">
@@ -1393,12 +1396,49 @@ function applyArtistFilters(){
     return true;
   });
   if(sort==='price') r.sort((a,b)=>(a.price||1e9)-(b.price||1e9));
-  else if(sort==='new') r.sort((a,b)=>(b.isNew?1:0)-(a.isNew?1:0));
   const grid=document.getElementById('af_grid'); if(grid) grid.innerHTML=r.map(artistCard).join('')||'<div class="muted" style="grid-column:1/-1;padding:34px;text-align:center">No hay artistas que coincidan con tu búsqueda.</div>';
   const cnt=document.getElementById('af_count'); if(cnt) cnt.textContent=r.length+(r.length===1?' artista encontrado':' artistas encontrados');
   document.querySelectorAll('.catrow').forEach(el=>el.classList.toggle('on', (el.dataset.cat||'')===AF.cat));
 }
 function pickArtCat(c){ AF.cat=c; const s=document.getElementById('af_cat'); if(s) s.value=c; applyArtistFilters(); }
+/* ---- Agenda de actuaciones: filtro por mes + rango de fechas + estado ---- */
+function agendaMonthPick(){
+  // Choosing a month clears the manual date range so the two don't fight each other.
+  const m=(document.getElementById('ag_month')||{}).value||'';
+  if(m){ const f=document.getElementById('ag_from'), t=document.getElementById('ag_to'); if(f)f.value=''; if(t)t.value=''; }
+  renderAgenda();
+}
+function agendaReset(){
+  ['ag_month','ag_from','ag_to','ag_status'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';});
+  renderAgenda();
+}
+function renderAgenda(fromRange){
+  // A manual Desde/Hasta takes over from the month dropdown.
+  if(fromRange){ const mm=document.getElementById('ag_month'); if(mm) mm.value=''; }
+  const bk=CACHE.agenda||[];
+  const m   =(document.getElementById('ag_month') ||{}).value||'';
+  const from=(document.getElementById('ag_from')  ||{}).value||'';
+  const to  =(document.getElementById('ag_to')    ||{}).value||'';
+  const st  =(document.getElementById('ag_status')||{}).value||'';
+  const r=bk.filter(b=>{
+    const iso=(b.starts_at||''); const d=iso.slice(0,10);
+    if(m && iso.slice(0,7)!==m) return false;
+    if(from && d<from) return false;
+    if(to && d>to) return false;
+    if(st && b.status!==st) return false;
+    return true;
+  });
+  const noun=n=>n===1?'actuación':'actuaciones';
+  const scope=document.getElementById('ag_scope');
+  if(scope) scope.textContent = (r.length===bk.length)
+    ? `${bk.length} ${noun(bk.length)}`
+    : `${r.length} de ${bk.length} ${noun(bk.length)}`;
+  const body=document.getElementById('ag_body'); if(!body) return;
+  body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
+      <td class="muted">${esc(b.venue_name||'—')}</td><td>${MXN(b.agreed_price)}</td>
+      <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td></tr>`).join('')
+    : `<tr><td colspan="6" class="muted" style="text-align:center;padding:22px">Sin actuaciones para este filtro.</td></tr>`;
+}
 /* ---- Facturación hoteles (screen 6): agrupa actuaciones facturables por hotel+mes ---- */
 async function hotelBill(box){
   const bk=await api(`/bookings?group_id=${GID}`);
@@ -1653,7 +1693,7 @@ const RENDER = {
           <div class="field" style="margin:0"><label>Buscar</label><input id="af_q" oninput="applyArtistFilters()" placeholder="Nombre, tipo de show, instrumento…"></div>
           <div class="field" style="margin:0"><label>Categoría</label><select id="af_cat" onchange="AF.cat=this.value;applyArtistFilters()"><option value="">Todas las categorías</option>${cats.map(([c])=>`<option value="${esc(c)}">${esc(pretty(c))}</option>`).join('')}</select></div>
           <div class="field" style="margin:0"><label>Presupuesto máx.</label><input id="af_max" type="range" min="5000" max="60000" step="1000" value="60000" oninput="document.getElementById('af_maxv').textContent=(+this.value>=60000?'Sin límite':MXN(+this.value));applyArtistFilters()"><span id="af_maxv" class="hint" style="margin-top:4px">Sin límite</span></div>
-          <div class="field" style="margin:0"><label>Ordenar por</label><select id="af_sort" onchange="applyArtistFilters()"><option value="best">Mejor coincidencia</option><option value="price">Menor precio</option><option value="new">Novedades primero</option></select></div>
+          <div class="field" style="margin:0"><label>Ordenar por</label><select id="af_sort" onchange="applyArtistFilters()"><option value="best">Mejor coincidencia</option><option value="price">Menor precio</option></select></div>
         </div>
       </div>
       <div class="artlayout">
@@ -1762,12 +1802,22 @@ const RENDER = {
   async cal(box){
     const bk = await api(SELF ? `/bookings/mine` : `/bookings?group_id=${GID}`);
     bk.sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
+    CACHE.agenda = bk;
     const scopeTxt = SELF ? (ME.artist_id?'tus actuaciones':'las de tu hotel') : 'toda la cadena';
-    box.innerHTML=`<div class="box"><h3>🗓️ Agenda de actuaciones</h3><div class="hint">${bk.length} actuaciones · ${scopeTxt}</div>
-      <table><thead><tr><th>Fecha</th><th>Show</th><th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th></tr></thead><tbody>
-      ${bk.map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td><td class="muted">${esc(b.venue_name||'—')}</td>
-        <td>${MXN(b.agreed_price)}</td><td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td></tr>`).join("")}
-      </tbody></table></div>`;
+    const months=[...new Set(bk.map(b=>(b.starts_at||'').slice(0,7)).filter(Boolean))].sort();
+    const mlabel=k=>{const[y,m]=k.split('-');return _cap(new Date(y,m-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'}));};
+    box.innerHTML=`<div class="box"><h3>🗓️ Agenda de actuaciones</h3>
+      <div class="hint" id="ag_scope">${bk.length} actuaciones · ${scopeTxt}</div>
+      <div class="filters" style="margin:14px 0 6px"><div class="agfilt">
+        <div class="field"><label>Mes</label><select id="ag_month" onchange="agendaMonthPick()"><option value="">Todos los meses</option>${months.map(k=>`<option value="${k}">${mlabel(k)}</option>`).join('')}</select></div>
+        <div class="field"><label>Desde</label><input type="date" id="ag_from" onchange="renderAgenda(true)"></div>
+        <div class="field"><label>Hasta</label><input type="date" id="ag_to" onchange="renderAgenda(true)"></div>
+        <div class="field"><label>Estado</label><select id="ag_status" onchange="renderAgenda()"><option value="">Todos</option><option value="pending">Pendiente</option><option value="confirmed">Confirmada</option><option value="completed">Realizada</option><option value="cancelled">Cancelada</option></select></div>
+        <button class="btn ghost" onclick="agendaReset()">Limpiar</button>
+      </div></div>
+      <table><thead><tr><th>Fecha</th><th>Show</th><th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th></tr></thead>
+      <tbody id="ag_body"></tbody></table></div>`;
+    renderAgenda();
   },
 
   async reqs(box){
