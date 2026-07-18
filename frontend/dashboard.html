@@ -303,6 +303,10 @@
   .mcard .mt{color:var(--mut);font-size:10px;display:flex;justify-content:space-between;gap:6px}
   .mcard .mwho{color:var(--mut);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
   .mcard.dragging{opacity:.35}
+  /* "X" to remove a booking (musician) from the board — like the venue X */
+  .mcard .mx{position:absolute;top:4px;right:5px;width:15px;height:15px;border-radius:50%;border:0;background:rgba(24,28,52,.10);color:var(--mut);font-size:10px;line-height:1;cursor:pointer;display:none;place-items:center;padding:0;z-index:2}
+  .mcard:hover .mx{display:grid} .mcard:hover .mdot{opacity:0}
+  .mcard .mx:hover{background:var(--bad);color:#fff}
   /* Budget donut */
   .donutwrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
   .donut{width:132px;height:132px;border-radius:50%;flex:none;display:grid;place-items:center;position:relative}
@@ -343,7 +347,7 @@
   .mtabs button.on{background:var(--card);color:var(--txt);box-shadow:0 1px 3px rgba(24,28,52,.1)}
   .addvenue{border:1px dashed var(--acc);color:var(--acc);background:#382ca10d;border-radius:9px;height:30px;padding:0 12px;font-weight:600;font-size:12.5px;cursor:pointer}
   /* split: maestro (wide) + right column */
-  .splitH{display:grid;grid-template-columns:1.75fr 1fr;gap:16px;align-items:start}
+  .splitH{display:grid;grid-template-columns:2.7fr 1fr;gap:16px;align-items:start}
   @media(max-width:1100px){.splitH{grid-template-columns:1fr}}
   .rcol{display:flex;flex-direction:column;gap:16px}
   /* sugerencias de IA */
@@ -1097,8 +1101,10 @@ function maestroCard(b,vi){
   const fixed=['completed','cancelled'].includes(b.status);
   const th=cellTheme(vi);
   const who=b.artist_name&&b.artist_name!==b.show_name?b.artist_name:'';
+  const nm=(b.show_name||b.artist_name||'Actuación').replace(/'/g,"\\'");
   return `<div class="mcard ${b.status}${fixed?' fixed':''}" ${fixed?'':'draggable="true"'} data-bid="${b.id}" data-vid="${b.venue_id||''}" style="--mc-bg:${th.bg};--mc-bd:${th.bd}">
     <span class="mdot"></span>
+    <button class="mx" title="Quitar del calendario" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();delBooking(${b.id},'${nm}')">✕</button>
     <b>${esc(b.show_name||b.artist_name||'Actuación')}</b>
     <div class="mt"><span>${hh}</span><span>${b.agreed_price?MXN(b.agreed_price):''}</span></div>
     ${who?`<div class="mwho">${esc(who)}</div>`:''}</div>`;
@@ -1167,6 +1173,15 @@ async function delVenue(id,name,count){
     bk.forEach(b=>{ if((b.venue_id||0)===id){ b.venue_id=null; b.venue_name=null; } });
     renderMaestro();
     toast('Venue eliminado ✓');
+  }catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
+}
+async function delBooking(id,name){
+  if(!confirm(`¿Quitar "${name}" del calendario?\n\nSe eliminará esta actuación del tablero.`)) return;
+  try{
+    await del('/bookings/'+id);
+    CACHE.homeBk=(CACHE.homeBk||[]).filter(b=>b.id!==id);
+    renderMaestro();
+    toast('Actuación eliminada ✓');
   }catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
 }
 
