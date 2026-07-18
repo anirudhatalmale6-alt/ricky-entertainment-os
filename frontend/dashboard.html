@@ -1414,7 +1414,7 @@ function updateBudgetKpi(){
   const set=(id,html)=>{const e=document.getElementById(id); if(e) e.innerHTML=html;};
   usadoV.textContent=MXN(usado);
   set('kUsadoD', budget>0?'de '+MXN(budget):'sin presupuesto cargado');
-  set('kUsadoBar', budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto anual</div>`:'');
+  set('kUsadoBar', budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto del mes</div>`:'');
   set('kAhorroV', budget>0?MXN(Math.abs(ahorro)):'—');
   set('kAhorroD', budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—');
   set('budgetMini', budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>');
@@ -1615,14 +1615,32 @@ async function openArtistProfile(artistId){
       ${videos.length?`<div class="apsec"><h4>Videos</h4><div class="socrow">${videos.map(v=>`<a class="socpill vid" href="${esc(v.url)}" target="_blank" rel="noopener">▶ ${esc(v.name)}</a>`).join('')}</div></div>`:''}
       ${photos.length>1?`<div class="apsec"><h4>Fotos</h4><div class="apgal">${photos.slice(0,12).map(u=>`<div class="apthumb" style="background-image:url('${esc(u)}')"></div>`).join('')}</div></div>`:''}
       ${shows.length?`<div class="apsec"><h4>Shows publicados</h4>${shows.map(s=>`<div class="apshow"><div class="apsh-t"><b>${esc(s.show_name)}</b>${s.price_hotel?`<span class="apsh-p">${MXN(s.price_hotel)}</span>`:''}</div><div class="muted" style="font-size:12px">${esc(pretty(s.category))}${s.subcategory?' · '+esc(pretty(s.subcategory)):''}${s.duration_minutes?' · '+s.duration_minutes+' min':''}</div>${s.description?`<div style="font-size:12.5px;margin-top:4px">${esc(s.description)}</div>`:''}</div>`).join('')}</div>`:''}
-      ${(a.phone||a.email)?`<div class="apsec"><h4>Contacto</h4><div class="muted" style="font-size:13px">${a.phone?'📞 '+esc(a.phone):''}${a.phone&&a.email?' · ':''}${a.email?'✉ '+esc(a.email):''}</div></div>`:''}
       ${(!a.bio&&!socLinks.length&&!videos.length&&photos.length<=1&&!shows.length)?'<div class="muted" style="padding:20px;text-align:center">Este artista aún no ha completado su perfil.</div>':''}
     </div>
-    <div class="af"><button class="btn ghost" onclick="apClose()">Cerrar</button><button class="ago" onclick="apContact('${esc((a.stage_name||'').replace(/'/g,''))}')">Enviar interés</button></div>
+    <div class="af"><button class="btn ghost" onclick="apClose()">Cerrar</button><button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button></div>
   </div>`;
 }
 function apClose(){ const ov=document.getElementById('apMov'); if(ov) ov.style.display='none'; }
-function apContact(name){ apClose(); suggAsignar(name); }
+// Toda la comunicación se queda dentro de la plataforma: abre (o reutiliza) el chat con el artista.
+async function anyCompanyId(){
+  if(ME && ME.company_id) return ME.company_id;
+  try{ const d=await api(`/groups/${GID}/dashboard`); return (d.properties&&d.properties[0]&&d.properties[0].id)||null; }catch(e){ return null; }
+}
+async function apMessage(artistId){
+  if(!artistId){ toast('Artista no válido.',true); return; }
+  const btn=document.querySelector('#apMov .af .ago'); if(btn){ btn.disabled=true; btn.textContent='Abriendo chat…'; }
+  try{
+    const cid=await anyCompanyId();
+    if(!cid){ toast('No hay un hotel asociado para iniciar el chat.',true); if(btn){btn.disabled=false;btn.textContent='Mandar mensaje';} return; }
+    const conv=await post('/conversations',{artist_id:artistId,company_id:cid});
+    apClose();
+    await show('chat',true);
+    if(conv&&conv.id) openConv(conv.id);
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent='Mandar mensaje'; }
+    toast('No se pudo abrir el chat: '+(e.message||''),true);
+  }
+}
 /* ---- Agenda de actuaciones: filtro por mes + rango de fechas + estado ---- */
 function agendaMonthPick(){
   // Choosing a month clears the manual date range so the two don't fight each other.
@@ -1797,12 +1815,13 @@ const RENDER = {
     // KPIs and the Calendario Maestro stay in sync — no "phantom" acts in an absent venue.
     const bk   = (await api(`/bookings?group_id=${GID}`)).filter(b=>!(b.venue_id && !b.venue_name));
     const reqs = await api(`/requests?status=open`);
-    // Presupuesto total = suma de TODOS los meses cargados de todas las propiedades
-    // del grupo (no solo el mes en curso), para que sume al cargar datos nuevos.
+    // El Dashboard muestra el presupuesto del MES EN CURSO únicamente (David 2026-07-18);
+    // el histórico completo de todos los meses vive en la pantalla Presupuesto.
     const gb   = await loadGroupBudgets();
     let AMAP={}; try{ (await api('/artists')||[]).forEach(a=>{AMAP[a.id]=a.stage_name;}); }catch(e){}
     const num = x => +x||0; const avg = a => a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
-    const budget = gb.total;
+    const budget = gb.rows.filter(r=>+r.year===PERIOD.year && +r.month===PERIOD.month)
+                          .reduce((a,r)=>a+(+r.entertainment_budget||0),0);
     const gastado = bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
     // "comprometido" = todo lo agendado que aún no se realiza (confirmadas + pendientes),
     // para que el Presupuesto utilizado se mueva en cuanto agregas o quitas actuaciones.
@@ -1838,7 +1857,7 @@ const RENDER = {
         <div class="kpi"><div class="kh"><div><div class="k">Actuaciones esta semana</div><div class="v" id="kpiWeekVal">0</div></div><div class="kc violet">🗓️</div></div>
           <div class="kbreak" id="kpiWeekBreak"></div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Presupuesto utilizado</div><div class="v" id="kUsadoV">${MXN(usado)}</div><div class="d" id="kUsadoD">${budget>0?'de '+MXN(budget):'sin presupuesto cargado'}</div></div><div class="kc green">💲</div></div>
-          <div id="kUsadoBar">${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto anual</div>`:''}</div></div>
+          <div id="kUsadoBar">${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto del mes</div>`:''}</div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Satisfacción media</div><div class="v">${sat5!=null?sat5.toFixed(1)+' / 5':'—'}</div></div><div class="kc blue">🙂</div></div>
           <div class="kstars">${sat5!=null?starRow(sat5):'☆☆☆☆☆'}<small>según asistencia real</small></div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Ahorro vs presupuesto</div><div class="v" id="kAhorroV">${budget>0?MXN(Math.abs(ahorro)):'—'}</div></div><div class="kc amber">📊</div></div>
