@@ -292,6 +292,14 @@
   .amod .af .fld input{border:1px solid var(--line);background:var(--inp);border-radius:9px;padding:8px 10px;font-size:13px;color:var(--txt);width:100px}
   .amod .af .ago{margin-left:auto;background:var(--grad);border:0;color:#fff;font-weight:650;font-size:13px;padding:10px 18px;border-radius:10px;cursor:pointer}
   .amod .af .ago:disabled{opacity:.45;cursor:not-allowed}
+  /* Form modals (crear solicitud / cargar presupuesto) + section headers */
+  .amod.rqmod{max-width:540px}
+  .amod .rqbody{padding:16px 18px 4px;overflow-y:auto}
+  .amod .rqbody .hint{margin:2px 0 12px}
+  .amod.rqmod .af{justify-content:flex-end}
+  .rqhead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+  .tx{background:var(--ov);border:0;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;color:var(--mut);line-height:1}
+  .tx:hover{background:var(--bad);color:#fff}
   .mcard{position:relative;background:var(--mc-bg,var(--card));border:1px solid rgba(24,28,52,.06);border-left:4px solid var(--mc-bd,var(--acc));border-radius:7px;padding:6px 7px 6px 9px;font-size:11px;cursor:grab;box-shadow:0 1px 2px rgba(24,28,52,.05);user-select:none}
   .mcard:hover{box-shadow:0 4px 12px rgba(56,44,161,.16)}
   .mcard.completed{opacity:.74} .mcard.cancelled{opacity:.5}
@@ -743,6 +751,10 @@ async function post(path,body){
   const r = await fetch(API+path,{method:"POST",headers:{Authorization:"Bearer "+TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body||{})});
   if(!r.ok) throw new Error(path+" "+r.status); return r.json();
 }
+async function put(path,body){
+  const r = await fetch(API+path,{method:"PUT",headers:{Authorization:"Bearer "+TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  if(!r.ok) throw new Error(path+" "+r.status); return r.json();
+}
 
 const val = id => (document.getElementById(id).value||"").trim();
 function authTab(t){
@@ -1147,7 +1159,7 @@ function renderMaestro(){
     });
   });
   if(!venues.length) html+=`<div style="grid-column:1/-1;padding:26px;text-align:center" class="muted">Aún no hay actuaciones programadas en esta cadena.</div>`;
-  grid.innerHTML=html; wireMaestroDnD(); updateWeekKpi(); updateNotifyBtn();
+  grid.innerHTML=html; wireMaestroDnD(); updateWeekKpi(); updateBudgetKpi(); updateNotifyBtn();
   const lbl=document.getElementById('maestroWeek');
   if(lbl){ const e=days[6]; lbl.textContent=`${mon.getDate()} ${mon.toLocaleDateString('es-MX',{month:'short'})} – ${e.getDate()} ${e.toLocaleDateString('es-MX',{month:'short'})}`; }
 }
@@ -1364,9 +1376,131 @@ function updateWeekKpi(){
     +`<span><i style="background:var(--warn)"></i>${c('pending')} Pendientes</span>`
     +`<span><i style="background:var(--bad)"></i>${c('cancelled')} Canceladas</span>`;
 }
+// "Presupuesto utilizado" / "Ahorro" / donut — recomputados en vivo desde el
+// calendario, así se mueven en cuanto agregas, mueves o quitas actuaciones.
+function updateBudgetKpi(){
+  const usadoV=document.getElementById('kUsadoV'); if(!usadoV) return;   // sólo en el Dashboard
+  const bk=CACHE.homeBk||[]; const budget=+CACHE.homeBudget||0; const num=x=>+x||0;
+  const gastado=bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
+  const comprometido=bk.filter(b=>b.status==='confirmed'||b.status==='pending').reduce((a,b)=>a+num(b.agreed_price),0);
+  const usado=gastado+comprometido;
+  const disponible=Math.max(0,budget-usado);
+  const ahorro=budget-usado;
+  const usadoPct=budget>0?Math.round(usado/budget*100):0;
+  const ahorroPct=budget>0?Math.round(ahorro/budget*100):0;
+  const set=(id,html)=>{const e=document.getElementById(id); if(e) e.innerHTML=html;};
+  usadoV.textContent=MXN(usado);
+  set('kUsadoD', budget>0?'de '+MXN(budget):'sin presupuesto cargado');
+  set('kUsadoBar', budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto anual</div>`:'');
+  set('kAhorroV', budget>0?MXN(Math.abs(ahorro)):'—');
+  set('kAhorroD', budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—');
+  set('budgetMini', budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>');
+}
 const starRow = v => { const f=Math.round(v||0); let s=''; for(let i=1;i<=5;i++) s+=(i<=f?'★':'☆'); return s; };
 function suggAsignar(name){ toast('Le enviaremos tu interés a '+(name||'este artista')+' ✓'); }
 function qtool(label){ toast(label+' — módulo en preparación'); }
+
+/* ---- Crear solicitud (desde la pantalla Solicitudes) ---- */
+async function openReqForm(){
+  let tax=CACHE.tax; if(!tax){ try{ tax=await api('/artists/taxonomy'); CACHE.tax=tax; }catch(e){ tax={}; } }
+  let comps=[]; try{ if(GID){ const d=await api(`/groups/${GID}/dashboard`); comps=d.properties||[]; } }catch(e){}
+  const cats=Object.keys(tax||{});
+  let ov=document.getElementById('reqMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='reqMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) reqClose(); }); }
+  ov.innerHTML=`<div class="amod rqmod" style="position:relative">
+    <button class="ax" onclick="reqClose()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Crear solicitud</b><span class="as">Describe el talento que buscas y recibe propuestas</span></div>
+    <div class="rqbody">
+      <div class="field"><label>Título *</label><input id="rq_title" placeholder="p. ej. Banda de jazz para noche de gala"></div>
+      ${comps.length?`<div class="field"><label>Hotel solicitante</label><select id="rq_comp"><option value="">— Selecciona —</option>${comps.map(c=>`<option value="${c.id}">${esc(c.name)}${c.city?' · '+esc(c.city):''}</option>`).join('')}</select></div>`:''}
+      <div class="fgrid">
+        <div class="field"><label>Categoría</label><select id="rq_cat" onchange="fillSub('rq_cat','rq_sub')"><option value="">Cualquiera</option>${cats.map(c=>`<option value="${esc(c)}">${esc(pretty(c))}</option>`).join('')}</select></div>
+        <div class="field"><label>Subcategoría</label><select id="rq_sub"><option value="">Cualquiera</option></select></div>
+      </div>
+      <div class="fgrid">
+        <div class="field"><label>Ciudad</label><input id="rq_city" placeholder="Ciudad del evento"></div>
+        <div class="field"><label>Fecha del evento</label><input id="rq_date" type="date"></div>
+      </div>
+      <div class="fgrid">
+        <div class="field"><label>Presupuesto mín. (MXN)</label><input id="rq_bmin" type="number" min="0" step="500" placeholder="Opcional"></div>
+        <div class="field"><label>Presupuesto máx. (MXN)</label><input id="rq_bmax" type="number" min="0" step="500" placeholder="Opcional"></div>
+      </div>
+      <div class="field"><label>Descripción</label><textarea id="rq_desc" placeholder="Detalles del evento, horario, requisitos…"></textarea></div>
+    </div>
+    <div class="af"><button class="ago" id="rq_go" onclick="submitReq(this)">Publicar solicitud</button></div>
+  </div>`;
+  ov.style.display='flex';
+  fillSub('rq_cat','rq_sub');
+}
+function reqClose(){ const ov=document.getElementById('reqMov'); if(ov) ov.style.display='none'; }
+async function submitReq(btn){
+  const g=id=>document.getElementById(id);
+  const title=(g('rq_title').value||'').trim();
+  if(!title){ toast('Ponle un título a la solicitud.',true); return; }
+  const body={ title, currency:'MXN',
+    description:(g('rq_desc').value||'').trim()||null,
+    category:g('rq_cat').value||null,
+    subcategory:g('rq_sub').value||null,
+    city:(g('rq_city').value||'').trim()||null };
+  const comp=g('rq_comp'); if(comp&&comp.value) body.company_id=+comp.value;
+  const dt=g('rq_date').value; if(dt) body.event_date=dt+'T20:00:00';
+  const bmin=g('rq_bmin').value, bmax=g('rq_bmax').value;
+  if(bmin!=='') body.budget_min=+bmin;
+  if(bmax!=='') body.budget_max=+bmax;
+  if(body.budget_min!=null&&body.budget_max!=null&&body.budget_max<body.budget_min){ toast('El presupuesto máximo debe ser mayor o igual al mínimo.',true); return; }
+  btn.disabled=true; btn.textContent='Publicando…';
+  try{ await post('/requests',body); reqClose(); toast('Solicitud publicada ✓'); show('reqs',true); }
+  catch(e){ btn.disabled=false; btn.textContent='Publicar solicitud'; toast('No se pudo publicar: '+(e.message||''),true); }
+}
+
+/* ---- Cargar presupuesto mensual (perfil de presupuesto) ---- */
+const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function openBudgetForm(){
+  const comps=CACHE.budgetComps||[];
+  if(!comps.length){ toast('Primero registra una propiedad en tu cadena.',true); return; }
+  let ov=document.getElementById('budMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='budMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) budClose(); }); }
+  ov.innerHTML=`<div class="amod rqmod" style="position:relative">
+    <button class="ax" onclick="budClose()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Cargar presupuesto</b><span class="as">Presupuesto de entretenimiento y ocupación del mes</span></div>
+    <div class="rqbody">
+      <div class="field"><label>Propiedad *</label><select id="bd_comp">${comps.map(c=>`<option value="${c.id}">${esc(c.name)}${c.rooms?' · '+c.rooms+' hab':''}</option>`).join('')}</select></div>
+      <div class="fgrid">
+        <div class="field"><label>Año *</label><input id="bd_year" type="number" min="2000" max="2100" value="${PERIOD.year}"></div>
+        <div class="field"><label>Mes *</label><select id="bd_month">${MESES.map((m,i)=>`<option value="${i+1}"${i+1===PERIOD.month?' selected':''}>${m}</option>`).join('')}</select></div>
+      </div>
+      <div class="fgrid">
+        <div class="field"><label>Presupuesto (MXN) *</label><input id="bd_amt" type="number" min="0" step="1000" placeholder="p. ej. 120000"></div>
+        <div class="field"><label>Ocupación (%)</label><input id="bd_occ" type="number" min="0" max="100" step="1" placeholder="0 – 100"></div>
+      </div>
+      <div class="field"><label>Notas</label><textarea id="bd_notes" placeholder="Opcional"></textarea></div>
+      <div class="hint">Las habitaciones se toman del perfil de cada hotel; con la ocupación calculamos el gasto por habitación y el histórico.</div>
+    </div>
+    <div class="af"><button class="ago" id="bd_go" onclick="submitBudget(this)">Guardar</button></div>
+  </div>`;
+  ov.style.display='flex';
+}
+function budClose(){ const ov=document.getElementById('budMov'); if(ov) ov.style.display='none'; }
+async function submitBudget(btn){
+  const g=id=>document.getElementById(id);
+  const cid=+g('bd_comp').value;
+  const amt=g('bd_amt').value;
+  if(!cid){ toast('Elige una propiedad.',true); return; }
+  if(amt===''||+amt<0){ toast('Ingresa el presupuesto.',true); return; }
+  const body={ year:+g('bd_year').value, month:+g('bd_month').value, entertainment_budget:+amt, currency:'MXN' };
+  const occ=g('bd_occ').value; if(occ!=='') body.occupancy_pct=+occ;
+  const notes=(g('bd_notes').value||'').trim(); if(notes) body.notes=notes;
+  btn.disabled=true; btn.textContent='Guardando…';
+  try{ await put(`/companies/${cid}/budgets`,body); budClose(); toast('Presupuesto cargado ✓'); show('budget',true); }
+  catch(e){ btn.disabled=false; btn.textContent='Guardar'; toast('No se pudo guardar: '+(e.message||''),true); }
+}
+async function delBudget(id){
+  if(!confirm('¿Eliminar este presupuesto cargado?')) return;
+  try{ await del('/companies/budgets/'+id); toast('Presupuesto eliminado ✓'); show('budget',true); }
+  catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
+}
 /* ---- Buscar Artistas (screen 4) ---- */
 let AF={cat:''};
 function artGrad(cat){ const c=CATCOL[cat]||'#382ca1'; return `linear-gradient(135deg,${c},#8b5cf6)`; }
@@ -1580,7 +1714,9 @@ const RENDER = {
     const num = x => +x||0; const avg = a => a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
     const budget = num(mkt.total_entertainment_budget);
     const gastado = bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
-    const comprometido = bk.filter(b=>b.status==='confirmed').reduce((a,b)=>a+num(b.agreed_price),0);
+    // "comprometido" = todo lo agendado que aún no se realiza (confirmadas + pendientes),
+    // para que el Presupuesto utilizado se mueva en cuanto agregas o quitas actuaciones.
+    const comprometido = bk.filter(b=>b.status==='confirmed'||b.status==='pending').reduce((a,b)=>a+num(b.agreed_price),0);
     const usado = gastado+comprometido;
     const disponible = Math.max(0, budget-usado);
     const ahorro = budget-usado;
@@ -1606,17 +1742,17 @@ const RENDER = {
     // Default the Maestro to the busiest week so the grid lands populated.
     const wc={}; bk.forEach(b=>{const k=ymd(mondayOf(new Date(b.starts_at)));wc[k]=(wc[k]||0)+1;});
     let bestW=null,bestN=-1; for(const k in wc){ if(wc[k]>bestN){bestN=wc[k];bestW=k;} }
-    CACHE.homeBk = bk; if(!MAESTRO_REF) MAESTRO_REF = bestW? new Date(bestW+'T00:00:00') : new Date();
+    CACHE.homeBk = bk; CACHE.homeBudget = budget; if(!MAESTRO_REF) MAESTRO_REF = bestW? new Date(bestW+'T00:00:00') : new Date();
     box.innerHTML=`
       <div class="kpis">
         <div class="kpi"><div class="kh"><div><div class="k">Actuaciones esta semana</div><div class="v" id="kpiWeekVal">0</div></div><div class="kc violet">🗓️</div></div>
           <div class="kbreak" id="kpiWeekBreak"></div></div>
-        <div class="kpi"><div class="kh"><div><div class="k">Presupuesto utilizado</div><div class="v">${MXN(usado)}</div><div class="d">${budget>0?'de '+MXN(budget):'sin presupuesto cargado'}</div></div><div class="kc green">💲</div></div>
-          ${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto anual</div>`:''}</div>
+        <div class="kpi"><div class="kh"><div><div class="k">Presupuesto utilizado</div><div class="v" id="kUsadoV">${MXN(usado)}</div><div class="d" id="kUsadoD">${budget>0?'de '+MXN(budget):'sin presupuesto cargado'}</div></div><div class="kc green">💲</div></div>
+          <div id="kUsadoBar">${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto anual</div>`:''}</div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Satisfacción media</div><div class="v">${sat5!=null?sat5.toFixed(1)+' / 5':'—'}</div></div><div class="kc blue">🙂</div></div>
           <div class="kstars">${sat5!=null?starRow(sat5):'☆☆☆☆☆'}<small>según asistencia real</small></div></div>
-        <div class="kpi"><div class="kh"><div><div class="k">Ahorro vs presupuesto</div><div class="v">${budget>0?MXN(Math.abs(ahorro)):'—'}</div></div><div class="kc amber">📊</div></div>
-          <div class="d" style="margin-top:8px">${budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—'}</div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Ahorro vs presupuesto</div><div class="v" id="kAhorroV">${budget>0?MXN(Math.abs(ahorro)):'—'}</div></div><div class="kc amber">📊</div></div>
+          <div class="d" style="margin-top:8px" id="kAhorroD">${budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—'}</div></div>
       </div>
       <div class="splitH">
         <div class="box">
@@ -1649,7 +1785,7 @@ const RENDER = {
       </div>
       <div class="grid4">
         <div class="box"><div class="bhead"><h3 style="margin:0">Presupuesto</h3><a onclick="show('budget')">Ver detalle</a></div>
-          ${budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>'}</div>
+          <div id="budgetMini">${budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>'}</div></div>
         <div class="box"><div class="bhead"><h3 style="margin:0">Top Artistas</h3><a onclick="show('reports')">Ver todas</a></div>
           ${topArt.length? topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} actuación${a.count===1?'':'es'}</span></div><b>${MXN(a.sum)}</b></div>`).join('') : '<div class="muted">Sin datos aún.</div>'}</div>
         <div class="box"><div class="bhead"><h3 style="margin:0">Facturación</h3><a onclick="show('bill')">Ver facturas</a></div>
@@ -1707,8 +1843,8 @@ const RENDER = {
             ${cats.map(([c,n])=>`<div class="catrow" data-cat="${esc(c)}" onclick="pickArtCat('${esc(c)}')">${esc(pretty(c))}<span>${n}</span></div>`).join('')}
           </div>
           <div class="catbox"><h4>¿No encuentras lo que buscas?</h4>
-            <div class="hint" style="margin-bottom:11px">Cuéntanos qué necesitas y nuestro equipo te ayuda a encontrar el talento ideal.</div>
-            <button class="btn" style="width:100%" onclick="show('reqs')">＋ Crear solicitud</button></div>
+            <div class="hint" style="margin-bottom:11px">Cuéntanos qué necesitas en Solicitudes y los artistas te envían propuestas.</div>
+            <button class="btn ghost" style="width:100%" onclick="show('reqs')">Ir a Solicitudes →</button></div>
         </div>
       </div>`;
     applyArtistFilters();
@@ -1718,10 +1854,17 @@ const RENDER = {
     const bk    = await api(`/bookings?group_id=${GID}`);
     const mkt   = await api(`/intelligence/market?year=${PERIOD.year}&month=${PERIOD.month}&group_id=${GID}`);
     const shows = await api('/shows');
+    // Propiedades de la cadena + presupuestos cargados (para la carga manual + histórico).
+    let comps=[]; try{ comps=(await api('/companies')||[]).filter(c=>!GID||c.group_id===GID); }catch(e){}
+    CACHE.budgetComps=comps;
+    let brows=[];
+    for(const c of comps){ try{ const bs=await api(`/companies/${c.id}/budgets`); (bs||[]).forEach(b=>brows.push({...b,company_name:c.name,city:c.city,rooms:c.rooms})); }catch(e){} }
+    brows.sort((a,b)=> (b.year-a.year)||(b.month-a.month)||(a.company_name||'').localeCompare(b.company_name||''));
     const num=x=>+x||0; const scat={}; (shows||[]).forEach(s=>{scat[s.id]=s.category;});
     const budget=num(mkt.total_entertainment_budget);
     const gastado=bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
-    const comprometido=bk.filter(b=>b.status==='confirmed').reduce((a,b)=>a+num(b.agreed_price),0);
+    // igual que el Dashboard: comprometido = agendado no realizado (confirmadas + pendientes)
+    const comprometido=bk.filter(b=>b.status==='confirmed'||b.status==='pending').reduce((a,b)=>a+num(b.agreed_price),0);
     const usado=gastado+comprometido; const disp=Math.max(0,budget-usado);
     const usadoPct=budget>0?Math.round(usado/budget*100):0;
     const inv=bk.filter(b=>['completed','confirmed'].includes(b.status));
@@ -1740,6 +1883,19 @@ const RENDER = {
         <div class="kpi"><div class="kh"><div><div class="k">Utilizado (realizado)</div><div class="v">${MXN(gastado)}</div><div class="d">${budget>0?Math.round(gastado/budget*100):0}% del anual</div></div><div class="kc green">✅</div></div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Comprometido</div><div class="v">${MXN(comprometido)}</div><div class="d">${budget>0?Math.round(comprometido/budget*100):0}% del anual</div></div><div class="kc amber">⏳</div></div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Disponible</div><div class="v">${MXN(disp)}</div><div class="d">${budget>0?Math.round(disp/budget*100):0}% del anual</div></div><div class="kc blue">📊</div></div></div>
+      </div>
+      <div class="box" style="margin-bottom:16px">
+        <div class="bhead"><div><h3 style="margin:0">Perfil de presupuesto</h3><span class="hint" style="margin:0">Carga, mes a mes, el presupuesto de entretenimiento y la ocupación de cada propiedad. Alimenta el gasto por habitación y el histórico.</span></div><button class="btn" onclick="openBudgetForm()">＋ Cargar presupuesto</button></div>
+        <div class="bmatrix" style="margin-top:12px"><table><thead><tr><th>Propiedad</th><th>Periodo</th><th>Presupuesto</th><th>Ocupación</th><th>$/hab est.</th><th></th></tr></thead><tbody>
+          ${brows.length? brows.map(b=>`<tr>
+            <td>${esc(b.company_name)}</td>
+            <td>${MESES[b.month-1]||b.month} ${b.year}</td>
+            <td style="font-weight:650">${MXN(b.entertainment_budget)}</td>
+            <td class="muted">${b.occupancy_pct!=null?(+b.occupancy_pct).toFixed(0)+'%':'—'}</td>
+            <td class="muted">${b.rooms?MXN(b.entertainment_budget/b.rooms):'—'}</td>
+            <td style="text-align:right"><button class="tx" title="Eliminar" onclick="delBudget(${b.id})">✕</button></td>
+          </tr>`).join('') : `<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">Aún no hay presupuestos cargados. Pulsa "Cargar presupuesto" para empezar el histórico.</td></tr>`}
+        </tbody></table></div>
       </div>
       <div class="box" style="margin-bottom:16px">
         <div class="bhead"><h3 style="margin:0">Presupuesto por categoría y mes</h3><span class="hint" style="margin:0">Gasto real (comprometido + realizado) · ${PERIOD.year}</span></div>
@@ -1822,13 +1978,18 @@ const RENDER = {
 
   async reqs(box){
     const rs = await api(`/requests`);
-    box.innerHTML=`<div class="reqs">${rs.map(r=>`
+    box.innerHTML=`
+      <div class="rqhead">
+        <div><h3 style="margin:0">Solicitudes</h3><div class="hint" style="margin:0">Publica lo que necesitas y recibe propuestas de artistas.</div></div>
+        ${ME.artist_id?'':`<button class="btn" onclick="openReqForm()">＋ Crear solicitud</button>`}
+      </div>
+      <div class="reqs">${rs.map(r=>`
       <div class="reqc"><div class="t">${esc(r.title)}</div>
         <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
         <div class="meta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
         <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
         <div class="ft">${chip(r.status)}<span class="muted">${r.proposals_count} propuesta${r.proposals_count===1?'':'s'}</span></div>
-      </div>`).join("") || '<div class="muted">Sin solicitudes.</div>'}</div>`;
+      </div>`).join("") || '<div class="muted">Aún no hay solicitudes. Pulsa "Crear solicitud" para publicar la primera.</div>'}</div>`;
   },
 
   async bill(box){
