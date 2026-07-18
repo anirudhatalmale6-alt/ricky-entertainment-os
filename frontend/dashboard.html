@@ -160,6 +160,22 @@
   .spchip{padding:6px 12px;border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--txt);font-size:12.5px;cursor:pointer;transition:.12s}
   .spchip:hover{border-color:var(--acc2)}
   .spchip.on{background:var(--grad);color:#fff;border-color:transparent}
+  /* solicitud detail + proposals */
+  .reqc{cursor:pointer;transition:.12s}
+  .reqc:hover{border-color:var(--acc2);box-shadow:0 6px 18px rgba(56,44,161,.12)}
+  .rddet{background:var(--ov);border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:16px}
+  .rddet .rdmeta{font-size:12.5px;color:var(--mut);margin:3px 0}
+  .rddet .spc{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 2px}
+  .rddet .spc span{font-size:11px;padding:2px 9px;border-radius:20px;background:var(--card);color:var(--acc);border:1px solid var(--line);font-weight:600}
+  .rdrest{font-size:13px;line-height:1.5;margin-top:9px;padding-top:9px;border-top:1px solid var(--line);white-space:pre-line}
+  .prow{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:10px;background:var(--card)}
+  .prow-h{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .plink{background:none;border:0;padding:0;font-weight:650;font-size:13.5px;color:var(--acc);cursor:pointer;text-decoration:underline}
+  .pprice{margin-left:auto;font-weight:700;font-size:13.5px}
+  .pmsg{font-size:13px;line-height:1.5;color:var(--txt);margin-top:7px;white-space:pre-line}
+  .prow-a{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+  .btn.sm{padding:6px 13px;font-size:12px;border-radius:8px}
+  .pmine{font-size:12.5px;color:var(--mut);margin-bottom:10px}
 
   /* chat */
   .chat{display:grid;grid-template-columns:280px 1fr;gap:0;height:560px;background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden;box-shadow:var(--shadow)}
@@ -1778,6 +1794,102 @@ async function apMessage(artistId){
     toast('No se pudo abrir el chat: '+(e.message||''),true);
   }
 }
+/* ---- Detalle de solicitud + propuestas ---- */
+function propChip(s){const m={pending:['c-pending','Pendiente'],accepted:['c-completed','Aceptada'],rejected:['c-cancelled','Descartada'],withdrawn:['c-cancelled','Retirada']};const x=m[s]||['c-pending',s];return `<span class="chip ${x[0]}">${x[1]}</span>`;}
+let RD_ID=null;
+async function openReqDetail(id){
+  RD_ID=id;
+  let ov=document.getElementById('rdMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='rdMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) rdClose(); }); }
+  ov.innerHTML=`<div class="amod rqmod" style="position:relative"><button class="ax" onclick="rdClose()">✕</button><div class="rqbody"><div class="muted" style="padding:40px;text-align:center">Cargando…</div></div></div>`;
+  ov.style.display='flex';
+  await rdRender();
+}
+function rdClose(){ const ov=document.getElementById('rdMov'); if(ov) ov.style.display='none'; RD_ID=null; }
+async function rdRender(){
+  const ov=document.getElementById('rdMov'); if(!ov||!RD_ID) return;
+  let r={}, props=[];
+  try{ r=await api('/requests/'+RD_ID); }catch(e){}
+  try{ props=(await api('/requests/'+RD_ID+'/proposals'))||[]; }catch(e){}
+  const meta=parseMeta(r.description);
+  const isArtist=!!ME.artist_id;
+  const open = r.status==='open';
+  const det=`<div class="rddet">
+      <div class="rdmeta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
+      <div class="rdmeta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
+      <div class="rdmeta">📅 ${r.event_date?fmtDate(r.event_date):'Fecha por definir'}</div>
+      <div class="rdmeta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
+      ${meta.loc.length?`<div class="spc">🎪 ${meta.loc.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`:''}
+      ${meta.size?`<div class="spc">👥 <span>${esc(meta.size)}</span></div>`:''}
+      ${meta.rest?`<div class="rdrest">${esc(meta.rest)}</div>`:''}
+    </div>`;
+  const body = det + (isArtist ? rdArtistSection(r, props.find(p=>p.artist_id===ME.artist_id), open) : rdHotelSection(r, props, open));
+  ov.querySelector('.amod').innerHTML=`<button class="ax" onclick="rdClose()" aria-label="Cerrar">✕</button>
+    <div class="ah" style="padding:18px 20px 6px"><b>${esc(r.title||'Solicitud')}</b> ${chip(r.status)}</div>
+    <div class="rqbody">${body}</div>
+    <div class="af"><button class="btn ghost" onclick="rdClose()">Cerrar</button></div>`;
+}
+function rdHotelSection(r, props, open){
+  if(!props.length) return `<div class="apsec"><h4>Propuestas recibidas</h4><div class="muted" style="padding:8px 0">Aún no hay propuestas. Cuando un artista responda, aparecerá aquí.</div></div>`;
+  const rows=props.map(p=>`<div class="prow">
+      <div class="prow-h">
+        <button class="plink" onclick="openArtistProfile(${p.artist_id||0})">${esc(p.artist_name||'Artista')}</button>
+        ${propChip(p.status)}
+        ${p.proposed_price!=null?`<span class="pprice">${MXN(p.proposed_price)}</span>`:''}
+      </div>
+      ${p.message?`<div class="pmsg">${esc(p.message)}</div>`:''}
+      <div class="prow-a">
+        <button class="btn ghost sm" onclick="apMessage(${p.artist_id||0})">Mensaje</button>
+        ${(open && p.status==='pending')?`<button class="btn sm" onclick="acceptProposal(${r.id},${p.id})">Aceptar</button>`:''}
+      </div>
+    </div>`).join('');
+  return `<div class="apsec"><h4>Propuestas recibidas (${props.length})</h4>${rows}
+    ${r.status==='fulfilled'?'<div class="muted" style="font-size:12px;margin-top:2px">Solicitud adjudicada: la actuación ya se generó en la agenda.</div>':''}</div>`;
+}
+function rdArtistSection(r, mine, open){
+  const canEdit = open && (!mine || ['pending','rejected','withdrawn'].includes(mine.status));
+  const head = mine ? `<div class="pmine">Tu propuesta ${propChip(mine.status)}</div>` : '';
+  if(!canEdit){
+    return `<div class="apsec"><h4>Tu propuesta</h4>${head}
+      ${mine&&mine.proposed_price!=null?`<div class="rdmeta">💰 ${MXN(mine.proposed_price)}</div>`:''}
+      ${mine&&mine.message?`<div class="pmsg">${esc(mine.message)}</div>`:''}
+      <div class="muted" style="font-size:12px;margin-top:8px">${r.status==='fulfilled'?(mine&&mine.status==='accepted'?'¡Felicidades! Tu propuesta fue aceptada. La actuación está en tu agenda.':'La solicitud fue adjudicada a otra propuesta.'):'Esta solicitud ya no admite propuestas.'}</div>
+    </div>`;
+  }
+  const priceVal = mine&&mine.proposed_price!=null?mine.proposed_price:'';
+  const msgVal = mine&&mine.message?mine.message:'';
+  return `<div class="apsec"><h4>${mine?'Actualiza tu propuesta':'Envía tu propuesta'}</h4>${head}
+    <div class="field"><label>Precio propuesto (MXN)</label><input id="pp_price" type="number" min="0" step="500" value="${priceVal}" placeholder="Tu tarifa para este evento"></div>
+    <div class="field"><label>Mensaje</label><textarea id="pp_msg" placeholder="Preséntate, propón formato/horario y qué incluyes…">${esc(msgVal)}</textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+      ${mine&&mine.status==='pending'?`<button class="btn ghost" onclick="withdrawProposal(${r.id},${mine.id})">Retirar</button>`:''}
+      <button class="btn" id="pp_go" onclick="submitProposal(${r.id})">${mine?'Actualizar propuesta':'Enviar propuesta'}</button>
+    </div>
+  </div>`;
+}
+async function submitProposal(reqId){
+  const price=document.getElementById('pp_price').value;
+  const msg=(document.getElementById('pp_msg').value||'').trim();
+  if(!msg && price===''){ toast('Escribe un mensaje o un precio para tu propuesta.',true); return; }
+  const btn=document.getElementById('pp_go'); if(btn){ btn.disabled=true; btn.textContent='Enviando…'; }
+  const body={ artist_id:ME.artist_id, currency:'MXN' };
+  if(msg) body.message=msg;
+  if(price!=='') body.proposed_price=+price;
+  try{ await post('/requests/'+reqId+'/proposals',body); toast('Propuesta enviada ✓'); await rdRender(); show('reqs',true); }
+  catch(e){ if(btn){btn.disabled=false;btn.textContent='Enviar propuesta';} toast('No se pudo enviar: '+(e.message||''),true); }
+}
+async function acceptProposal(reqId,pid){
+  if(!confirm('¿Aceptar esta propuesta? Se generará la actuación en la agenda y se descartarán las demás propuestas.')) return;
+  try{ await post(`/requests/${reqId}/proposals/${pid}/accept`,{}); toast('Propuesta aceptada ✓ Actuación creada'); await rdRender(); show('reqs',true); }
+  catch(e){ toast('No se pudo aceptar: '+(e.message||''),true); }
+}
+async function withdrawProposal(reqId,pid){
+  if(!confirm('¿Retirar tu propuesta de esta solicitud?')) return;
+  try{ await post(`/requests/${reqId}/proposals/${pid}/withdraw`,{}); toast('Propuesta retirada'); await rdRender(); show('reqs',true); }
+  catch(e){ toast('No se pudo retirar: '+(e.message||''),true); }
+}
+
 /* ---- Agenda de actuaciones: filtro por mes + rango de fechas + estado ---- */
 function agendaMonthPick(){
   // Choosing a month clears the manual date range so the two don't fight each other.
@@ -2244,12 +2356,12 @@ const RENDER = {
         ${ME.artist_id?'':`<button class="btn" onclick="openReqForm()">＋ Crear solicitud</button>`}
       </div>
       <div class="reqs">${rs.map(r=>`
-      <div class="reqc"><div class="t">${esc(r.title)}</div>
+      <div class="reqc" onclick="openReqDetail(${r.id})"><div class="t">${esc(r.title)}</div>
         <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
         <div class="meta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
         <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
         ${(()=>{const m=parseMeta(r.description);let h='';if(m.loc.length)h+=`<div class="spc">🎪 ${m.loc.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`;if(m.size)h+=`<div class="spc">👥 <span>${esc(m.size)}</span></div>`;return h;})()}
-        <div class="ft">${chip(r.status)}<span class="muted">${r.proposals_count} propuesta${r.proposals_count===1?'':'s'}</span></div>
+        <div class="ft">${chip(r.status)}<span class="muted">${ME.artist_id?(r.status==='open'?'Ver y proponer →':'Ver detalle →'):(r.proposals_count+' propuesta'+(r.proposals_count===1?'':'s'))}</span></div>
       </div>`).join("") || '<div class="muted">Aún no hay solicitudes. Pulsa "Crear solicitud" para publicar la primera.</div>'}</div>`;
   },
 

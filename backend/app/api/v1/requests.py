@@ -14,7 +14,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 
-from app.api.deps import DbSession, get_current_user, require_permission
+from app.api.deps import CurrentScope, DbSession, get_current_user, require_permission
 from app.api.v1.bookings import _check_travel_buffer, _now
 from app.models.artist import Artist
 from app.models.booking import Booking
@@ -181,11 +181,23 @@ async def _decorate_proposal(db: DbSession, p: RequestProposal) -> ProposalOut:
     "/{request_id}/proposals",
     response_model=ProposalOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def submit_proposal(request_id: int, payload: ProposalCreate, db: DbSession):
+async def submit_proposal(
+    request_id: int, payload: ProposalCreate, db: DbSession, scope: CurrentScope
+):
     """An artist answers a request. One live proposal per artist (re-sending
-    updates the existing one)."""
+    updates the existing one).
+
+    An artist submits as themselves (their artist_id comes from the session, not
+    the payload); a hotel/admin with booking.manage may submit on an artist's
+    behalf (concierge flow).
+    """
+    can_manage = scope.is_admin or scope.user.has_permission("booking.manage")
+    if scope.is_artist:
+        payload.artist_id = scope.artist_id  # an artist can only propose as themselves
+    elif not can_manage:
+        raise HTTPException(status_code=403, detail="No autorizado para enviar propuestas")
+
     req = await _get_request_or_404(db, request_id)
     if req.status != RequestStatus.OPEN:
         raise HTTPException(status_code=409, detail="La solicitud ya no admite propuestas")
@@ -215,17 +227,20 @@ async def submit_proposal(request_id: int, payload: ProposalCreate, db: DbSessio
 @router.get(
     "/{request_id}/proposals",
     response_model=list[ProposalOut],
-    dependencies=[Depends(get_current_user)],
 )
-async def list_proposals(request_id: int, db: DbSession):
+async def list_proposals(request_id: int, db: DbSession, scope: CurrentScope):
+    """Hotels/admins see every proposal on the request; an artist only sees their
+    own (so competitor bids stay private)."""
     await _get_request_or_404(db, request_id)
-    rows = list(
-        (await db.execute(
-            select(RequestProposal)
-            .where(RequestProposal.request_id == request_id)
-            .order_by(RequestProposal.created_at)
-        )).scalars().all()
+    q = (
+        select(RequestProposal)
+        .where(RequestProposal.request_id == request_id)
+        .order_by(RequestProposal.created_at)
     )
+    can_manage = scope.is_admin or scope.user.has_permission("booking.manage")
+    if scope.is_artist and not can_manage:
+        q = q.where(RequestProposal.artist_id == scope.artist_id)
+    rows = list((await db.execute(q)).scalars().all())
     aids = {p.artist_id for p in rows if p.artist_id}
     names: dict[int, str] = {}
     if aids:
@@ -324,11 +339,15 @@ async def _booking_from_proposal(
 @router.post(
     "/{request_id}/proposals/{proposal_id}/withdraw",
     response_model=ProposalOut,
-    dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def withdraw_proposal(request_id: int, proposal_id: int, db: DbSession):
-    """The artist pulls their proposal."""
+async def withdraw_proposal(
+    request_id: int, proposal_id: int, db: DbSession, scope: CurrentScope
+):
+    """The artist pulls their own proposal (or a hotel/admin manages it)."""
     p = await _get_proposal_or_404(db, request_id, proposal_id)
+    can_manage = scope.is_admin or scope.user.has_permission("booking.manage")
+    if not (can_manage or (scope.is_artist and p.artist_id == scope.artist_id)):
+        raise HTTPException(status_code=403, detail="No autorizado")
     p.status = ProposalStatus.WITHDRAWN
     await db.commit()
     await db.refresh(p)
