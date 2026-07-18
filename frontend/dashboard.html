@@ -1581,70 +1581,86 @@ async function openReqForm(){
     <button class="ax" onclick="reqClose()" aria-label="Cerrar">✕</button>
     <div class="ah"><b>Crear solicitud</b><span class="as">Describe el talento que buscas y recibe propuestas</span></div>
     <div class="rqbody">
+      <div class="hint" style="margin:0 0 12px">Todos los campos son obligatorios.</div>
       <div class="field"><label>Título *</label><input id="rq_title" placeholder="p. ej. Banda de jazz para noche de gala"></div>
-      ${comps.length?`<div class="field"><label>Hotel solicitante</label><select id="rq_comp"><option value="">— Selecciona —</option>${comps.map(c=>`<option value="${c.id}">${esc(c.name)}${c.city?' · '+esc(c.city):''}</option>`).join('')}</select></div>`:''}
+      ${comps.length?`<div class="field"><label>Hotel solicitante *</label><select id="rq_comp"><option value="">— Selecciona —</option>${comps.map(c=>`<option value="${c.id}">${esc(c.name)}${c.city?' · '+esc(c.city):''}</option>`).join('')}</select></div>`:''}
       <div class="fgrid">
-        <div class="field"><label>Categoría</label><select id="rq_cat" onchange="fillSub('rq_cat','rq_sub')"><option value="">Cualquiera</option>${cats.map(c=>`<option value="${esc(c)}">${esc(pretty(c))}</option>`).join('')}</select></div>
-        <div class="field"><label>Subcategoría</label><select id="rq_sub"><option value="">Cualquiera</option></select></div>
+        <div class="field"><label>Categoría *</label><select id="rq_cat" onchange="fillSub('rq_cat','rq_sub','— Selecciona —')"><option value="">— Selecciona —</option>${cats.map(c=>`<option value="${esc(c)}">${esc(pretty(c))}</option>`).join('')}</select></div>
+        <div class="field"><label>Subcategoría *</label><select id="rq_sub"><option value="">— Selecciona —</option></select></div>
       </div>
       <div class="fgrid">
-        <div class="field"><label>Ciudad</label><input id="rq_city" placeholder="Ciudad del evento"></div>
-        <div class="field"><label>Fecha del evento</label><input id="rq_date" type="date"></div>
+        <div class="field"><label>Ciudad *</label><input id="rq_city" placeholder="Ciudad del evento"></div>
+        <div class="field"><label>Fecha del evento *</label><input id="rq_date" type="date"></div>
       </div>
       <div class="fgrid fg3">
-        <div class="field"><label>Turno</label><select id="rq_turno"><option value="">—</option>${TURNOS.map(t=>`<option>${t}</option>`).join('')}</select></div>
-        <div class="field"><label>Hora inicio</label><select id="rq_hini"><option value="">—</option>${TIMES.map(t=>`<option>${t}</option>`).join('')}</select></div>
-        <div class="field"><label>Duración</label><select id="rq_dur"><option value="">—</option>${DURACIONES.map(d=>`<option value="${d.v}">${d.t}</option>`).join('')}</select></div>
+        <div class="field"><label>Turno *</label><select id="rq_turno"><option value="">—</option>${TURNOS.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>Hora inicio *</label><select id="rq_hini"><option value="">—</option>${TIMES.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>Duración *</label><select id="rq_dur"><option value="">—</option>${DURACIONES.map(d=>`<option value="${d.v}">${d.t}</option>`).join('')}</select></div>
       </div>
       <div class="fgrid">
-        <div class="field"><label>Presupuesto mín. (MXN)</label><input id="rq_bmin" type="number" min="0" step="500" placeholder="Opcional"></div>
-        <div class="field"><label>Presupuesto máx. (MXN)</label><input id="rq_bmax" type="number" min="0" step="500" placeholder="Opcional"></div>
+        <div class="field"><label>Presupuesto mín. (MXN) *</label><input id="rq_bmin" type="number" min="0" step="500" placeholder="0"></div>
+        <div class="field"><label>Presupuesto máx. (MXN) *</label><input id="rq_bmax" type="number" min="0" step="500" placeholder="0"></div>
       </div>
-      <div class="field"><label>Locación <span class="muted" style="font-weight:400">(dónde se realizará · una o varias · opcional)</span></label>
+      <div class="field"><label>Locación * <span class="muted" style="font-weight:400">(dónde se realizará · una o varias)</span></label>
         <div class="chipset" id="rq_loc">${LOCACIONES.map(s=>`<button type="button" class="spchip" data-v="${esc(s)}" onclick="this.classList.toggle('on')">${esc(s)}</button>`).join('')}</div>
       </div>
-      <div class="field"><label>Tamaño del evento <span class="muted" style="font-weight:400">(aforo · opcional)</span></label>
+      <div class="field"><label>Tamaño del evento * <span class="muted" style="font-weight:400">(aforo)</span></label>
         <div class="chipset" id="rq_size">${TAMANOS.map(s=>`<button type="button" class="spchip" data-v="${esc(s)}" onclick="pickSize(this)">${esc(s)}</button>`).join('')}</div>
       </div>
-      <div class="field"><label>Descripción</label><textarea id="rq_desc" placeholder="Detalles del evento, horario, requisitos…"></textarea></div>
+      <div class="field"><label>Descripción *</label><textarea id="rq_desc" placeholder="Detalles del evento, horario, requisitos…"></textarea></div>
     </div>
     <div class="af"><button class="ago" id="rq_go" onclick="submitReq(this)">Publicar solicitud</button></div>
   </div>`;
   ov.style.display='flex';
-  fillSub('rq_cat','rq_sub');
+  fillSub('rq_cat','rq_sub','— Selecciona —');
 }
 function reqClose(){ const ov=document.getElementById('reqMov'); if(ov) ov.style.display='none'; }
 async function submitReq(btn){
   const g=id=>document.getElementById(id);
+  const focusEl=id=>{ const e=g(id); if(e){ try{ e.scrollIntoView({block:'center',behavior:'smooth'}); e.focus(); }catch(_){} } };
   const title=(g('rq_title').value||'').trim();
-  if(!title){ toast('Ponle un título a la solicitud.',true); return; }
+  const comp=g('rq_comp');
+  const cat=g('rq_cat').value, sub=g('rq_sub').value, subHasOptions=g('rq_sub').options.length>1;
+  const city=(g('rq_city').value||'').trim();
+  const dt=g('rq_date').value;
+  const turno=g('rq_turno').value, hini=g('rq_hini').value, durMin=+(g('rq_dur').value||0);
+  const bmin=g('rq_bmin').value, bmax=g('rq_bmax').value;
   const locs=[...document.querySelectorAll('#rq_loc .spchip.on')].map(b=>b.dataset.v);
   const sizeEl=document.querySelector('#rq_size .spchip.on'); const size=sizeEl?sizeEl.dataset.v:'';
-  const turno=g('rq_turno').value, hini=g('rq_hini').value, durMin=+(g('rq_dur').value||0);
-  const durLabel = durMin ? (DURACIONES.find(d=>d.v===durMin)||{}).t : '';
-  const hparts=[];
-  if(turno) hparts.push(turno);
-  if(hini){
-    if(durMin) hparts.push(`${hini}–${timeAdd(hini,durMin)} (${durLabel})`);
-    else hparts.push(hini+' en adelante');
-  } else if(durMin){ hparts.push('Duración '+durLabel); }
   let desc=(g('rq_desc').value||'').trim();
-  const head=[];
-  if(locs.length) head.push(`Locación: ${locs.join(', ')}`);
-  if(size) head.push(`Tamaño: ${size}`);
-  if(hparts.length) head.push(`Horario: ${hparts.join(' · ')}`);
-  if(head.length) desc=head.join('\n')+(desc?`\n\n${desc}`:'');
-  const body={ title, currency:'MXN',
-    description:desc||null,
-    category:g('rq_cat').value||null,
-    subcategory:g('rq_sub').value||null,
-    city:(g('rq_city').value||'').trim()||null };
-  const comp=g('rq_comp'); if(comp&&comp.value) body.company_id=+comp.value;
-  const dt=g('rq_date').value; if(dt) body.event_date=dt+'T'+(hini||'20:00')+':00';
-  const bmin=g('rq_bmin').value, bmax=g('rq_bmax').value;
-  if(bmin!=='') body.budget_min=+bmin;
-  if(bmax!=='') body.budget_max=+bmax;
-  if(body.budget_min!=null&&body.budget_max!=null&&body.budget_max<body.budget_min){ toast('El presupuesto máximo debe ser mayor o igual al mínimo.',true); return; }
+
+  // Todos los campos son obligatorios
+  const checks=[
+    [!title,'Escribe un título.','rq_title'],
+    [comp && !comp.value,'Selecciona el hotel solicitante.','rq_comp'],
+    [!cat,'Selecciona una categoría.','rq_cat'],
+    [subHasOptions && !sub,'Selecciona una subcategoría.','rq_sub'],
+    [!city,'Indica la ciudad del evento.','rq_city'],
+    [!dt,'Elige la fecha del evento.','rq_date'],
+    [!turno,'Elige el turno.','rq_turno'],
+    [!hini,'Elige la hora de inicio.','rq_hini'],
+    [!durMin,'Elige la duración.','rq_dur'],
+    [bmin==='','Indica el presupuesto mínimo.','rq_bmin'],
+    [bmax==='','Indica el presupuesto máximo.','rq_bmax'],
+    [!locs.length,'Selecciona al menos una locación.','rq_loc'],
+    [!size,'Selecciona el tamaño del evento.','rq_size'],
+    [!desc,'Agrega una descripción.','rq_desc'],
+  ];
+  for(const [bad,msg,id] of checks){ if(bad){ toast(msg,true); focusEl(id); return; } }
+  if(+bmax<+bmin){ toast('El presupuesto máximo debe ser mayor o igual al mínimo.',true); focusEl('rq_bmax'); return; }
+
+  const durLabel = (DURACIONES.find(d=>d.v===durMin)||{}).t || '';
+  const head=[
+    `Locación: ${locs.join(', ')}`,
+    `Tamaño: ${size}`,
+    `Horario: ${turno} · ${hini}–${timeAdd(hini,durMin)} (${durLabel})`,
+  ];
+  desc=head.join('\n')+'\n\n'+desc;
+  const body={ title, currency:'MXN', description:desc,
+    category:cat, subcategory:sub||null, city,
+    event_date:dt+'T'+hini+':00',
+    budget_min:+bmin, budget_max:+bmax };
+  if(comp&&comp.value) body.company_id=+comp.value;
   btn.disabled=true; btn.textContent='Publicando…';
   try{ await post('/requests',body); reqClose(); toast('Solicitud publicada ✓'); show('reqs',true); }
   catch(e){ btn.disabled=false; btn.textContent='Publicar solicitud'; toast('No se pudo publicar: '+(e.message||''),true); }
@@ -2759,9 +2775,9 @@ function showEditor(s){
       <span class="saved" id="sh_saved_${s.id}">Guardado ✓</span></div>
   </div>`;
 }
-function fillSub(catId,subId){
+function fillSub(catId,subId,ph){
   const tax=CACHE.tax||{}; const cat=document.getElementById(catId).value; const sel=document.getElementById(subId);
-  const subs=tax[cat]||[]; sel.innerHTML='<option value="">(opcional)</option>'+subs.map(x=>`<option value="${esc(x)}">${esc(pretty(x))}</option>`).join("");
+  const subs=tax[cat]||[]; sel.innerHTML=`<option value="">${ph||'(opcional)'}</option>`+subs.map(x=>`<option value="${esc(x)}">${esc(pretty(x))}</option>`).join("");
 }
 function refreshIdentity(){
   const p=CACHE.profile; if(!p)return; ME.artist_name=p.stage_name;
