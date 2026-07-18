@@ -300,6 +300,29 @@
   .rqhead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;flex-wrap:wrap}
   .tx{background:var(--ov);border:0;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;color:var(--mut);line-height:1}
   .tx:hover{background:var(--bad);color:#fff}
+  /* Artist profile pop-up */
+  .amod.apmod{max-width:620px;max-height:90vh}
+  .aphero{height:190px;background:var(--grad);background-size:cover;background-position:center;position:relative;flex:none}
+  .aphscrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,16,32,.05) 0%,rgba(6,16,32,.72) 100%)}
+  .aphttl{position:absolute;left:20px;right:20px;bottom:14px;color:#fff}
+  .aphttl h2{margin:0;font-size:23px;font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,.4);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .aphttl .ppart{font-size:11px;font-weight:700;background:rgba(255,255,255,.22);padding:3px 9px;border-radius:20px;backdrop-filter:blur(4px)}
+  .apchips{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+  .apchips span{font-size:11.5px;background:rgba(255,255,255,.18);color:#fff;padding:3px 10px;border-radius:20px;backdrop-filter:blur(4px)}
+  .apbody{padding:18px 20px 6px}
+  .apsec{margin-bottom:18px}
+  .apsec h4{margin:0 0 8px;font-size:12.5px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.4px}
+  .apsec p{margin:0;font-size:13.5px;line-height:1.55;color:var(--txt)}
+  .socrow{display:flex;gap:8px;flex-wrap:wrap}
+  .socpill{font-size:12.5px;font-weight:600;color:var(--acc);background:var(--ov2);border:1px solid var(--line);padding:7px 13px;border-radius:20px;text-decoration:none;cursor:pointer}
+  .socpill:hover{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .socpill.vid{color:#fff;background:var(--grad);border:0}
+  .apgal{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .apthumb{padding-top:70%;background-size:cover;background-position:center;border-radius:10px;background-color:var(--ov)}
+  .apshow{border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:9px}
+  .apsh-t{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .apsh-t b{font-size:14px;font-weight:700}
+  .apsh-p{font-size:13.5px;font-weight:750;color:var(--acc);white-space:nowrap}
   .mcard{position:relative;background:var(--mc-bg,var(--card));border:1px solid rgba(24,28,52,.06);border-left:4px solid var(--mc-bd,var(--acc));border-radius:7px;padding:6px 7px 6px 9px;font-size:11px;cursor:grab;box-shadow:0 1px 2px rgba(24,28,52,.05);user-select:none}
   .mcard:hover{box-shadow:0 4px 12px rgba(56,44,161,.16)}
   .mcard.completed{opacity:.74} .mcard.cancelled{opacity:.5}
@@ -1508,8 +1531,8 @@ function artistCard(i){
   const badge=`<span class="av-badge">● Disponible</span>`;
   const ph=i.img?`style="background-image:url('${i.img}')"`:`style="background:${artGrad(i.cat)}"`;
   const tags=(i.sub?[pretty(i.sub)]:[]).concat((i.genres||[]).slice(0,2)).slice(0,3);
-  return `<div class="acard" onclick="suggAsignar('${esc((i.name||'').replace(/'/g,''))}')">
-    <div class="ph" ${ph}>${badge}<div class="heart">♡</div><div class="play">▶</div></div>
+  return `<div class="acard" onclick="openArtistProfile(${i.artistId||'null'})">
+    <div class="ph" ${ph}>${badge}<div class="play">▶</div></div>
     <div class="ab">
       <div class="arow"><h4>${esc(i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
       <div class="ty">${esc(i.show)} · ${esc(pretty(i.cat))}</div>
@@ -1535,6 +1558,59 @@ function applyArtistFilters(){
   document.querySelectorAll('.catrow').forEach(el=>el.classList.toggle('on', (el.dataset.cat||'')===AF.cat));
 }
 function pickArtCat(c){ AF.cat=c; const s=document.getElementById('af_cat'); if(s) s.value=c; applyArtistFilters(); }
+
+/* ---- Perfil del artista (ventana emergente desde Buscar Artistas) ---- */
+const SOCNAME={instagram:'Instagram',facebook:'Facebook',youtube:'YouTube',tiktok:'TikTok',spotify:'Spotify',twitter:'X',x:'X',soundcloud:'SoundCloud'};
+function socialUrl(k,v){
+  if(/^https?:/i.test(v)) return v;
+  const h=v.replace(/^@/,'');
+  if(k==='instagram') return 'https://instagram.com/'+h;
+  if(k==='tiktok')    return 'https://tiktok.com/@'+h;
+  if(k==='facebook')  return 'https://facebook.com/'+h;
+  if(k==='youtube')   return 'https://youtube.com/'+h;
+  if(k==='spotify')   return 'https://open.spotify.com/'+h;
+  if(k==='twitter'||k==='x') return 'https://x.com/'+h;
+  return 'https://'+v;
+}
+async function openArtistProfile(artistId){
+  if(!artistId){ toast('Perfil no disponible para este artista.',true); return; }
+  let ov=document.getElementById('apMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='apMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) apClose(); }); }
+  ov.innerHTML=`<div class="amod apmod" style="position:relative"><button class="ax" onclick="apClose()">✕</button><div class="rqbody"><div class="muted" style="padding:40px;text-align:center">Cargando perfil…</div></div></div>`;
+  ov.style.display='flex';
+  let a={}, shows=[];
+  try{ a=await api('/artists/'+artistId); }catch(e){}
+  try{ shows=(await api('/artists/'+artistId+'/shows'))||[]; }catch(e){}
+  const photos=[]; shows.forEach(s=>(s.images||[]).forEach(im=>{ if(im.url) photos.push(im.url); }));
+  const videos=shows.filter(s=>s.video_url).map(s=>({name:s.show_name,url:s.video_url}));
+  const cover=photos[0]||null;
+  const langs=a.languages_spoken||[];
+  const sl=a.social_links||{};
+  const socLinks=Object.entries(sl).filter(([k,v])=>v).map(([k,v])=>`<a class="socpill" href="${esc(socialUrl(k,v))}" target="_blank" rel="noopener">${esc(SOCNAME[k]||_cap(k))}</a>`);
+  if(a.website) socLinks.push(`<a class="socpill" href="${esc(/^https?:/i.test(a.website)?a.website:'https://'+a.website)}" target="_blank" rel="noopener">Sitio web</a>`);
+  const chips=[]; if(a.artist_type) chips.push(esc(pretty(a.artist_type))); if(a.base_city||a.city) chips.push('📍 '+esc(a.base_city||a.city)); if(a.years_experience) chips.push('🎓 '+esc(a.years_experience)); if(langs.length) chips.push('🗣 '+esc(langs.join(', ')));
+  ov.innerHTML=`<div class="amod apmod" style="position:relative">
+    <button class="ax" onclick="apClose()" aria-label="Cerrar">✕</button>
+    <div class="aphero" ${cover?`style="background-image:url('${cover}')"`:''}>
+      <div class="aphscrim"></div>
+      <div class="aphttl"><h2>${esc(a.stage_name||'Artista')}${a.is_partner?' <span class="ppart">✓ Partner</span>':''}</h2>
+        <div class="apchips">${chips.map(c=>`<span>${c}</span>`).join('')}</div></div>
+    </div>
+    <div class="rqbody apbody">
+      ${a.bio?`<div class="apsec"><h4>Sobre el artista</h4><p>${esc(a.bio)}</p></div>`:''}
+      ${socLinks.length?`<div class="apsec"><h4>Redes y enlaces</h4><div class="socrow">${socLinks.join('')}</div></div>`:''}
+      ${videos.length?`<div class="apsec"><h4>Videos</h4><div class="socrow">${videos.map(v=>`<a class="socpill vid" href="${esc(v.url)}" target="_blank" rel="noopener">▶ ${esc(v.name)}</a>`).join('')}</div></div>`:''}
+      ${photos.length>1?`<div class="apsec"><h4>Fotos</h4><div class="apgal">${photos.slice(0,12).map(u=>`<div class="apthumb" style="background-image:url('${esc(u)}')"></div>`).join('')}</div></div>`:''}
+      ${shows.length?`<div class="apsec"><h4>Shows publicados</h4>${shows.map(s=>`<div class="apshow"><div class="apsh-t"><b>${esc(s.show_name)}</b>${s.price_hotel?`<span class="apsh-p">${MXN(s.price_hotel)}</span>`:''}</div><div class="muted" style="font-size:12px">${esc(pretty(s.category))}${s.subcategory?' · '+esc(pretty(s.subcategory)):''}${s.duration_minutes?' · '+s.duration_minutes+' min':''}</div>${s.description?`<div style="font-size:12.5px;margin-top:4px">${esc(s.description)}</div>`:''}</div>`).join('')}</div>`:''}
+      ${(a.phone||a.email)?`<div class="apsec"><h4>Contacto</h4><div class="muted" style="font-size:13px">${a.phone?'📞 '+esc(a.phone):''}${a.phone&&a.email?' · ':''}${a.email?'✉ '+esc(a.email):''}</div></div>`:''}
+      ${(!a.bio&&!socLinks.length&&!videos.length&&photos.length<=1&&!shows.length)?'<div class="muted" style="padding:20px;text-align:center">Este artista aún no ha completado su perfil.</div>':''}
+    </div>
+    <div class="af"><button class="btn ghost" onclick="apClose()">Cerrar</button><button class="ago" onclick="apContact('${esc((a.stage_name||'').replace(/'/g,''))}')">Enviar interés</button></div>
+  </div>`;
+}
+function apClose(){ const ov=document.getElementById('apMov'); if(ov) ov.style.display='none'; }
+function apContact(name){ apClose(); suggAsignar(name); }
 /* ---- Agenda de actuaciones: filtro por mes + rango de fechas + estado ---- */
 function agendaMonthPick(){
   // Choosing a month clears the manual date range so the two don't fight each other.
@@ -1816,7 +1892,7 @@ const RENDER = {
     (shows||[]).filter(s=>s.is_active!==false).forEach(s=>{
       const key=(s.artist_id||'')+'|'+s.show_name; if(seen.has(key))return; seen.add(key);
       const a=amap[s.artist_id]||{}; const img=(s.images&&s.images[0]&&s.images[0].url)||null;
-      items.push({id:s.id,name:a.name||s.show_name,show:s.show_name,cat:s.category,sub:s.subcategory,
+      items.push({id:s.id,artistId:s.artist_id,name:a.name||s.show_name,show:s.show_name,cat:s.category,sub:s.subcategory,
         price:s.price_hotel||s.base_price||null,rating:s.rating,img,city:a.city,partner:a.partner,langs:a.langs,
         isNew:s.created_at?(now-new Date(s.created_at).getTime())<7*864e5:false,genres:s.genres||[]});
     });
