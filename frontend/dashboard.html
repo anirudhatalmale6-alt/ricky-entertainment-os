@@ -235,6 +235,7 @@
   .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--acc)}
   .field textarea{resize:vertical;min-height:74px}
   .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  .fgrid.fg3{grid-template-columns:1fr 1fr 1fr}
   @media(max-width:640px){.fgrid{grid-template-columns:1fr}}
   .btn{background:var(--grad);border:0;color:#fff;font-weight:650;padding:10px 18px;border-radius:9px;cursor:pointer;font-size:13px}
   .btn.ghost{background:var(--ov2);color:var(--txt);border:1px solid var(--line)}
@@ -1545,17 +1546,20 @@ function qtool(label){ toast(label+' — módulo en preparación'); }
 /* ---- Crear solicitud (desde la pantalla Solicitudes) ---- */
 const LOCACIONES=['Alberca','Playa','Rooftop','Salones','Lobby-Bar','Restaurante','Lobby','Jardines'];
 const TAMANOS=['Íntimo (hasta 30 pax)','Pequeño (30-80)','Mediano (80-200)','Grande (200-500)','Masivo (+500)'];
+const TURNOS=['Mañana','Tarde','Noche'];
+const TIMES=(()=>{const a=[];for(let h=0;h<24;h++)for(const m of['00','30'])a.push(String(h).padStart(2,'0')+':'+m);return a;})();
 // Locación (varias) y Tamaño (una) se guardan como líneas estructuradas al inicio de la descripción,
 // p.ej. "Locación: Playa, Rooftop\nTamaño: Mediano (80-200)". Así no tocamos la base de datos y se
 // lee bien aunque no se procese. "Espacio:" se acepta como alias antiguo -> Locación.
 function parseMeta(desc){
-  const out={loc:[],size:null,rest:desc||''};
+  const out={loc:[],size:null,horario:null,rest:desc||''};
   if(!desc) return out;
   const lines=desc.split(/\r?\n/);
   while(lines.length){
-    const m=lines[0].match(/^(Locación|Espacio|Tamaño):\s*(.+)$/);
+    const m=lines[0].match(/^(Locación|Espacio|Tamaño|Horario):\s*(.+)$/);
     if(!m) break;
     if(m[1]==='Tamaño') out.size=m[2].trim();
+    else if(m[1]==='Horario') out.horario=m[2].trim();
     else out.loc=out.loc.concat(m[2].split(',').map(s=>s.trim()).filter(Boolean));
     lines.shift();
   }
@@ -1585,6 +1589,11 @@ async function openReqForm(){
         <div class="field"><label>Ciudad</label><input id="rq_city" placeholder="Ciudad del evento"></div>
         <div class="field"><label>Fecha del evento</label><input id="rq_date" type="date"></div>
       </div>
+      <div class="fgrid fg3">
+        <div class="field"><label>Turno</label><select id="rq_turno"><option value="">—</option>${TURNOS.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>Hora inicio</label><select id="rq_hini"><option value="">—</option>${TIMES.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>Hora fin</label><select id="rq_hfin"><option value="">—</option>${TIMES.map(t=>`<option>${t}</option>`).join('')}</select></div>
+      </div>
       <div class="fgrid">
         <div class="field"><label>Presupuesto mín. (MXN)</label><input id="rq_bmin" type="number" min="0" step="500" placeholder="Opcional"></div>
         <div class="field"><label>Presupuesto máx. (MXN)</label><input id="rq_bmax" type="number" min="0" step="500" placeholder="Opcional"></div>
@@ -1609,10 +1618,17 @@ async function submitReq(btn){
   if(!title){ toast('Ponle un título a la solicitud.',true); return; }
   const locs=[...document.querySelectorAll('#rq_loc .spchip.on')].map(b=>b.dataset.v);
   const sizeEl=document.querySelector('#rq_size .spchip.on'); const size=sizeEl?sizeEl.dataset.v:'';
+  const turno=g('rq_turno').value, hini=g('rq_hini').value, hfin=g('rq_hfin').value;
+  if(hini&&hfin&&hfin<hini){ toast('La hora de fin debe ser posterior a la de inicio.',true); return; }
+  const hparts=[];
+  if(turno) hparts.push(turno);
+  if(hini) hparts.push(hini+(hfin?('–'+hfin):' en adelante'));
+  else if(hfin) hparts.push('hasta '+hfin);
   let desc=(g('rq_desc').value||'').trim();
   const head=[];
   if(locs.length) head.push(`Locación: ${locs.join(', ')}`);
   if(size) head.push(`Tamaño: ${size}`);
+  if(hparts.length) head.push(`Horario: ${hparts.join(' · ')}`);
   if(head.length) desc=head.join('\n')+(desc?`\n\n${desc}`:'');
   const body={ title, currency:'MXN',
     description:desc||null,
@@ -1620,7 +1636,7 @@ async function submitReq(btn){
     subcategory:g('rq_sub').value||null,
     city:(g('rq_city').value||'').trim()||null };
   const comp=g('rq_comp'); if(comp&&comp.value) body.company_id=+comp.value;
-  const dt=g('rq_date').value; if(dt) body.event_date=dt+'T20:00:00';
+  const dt=g('rq_date').value; if(dt) body.event_date=dt+'T'+(hini||'20:00')+':00';
   const bmin=g('rq_bmin').value, bmax=g('rq_bmax').value;
   if(bmin!=='') body.budget_min=+bmin;
   if(bmax!=='') body.budget_max=+bmax;
@@ -1819,6 +1835,7 @@ async function rdRender(){
       <div class="rdmeta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
       <div class="rdmeta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
       <div class="rdmeta">📅 ${r.event_date?fmtDate(r.event_date):'Fecha por definir'}</div>
+      ${meta.horario?`<div class="rdmeta">🕐 ${esc(meta.horario)}</div>`:''}
       <div class="rdmeta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
       ${meta.loc.length?`<div class="spc">🎪 ${meta.loc.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`:''}
       ${meta.size?`<div class="spc">👥 <span>${esc(meta.size)}</span></div>`:''}
@@ -2360,7 +2377,7 @@ const RENDER = {
         <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
         <div class="meta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
         <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
-        ${(()=>{const m=parseMeta(r.description);let h='';if(m.loc.length)h+=`<div class="spc">🎪 ${m.loc.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`;if(m.size)h+=`<div class="spc">👥 <span>${esc(m.size)}</span></div>`;return h;})()}
+        ${(()=>{const m=parseMeta(r.description);let h='';if(m.horario)h+=`<div class="meta">🕐 ${esc(m.horario)}</div>`;if(m.loc.length)h+=`<div class="spc">🎪 ${m.loc.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`;if(m.size)h+=`<div class="spc">👥 <span>${esc(m.size)}</span></div>`;return h;})()}
         <div class="ft">${chip(r.status)}<span class="muted">${ME.artist_id?(r.status==='open'?'Ver y proponer →':'Ver detalle →'):(r.proposals_count+' propuesta'+(r.proposals_count===1?'':'s'))}</span></div>
       </div>`).join("") || '<div class="muted">Aún no hay solicitudes. Pulsa "Crear solicitud" para publicar la primera.</div>'}</div>`;
   },
