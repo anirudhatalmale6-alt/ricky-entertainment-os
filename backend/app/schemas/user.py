@@ -11,6 +11,11 @@ class RoleOut(BaseModel):
     description: str | None = None
 
 
+class UserSelfUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    full_name: str | None = None
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

@@ -4,13 +4,25 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession, require_permission
 from app.models.user import User
-from app.schemas.user import UserOut
+from app.schemas.user import UserOut, UserSelfUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("/me", response_model=UserOut)
 async def read_me(current_user: CurrentUser):
+    return current_user
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(payload: UserSelfUpdate, current_user: CurrentUser, db: DbSession):
+    """The signed-in user updates their own profile (display name)."""
+    if payload.full_name is not None:
+        name = payload.full_name.strip()
+        if name:
+            current_user.full_name = name
+    await db.commit()
+    await db.refresh(current_user)
     return current_user
 
 
