@@ -69,6 +69,19 @@
   .spacer{flex:1}
   .ctrl{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);padding:7px 11px;border-radius:9px;font-size:13px;color:var(--txt)}
   .ctrl select{background:transparent;border:0;color:var(--txt);font-size:13px;outline:none}
+  .mctrl{cursor:pointer;font-family:inherit}
+  .mctrl:hover{border-color:var(--acc)}
+  .mctrl .mcar{color:var(--mut);font-size:11px}
+  .monthpop{position:fixed;width:250px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(12,16,30,.28);z-index:85;display:none;padding:12px}
+  .monthpop.open{display:block}
+  .mp-yr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .mp-yr b{font-size:14px;font-weight:750}
+  .mp-yr button{background:var(--ov);border:0;width:28px;height:28px;border-radius:8px;cursor:pointer;color:var(--txt);font-size:15px}
+  .mp-yr button:hover{background:var(--acc);color:#fff}
+  .mp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .mp-grid button{background:var(--ov);border:0;padding:9px 0;border-radius:8px;cursor:pointer;color:var(--txt);font-size:12.5px;font-weight:600}
+  .mp-grid button:hover{background:var(--ov2)}
+  .mp-grid button.on{background:var(--grad);color:#fff}
   .ava{width:34px;height:34px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff}
   .bell{position:relative;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;font-size:16px;cursor:pointer;transition:.15s}
   .bell:hover{background:var(--inp)}
@@ -726,11 +739,12 @@
         <div class="sub" id="psub">Vista consolidada</div>
       </div>
       <div class="spacer"></div>
-      <div class="ctrl" id="monthCtrl">📅 Julio 2026</div>
+      <button class="ctrl mctrl" id="monthCtrl" onclick="toggleMonthPop(event)" title="Cambiar mes"><span id="monthLbl">📅 —</span><span class="mcar">▾</span></button>
       <div class="bell" id="bellBtn" title="Notificaciones" onclick="toggleBell(event)">🔔<span class="dot" id="bellDot" style="display:none"></span></div>
       <div class="ava" id="topAva">RA</div>
     </div>
     <div class="bellpanel" id="bellPanel"></div>
+    <div class="monthpop" id="monthPop"></div>
     <div class="wrap">
       <div class="panel on" id="panel-home"><div class="load">Cargando…</div></div>
       <div class="panel" id="panel-artists"></div>
@@ -751,7 +765,9 @@
 
 <script>
 const API = (window.RICKY_API ?? "http://localhost:8000") + "/api/v1";  // "" = same-origin root deploy
-const PERIOD = {year:2026, month:7};
+// Arranca en el mes en curso real (se actualiza solo con el cambio de mes);
+// el usuario puede cambiarlo desde el selector de arriba a la derecha.
+const PERIOD = (()=>{ const d=new Date(); return {year:d.getFullYear(), month:d.getMonth()+1}; })();
 let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company", NOTIF_CACHE=[];
 const MXN = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n||0);
 const CATCOL = {"Musica":"#382ca1","Shows":"#f59e0b","Fotografia y Video":"#3b82f6","Produccion":"#10b981"};
@@ -1017,6 +1033,7 @@ async function boot(){
   document.querySelectorAll('.panel').forEach(x=>{x.dataset.loaded="";});
   if(first){ first.classList.add('on'); await show(first.dataset.p,true); }
   loadNotifications();
+  updateMonthLabel();
 }
 async function reload(){
   if(ME&&ME.is_admin){ GID = document.getElementById('groupSel').value || GID; syncHotelCard(); }
@@ -1257,6 +1274,35 @@ function toggleBell(e){
 }
 document.addEventListener('click',e=>{ const p=document.getElementById('bellPanel'),b=document.getElementById('bellBtn'); if(p&&p.classList.contains('open')&&!p.contains(e.target)&&b&&!b.contains(e.target)) p.classList.remove('open'); });
 
+/* ---- Selector de mes/año (arriba a la derecha) ---- */
+let MP_YEAR=PERIOD.year;   // año que se está hojeando en el popover
+function updateMonthLabel(){
+  const l=document.getElementById('monthLbl'); if(l) l.textContent='📅 '+MESES[PERIOD.month-1]+' '+PERIOD.year;
+}
+function renderMonthPop(){
+  const pop=document.getElementById('monthPop'); if(!pop) return;
+  const abbr=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  pop.innerHTML=`<div class="mp-yr"><button onclick="mpYear(-1)" title="Año anterior">‹</button><b>${MP_YEAR}</b><button onclick="mpYear(1)" title="Año siguiente">›</button></div>
+    <div class="mp-grid">${abbr.map((m,i)=>`<button class="${(MP_YEAR===PERIOD.year&&i+1===PERIOD.month)?'on':''}" onclick="setPeriod(${MP_YEAR},${i+1})">${m}</button>`).join('')}</div>`;
+}
+function mpYear(d){ MP_YEAR+=d; renderMonthPop(); }
+function toggleMonthPop(e){
+  if(e) e.stopPropagation();
+  const pop=document.getElementById('monthPop'), btn=document.getElementById('monthCtrl'); if(!pop||!btn) return;
+  const open=pop.classList.toggle('open');
+  if(open){ MP_YEAR=PERIOD.year; renderMonthPop();
+    const r=btn.getBoundingClientRect(); pop.style.top=(r.bottom+8)+'px'; pop.style.left=Math.max(12,r.right-250)+'px'; }
+}
+function setPeriod(y,m){
+  PERIOD.year=y; PERIOD.month=m; MP_YEAR=y;
+  updateMonthLabel();
+  const pop=document.getElementById('monthPop'); if(pop) pop.classList.remove('open');
+  // El Calendario Maestro salta al mes elegido; luego se re-renderiza la pantalla activa.
+  MAESTRO_REF=new Date(y,m-1,1);
+  const panel=document.querySelector('.panel.on'); if(panel) show(panel.id.replace('panel-',''), true);
+}
+document.addEventListener('click',e=>{ const pop=document.getElementById('monthPop'),btn=document.getElementById('monthCtrl'); if(pop&&pop.classList.contains('open')&&!pop.contains(e.target)&&btn&&!btn.contains(e.target)) pop.classList.remove('open'); });
+
 async function dropBooking(vid,date){
   const bid=DRAG_BID; DRAG_BID=null; if(!bid) return;
   const bk=CACHE.homeBk||[]; const b=bk.find(x=>String(x.id)===String(bid)); if(!b) return;
@@ -1399,13 +1445,15 @@ function updateWeekKpi(){
     +`<span><i style="background:var(--warn)"></i>${c('pending')} Pendientes</span>`
     +`<span><i style="background:var(--bad)"></i>${c('cancelled')} Canceladas</span>`;
 }
-// "Presupuesto utilizado" / "Ahorro" / donut — recomputados en vivo desde el
+// ¿La actuación cae en el mes/año activo (selector de arriba)?
+function inPeriodMonth(iso){ if(!iso) return false; const d=new Date(iso); return d.getFullYear()===PERIOD.year && (d.getMonth()+1)===PERIOD.month; }
+// "Presupuesto mensual" / "Ahorro" / donut — recomputados en vivo desde el
 // calendario, así se mueven en cuanto agregas, mueves o quitas actuaciones.
 function updateBudgetKpi(){
   const usadoV=document.getElementById('kUsadoV'); if(!usadoV) return;   // sólo en el Dashboard
   const bk=CACHE.homeBk||[]; const budget=+CACHE.homeBudget||0; const num=x=>+x||0;
-  const gastado=bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
-  const comprometido=bk.filter(b=>b.status==='confirmed'||b.status==='pending').reduce((a,b)=>a+num(b.agreed_price),0);
+  const gastado=bk.filter(b=>b.status==='completed'&&inPeriodMonth(b.starts_at)).reduce((a,b)=>a+num(b.agreed_price),0);
+  const comprometido=bk.filter(b=>(b.status==='confirmed'||b.status==='pending')&&inPeriodMonth(b.starts_at)).reduce((a,b)=>a+num(b.agreed_price),0);
   const usado=gastado+comprometido;
   const disponible=Math.max(0,budget-usado);
   const ahorro=budget-usado;
@@ -1822,10 +1870,10 @@ const RENDER = {
     const num = x => +x||0; const avg = a => a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
     const budget = gb.rows.filter(r=>+r.year===PERIOD.year && +r.month===PERIOD.month)
                           .reduce((a,r)=>a+(+r.entertainment_budget||0),0);
-    const gastado = bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
-    // "comprometido" = todo lo agendado que aún no se realiza (confirmadas + pendientes),
-    // para que el Presupuesto utilizado se mueva en cuanto agregas o quitas actuaciones.
-    const comprometido = bk.filter(b=>b.status==='confirmed'||b.status==='pending').reduce((a,b)=>a+num(b.agreed_price),0);
+    // Presupuesto MENSUAL: gasto del mes en curso (o del mes elegido en el selector)
+    // contra el presupuesto de ese mes, para que ambos hablen del mismo periodo.
+    const gastado = bk.filter(b=>b.status==='completed'&&inPeriodMonth(b.starts_at)).reduce((a,b)=>a+num(b.agreed_price),0);
+    const comprometido = bk.filter(b=>(b.status==='confirmed'||b.status==='pending')&&inPeriodMonth(b.starts_at)).reduce((a,b)=>a+num(b.agreed_price),0);
     const usado = gastado+comprometido;
     const disponible = Math.max(0, budget-usado);
     const ahorro = budget-usado;
