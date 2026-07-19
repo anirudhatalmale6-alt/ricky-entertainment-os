@@ -8,21 +8,29 @@ what powers the "Mi Perfil" screen where a musician edits their tarifas,
 descripciones and gestiona sus publicaciones (shows).
 """
 import uuid
+from datetime import date as date_cls
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from sqlalchemy import select, update
+from pydantic import BaseModel
+from sqlalchemy import delete as sa_delete, select, update
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentScope, DbSession
 from app.core.config import settings
 from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
+from app.models.blocked_date import ArtistBlockedDate
 from app.models.notification import ArtistNotification
 from app.models.media import ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
 from app.schemas.artist import ArtistOut, ArtistUpdate
 from app.schemas.show import ShowCreate, ShowOut, ShowUpdate
+
+
+class BlockedDateIn(BaseModel):
+    date: date_cls
+    reason: str | None = None
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -212,3 +220,48 @@ async def mark_notifications_read(scope: CurrentScope, db: DbSession):
             .values(is_read=True)
         )
         await db.commit()
+
+
+# --- Availability blocks (vacaciones / enfermedad) ------------------------
+
+@router.get("/blocked-dates")
+async def list_blocked_dates(scope: CurrentScope, db: DbSession):
+    """Days the artist marked as unavailable, as 'YYYY-MM-DD' strings."""
+    artist_id = await _require_artist(scope)
+    rows = (await db.execute(
+        select(ArtistBlockedDate)
+        .where(ArtistBlockedDate.artist_id == artist_id)
+        .order_by(ArtistBlockedDate.blocked_on)
+    )).scalars().all()
+    return [{"date": r.blocked_on.isoformat(), "reason": r.reason} for r in rows]
+
+
+@router.post("/blocked-dates", status_code=status.HTTP_201_CREATED)
+async def block_date(payload: BlockedDateIn, scope: CurrentScope, db: DbSession):
+    """Block one day (idempotent: re-blocking just refreshes the reason)."""
+    artist_id = await _require_artist(scope)
+    existing = (await db.execute(
+        select(ArtistBlockedDate).where(
+            ArtistBlockedDate.artist_id == artist_id,
+            ArtistBlockedDate.blocked_on == payload.date,
+        )
+    )).scalar_one_or_none()
+    if existing:
+        existing.reason = payload.reason
+    else:
+        db.add(ArtistBlockedDate(artist_id=artist_id, blocked_on=payload.date, reason=payload.reason))
+    await db.commit()
+    return {"date": payload.date.isoformat(), "reason": payload.reason}
+
+
+@router.delete("/blocked-dates/{day}", status_code=status.HTTP_204_NO_CONTENT)
+async def unblock_date(day: date_cls, scope: CurrentScope, db: DbSession):
+    """Remove a block so the day is bookable again."""
+    artist_id = await _require_artist(scope)
+    await db.execute(
+        sa_delete(ArtistBlockedDate).where(
+            ArtistBlockedDate.artist_id == artist_id,
+            ArtistBlockedDate.blocked_on == day,
+        )
+    )
+    await db.commit()

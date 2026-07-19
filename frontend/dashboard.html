@@ -209,14 +209,25 @@
   .cal .hd{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:6px}
   .cal .hd span{font-size:10px;color:var(--mut2);text-transform:uppercase;letter-spacing:.5px;text-align:center}
   .cal .gr{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
-  .cal .cell{aspect-ratio:1;border:1px solid var(--line);border-radius:8px;padding:5px 6px;font-size:12px;position:relative;min-height:40px}
-  .cal .cell.out{opacity:.28}
+  .cal .cell{border:1px solid var(--line);border-radius:8px;padding:5px 6px 6px;font-size:12px;position:relative;min-height:62px;cursor:pointer;transition:.12s;overflow:hidden}
+  .cal .cell:hover{border-color:var(--acc);background:#382ca108}
+  .cal .cell.out{opacity:.28;cursor:default;pointer-events:none}
   .cal .cell.today{border-color:var(--acc);background:#382ca112}
-  .cal .cell .dts{position:absolute;bottom:5px;left:6px;display:flex;gap:3px}
-  .cal .cell .dts i{width:6px;height:6px;border-radius:50%;display:block}
+  .cal .cell.blk{background:repeating-linear-gradient(45deg,#f871710e,#f871710e 6px,transparent 6px,transparent 12px);border-color:#f8717155}
+  .cal .cell .cd{font-weight:600}
+  .cal .cell .cc{position:absolute;top:4px;right:5px;background:var(--acc);color:#fff;font-size:9.5px;font-weight:700;min-width:15px;height:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px}
+  .cal .cell .cblk{position:absolute;bottom:4px;right:5px;font-size:10px;line-height:1}
+  .cal .cell .evs{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+  .cal .cell .ev{font-size:9px;line-height:1.3;padding:1px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--acc);background:var(--ov);color:var(--txt)}
+  .cal .cell .ev.e-confirmed{border-left-color:var(--info)}
+  .cal .cell .ev.e-pending{border-left-color:var(--warn)}
+  .cal .cell .ev.e-completed{border-left-color:var(--ok)}
+  .cal .cell .ev.e-cancelled{border-left-color:var(--bad);opacity:.55;text-decoration:line-through}
+  .cal .cell .evmore{font-size:8.5px;color:var(--mut);padding-left:3px;margin-top:1px}
   .cal-leg{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:11.5px;color:var(--mut)}
   .cal-leg span{display:flex;align-items:center;gap:6px}
-  .d-confirmed{background:var(--info)}.d-pending{background:var(--warn)}.d-completed{background:var(--ok)}.d-cancelled{background:var(--bad)}
+  .cal-leg .dot{width:9px;height:9px;border-radius:50%;display:block}
+  .d-confirmed{background:var(--info)}.d-pending{background:var(--warn)}.d-completed{background:var(--ok)}.d-cancelled{background:var(--bad)}.d-blk{background:#f87171}
 
   /* summary rows (solicitudes / market) */
   .srow{display:flex;align-items:center;gap:11px;padding:11px 0;border-top:1px solid var(--line)}
@@ -336,6 +347,10 @@
   .amod .rqbody{padding:16px 18px 4px;overflow-y:auto}
   .amod .rqbody .hint{margin:2px 0 12px}
   .amod.rqmod .af{justify-content:flex-end}
+  .dm-note{background:#f871711a;border:1px solid #f8717140;color:var(--bad);border-radius:9px;padding:9px 12px;font-size:12px;margin-bottom:8px}
+  .dm-ev{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:9px 11px;margin-bottom:7px}
+  .dm-ev.e-confirmed{border-left-color:var(--info)}.dm-ev.e-pending{border-left-color:var(--warn)}.dm-ev.e-completed{border-left-color:var(--ok)}.dm-ev.e-cancelled{border-left-color:var(--bad);opacity:.6}
+  .dm-ev b{font-size:13px}.dm-ev span{display:block;font-size:11px;color:var(--mut);margin-top:1px}
   .rqhead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;flex-wrap:wrap}
   .tx{background:var(--ov);border:0;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;color:var(--mut);line-height:1}
   .tx:hover{background:var(--bad);color:#fff}
@@ -707,7 +722,7 @@
         <div id="reg-hotel-done" class="lg-hide lg-done">
           <div class="lg-done-ic">✓</div>
           <h3>¡Solicitud recibida!</h3>
-          <p>Gracias por tu interés en ShowCase. Revisaremos tus datos y te contactaremos muy pronto para activar tu cuenta y coordinar una llamada.</p>
+          <p>Gracias por tu interés en SHOWMA. Revisaremos tus datos y te contactaremos muy pronto para activar tu cuenta y coordinar una llamada.</p>
         </div>
 
         <div class="lg-terms">Al crear tu cuenta, aceptas nuestros <span class="lg-link">Términos y Condiciones</span> y la <span class="lg-link">Política de Privacidad</span>.</div>
@@ -756,10 +771,10 @@
     <div class="promo" id="sidePromo" style="display:none"></div>
     <div class="side-user">
       <div class="su-av" id="suAv">RA</div>
-      <div class="su-meta"><b id="suName">Mi cuenta</b><span id="suRole">ShowCase</span></div>
+      <div class="su-meta"><b id="suName">Mi cuenta</b><span id="suRole">SHOWMA</span></div>
       <button class="su-out" onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión">↪ Salir</button>
     </div>
-    <div class="foot">ShowCase · v0.1</div>
+    <div class="foot">SHOWMA · v0.1</div>
   </aside>
 
   <div class="main">
@@ -799,6 +814,7 @@ const API = (window.RICKY_API ?? "http://localhost:8000") + "/api/v1";  // "" = 
 // el usuario puede cambiarlo desde el selector de arriba a la derecha.
 const PERIOD = (()=>{ const d=new Date(); return {year:d.getFullYear(), month:d.getMonth()+1}; })();
 let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company", NOTIF_CACHE=[];
+let BLOCKED=new Set();   // fechas 'YYYY-MM-DD' que el artista bloqueó (vacaciones/enfermedad)
 const MXN = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n||0);
 const CATCOL = {"Musica":"#382ca1","Shows":"#f59e0b","Fotografia y Video":"#3b82f6","Produccion":"#10b981"};
 const palette=["#382ca1","#3b82f6","#10b981","#f59e0b","#06b6d4","#ef4444"];
@@ -981,6 +997,20 @@ function setNavLabel(p,ic,txt){
   const n=document.querySelector(`.nav[data-p='${p}']`);
   if(n) n.innerHTML=`<span class="ic">${NAVICON[p]||ic}</span> ${txt}`;
 }
+// Aviso de mensajes sin leer junto a "Mis chats" / "Chat" en el menú lateral.
+async function syncChatBadge(){
+  const n=document.querySelector(".nav[data-p='chat']"); if(!n||!ME) return;
+  let total=0;
+  try{
+    const convs=await api(SELF?'/conversations/mine':'/conversations');
+    total=convs.reduce((a,c)=>a+((SENDER==='artist'?c.unread_for_artist:c.unread_for_company)||0),0);
+  }catch(e){ return; }
+  let b=n.querySelector('.badge');
+  if(total>0){
+    if(!b){ b=document.createElement('span'); b.className='badge'; n.appendChild(b); }
+    b.textContent=total>99?'99+':total; b.style.display='';
+  } else if(b){ b.style.display='none'; }
+}
 function applyRole(){
   SELF = !ME.is_admin;                       // artist / contratante -> scoped /mine views
   const isArtist = !!ME.artist_id;
@@ -1027,11 +1057,15 @@ function applyRole(){
   show('cal', true);                                     // actuaciones / historial de agenda
   if(isArtist){
     setNavLabel('home','🏠','Dashboard'); setNavLabel('cal','🗓️','Mis actuaciones'); setNavLabel('chat','💬','Mis chats');
+    setNavLabel('reqs','📣','Novedades');
     TITLES.home=["Dashboard","Tu actividad de un vistazo"];
+    TITLES.reqs=["Novedades","Oportunidades abiertas para ti"];
+    TITLES.chat=["Mis chats","Tus conversaciones con hoteles"];
   } else {
     setNavLabel('home','🏠','Dashboard'); setNavLabel('cal','🗓️','Actuaciones'); setNavLabel('chat','💬','Chat');
     TITLES.home=["Dashboard Ejecutivo","Resumen de entretenimiento"];
   }
+  syncChatBadge();   // total de mensajes sin leer junto a "Mis chats" / "Chat"
   // Sidebar hotel selector card (replaces the old top-bar group dropdown)
   const hs=document.getElementById('hotelSel');
   if(isArtist){ if(hs) hs.style.display='none'; }
@@ -2668,30 +2702,87 @@ async function del(path){
   if(!r.ok) throw new Error(path+' '+r.status);
 }
 
+function pad2(n){return String(n).padStart(2,'0');}
+function ymdStr(y,m,dd){return y+'-'+pad2(m+1)+'-'+pad2(dd);}   // m es 0-based
 function artistCal(bk, ref){
   const y=ref.getFullYear(), m=ref.getMonth();
   const start=(new Date(y,m,1).getDay()+6)%7;          // Monday-first
   const days=new Date(y,m+1,0).getDate();
   const today=new Date();
   const byDay={};
-  bk.forEach(b=>{const d=new Date(b.starts_at); if(d.getFullYear()===y&&d.getMonth()===m){(byDay[d.getDate()]=byDay[d.getDate()]||[]).push(b.status);}});
+  bk.forEach(b=>{const d=new Date(b.starts_at); if(d.getFullYear()===y&&d.getMonth()===m){(byDay[d.getDate()]=byDay[d.getDate()]||[]).push(b);}});
   const cells=[];
   for(let i=0;i<start;i++) cells.push('<div class="cell out"></div>');
   for(let dd=1;dd<=days;dd++){
+    const key=ymdStr(y,m,dd);
     const isToday=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===dd;
-    const dots=[...new Set(byDay[dd]||[])].map(s=>`<i class="d-${s}"></i>`).join("");
-    cells.push(`<div class="cell${isToday?' today':''}">${dd}<div class="dts">${dots}</div></div>`);
+    const blocked=BLOCKED.has(key);
+    const evs=(byDay[dd]||[]).slice().sort((a,b)=>String(a.starts_at).localeCompare(String(b.starts_at)));
+    let inner=`<span class="cd">${dd}</span>`;
+    if(evs.length) inner+=`<span class="cc">${evs.length}</span>`;
+    if(blocked) inner+=`<span class="cblk" title="Fecha bloqueada">🚫</span>`;
+    if(evs.length){
+      inner+=`<div class="evs">`+evs.slice(0,2).map(b=>{
+        const t=new Date(b.starts_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+        const nm=b.company_name||showLabel(b)||'Actuación';
+        return `<span class="ev e-${b.status}" title="${esc(t+' · '+nm)}">${esc(nm)}</span>`;
+      }).join('')+(evs.length>2?`<span class="evmore">+${evs.length-2} más</span>`:'')+`</div>`;
+    }
+    cells.push(`<div class="cell${isToday?' today':''}${blocked?' blk':''}" data-day="${key}" onclick="dayMenu('${key}',${evs.length})">${inner}</div>`);
   }
   const head=['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM'].map(h=>`<span>${h}</span>`).join("");
   return `<div class="cal"><div class="hd">${head}</div><div class="gr">${cells.join("")}</div>
-    <div class="cal-leg"><span><i class="dot d-confirmed"></i>Confirmada</span><span><i class="dot d-pending"></i>Pendiente</span><span><i class="dot d-completed"></i>Realizada</span><span><i class="dot d-cancelled"></i>Cancelada</span></div></div>`;
+    <div class="cal-leg"><span><i class="dot d-confirmed"></i>Confirmada</span><span><i class="dot d-pending"></i>Pendiente</span><span><i class="dot d-completed"></i>Realizada</span><span><i class="dot d-cancelled"></i>Cancelada</span><span><i class="dot d-blk"></i>Bloqueada</span></div></div>`;
 }
 
+// Popup de un día del calendario: sus actuaciones + bloquear/desbloquear la fecha.
+function dayMenu(key){
+  const [Y,M,D]=key.split('-').map(Number);
+  const evs=(CACHE.artistBk||[]).filter(b=>{const d=new Date(b.starts_at);return d.getFullYear()===Y&&d.getMonth()===M-1&&d.getDate()===D;})
+    .sort((a,b)=>String(a.starts_at).localeCompare(String(b.starts_at)));
+  const blocked=BLOCKED.has(key);
+  const nice=new Date(Y,M-1,D).toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  let ov=document.getElementById('dmMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='dmMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) dmClose(); }); }
+  const evHtml = evs.length
+    ? evs.map(b=>{const t=new Date(b.starts_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+        return `<div class="dm-ev e-${b.status}"><div><b>${esc(b.company_name||showLabel(b)||'Actuación')}</b><span>${t} · ${esc(showLabel(b))}</span></div>${chip(b.status)}</div>`;}).join('')
+    : `<div class="muted" style="padding:6px 0">Sin actuaciones este día.</div>`;
+  const blockBtn = blocked
+    ? `<button class="btn ghost" onclick="unblockDate('${key}')">✅ Desbloquear día</button>`
+    : `<button class="btn danger" ${evs.length?'title="Este día ya tiene actuaciones"':''} onclick="blockDate('${key}')">🚫 Bloquear día</button>`;
+  ov.innerHTML=`<div class="amod" style="max-width:400px;position:relative">
+    <button class="ax" onclick="dmClose()" aria-label="Cerrar">✕</button>
+    <div class="ah" style="padding:18px 20px 4px;text-transform:capitalize"><b>${esc(nice)}</b></div>
+    <div class="rqbody" style="padding:8px 20px 4px">
+      ${blocked?`<div class="dm-note">🚫 Día bloqueado — los hoteles te ven como no disponible.</div>`:''}
+      <h4 style="margin:6px 0 4px;font-size:12.5px;color:var(--mut)">Actuaciones</h4>
+      ${evHtml}
+    </div>
+    <div class="af" style="justify-content:space-between">${blockBtn}<button class="btn ghost" onclick="dmClose()">Cerrar</button></div>`;
+  ov.style.display='flex';
+}
+function dmClose(){ const ov=document.getElementById('dmMov'); if(ov) ov.style.display='none'; }
+async function blockDate(key){
+  try{ await post('/me/blocked-dates',{date:key}); BLOCKED.add(key); toast('Día bloqueado 🚫'); dmClose(); show('home',true); }
+  catch(e){ toast('No se pudo bloquear: '+(e.message||''),true); }
+}
+async function unblockDate(key){
+  try{ await del('/me/blocked-dates/'+key); BLOCKED.delete(key); toast('Día liberado ✓'); dmClose(); show('home',true); }
+  catch(e){ toast('No se pudo desbloquear: '+(e.message||''),true); }
+}
+window.dayMenu=dayMenu;window.blockDate=blockDate;window.unblockDate=unblockDate;window.dmClose=dmClose;
+
 async function artistHome(box){
-  const [p, bk, convs, openReqs] = await Promise.all([
-    api('/me/artist'), api('/bookings/mine'), api('/conversations/mine'), api('/requests?status=open')
+  const [p, bk, convs, openReqs, blk] = await Promise.all([
+    api('/me/artist'), api('/bookings/mine'), api('/conversations/mine'), api('/requests?status=open'),
+    api('/me/blocked-dates').catch(()=>[])
   ]);
+  BLOCKED = new Set((blk||[]).map(x=>typeof x==='string'?x:x.date));
+  CACHE.artistBk = bk;   // lo usa dayMenu() para listar las actuaciones de un día
   const now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const calRef=new Date(PERIOD.year, PERIOD.month-1, 1);   // el calendario sigue el mes elegido arriba a la derecha
   const isRev=b=>['confirmed','completed'].includes(b.status);
   const done=bk.filter(b=>b.status==='completed');
   const upcoming=bk.filter(b=>['pending','confirmed'].includes(b.status)&&new Date(b.starts_at)>=today).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
@@ -2734,9 +2825,9 @@ async function artistHome(box){
         </div></div>
     </div>
     <div class="grid2">
-      <div class="box"><h3 style="text-transform:capitalize">🗓️ Calendario — ${now.toLocaleDateString('es-MX',{month:'long',year:'numeric'})}</h3><div class="hint">Tus fechas del mes</div>${artistCal(bk,now)}</div>
+      <div class="box"><h3 style="text-transform:capitalize">🗓️ Calendario — ${calRef.toLocaleDateString('es-MX',{month:'long',year:'numeric'})}</h3><div class="hint">Toca un día para bloquearlo (vacaciones/enfermedad) o ver sus actuaciones · cambia de mes arriba a la derecha</div>${artistCal(bk,calRef)}</div>
       <div style="display:flex;flex-direction:column;gap:16px">
-        <div class="box"><h3>📣 Solicitudes</h3><div class="hint">Oportunidades y mensajes</div>
+        <div class="box"><h3>📣 Novedades</h3><div class="hint">Oportunidades y mensajes</div>
           <div class="srow"><div class="ic2">✨</div><div class="lb">Nuevas oportunidades<s>solicitudes abiertas</s></div><div class="nb">${openReqs.length}</div></div>
           <div class="srow"><div class="ic2">💬</div><div class="lb">Mensajes sin leer<s>de hoteles</s></div><div class="nb">${unread}</div></div>
           <div class="srow"><div class="ic2">🎭</div><div class="lb">Actuaciones próximas<s>confirmadas o pendientes</s></div><div class="nb">${upcoming.length}</div></div>
@@ -2835,6 +2926,13 @@ async function openConv(id,el){
   CACHE.cur=id;
   document.getElementById('msgs').innerHTML=msgs.map(m=>`<div class="msg ${m.sender_role===SENDER?'me':'them'}">${esc(m.body)}<div class="tm">${fmtDate(m.created_at)}</div></div>`).join("");
   const mm=document.getElementById('msgs'); mm.scrollTop=mm.scrollHeight;
+  // Marca como leídos los mensajes de la otra parte y baja el contador.
+  if(SELF){ try{
+    await post(`/conversations/${id}/read?role=${SENDER}`);
+    if(c) c[SENDER==='artist'?'unread_for_artist':'unread_for_company']=0;
+    const item=document.querySelector(`.citem[data-id='${id}'] .badge`); if(item) item.remove();
+    syncChatBadge();
+  }catch(e){} }
 }
 async function sendMsg(){
   const inp=document.getElementById('cin'); const b=inp.value.trim(); if(!b||!CACHE.cur)return;
