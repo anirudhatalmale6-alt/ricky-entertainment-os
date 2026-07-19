@@ -1093,9 +1093,9 @@ function applyRole(){
   show('cal', true);                                     // actuaciones / historial de agenda
   if(isArtist){
     setNavLabel('home','🏠','Dashboard'); setNavLabel('cal','🗓️','Mis actuaciones'); setNavLabel('chat','💬','Mis chats');
-    setNavLabel('reqs','📣','Novedades');
+    setNavLabel('reqs','📣','Propuestas');
     TITLES.home=["Dashboard","Tu actividad de un vistazo"];
-    TITLES.reqs=["Novedades","Oportunidades abiertas para ti"];
+    TITLES.reqs=["Propuestas","Oportunidades abiertas para ti"];
     TITLES.chat=["Mis chats","Tus conversaciones con hoteles"];
   } else {
     setNavLabel('home','🏠','Dashboard'); setNavLabel('cal','🗓️','Actuaciones'); setNavLabel('chat','💬','Chat');
@@ -1864,8 +1864,8 @@ async function openArtistProfile(artistId){
   const cover=a.profile_image_url||photos[0]||null;
   const langs=a.languages_spoken||[];
   const sl=a.social_links||{};
-  const socLinks=Object.entries(sl).filter(([k,v])=>v).map(([k,v])=>`<a class="socpill" href="${esc(socialUrl(k,v))}" target="_blank" rel="noopener">${esc(SOCNAME[k]||_cap(k))}</a>`);
-  if(a.website) socLinks.push(`<a class="socpill" href="${esc(/^https?:/i.test(a.website)?a.website:'https://'+a.website)}" target="_blank" rel="noopener">Sitio web</a>`);
+  // Solo dejamos YouTube (y las fotos/videos); se quitaron el resto de redes y las páginas web propias.
+  const socLinks=Object.entries(sl).filter(([k,v])=>v && k==='youtube').map(([k,v])=>`<a class="socpill" href="${esc(socialUrl(k,v))}" target="_blank" rel="noopener">${esc(SOCNAME[k]||_cap(k))}</a>`);
   const chips=[]; if(a.artist_type) chips.push(esc(pretty(a.artist_type))); if(a.base_city||a.city) chips.push('📍 '+esc(a.base_city||a.city)); if(a.years_experience) chips.push('🎓 '+esc(a.years_experience)); if(langs.length) chips.push('🗣 '+esc(langs.join(', ')));
   ov.innerHTML=`<div class="amod apmod" style="position:relative">
     <button class="ax" onclick="apClose()" aria-label="Cerrar">✕</button>
@@ -2611,10 +2611,7 @@ const RENDER = {
           <div class="field"><label>Teléfono</label><input id="pf_phone" value="${esc(p.phone||'')}"></div>
           <div class="field"><label>Correo de contacto</label><input id="pf_email" value="${esc(p.email||'')}"></div>
         </div>
-        <div class="fgrid">
-          <div class="field"><label>Sitio web</label><input id="pf_web" value="${esc(p.website||'')}" placeholder="https://…"></div>
-          <div class="field"><label>Instagram</label><input id="pf_ig" value="${esc(sl.instagram||'')}" placeholder="@usuario"></div>
-        </div>
+        <div class="field"><label>YouTube (opcional)</label><input id="pf_yt" value="${esc(sl.youtube||'')}" placeholder="Enlace o usuario de tu canal de YouTube"></div>
         <div class="saverow"><button class="btn" onclick="saveProfile(this)">Guardar cambios</button><span class="saved" id="pf_saved">Guardado ✓</span></div>
       </div>
       <div class="box">
@@ -3000,10 +2997,11 @@ function setSelfAvatar(url,name){
 }
 async function saveProfile(btn){
   btn.disabled=true;
-  const sl=Object.assign({},(CACHE.profile&&CACHE.profile.social_links)||{});
-  const ig=gv('pf_ig'); if(ig) sl.instagram=ig; else delete sl.instagram;
+  // Solo conservamos YouTube; se eliminan el resto de redes y las páginas web propias.
+  const sl={};
+  const yt=gv('pf_yt'); if(yt) sl.youtube=yt;
   const body={stage_name:gv('pf_stage'),base_city:gv('pf_city')||null,bio:gv('pf_bio')||null,
-    phone:gv('pf_phone')||null,email:gv('pf_email')||null,website:gv('pf_web')||null,social_links:sl};
+    phone:gv('pf_phone')||null,email:gv('pf_email')||null,website:null,social_links:sl};
   try{ CACHE.profile=await patch('/me/artist',body); flash('pf_saved'); refreshIdentity(); }
   catch(e){ alert('No se pudo guardar: '+e.message); }
   btn.disabled=false;
