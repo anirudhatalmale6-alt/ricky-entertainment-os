@@ -25,6 +25,29 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+# Additive columns that landed after the initial deploy. create_all() creates
+# missing TABLES but never alters existing ones, and this staging box is on
+# SQLite with FTP-only access (no shell to run migrations). So we add any missing
+# column here at boot — idempotent and safe (ADD COLUMN only, never drops).
+_SQLITE_ADDED_COLUMNS = [
+    # (table, column, sqlite column definition)
+    ("artists", "auto_confirm_bookings", "BOOLEAN DEFAULT 0"),
+    ("artists", "profile_image_url", "VARCHAR(500)"),
+    ("request_proposals", "images", "JSON"),
+]
+
+
+def _apply_additive_columns(sync_conn) -> None:
+    from sqlalchemy import text
+
+    for table, column, decl in _SQLITE_ADDED_COLUMNS:
+        cols = {row[1] for row in sync_conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+        if not cols:
+            continue  # table doesn't exist yet (fresh DB) — create_all made it with the column
+        if column not in cols:
+            sync_conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
 async def init_db() -> None:
     """Create tables. For production use Alembic migrations instead."""
     from app.db.base import Base
@@ -32,3 +55,5 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if settings.DATABASE_URL.startswith("sqlite"):
+            await conn.run_sync(_apply_additive_columns)

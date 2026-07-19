@@ -39,6 +39,7 @@ class Artist(Base, TimestampMixin):
     date_of_birth: Mapped[date | None] = mapped_column(Date)
     artist_type: Mapped[str | None] = mapped_column(String(80))        # Solista / agrupacion / productora
     bio: Mapped[str | None] = mapped_column(Text)
+    profile_image_url: Mapped[str | None] = mapped_column(String(500))   # avatar que ven los hoteles
     years_experience: Mapped[str | None] = mapped_column(String(40))
     languages_spoken: Mapped[list] = mapped_column(JSON, default=list)
     social_links: Mapped[dict] = mapped_column(JSON, default=dict)     # {instagram, facebook, youtube, tiktok}
@@ -65,6 +66,9 @@ class Artist(Base, TimestampMixin):
 
     # --- Marketplace flags (profile level) -----------------------------
     allow_subcontracting: Mapped[bool] = mapped_column(Boolean, default=False)  # deja que Partners lo contacten
+    # Cómo se aprueban las actuaciones que le llegan: True = se confirman solas,
+    # False = quedan "pendientes" hasta que el artista las acepta/rechaza.
+    auto_confirm_bookings: Mapped[bool] = mapped_column(Boolean, default=False)
     # Artist who upgraded to provider - branded "Partner" so they feel part of it.
     # Partner is a paid subscription ($499/mes) that adds visibility + a
     # "Partner Verificado" badge and unlocks subcontracting between acts.

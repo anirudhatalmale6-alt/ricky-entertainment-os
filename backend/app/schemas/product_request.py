@@ -70,6 +70,7 @@ class ProposalCreate(BaseModel):
     message: str | None = None
     proposed_price: float | None = Field(default=None, ge=0)
     currency: str = "MXN"
+    images: list[str] = Field(default=[], max_length=3)   # hasta 3 imágenes de referencia
 
 
 class ProposalOut(BaseModel):
@@ -80,6 +81,7 @@ class ProposalOut(BaseModel):
     message: str | None = None
     proposed_price: float | None = None
     currency: str
+    images: list[str] = []
     status: ProposalStatus
     created_at: datetime
     artist_name: str | None = None

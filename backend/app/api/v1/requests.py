@@ -317,6 +317,10 @@ async def _booking_from_proposal(
     if req.event_date is None:
         note += " (fecha tentativa, confirmar en agenda)"
 
+    # Respect the artist's approval preference (auto vs. manual).
+    artist = await db.get(Artist, winner.artist_id)
+    auto = bool(artist and artist.auto_confirm_bookings)
+
     booking = Booking(
         show_id=None,
         venue_id=None,
@@ -329,7 +333,8 @@ async def _booking_from_proposal(
         currency=winner.currency,
         commission_pct=commission_pct,
         notes=note,
-        status=BookingStatus.PENDING,
+        status=BookingStatus.CONFIRMED if auto else BookingStatus.PENDING,
+        confirmed_at=_now() if auto else None,
     )
     db.add(booking)
     await db.flush()  # assign booking.id within the same transaction

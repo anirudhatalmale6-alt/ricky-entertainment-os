@@ -85,6 +85,42 @@
   .mp-grid button:hover{background:var(--ov2)}
   .mp-grid button.on{background:var(--grad);color:#fff}
   .ava{width:34px;height:34px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff}
+  .ava.hasimg,.su-av.hasimg{background-size:cover;background-position:center;color:transparent}
+  /* avatar reutilizable (perfil, catálogo): foto o iniciales */
+  .uav{border-radius:50%;background-size:cover;background-position:center;background-color:var(--ov2);flex:none;background-repeat:no-repeat}
+  .uav.ini{display:grid;place-items:center;background:var(--grad);color:#fff;font-weight:700}
+  /* tarjeta de foto de perfil (Mi Perfil) */
+  .pfimg-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .pfimg-av{width:82px;height:82px;border-radius:16px;background-size:cover;background-position:center;background:var(--ov2);display:grid;place-items:center;color:var(--mut);font-size:26px;font-weight:700;flex:none;border:1px solid var(--line)}
+  .pfgal{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .pfgal .g{width:56px;height:56px;border-radius:10px;background-size:cover;background-position:center;cursor:pointer;border:2px solid transparent;transition:.12s}
+  .pfgal .g:hover{border-color:var(--acc)}
+  .pfgal .g.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}
+  /* toggle (auto-confirmar) */
+  .swrow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:4px 0}
+  .switch{position:relative;width:44px;height:25px;flex:none}
+  .switch input{opacity:0;width:0;height:0}
+  .switch .sl{position:absolute;inset:0;background:var(--ov2);border:1px solid var(--line);border-radius:25px;cursor:pointer;transition:.18s}
+  .switch .sl:before{content:"";position:absolute;width:19px;height:19px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .switch input:checked+.sl{background:var(--acc);border-color:var(--acc)}
+  .switch input:checked+.sl:before{transform:translateX(19px)}
+  .pendbar{background:#f59e0b14;border:1px solid #f59e0b40;color:#b45309;border-radius:10px;padding:10px 13px;font-size:12.5px;margin-top:12px}
+  .agact{display:flex;gap:6px}
+  .mini{border:1px solid var(--line);background:var(--ov2);color:var(--txt);font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
+  .mini.ok{background:#10b98118;border-color:#10b98155;color:#059669}
+  .mini.ok:hover{background:#10b981;color:#fff}
+  .mini.no{background:#f8717112;border-color:#f8717145;color:#dc2626}
+  .mini.no:hover{background:#ef4444;color:#fff}
+  /* miniaturas de propuesta */
+  .pgal{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 2px}
+  .pthumb{width:62px;height:62px;border-radius:9px;background-size:cover;background-position:center;cursor:pointer;border:1px solid var(--line)}
+  .ppgal{display:flex;gap:8px;flex-wrap:wrap}
+  .ppthumb{position:relative;width:66px;height:66px;border-radius:9px;background-size:cover;background-position:center;border:1px solid var(--line)}
+  .ppthumb .ppx{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:#ef4444;color:#fff;font-size:11px;cursor:pointer;line-height:1;display:grid;place-items:center}
+  .ppadd{width:66px;height:66px;border-radius:9px;border:1.5px dashed var(--line);background:var(--ov);color:var(--mut);font-size:24px;cursor:pointer}
+  .ppadd:hover{border-color:var(--acc);color:var(--acc)}
+  .lbmov{position:fixed;inset:0;background:rgba(8,10,20,.85);z-index:80;display:none;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
+  .lbmov img{max-width:92vw;max-height:88vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
   .bell{position:relative;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;font-size:16px;cursor:pointer;transition:.15s}
   .bell:hover{background:var(--inp)}
   .bell .dot{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--acc2);border:1.5px solid var(--card)}
@@ -1825,7 +1861,7 @@ async function openArtistProfile(artistId){
   try{ shows=(await api('/artists/'+artistId+'/shows'))||[]; }catch(e){}
   const photos=[]; shows.forEach(s=>(s.images||[]).forEach(im=>{ if(im.url) photos.push(im.url); }));
   const videos=shows.filter(s=>s.video_url).map(s=>({name:s.show_name,url:s.video_url}));
-  const cover=photos[0]||null;
+  const cover=a.profile_image_url||photos[0]||null;
   const langs=a.languages_spoken||[];
   const sl=a.social_links||{};
   const socLinks=Object.entries(sl).filter(([k,v])=>v).map(([k,v])=>`<a class="socpill" href="${esc(socialUrl(k,v))}" target="_blank" rel="noopener">${esc(SOCNAME[k]||_cap(k))}</a>`);
@@ -1873,6 +1909,7 @@ async function apMessage(artistId){
 /* ---- Detalle de solicitud + propuestas ---- */
 function propChip(s){const m={pending:['c-pending','Pendiente'],accepted:['c-completed','Aceptada'],rejected:['c-cancelled','Descartada'],withdrawn:['c-cancelled','Retirada']};const x=m[s]||['c-pending',s];return `<span class="chip ${x[0]}">${x[1]}</span>`;}
 let RD_ID=null;
+let PROP_IMGS=[];   // imágenes adjuntas a la propuesta que el artista está redactando
 async function openReqDetail(id){
   RD_ID=id;
   let ov=document.getElementById('rdMov');
@@ -1891,6 +1928,8 @@ async function rdRender(){
   const meta=parseMeta(r.description);
   const isArtist=!!ME.artist_id;
   const open = r.status==='open';
+  const myProp = isArtist ? props.find(p=>p.artist_id===ME.artist_id) : null;
+  PROP_IMGS = ((myProp&&myProp.images)||[]).slice(0,3);   // arranca con las que ya tenía
   const det=`<div class="rddet">
       <div class="rdmeta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
       <div class="rdmeta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
@@ -1906,6 +1945,7 @@ async function rdRender(){
     <div class="ah" style="padding:18px 20px 6px"><b>${esc(r.title||'Solicitud')}</b> ${chip(r.status)}</div>
     <div class="rqbody">${body}</div>
     <div class="af"><button class="btn ghost" onclick="rdClose()">Cerrar</button></div>`;
+  if(document.getElementById('pp_imgs')) renderPropImgs();
 }
 function rdHotelSection(r, props, open){
   if(!props.length) return `<div class="apsec"><h4>Propuestas recibidas</h4><div class="muted" style="padding:8px 0">Aún no hay propuestas. Cuando un artista responda, aparecerá aquí.</div></div>`;
@@ -1916,6 +1956,7 @@ function rdHotelSection(r, props, open){
         ${p.proposed_price!=null?`<span class="pprice">${MXN(p.proposed_price)}</span>`:''}
       </div>
       ${p.message?`<div class="pmsg">${esc(p.message)}</div>`:''}
+      ${(p.images&&p.images.length)?`<div class="pgal">${p.images.map(u=>`<div class="pthumb" style="background-image:url('${esc(u)}')" onclick="lightbox('${esc(u)}')"></div>`).join('')}</div>`:''}
       <div class="prow-a">
         <button class="btn ghost sm" onclick="apMessage(${p.artist_id||0})">Mensaje</button>
         ${(open && p.status==='pending')?`<button class="btn sm" onclick="acceptProposal(${r.id},${p.id})">Aceptar</button>`:''}
@@ -1931,6 +1972,7 @@ function rdArtistSection(r, mine, open){
     return `<div class="apsec"><h4>Tu propuesta</h4>${head}
       ${mine&&mine.proposed_price!=null?`<div class="rdmeta">💰 ${MXN(mine.proposed_price)}</div>`:''}
       ${mine&&mine.message?`<div class="pmsg">${esc(mine.message)}</div>`:''}
+      ${(mine&&mine.images&&mine.images.length)?`<div class="pgal">${mine.images.map(u=>`<div class="pthumb" style="background-image:url('${esc(u)}')" onclick="lightbox('${esc(u)}')"></div>`).join('')}</div>`:''}
       <div class="muted" style="font-size:12px;margin-top:8px">${r.status==='fulfilled'?(mine&&mine.status==='accepted'?'¡Felicidades! Tu propuesta fue aceptada. La actuación está en tu agenda.':'La solicitud fue adjudicada a otra propuesta.'):'Esta solicitud ya no admite propuestas.'}</div>
     </div>`;
   }
@@ -1939,18 +1981,43 @@ function rdArtistSection(r, mine, open){
   return `<div class="apsec"><h4>${mine?'Actualiza tu propuesta':'Envía tu propuesta'}</h4>${head}
     <div class="field"><label>Precio propuesto (MXN)</label><input id="pp_price" type="number" min="0" step="500" value="${priceVal}" placeholder="Tu tarifa para este evento"></div>
     <div class="field"><label>Mensaje</label><textarea id="pp_msg" placeholder="Preséntate, propón formato/horario y qué incluyes…">${esc(msgVal)}</textarea></div>
+    <div class="field"><label>Imágenes (opcional · hasta 3)</label>
+      <div class="hint" style="margin:0 0 8px">Adjunta fotos de tu show, montaje o referencias para que el hotel se dé una idea.</div>
+      <input type="file" id="pp_file" accept="image/*" style="display:none" onchange="addPropImg(this)">
+      <div id="pp_imgs"></div>
+    </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
       ${mine&&mine.status==='pending'?`<button class="btn ghost" onclick="withdrawProposal(${r.id},${mine.id})">Retirar</button>`:''}
       <button class="btn" id="pp_go" onclick="submitProposal(${r.id})">${mine?'Actualizar propuesta':'Enviar propuesta'}</button>
     </div>
   </div>`;
 }
+function renderPropImgs(){
+  const box=document.getElementById('pp_imgs'); if(!box) return;
+  const thumbs=PROP_IMGS.map((u,i)=>`<div class="ppthumb" style="background-image:url('${esc(u)}')"><button class="ppx" onclick="rmPropImg(${i})" title="Quitar">✕</button></div>`).join('');
+  const addBtn=PROP_IMGS.length<3?`<button class="ppadd" onclick="document.getElementById('pp_file').click()" title="Agregar imagen">＋</button>`:'';
+  box.innerHTML=`<div class="ppgal">${thumbs}${addBtn}</div>`;
+}
+async function addPropImg(input){
+  const f=input.files&&input.files[0]; input.value=''; if(!f) return;
+  if(PROP_IMGS.length>=3){ toast('Máximo 3 imágenes.',true); return; }
+  try{ toast('Subiendo imagen…'); const url=await uploadImage(f); PROP_IMGS.push(url); renderPropImgs(); }
+  catch(e){ toast('No se pudo subir: '+(e.message||''),true); }
+}
+function rmPropImg(i){ PROP_IMGS.splice(i,1); renderPropImgs(); }
+function lightbox(url){
+  let ov=document.getElementById('lbMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='lbMov'; ov.className='lbmov'; document.body.appendChild(ov);
+    ov.addEventListener('click',()=>{ ov.style.display='none'; }); }
+  ov.innerHTML=`<img src="${esc(url)}" alt="">`; ov.style.display='flex';
+}
+window.addPropImg=addPropImg;window.rmPropImg=rmPropImg;window.lightbox=lightbox;
 async function submitProposal(reqId){
   const price=document.getElementById('pp_price').value;
   const msg=(document.getElementById('pp_msg').value||'').trim();
   if(!msg && price===''){ toast('Escribe un mensaje o un precio para tu propuesta.',true); return; }
   const btn=document.getElementById('pp_go'); if(btn){ btn.disabled=true; btn.textContent='Enviando…'; }
-  const body={ artist_id:ME.artist_id, currency:'MXN' };
+  const body={ artist_id:ME.artist_id, currency:'MXN', images:PROP_IMGS.slice(0,3) };
   if(msg) body.message=msg;
   if(price!=='') body.proposed_price=+price;
   try{ await post('/requests/'+reqId+'/proposals',body); toast('Propuesta enviada ✓'); await rdRender(); show('reqs',true); }
@@ -2000,11 +2067,28 @@ function renderAgenda(fromRange){
     ? `${bk.length} ${noun(bk.length)}`
     : `${r.length} de ${bk.length} ${noun(bk.length)}`;
   const body=document.getElementById('ag_body'); if(!body) return;
+  const isArtist=!!(ME&&ME.artist_id);
+  const cols=isArtist?7:6;
+  const actionCell=b=>{ if(!isArtist) return '';
+    return `<td>${b.status==='pending'
+      ? `<div class="agact"><button class="mini ok" onclick="artistRespond(${b.id},'accept')">Aceptar</button><button class="mini no" onclick="artistRespond(${b.id},'reject')">Rechazar</button></div>`
+      : '<span class="muted">—</span>'}</td>`; };
   body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
       <td class="muted">${esc(b.venue_name||'—')}</td><td>${MXN(b.agreed_price)}</td>
-      <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td></tr>`).join('')
-    : `<tr><td colspan="6" class="muted" style="text-align:center;padding:22px">Sin actuaciones para este filtro.</td></tr>`;
+      <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
+    : `<tr><td colspan="${cols}" class="muted" style="text-align:center;padding:22px">Sin actuaciones para este filtro.</td></tr>`;
 }
+async function artistRespond(id,action){
+  if(action==='reject' && !confirm('¿Rechazar esta actuación? El hotel será notificado y quedará cancelada.')) return;
+  try{
+    await post(`/bookings/${id}/artist-respond?action=${action}`);
+    const b=(CACHE.agenda||[]).find(x=>x.id===id);
+    if(b) b.status = action==='accept'?'confirmed':'cancelled';
+    toast(action==='accept'?'Actuación confirmada ✓':'Actuación rechazada');
+    renderAgenda();
+  }catch(e){ toast('No se pudo procesar: '+(e.message||''),true); }
+}
+window.artistRespond=artistRespond;
 /* ---- Facturación hoteles (screen 6): agrupa actuaciones facturables por hotel+mes ---- */
 async function hotelBill(box){
   const bk=await api(`/bookings?group_id=${GID}`);
@@ -2248,11 +2332,11 @@ const RENDER = {
 
   async artists(box){
     const shows = await api('/shows');
-    let amap={}; try{ (await api('/artists')||[]).forEach(a=>{amap[a.id]={name:a.stage_name,city:a.base_city||a.city,partner:a.is_partner,langs:a.languages_spoken||[]};}); }catch(e){}
+    let amap={}; try{ (await api('/artists')||[]).forEach(a=>{amap[a.id]={name:a.stage_name,city:a.base_city||a.city,partner:a.is_partner,langs:a.languages_spoken||[],profileImg:a.profile_image_url||null};}); }catch(e){}
     const now=Date.now(); const seen=new Set(); const items=[];
     (shows||[]).filter(s=>s.is_active!==false).forEach(s=>{
       const key=(s.artist_id||'')+'|'+s.show_name; if(seen.has(key))return; seen.add(key);
-      const a=amap[s.artist_id]||{}; const img=(s.images&&s.images[0]&&s.images[0].url)||null;
+      const a=amap[s.artist_id]||{}; const img=(s.images&&s.images[0]&&s.images[0].url)||a.profileImg||null;
       items.push({id:s.id,artistId:s.artist_id,name:a.name||s.show_name,show:s.show_name,cat:s.category,sub:s.subcategory,
         price:s.price_hotel||s.base_price||null,rating:s.rating,img,city:a.city,partner:a.partner,langs:a.langs,
         isNew:s.created_at?(now-new Date(s.created_at).getTime())<7*864e5:false,genres:s.genres||[]});
@@ -2411,8 +2495,10 @@ const RENDER = {
     const scopeTxt = SELF ? (ME.artist_id?'tus actuaciones':'las de tu hotel') : 'toda la cadena';
     const months=[...new Set(bk.map(b=>(b.starts_at||'').slice(0,7)).filter(Boolean))].sort();
     const mlabel=k=>{const[y,m]=k.split('-');return _cap(new Date(y,m-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'}));};
+    const pend = ME.artist_id ? bk.filter(b=>b.status==='pending').length : 0;
     box.innerHTML=`<div class="box"><h3>🗓️ Agenda de actuaciones</h3>
       <div class="hint" id="ag_scope">${bk.length} actuaciones · ${scopeTxt}</div>
+      ${pend?`<div class="pendbar">🔔 Tienes ${pend} ${pend===1?'actuación pendiente':'actuaciones pendientes'} por aceptar o rechazar. ¿Quieres que se confirmen solas? Actívalo en Mi Perfil → Confirmación de actuaciones.</div>`:''}
       <div class="filters" style="margin:14px 0 6px"><div class="agfilt">
         <div class="field"><label>Mes</label><select id="ag_month" onchange="agendaMonthPick()"><option value="">Todos los meses</option>${months.map(k=>`<option value="${k}">${mlabel(k)}</option>`).join('')}</select></div>
         <div class="field"><label>Desde</label><input type="date" id="ag_from" onchange="renderAgenda(true)"></div>
@@ -2420,7 +2506,7 @@ const RENDER = {
         <div class="field"><label>Estado</label><select id="ag_status" onchange="renderAgenda()"><option value="">Todos</option><option value="pending">Pendiente</option><option value="confirmed">Confirmada</option><option value="completed">Realizada</option><option value="cancelled">Cancelada</option></select></div>
         <button class="btn ghost" onclick="agendaReset()">Limpiar</button>
       </div></div>
-      <table><thead><tr><th>Fecha</th><th>Show</th><th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th></tr></thead>
+      <table><thead><tr><th>Fecha</th><th>Show</th><th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th>${ME.artist_id?'<th>Acción</th>':''}</tr></thead>
       <tbody id="ag_body"></tbody></table></div>`;
     renderAgenda();
   },
@@ -2489,8 +2575,31 @@ const RENDER = {
     const partner = p.is_partner
       ? `<div class="partner"><div class="cr">👑</div><div><b>Eres Partner ✓</b><p>Tienes acceso a Market Intelligence, prioridad en el tablero y tu insignia Partner visible para los hoteles.</p></div></div>`
       : `<div class="partner"><div class="cr">🚀</div><div style="flex:1"><b>Conviértete en Partner</b><p>Desbloquea Market Intelligence (tu precio vs. mercado, demanda por zona), prioridad en solicitudes y la insignia Partner que ven los hoteles.</p></div><button class="btn" onclick="becomePartner()">Activar Partner</button></div>`;
+    const gal=[]; (p.shows||[]).forEach(s=>(s.images||[]).forEach(im=>{ if(im.url && !gal.includes(im.url)) gal.push(im.url); }));
+    const pfUrl=p.profile_image_url||null;
     box.innerHTML=`
       <div style="margin-bottom:16px">${partner}</div>
+      <div class="box" style="margin-bottom:16px">
+        <h3>📸 Foto de perfil</h3><div class="hint">Es la imagen que ven los hoteles en el catálogo. Con foto tu perfil se ve mucho más profesional que solo con iniciales.</div>
+        <div class="pfimg-row">
+          <div class="pfimg-av" style="${pfUrl?`background-image:url('${esc(pfUrl)}')`:''}">${pfUrl?'':(esc((p.stage_name||'A').split(/\\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase()))}</div>
+          <div style="flex:1;min-width:200px">
+            <input type="file" id="pf_file" accept="image/*" style="display:none" onchange="uploadProfileImg(this)">
+            <button class="btn" onclick="document.getElementById('pf_file').click()">${pfUrl?'Cambiar foto':'Subir foto'}</button>
+            ${pfUrl?`<button class="btn ghost" onclick="clearProfileImg()" style="margin-left:8px">Quitar</button>`:''}
+            <div class="hint" style="margin:10px 0 0">Sube una imagen (se ajusta sola). ${gal.length?'O elige una de tus fotos ya cargadas:':''}</div>
+            ${gal.length?`<div class="pfgal">${gal.slice(0,12).map(u=>`<div class="g${u===pfUrl?' on':''}" style="background-image:url('${esc(u)}')" onclick="pickProfileImg('${esc(u)}')" title="Usar como foto de perfil"></div>`).join('')}</div>`:''}
+          </div>
+        </div>
+      </div>
+      <div class="box" style="margin-bottom:16px">
+        <h3>🎫 Confirmación de actuaciones</h3><div class="hint">Cuando un hotel te contrata, decide cómo se aprueba la actuación.</div>
+        <div class="swrow">
+          <div><div style="font-weight:600;font-size:13.5px">Confirmar automáticamente</div>
+            <div class="hint" style="margin:2px 0 0">Activado: las actuaciones que te llegan quedan confirmadas solas. Desactivado: quedan "pendientes" y tú las aceptas o rechazas desde Mis Actuaciones.</div></div>
+          <label class="switch"><input type="checkbox" ${p.auto_confirm_bookings?'checked':''} onchange="toggleAutoConfirm(this)"><span class="sl"></span></label>
+        </div>
+      </div>
       <div class="box" style="margin-bottom:16px">
         <h3>👤 Datos del perfil</h3><div class="hint">Cómo te ven los hoteles en el catálogo</div>
         <div class="fgrid">
@@ -2781,6 +2890,7 @@ async function artistHome(box){
   ]);
   BLOCKED = new Set((blk||[]).map(x=>typeof x==='string'?x:x.date));
   CACHE.artistBk = bk;   // lo usa dayMenu() para listar las actuaciones de un día
+  CACHE.profile = p; setSelfAvatar(p.profile_image_url, p.stage_name);
   const now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const calRef=new Date(PERIOD.year, PERIOD.month-1, 1);   // el calendario sigue el mes elegido arriba a la derecha
   const isRev=b=>['confirmed','completed'].includes(b.status);
@@ -2878,7 +2988,15 @@ function fillSub(catId,subId,ph){
 }
 function refreshIdentity(){
   const p=CACHE.profile; if(!p)return; ME.artist_name=p.stage_name;
-  document.querySelector('.brand span').textContent=p.stage_name||'Artista';
+  setSelfAvatar(p.profile_image_url, p.stage_name||ME.full_name);
+}
+// Pinta la foto (o iniciales) del propio usuario en los avatares del menú.
+function setSelfAvatar(url,name){
+  const ini=((name||ME&&ME.full_name||'RA').split(/\s+/).map(s=>s[0]).slice(0,2).join('')||'RA').toUpperCase();
+  ['.ava','#suAv'].forEach(sel=>{ const el=document.querySelector(sel); if(!el)return;
+    if(url){ el.textContent=''; el.style.backgroundImage="url('"+url+"')"; el.classList.add('hasimg'); }
+    else { el.style.backgroundImage=''; el.textContent=ini; el.classList.remove('hasimg'); }
+  });
 }
 async function saveProfile(btn){
   btn.disabled=true;
@@ -2916,7 +3034,57 @@ async function becomePartner(){
   try{ CACHE.profile=await patch('/me/artist',{is_partner:true}); refreshIdentity(); show('profile',true); }
   catch(e){ alert('No se pudo activar: '+e.message); }
 }
+
+/* ---- Imágenes: redimensiona en el navegador y sube (perfil + propuestas) ---- */
+function _resizeImage(file, max=1280, q=0.85){
+  return new Promise((res,rej)=>{
+    const rd=new FileReader();
+    rd.onload=()=>{ const img=new Image();
+      img.onload=()=>{ let w=img.width,h=img.height;
+        if(w>max||h>max){ if(w>=h){h=Math.round(h*max/w);w=max;} else {w=Math.round(w*max/h);h=max;} }
+        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        c.toBlob(b=>b?res(b):rej(new Error('No se pudo procesar la imagen')),'image/jpeg',q);
+      };
+      img.onerror=()=>rej(new Error('Imagen inválida')); img.src=rd.result; };
+    rd.onerror=()=>rej(new Error('No se pudo leer el archivo')); rd.readAsDataURL(file);
+  });
+}
+async function uploadImage(file){
+  if(!/^image\//.test(file.type)) throw new Error('El archivo no es una imagen');
+  const blob=await _resizeImage(file);
+  const fd=new FormData(); fd.append('file', blob, 'photo.jpg');
+  const r=await fetch(API+'/me/artist/upload-image',{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
+  if(!r.ok) throw new Error('No se pudo subir ('+r.status+')');
+  return (await r.json()).url;
+}
+// Avatar reutilizable: foto si existe, si no las iniciales en un círculo.
+function avatarHtml(url,name,px){
+  const s=px||44;
+  if(url) return `<div class="uav" style="width:${s}px;height:${s}px;background-image:url('${esc(url)}')"></div>`;
+  const ini=(name||'?').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+  return `<div class="uav ini" style="width:${s}px;height:${s}px;font-size:${Math.round(s*0.36)}px">${esc(ini)}</div>`;
+}
+async function uploadProfileImg(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  try{ toast('Subiendo foto…'); const url=await uploadImage(f);
+    CACHE.profile=await patch('/me/artist',{profile_image_url:url}); toast('Foto de perfil actualizada ✓'); refreshIdentity(); show('profile',true); }
+  catch(e){ toast('No se pudo subir: '+(e.message||''),true); }
+}
+async function pickProfileImg(url){
+  try{ CACHE.profile=await patch('/me/artist',{profile_image_url:url}); toast('Foto de perfil actualizada ✓'); refreshIdentity(); show('profile',true); }
+  catch(e){ toast('No se pudo actualizar: '+(e.message||''),true); }
+}
+async function clearProfileImg(){
+  try{ CACHE.profile=await patch('/me/artist',{profile_image_url:null}); toast('Foto quitada'); refreshIdentity(); show('profile',true); }
+  catch(e){ toast('No se pudo quitar: '+(e.message||''),true); }
+}
+async function toggleAutoConfirm(el){
+  try{ CACHE.profile=await patch('/me/artist',{auto_confirm_bookings:el.checked}); toast(el.checked?'Las actuaciones se confirmarán solas ✓':'Ahora tú apruebas cada actuación'); }
+  catch(e){ el.checked=!el.checked; toast('No se pudo guardar: '+(e.message||''),true); }
+}
 window.saveProfile=saveProfile;window.saveShow=saveShow;window.delShow=delShow;window.addShow=addShow;window.becomePartner=becomePartner;window.fillSub=fillSub;
+window.uploadProfileImg=uploadProfileImg;window.pickProfileImg=pickProfileImg;window.clearProfileImg=clearProfileImg;window.toggleAutoConfirm=toggleAutoConfirm;
 
 async function openConv(id,el){
   if(el){document.querySelectorAll('.citem').forEach(x=>x.classList.remove('on'));el.classList.add('on');}

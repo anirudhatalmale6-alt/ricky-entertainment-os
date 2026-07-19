@@ -32,6 +32,7 @@ class ArtistBase(BaseModel):
     date_of_birth: date | None = None
     artist_type: str | None = None
     bio: str | None = None
+    profile_image_url: str | None = None
     years_experience: str | None = None
     languages_spoken: list[str] = []
     social_links: dict[str, str] = {}
@@ -52,6 +53,7 @@ class ArtistBase(BaseModel):
     # payout preference + marketplace flags
     payout_speed: PayoutSpeed = PayoutSpeed.MENSUAL
     allow_subcontracting: bool = False
+    auto_confirm_bookings: bool = False
     is_partner: bool = False
     partner_monthly_fee: float | None = None
     calendar_sync: str | None = None  # google / outlook / none
@@ -95,6 +97,7 @@ class ArtistUpdate(BaseModel):
     date_of_birth: date | None = None
     artist_type: str | None = None
     bio: str | None = None
+    profile_image_url: str | None = None
     years_experience: str | None = None
     languages_spoken: list[str] | None = None
     social_links: dict[str, str] | None = None
@@ -110,6 +113,7 @@ class ArtistUpdate(BaseModel):
     usa_visa: bool | None = None
     payout_speed: PayoutSpeed | None = None
     allow_subcontracting: bool | None = None
+    auto_confirm_bookings: bool | None = None
     is_partner: bool | None = None
     partner_monthly_fee: float | None = None
     calendar_sync: str | None = None

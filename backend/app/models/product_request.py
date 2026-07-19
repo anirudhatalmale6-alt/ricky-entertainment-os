@@ -17,6 +17,7 @@ from sqlalchemy import (
     DateTime,
     Enum as SQLEnum,
     ForeignKey,
+    JSON,
     Numeric,
     String,
     Text,
@@ -87,6 +88,9 @@ class RequestProposal(Base, TimestampMixin):
     message: Mapped[str | None] = mapped_column(Text)
     proposed_price: Mapped[float | None] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(3), default="MXN")
+    # Hasta 3 imágenes de referencia que el artista adjunta a su propuesta
+    # (fotos del show, montaje, etc.). Lista de URLs servidas por /uploads.
+    images: Mapped[list] = mapped_column(JSON, default=list)
 
     status: Mapped[ProposalStatus] = mapped_column(
         SQLEnum(ProposalStatus, values_callable=lambda e: [m.value for m in e]),

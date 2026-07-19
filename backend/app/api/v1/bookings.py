@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.api.deps import CurrentScope, DbSession, require_permission
+from app.models.artist import Artist
 from app.models.booking import Booking
 from app.models.company import Company
 from app.models.notification import ArtistNotification
@@ -120,6 +121,11 @@ async def create_booking(payload: BookingCreate, db: DbSession):
 
     await _check_travel_buffer(db, show.artist_id, payload.starts_at, payload.ends_at)
 
+    # The artist decides how incoming actuaciones are handled: auto-confirmed, or
+    # left pending for them to accept/reject (see Artist.auto_confirm_bookings).
+    artist = await db.get(Artist, show.artist_id) if show.artist_id else None
+    auto = bool(artist and artist.auto_confirm_bookings)
+
     booking = Booking(
         show_id=show.id,
         venue_id=venue.id,
@@ -133,7 +139,8 @@ async def create_booking(payload: BookingCreate, db: DbSession):
         currency=payload.currency,
         commission_pct=commission_pct,
         notes=payload.notes,
-        status=BookingStatus.PENDING,
+        status=BookingStatus.CONFIRMED if auto else BookingStatus.PENDING,
+        confirmed_at=_now() if auto else None,
     )
     db.add(booking)
     await db.commit()
@@ -325,6 +332,40 @@ async def cancel_booking(booking_id: int, db: DbSession, reason: str | None = No
     booking.status = BookingStatus.CANCELLED
     booking.cancelled_at = _now()
     booking.cancellation_reason = reason
+    await db.commit()
+    await db.refresh(booking)
+    venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
+    show = await db.get(Show, booking.show_id) if booking.show_id else None
+    return _decorate(booking, venue, show)
+
+
+@router.post("/{booking_id}/artist-respond", response_model=BookingOut)
+async def artist_respond(
+    booking_id: int,
+    scope: CurrentScope,
+    db: DbSession,
+    action: str = Query(..., pattern="^(accept|reject)$"),
+):
+    """The artist accepts or rejects one of THEIR OWN pending actuaciones.
+
+    This is the manual-approval path (Artist.auto_confirm_bookings = False): a new
+    actuacion arrives 'pendiente' and the artist decides. Rejecting a pending
+    request is not the same as cancelling a confirmed show, so the 2h cut-off does
+    not apply here."""
+    if scope.artist_id is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo artistas.")
+    booking = await _get_or_404(db, booking_id)
+    if booking.artist_id != scope.artist_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    if booking.status != BookingStatus.PENDING:
+        raise HTTPException(status_code=409, detail="Esta actuacion ya no esta pendiente.")
+    if action == "accept":
+        booking.status = BookingStatus.CONFIRMED
+        booking.confirmed_at = _now()
+    else:
+        booking.status = BookingStatus.CANCELLED
+        booking.cancelled_at = _now()
+        booking.cancellation_reason = "Rechazada por el artista"
     await db.commit()
     await db.refresh(booking)
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
