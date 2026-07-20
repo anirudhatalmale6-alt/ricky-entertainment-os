@@ -1452,16 +1452,23 @@ async function dropBooking(vid,date){
 }
 async function delVenue(id,name,count){
   const warn = count>0
-    ? `¿Eliminar el venue "${name}"?\n\nSus ${count} ${count===1?'actuación':'actuaciones'} quedarán sin lugar asignado (no se borran, las puedes reasignar a otro venue).`
+    ? `¿Eliminar el venue "${name}"?\n\nSe eliminarán también sus ${count} ${count===1?'actuación':'actuaciones'} y ese gasto se descontará del presupuesto. Esta acción no se puede deshacer.`
     : `¿Eliminar el venue "${name}"?`;
   if(!confirm(warn)) return;
+  const bk=CACHE.homeBk||[];
+  const victims=bk.filter(b=>(b.venue_id||0)===id).map(b=>b.id);
   try{
+    if(victims.length) toast('Eliminando venue y sus actuaciones…');
+    // El borrado del venue va primero (es la acción con permiso): si falla, no perdemos nada.
     await del('/companies/venues/'+id);
-    const bk=CACHE.homeBk||[];
-    bk.forEach(b=>{ if((b.venue_id||0)===id){ b.venue_id=null; b.venue_name=null; } });
+    // Luego sus actuaciones, una por una (secuencial, para no saturar el servidor),
+    // así el gasto se ajusta igual que cuando se elimina una actuación suelta.
+    for(const bid of victims){ try{ await del('/bookings/'+bid); }catch(_){ /* seguimos con las demás */ } }
+    CACHE.homeBk=bk.filter(b=>(b.venue_id||0)!==id);
     CACHE.venues=(CACHE.venues||[]).filter(v=>v.id!==id);
+    if(CACHE.agenda) CACHE.agenda=CACHE.agenda.filter(b=>(b.venue_id||0)!==id);
     renderMaestro();
-    toast('Venue eliminado ✓');
+    toast(victims.length ? `Venue y ${victims.length} ${victims.length===1?'actuación':'actuaciones'} eliminados ✓` : 'Venue eliminado ✓');
   }catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
 }
 
