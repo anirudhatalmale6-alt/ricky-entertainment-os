@@ -478,6 +478,7 @@
   .bellitem{padding:11px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px}
   .bellitem:last-child{border-bottom:0}
   .bellitem .bi-i{width:30px;height:30px;border-radius:9px;flex:none;display:grid;place-items:center;background:#382ca114;color:var(--acc)}
+  .bellitem .bi-i.ok{background:#16a34a1a;color:#16a34a}
   .bellitem.unread{background:#382ca10a}
   .bellitem b{display:block;font-size:12.5px;font-weight:650;margin-bottom:2px}
   .bellitem span{font-size:11.5px;color:var(--mut);line-height:1.35}
@@ -1133,7 +1134,22 @@ async function boot(){
   document.querySelectorAll('.panel').forEach(x=>{x.dataset.loaded="";});
   if(first){ first.classList.add('on'); await show(first.dataset.p,true); }
   loadNotifications();
+  startNotifPoll();
   updateMonthLabel();
+}
+// Keep the bell (and chat badge) fresh without the artist having to refresh the
+// page. Skips a tick while the panel is open so we don't fight the "marcar
+// leídas" state, and only polls for logged-in artists.
+let _NOTIF_POLL=null;
+function startNotifPoll(){
+  if(_NOTIF_POLL||!(ME&&ME.artist_id)) return;
+  _NOTIF_POLL=setInterval(()=>{
+    if(document.hidden) return;
+    const p=document.getElementById('bellPanel');
+    if(p&&p.classList.contains('open')) return;
+    loadNotifications();
+    syncChatBadge();
+  },30000);
 }
 async function reload(){
   if(ME&&ME.is_admin){ GID = document.getElementById('groupSel').value || GID; syncHotelCard(); }
@@ -1352,13 +1368,20 @@ async function loadNotifications(){
   }catch(_){ /* not an artist / not logged in — leave bell empty */ }
 }
 function fmtNotifTime(iso){ if(!iso) return ''; try{ const d=new Date(iso); return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}); }catch(_){ return ''; } }
+const _NOTIF_ICONS={
+  confirmed:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M20 6 9 17l-5-5"/></svg>',
+  reschedule:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  _default:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+};
 function renderBellPanel(){
   const p=document.getElementById('bellPanel'); if(!p) return;
   const items=NOTIF_CACHE||[];
-  const ic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
   const unread=items.some(n=>!n.is_read);
   p.innerHTML=`<div class="bph">Notificaciones${unread?` <a onclick="clearBell()" style="font-size:11.5px;color:var(--acc);cursor:pointer;font-weight:600">Marcar leídas</a>`:''}</div>`
-    + (items.length? items.map(n=>`<div class="bellitem${n.is_read?'':' unread'}"><div class="bi-i">${ic}</div><div><b>${esc(n.title||'')}</b><span>${esc(n.body||'')}</span><span class="bi-t">${fmtNotifTime(n.created_at)}</span></div></div>`).join('')
+    + (items.length? items.map(n=>{
+        const ic=_NOTIF_ICONS[n.kind]||_NOTIF_ICONS._default;
+        return `<div class="bellitem${n.is_read?'':' unread'}"><div class="bi-i${n.kind==='confirmed'?' ok':''}">${ic}</div><div><b>${esc(n.title||'')}</b><span>${esc(n.body||'')}</span><span class="bi-t">${fmtNotifTime(n.created_at)}</span></div></div>`;
+      }).join('')
       : `<div class="bellempty">No tienes notificaciones por ahora.</div>`);
 }
 function _markNotifRead(){

@@ -25,7 +25,8 @@ class ArtistNotification(Base, TimestampMixin):
     booking_id: Mapped[int | None] = mapped_column(
         ForeignKey("bookings.id", ondelete="SET NULL")
     )
-    # new_booking (nueva actuación) | reschedule (cambio de fecha/horario)
+    # new_booking (nueva actuación pendiente) | confirmed (actuación confirmada)
+    # | reschedule (cambio de fecha/horario)
     kind: Mapped[str] = mapped_column(String(20), default="new_booking", index=True)
     title: Mapped[str] = mapped_column(String(160))
     body: Mapped[str | None] = mapped_column(Text)

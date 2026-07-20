@@ -121,11 +121,11 @@ async def create_booking(payload: BookingCreate, db: DbSession):
 
     await _check_travel_buffer(db, show.artist_id, payload.starts_at, payload.ends_at)
 
-    # The artist decides how incoming actuaciones are handled: auto-confirmed, or
-    # left pending for them to accept/reject (see Artist.auto_confirm_bookings).
-    artist = await db.get(Artist, show.artist_id) if show.artist_id else None
-    auto = bool(artist and artist.auto_confirm_bookings)
-
+    # A booking added on the Calendario Maestro starts as a DRAFT (borrador):
+    # notified_at is NULL, so the artist doesn't see it yet. The hotel keeps
+    # arranging the week and, when they press "Guardar y notificar", the /notify
+    # endpoint makes it visible and applies the artist's auto/manual confirmation
+    # preference. That's why we don't auto-confirm here anymore.
     booking = Booking(
         show_id=show.id,
         venue_id=venue.id,
@@ -139,8 +139,8 @@ async def create_booking(payload: BookingCreate, db: DbSession):
         currency=payload.currency,
         commission_pct=commission_pct,
         notes=payload.notes,
-        status=BookingStatus.CONFIRMED if auto else BookingStatus.PENDING,
-        confirmed_at=_now() if auto else None,
+        status=BookingStatus.PENDING,
+        confirmed_at=None,
     )
     db.add(booking)
     await db.commit()
@@ -216,7 +216,12 @@ async def my_bookings(
     a hotel manager their property's, a group director the whole chain."""
     stmt = select(Booking)
     if scope.is_artist:
-        stmt = stmt.where(Booking.artist_id == scope.artist_id)
+        # Artists never see drafts — only actuaciones the hotel already sent
+        # them via "Guardar y notificar" (notified_at set).
+        stmt = stmt.where(
+            Booking.artist_id == scope.artist_id,
+            Booking.notified_at.isnot(None),
+        )
     elif scope.group_id is not None:
         sub = select(Company.id).where(Company.group_id == scope.group_id)
         stmt = stmt.where(Booking.company_id.in_(sub))
@@ -433,16 +438,34 @@ async def notify_artists(payload: NotifyIn, db: DbSession):
         booking = await db.get(Booking, item.booking_id)
         if booking is None or not booking.artist_id:
             continue
+        if booking.status in (BookingStatus.CANCELLED, BookingStatus.COMPLETED):
+            continue
         show = await db.get(Show, booking.show_id) if booking.show_id else None
         venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
         st = booking.starts_at
         when = _naive(st).strftime("%d/%m/%Y a las %H:%M") if st else "una fecha por confirmar"
         show_name = (show.show_name if show else None) or "tu actuación"
         venue_name = (venue.name if venue else None) or "el venue"
+
+        # This is the moment the actuación becomes real for the artist: reveal it
+        # (notified_at) and apply their approval preference.
+        booking.notified_at = booking.notified_at or _now()
+        artist = await db.get(Artist, booking.artist_id)
+        auto = bool(artist and artist.auto_confirm_bookings)
+
         if item.kind == "reschedule":
+            kind = "reschedule"
             title = f"Cambio de horario: {show_name}"
             body = f"Tu actuación en {venue_name} se movió a {when}."
+        elif auto and booking.status == BookingStatus.PENDING:
+            # Auto-confirm: lock it in and tell the artist it's confirmed.
+            booking.status = BookingStatus.CONFIRMED
+            booking.confirmed_at = _now()
+            kind = "confirmed"
+            title = f"Actuación confirmada: {show_name}"
+            body = f"Tu actuación en {venue_name} el {when} quedó confirmada automáticamente."
         else:
+            kind = "new_booking"
             title = f"Nueva actuación: {show_name}"
             body = (
                 f"Fuiste agendado en {venue_name} para el {when}. "
@@ -451,7 +474,7 @@ async def notify_artists(payload: NotifyIn, db: DbSession):
         db.add(ArtistNotification(
             artist_id=booking.artist_id,
             booking_id=booking.id,
-            kind=item.kind if item.kind in ("new_booking", "reschedule") else "new_booking",
+            kind=kind,
             title=title,
             body=body,
             starts_at=st,

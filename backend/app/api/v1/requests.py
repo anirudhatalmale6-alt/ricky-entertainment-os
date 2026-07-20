@@ -335,6 +335,9 @@ async def _booking_from_proposal(
         notes=note,
         status=BookingStatus.CONFIRMED if auto else BookingStatus.PENDING,
         confirmed_at=_now() if auto else None,
+        # The artist proposed this themselves, so it's not a hotel draft — make it
+        # visible in their agenda right away (not a borrador).
+        notified_at=_now(),
     )
     db.add(booking)
     await db.flush()  # assign booking.id within the same transaction

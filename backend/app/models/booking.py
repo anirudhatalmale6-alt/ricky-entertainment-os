@@ -81,6 +81,11 @@ class Booking(Base, TimestampMixin):
     headcount_end: Mapped[int | None] = mapped_column(Integer)    # aforo al terminar
 
     # Life-cycle timestamps.
+    # notified_at: when the hotel finished arranging the week and pressed
+    # "Guardar y notificar". Until then the booking is a DRAFT the hotel is still
+    # moving around on the Calendario Maestro — invisible to the artist and not
+    # auto-confirmed. NULL = draft (borrador), not yet sent to the artist.
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancellation_reason: Mapped[str | None] = mapped_column(String(255))
