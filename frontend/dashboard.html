@@ -1603,6 +1603,13 @@ function openEditAct(bid){
   const st=new Date(b.starts_at);
   const dstr=`${st.getFullYear()}-${String(st.getMonth()+1).padStart(2,'0')}-${String(st.getDate()).padStart(2,'0')}`;
   const tstr=`${String(st.getHours()).padStart(2,'0')}:${String(st.getMinutes()).padStart(2,'0')}`;
+  // Venues disponibles = los que ya tienen actuaciones en la cadena (de la caché, sin llamadas extra).
+  const seen=new Map();
+  [CACHE.homeBk,CACHE.agenda].forEach(arr=>(arr||[]).forEach(x=>{ if(x.venue_id&&x.venue_name&&!seen.has(x.venue_id)) seen.set(x.venue_id,x.venue_name); }));
+  if(b.venue_id&&b.venue_name&&!seen.has(b.venue_id)) seen.set(b.venue_id,b.venue_name);
+  const venues=[...seen.entries()];
+  const venueRow = venues.length>1 ? `<div class="fld" style="margin-top:12px"><label>Venue</label>
+      <select id="edVenue">${venues.map(([id,nm])=>`<option value="${id}"${id===b.venue_id?' selected':''}>${esc(nm)}</option>`).join('')}</select></div>` : '';
   let ov=document.getElementById('editMov');
   if(!ov){ ov=document.createElement('div'); ov.id='editMov'; ov.className='mov'; document.body.appendChild(ov);
     ov.addEventListener('click',e=>{ if(e.target===ov) editActClose(); }); }
@@ -1613,6 +1620,7 @@ function openEditAct(bid){
       <div class="fld"><label>Fecha</label><input id="edDate" type="date" value="${dstr}"></div>
       <div class="fld"><label>Hora</label><input id="edTime" type="time" value="${tstr}"></div>
     </div>
+    ${venueRow}
     <div style="padding:8px 4px 2px"><button class="ago" style="width:100%" id="edGo" onclick="editActSave(${b.id})">Guardar cambios</button></div>
     <div class="hint" style="padding:4px 6px 2px">El cambio le llegará al artista cuando pulses "Guardar y notificar".</div>
   </div>`;
@@ -1623,11 +1631,20 @@ async function editActSave(bid){
   bid=Number(bid);
   const d=(document.getElementById('edDate')||{}).value, t=(document.getElementById('edTime')||{}).value;
   if(!d||!t){ toast('Elige fecha y hora.',true); return; }
+  const cur=(CACHE.homeBk||[]).find(x=>x.id===bid)||(CACHE.agenda||[]).find(x=>x.id===bid);
+  const vSel=document.getElementById('edVenue');
+  const newVid=vSel?Number(vSel.value):null;
   const go=document.getElementById('edGo'); if(go){ go.disabled=true; go.textContent='Guardando…'; }
   const starts=`${d}T${t}:00`;
+  const body={starts_at:starts};
+  if(vSel && cur && newVid && newVid!==cur.venue_id){ body.venue_id=newVid; }
+  const newVname = (vSel && body.venue_id!=null) ? (vSel.options[vSel.selectedIndex]||{}).text : null;
   try{
-    const upd=await patch('/bookings/'+bid,{starts_at:starts});
-    [CACHE.homeBk,CACHE.agenda].forEach(arr=>{ const b=(arr||[]).find(x=>x.id===bid); if(b) b.starts_at=upd.starts_at||starts; });
+    const upd=await patch('/bookings/'+bid,body);
+    [CACHE.homeBk,CACHE.agenda].forEach(arr=>{ const b=(arr||[]).find(x=>x.id===bid); if(b){
+      b.starts_at=upd.starts_at||starts;
+      if(body.venue_id!=null){ b.venue_id=(upd.venue_id!==undefined?upd.venue_id:body.venue_id); b.venue_name=upd.venue_name||newVname||b.venue_name; }
+    } });
     editActClose(); notifyMark(bid,'reschedule');
     const panel=document.querySelector('.panel.on');
     if(panel&&panel.id==='panel-cal') renderAgenda(); else renderMaestro();

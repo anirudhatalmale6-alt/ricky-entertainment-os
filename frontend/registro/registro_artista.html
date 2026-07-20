@@ -196,7 +196,6 @@ textarea{resize:vertical;min-height:70px}
         <label class="f"><span>Años de experiencia</span><input id="p_years" placeholder="10+ años"></label>
         <label class="f"><span>Teléfono móvil <i>*</i></span><input id="p_phone" placeholder="+52 998 123 4567"></label>
         <label class="f"><span>Correo electrónico <i>*</i></span><input id="p_email" placeholder="hola@correo.com"></label>
-        <label class="f full"><span>Sitio web</span><input id="p_web" placeholder="www.tusitio.com"></label>
         <label class="f full"><span>Idiomas que hablas</span>
           <div class="chips" id="langChips"><span class="chip">Español <b onclick="delChip(this)">×</b></span><span class="chip">Inglés <b onclick="delChip(this)">×</b></span><span class="chip add" onclick="addChip('langChips','Idioma')">+ Agregar</span></div>
         </label>
@@ -224,9 +223,7 @@ textarea{resize:vertical;min-height:70px}
         <div class="tog"><div class="tt"><b>Pasaporte vigente</b></div><label class="sw"><input type="checkbox" id="t_passport"><i></i></label></div>
         <div class="tog"><div class="tt"><b>Visa USA</b></div><label class="sw"><input type="checkbox" id="t_visa"><i></i></label></div>
       </div>
-      <label class="f full" style="margin-top:14px"><span>Redes sociales</span>
-        <div class="grid"><input id="s_instagram" placeholder="Instagram: @tuusuario"><input id="s_facebook" placeholder="Facebook: /tupagina"><input id="s_youtube" placeholder="YouTube: /tucanal"><input id="s_tiktok" placeholder="TikTok: @tuusuario"></div>
-      </label>
+      <label class="f full" style="margin-top:14px"><span>Canal de YouTube</span><input id="s_youtube" placeholder="https://youtube.com/@tucanal"></label>
     </div>
     <div class="foot"><span></span><button class="btn next" onclick="go(1)">Siguiente →</button></div>
   </section>
@@ -474,11 +471,12 @@ const intOf=s=>{ const x=(s||'').replace(/[^0-9]/g,''); return x?parseInt(x,10):
 function collectProfile(){
   const v=id=>{ const n=document.getElementById(id); return n?n.value.trim():''; };
   const chk=id=>{ const n=document.getElementById(id); return n?n.checked:false; };
-  const social={}; ['instagram','facebook','youtube','tiktok'].forEach(k=>{ const x=v('s_'+k); if(x) social[k]=x; });
+  // Solo YouTube (fotos + YouTube; sin Instagram/Facebook/TikTok ni sitio web propio).
+  const social={}; const yt=v('s_youtube'); if(yt) social.youtube=yt;
   return {
     stage_name:v('p_stage'), first_name:v('p_first')||null, last_name:v('p_last')||null,
     artist_type:v('p_type')||null, years_experience:v('p_years')||null,
-    phone:v('p_phone')||null, email:v('p_email')||null, website:v('p_web')||null, bio:v('p_bio')||null,
+    phone:v('p_phone')||null, email:v('p_email')||null, website:null, bio:v('p_bio')||null,
     languages_spoken:chipValues('langChips'), social_links:social,
     country:v('p_country')||null, region:v('p_state')||null, base_city:v('p_city')||null, city:v('p_city')||null,
     work_radius_km:intOf(v('p_radius')), states_worked:chipValues('stateChips'),
