@@ -31,3 +31,17 @@ class HotelLeadOut(BaseModel):
 
 class HotelLeadStatusIn(BaseModel):
     status: str = Field(pattern="^(new|contacted|converted|discarded)$")
+
+
+class HotelLeadConvertIn(BaseModel):
+    """Optional password when the admin turns a prospecto into a real hotel account.
+    If omitted, the server generates a temporary one."""
+    password: str | None = Field(default=None, min_length=6, max_length=128)
+
+
+class HotelLeadConvertOut(BaseModel):
+    """The credentials to hand over to the hotel. The password is shown ONCE."""
+    email: str
+    password: str
+    company_id: int
+    company_name: str

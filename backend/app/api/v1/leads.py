@@ -3,12 +3,25 @@
 POST /leads/hotel is PUBLIC — a hotel leaves its details, no account is created.
 The admin sees the prospectos and provisions accounts internally.
 """
+import secrets
+import string
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentScope, DbSession
+from app.core import security
+from app.models.booker import Booker
+from app.models.company import Company
 from app.models.hotel_lead import HotelLead
-from app.schemas.hotel_lead import HotelLeadCreate, HotelLeadOut, HotelLeadStatusIn
+from app.models.user import Role, User
+from app.schemas.hotel_lead import (
+    HotelLeadConvertIn,
+    HotelLeadConvertOut,
+    HotelLeadCreate,
+    HotelLeadOut,
+    HotelLeadStatusIn,
+)
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 
@@ -19,6 +32,21 @@ def _require_admin(scope) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo el administrador puede ver los prospectos.",
         )
+
+
+def _gen_password() -> str:
+    alpha = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alpha) for _ in range(10))
+
+
+async def _role(db: DbSession, name: str) -> Role | None:
+    res = await db.execute(select(Role).where(Role.name == name))
+    return res.scalar_one_or_none()
+
+
+async def _email_taken(db: DbSession, email: str) -> bool:
+    res = await db.execute(select(User).where(func.lower(User.email) == email.lower()))
+    return res.scalar_one_or_none() is not None
 
 
 @router.post("/hotel", response_model=HotelLeadOut, status_code=status.HTTP_201_CREATED)
@@ -63,3 +91,56 @@ async def update_hotel_lead(
     await db.commit()
     await db.refresh(lead)
     return lead
+
+
+@router.post(
+    "/hotel/{lead_id}/convert",
+    response_model=HotelLeadConvertOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def convert_hotel_lead(
+    lead_id: int, payload: HotelLeadConvertIn, scope: CurrentScope, db: DbSession
+):
+    """Turn a prospecto into a real hotel account: creates the empresa (Company) +
+    the login (User, role booker) + Booker profile, and hands back the credentials
+    so the admin can share them. The plaintext password is returned only here."""
+    _require_admin(scope)
+    lead = await db.get(HotelLead, lead_id)
+    if lead is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Prospecto no encontrado")
+    if lead.status == "converted":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Este prospecto ya tiene una cuenta.")
+    if await _email_taken(db, lead.email):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Ya existe una cuenta con ese correo.")
+
+    company = Company(name=lead.company_name)
+    db.add(company)
+    await db.flush()
+
+    role = await _role(db, "booker")
+    plain = payload.password or _gen_password()
+    user = User(
+        email=lead.email,
+        full_name=lead.full_name,
+        hashed_password=security.hash_password(plain),
+        role_id=role.id if role else None,
+    )
+    db.add(user)
+    await db.flush()
+
+    booker = Booker(
+        user_id=user.id,
+        company_id=company.id,
+        position=lead.position,
+        phone=lead.phone,
+    )
+    db.add(booker)
+    lead.status = "converted"
+    await db.commit()
+
+    return HotelLeadConvertOut(
+        email=lead.email,
+        password=plain,
+        company_id=company.id,
+        company_name=company.name,
+    )

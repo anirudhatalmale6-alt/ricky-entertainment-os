@@ -1033,6 +1033,47 @@ async function markLead(id,status){
     const box=document.getElementById('panel-leads'); box.dataset.loaded=""; await show('leads',true);
   }catch(e){ alert('No se pudo actualizar: '+e.message); }
 }
+// ---- Convertir prospecto -> cuenta de hotel (crea empresa + login) ----
+function openConvertLead(id,name,email){
+  let ov=document.getElementById('cvMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='cvMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) cvClose(); }); }
+  ov.innerHTML=`<div class="amod" style="position:relative;max-width:460px">
+    <button class="ax" onclick="cvClose()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Crear cuenta de hotel</b><span class="as">${esc(name)} · ${esc(email)}</span></div>
+    <div id="cvBody">
+      <div class="fld" style="margin-top:8px"><label>Contraseña (opcional)</label><input id="cvPw" placeholder="Vacío = se genera una automática" autocomplete="off"></div>
+      <div class="hint" style="padding:4px 2px">Se creará el acceso del hotel con este correo. Después podrás compartirle usuario y contraseña.</div>
+      <button class="ago" style="width:100%;margin-top:8px" id="cvGo" onclick="doConvertLead(${id})">Crear cuenta</button>
+    </div>
+  </div>`;
+  ov.style.display='flex';
+}
+function cvClose(){ const ov=document.getElementById('cvMov'); if(ov) ov.style.display='none'; }
+async function doConvertLead(id){
+  const pw=((document.getElementById('cvPw')||{}).value||'').trim();
+  if(pw && pw.length<6){ toast('La contraseña debe tener al menos 6 caracteres.',true); return; }
+  const go=document.getElementById('cvGo'); if(go){ go.disabled=true; go.textContent='Creando…'; }
+  try{
+    const r=await post('/leads/hotel/'+id+'/convert', pw?{password:pw}:{});
+    const body=document.getElementById('cvBody');
+    if(body) body.innerHTML=`<div style="margin-top:10px;background:var(--ov);border-radius:10px;padding:15px">
+      <div style="font-weight:700;color:#10b981;margin-bottom:9px">✓ Cuenta creada</div>
+      <div style="font-size:13.5px;line-height:2">
+        <div>Usuario (correo): <b>${esc(r.email)}</b></div>
+        <div>Contraseña: <b>${esc(r.password)}</b></div>
+      </div>
+      <div class="hint" style="margin-top:9px">Comparte estos accesos con el hotel. La contraseña no se vuelve a mostrar.</div>
+      <button class="ago" style="width:100%;margin-top:11px" onclick="cvClose()">Listo</button>
+    </div>`;
+    refreshLeadsBadge();
+    const panel=document.querySelector('.panel.on');
+    if(panel&&panel.id==='panel-leads'){ const b=document.getElementById('panel-leads'); b.dataset.loaded=""; show('leads',true); }
+  }catch(e){
+    if(go){ go.disabled=false; go.textContent='Crear cuenta'; }
+    toast('No se pudo crear la cuenta: '+(e.message||''),true);
+  }
+}
 
 function setNavLabel(p,ic,txt){
   const n=document.querySelector(`.nav[data-p='${p}']`);
@@ -2298,9 +2339,9 @@ const RENDER = {
           </div>
           ${l.message?`<div style="margin-top:8px;font-size:12.5px;background:var(--ov);padding:9px 11px;border-radius:8px">“${esc(l.message)}”</div>`:''}
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-            ${l.status==='new'?`<button class="btn" onclick="markLead(${l.id},'contacted')">Marcar contactado</button>`:''}
-            ${l.status!=='converted'?`<button class="btn ghost" onclick="markLead(${l.id},'converted')">Marcar convertido</button>`:''}
-            ${l.status!=='discarded'?`<button class="btn ghost" onclick="markLead(${l.id},'discarded')">Descartar</button>`:''}
+            ${l.status!=='converted'?`<button class="btn" onclick="openConvertLead(${l.id},'${esc(l.company_name).replace(/'/g,"\\'")}','${esc(l.email).replace(/'/g,"\\'")}')">Crear cuenta</button>`:''}
+            ${l.status==='new'?`<button class="btn ghost" onclick="markLead(${l.id},'contacted')">Marcar contactado</button>`:''}
+            ${(l.status!=='discarded'&&l.status!=='converted')?`<button class="btn ghost" onclick="markLead(${l.id},'discarded')">Descartar</button>`:''}
           </div>
         </div>`;}).join("")}
       </div></div>`;
