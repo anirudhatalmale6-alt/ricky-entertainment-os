@@ -428,6 +428,10 @@
   .mcard .mx{position:absolute;top:4px;right:5px;width:15px;height:15px;border-radius:50%;border:0;background:rgba(24,28,52,.10);color:var(--mut);font-size:10px;line-height:1;cursor:pointer;display:none;place-items:center;padding:0;z-index:2}
   .mcard:hover .mx{display:grid} .mcard:hover .mdot{opacity:0}
   .mcard .mx:hover{background:var(--bad);color:#fff}
+  /* pencil to change date/time */
+  .mcard .med{position:absolute;top:4px;right:23px;width:15px;height:15px;border-radius:50%;border:0;background:rgba(24,28,52,.10);color:var(--mut);font-size:9px;line-height:1;cursor:pointer;display:none;place-items:center;padding:0;z-index:2}
+  .mcard:hover .med{display:grid}
+  .mcard .med:hover{background:var(--acc);color:#fff}
   /* Budget donut */
   .donutwrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
   .donut{width:132px;height:132px;border-radius:50%;flex:none;display:grid;place-items:center;position:relative}
@@ -1293,6 +1297,7 @@ function maestroCard(b,vi){
   const nm=(b.show_name||b.artist_name||'Actuación').replace(/'/g,"\\'");
   return `<div class="mcard ${b.status}${fixed?' fixed':''}" ${fixed?'':'draggable="true"'} data-bid="${b.id}" data-vid="${b.venue_id||''}" style="--mc-bg:${th.bg};--mc-bd:${th.bd}">
     <span class="mdot"></span>
+    ${fixed?'':`<button class="med" title="Cambiar fecha y hora" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();openEditAct(${b.id})">✎</button>`}
     <button class="mx" title="Quitar del calendario" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();delBooking(${b.id},'${nm}')">✕</button>
     <b>${esc(b.show_name||b.artist_name||'Actuación')}</b>
     <div class="mt"><span>${hh}</span><span>${b.agreed_price?MXN(b.agreed_price):''}</span></div>
@@ -1589,6 +1594,47 @@ async function actConfirm(){
     toast(e.message||'No se pudo agregar',true);
   }
 }
+/* ---- Modificar actuación: cambiar fecha y hora (desde el calendario o la agenda) ---- */
+function openEditAct(bid){
+  bid=Number(bid);
+  const b=(CACHE.homeBk||[]).find(x=>x.id===bid)||(CACHE.agenda||[]).find(x=>x.id===bid);
+  if(!b){ toast('No se encontró la actuación.',true); return; }
+  if(['completed','cancelled'].includes(b.status)){ toast('Esta actuación ya no se puede modificar.',true); return; }
+  const st=new Date(b.starts_at);
+  const dstr=`${st.getFullYear()}-${String(st.getMonth()+1).padStart(2,'0')}-${String(st.getDate()).padStart(2,'0')}`;
+  const tstr=`${String(st.getHours()).padStart(2,'0')}:${String(st.getMinutes()).padStart(2,'0')}`;
+  let ov=document.getElementById('editMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='editMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) editActClose(); }); }
+  ov.innerHTML=`<div class="amod" style="position:relative;max-width:440px">
+    <button class="ax" onclick="editActClose()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Modificar actuación</b><span class="as">${esc(b.show_name||b.artist_name||'Actuación')}${b.venue_name?' · '+esc(b.venue_name):''}</span></div>
+    <div class="af" style="grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
+      <div class="fld"><label>Fecha</label><input id="edDate" type="date" value="${dstr}"></div>
+      <div class="fld"><label>Hora</label><input id="edTime" type="time" value="${tstr}"></div>
+    </div>
+    <div style="padding:8px 4px 2px"><button class="ago" style="width:100%" id="edGo" onclick="editActSave(${b.id})">Guardar cambios</button></div>
+    <div class="hint" style="padding:4px 6px 2px">El cambio le llegará al artista cuando pulses "Guardar y notificar".</div>
+  </div>`;
+  ov.style.display='flex';
+}
+function editActClose(){ const ov=document.getElementById('editMov'); if(ov) ov.style.display='none'; }
+async function editActSave(bid){
+  bid=Number(bid);
+  const d=(document.getElementById('edDate')||{}).value, t=(document.getElementById('edTime')||{}).value;
+  if(!d||!t){ toast('Elige fecha y hora.',true); return; }
+  const go=document.getElementById('edGo'); if(go){ go.disabled=true; go.textContent='Guardando…'; }
+  const starts=`${d}T${t}:00`;
+  try{
+    const upd=await patch('/bookings/'+bid,{starts_at:starts});
+    [CACHE.homeBk,CACHE.agenda].forEach(arr=>{ const b=(arr||[]).find(x=>x.id===bid); if(b) b.starts_at=upd.starts_at||starts; });
+    editActClose(); notifyMark(bid,'reschedule');
+    const panel=document.querySelector('.panel.on');
+    if(panel&&panel.id==='panel-cal') renderAgenda(); else renderMaestro();
+    toast('Actuación actualizada ✓');
+  }catch(e){ if(go){ go.disabled=false; go.textContent='Guardar cambios'; } toast('No se pudo actualizar: '+(e.message||''),true); }
+}
+window.openEditAct=openEditAct; window.editActClose=editActClose; window.editActSave=editActSave;
 function budgetDonut(gastado,comprometido,disponible){
   const tot=Math.max(1,gastado+comprometido+disponible);
   const g=gastado/tot*100, c=comprometido/tot*100;
@@ -2091,8 +2137,13 @@ function renderAgenda(fromRange){
     : `${r.length} de ${bk.length} ${noun(bk.length)}`;
   const body=document.getElementById('ag_body'); if(!body) return;
   const isArtist=!!(ME&&ME.artist_id);
-  const cols=isArtist?7:6;
-  const actionCell=b=>{ if(!isArtist) return '';
+  const cols=7;
+  const actionCell=b=>{ if(!isArtist){
+      // hotel / cadena: puede cambiar fecha y hora mientras la actuación siga vigente
+      return `<td>${['completed','cancelled'].includes(b.status)
+        ? '<span class="muted">—</span>'
+        : `<button class="mini" onclick="openEditAct(${b.id})">Editar</button>`}</td>`;
+    }
     return `<td>${b.status==='pending'
       ? `<div class="agact"><button class="mini ok" onclick="artistRespond(${b.id},'accept')">Aceptar</button><button class="mini no" onclick="artistRespond(${b.id},'reject')">Rechazar</button></div>`
       : '<span class="muted">—</span>'}</td>`; };
@@ -2529,7 +2580,7 @@ const RENDER = {
         <div class="field"><label>Estado</label><select id="ag_status" onchange="renderAgenda()"><option value="">Todos</option><option value="pending">Pendiente</option><option value="confirmed">Confirmada</option><option value="completed">Realizada</option><option value="cancelled">Cancelada</option></select></div>
         <button class="btn ghost" onclick="agendaReset()">Limpiar</button>
       </div></div>
-      <table><thead><tr><th>Fecha</th><th>Show</th><th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th>${ME.artist_id?'<th>Acción</th>':''}</tr></thead>
+      <table><thead><tr><th>Fecha</th><th>Show</th><th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th><th>Acción</th></tr></thead>
       <tbody id="ag_body"></tbody></table></div>`;
     renderAgenda();
   },
