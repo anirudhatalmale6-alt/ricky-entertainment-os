@@ -1029,7 +1029,7 @@ async function refreshLeadsBadge(){
   }catch(e){}
 }
 async function markLead(id,status){
-  try{ await patch('/leads/hotel/'+id,{status}); await refreshLeadsBadge();
+  try{ await patch('/leads/hotel/'+id,{status}); await refreshLeadsBadge(); loadNotifications();
     const box=document.getElementById('panel-leads'); box.dataset.loaded=""; await show('leads',true);
   }catch(e){ alert('No se pudo actualizar: '+e.message); }
 }
@@ -1066,7 +1066,7 @@ async function doConvertLead(id){
       <div class="hint" style="margin-top:9px">Comparte estos accesos con el hotel. La contraseña no se vuelve a mostrar.</div>
       <button class="ago" style="width:100%;margin-top:11px" onclick="cvClose()">Listo</button>
     </div>`;
-    refreshLeadsBadge();
+    refreshLeadsBadge(); loadNotifications();
     const panel=document.querySelector('.panel.on');
     if(panel&&panel.id==='panel-leads'){ const b=document.getElementById('panel-leads'); b.dataset.loaded=""; show('leads',true); }
   }catch(e){
@@ -1135,7 +1135,7 @@ function applyRole(){
   show('reports', canPartner);                           // reportes
   show('bill', isArtist || canPartner);                 // facturación (artist self / hotel)
   show('profile', isArtist);                            // artist-only self-service
-  show('leads', false);                                  // Prospectos moved to the future admin/control panel (hidden from hotel menu)
+  show('leads', ME.is_admin);                            // Prospectos: solo el administrador (master); oculto para hoteles/artistas
   show('cal', true);                                     // actuaciones / historial de agenda
   if(isArtist){
     setNavLabel('home','🏠','Dashboard'); setNavLabel('cal','🗓️','Mis actuaciones'); setNavLabel('chat','💬','Mis chats');
@@ -1179,6 +1179,7 @@ async function boot(){
   document.querySelectorAll('.panel').forEach(x=>{x.dataset.loaded="";});
   if(first){ first.classList.add('on'); await show(first.dataset.p,true); }
   loadNotifications();
+  refreshLeadsBadge();   // globito rojo junto a "Prospectos" (admin) desde el arranque
   startNotifPoll();
   updateMonthLabel();
 }
@@ -1187,12 +1188,13 @@ async function boot(){
 // leídas" state, and only polls for logged-in artists.
 let _NOTIF_POLL=null;
 function startNotifPoll(){
-  if(_NOTIF_POLL||!(ME&&ME.artist_id)) return;
+  if(_NOTIF_POLL||!(ME&&(ME.artist_id||ME.is_admin))) return;
   _NOTIF_POLL=setInterval(()=>{
     if(document.hidden) return;
     const p=document.getElementById('bellPanel');
     if(p&&p.classList.contains('open')) return;
     loadNotifications();
+    if(ME&&ME.is_admin) refreshLeadsBadge();
     syncChatBadge();
   },30000);
 }
@@ -1403,8 +1405,9 @@ async function saveAndNotify(){
     toast(a? `${a} artista${a===1?'':'s'} notificado${a===1?'':'s'} ✓` : 'Cambios guardados ✓');
   }catch(e){ updateNotifyBtn(); toast('No se pudo notificar: '+(e.message||''),true); }
 }
-// ---- Bell inbox (artist notifications) ----
+// ---- Bell inbox (artist / hotel notifications) ----
 async function loadNotifications(){
+  if(ME&&ME.is_admin) return loadAdminNotifications();
   try{
     const d=await api('/me/artist/notifications');
     NOTIF_CACHE=(d&&d.items)||[];
@@ -1413,22 +1416,54 @@ async function loadNotifications(){
     renderBellPanel();
   }catch(_){ /* not an artist / not logged in — leave bell empty */ }
 }
+// The master/admin bell surfaces new prospectos (hoteles que dejaron sus datos).
+// Reusamos el estado del prospecto: uno en "new" == un aviso sin leer. Al atenderlo
+// en el panel de Prospectos (contactar / convertir / descartar) sale de "new" y
+// desaparece de la campanita. Abrir la campanita NO los marca como leídos (sería
+// engañoso): el puntito se apaga solo cuando de verdad se atienden.
+async function loadAdminNotifications(){
+  try{
+    const rows=await api('/leads/hotel?status_filter=new');
+    NOTIF_CACHE=(rows||[]).map(l=>({
+      kind:'lead', is_read:false, lead_id:l.id,
+      title:'Nuevo prospecto de hotel',
+      body:(l.company_name||'Un hotel')+' dejó sus datos'+(l.full_name?(' · '+l.full_name):''),
+      created_at:l.created_at
+    }));
+    const dot=document.getElementById('bellDot');
+    if(dot) dot.style.display=NOTIF_CACHE.length?'':'none';
+    renderBellPanel();
+  }catch(_){ /* silent */ }
+}
+function bellOpenLeads(){
+  const p=document.getElementById('bellPanel'); if(p) p.classList.remove('open');
+  const n=document.querySelector(".nav[data-p='leads']");
+  if(n){ document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on')); n.classList.add('on'); }
+  const box=document.getElementById('panel-leads'); if(box) box.dataset.loaded="";
+  show('leads', true);
+}
 function fmtNotifTime(iso){ if(!iso) return ''; try{ const d=new Date(iso); return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}); }catch(_){ return ''; } }
 const _NOTIF_ICONS={
   confirmed:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M20 6 9 17l-5-5"/></svg>',
   reschedule:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  lead:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h.01M9 13h.01M9 17h.01M14 9h.01M14 13h.01M14 17h.01"/></svg>',
   _default:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
 };
 function renderBellPanel(){
   const p=document.getElementById('bellPanel'); if(!p) return;
   const items=NOTIF_CACHE||[];
+  const isAdmin=!!(ME&&ME.is_admin);
   const unread=items.some(n=>!n.is_read);
-  p.innerHTML=`<div class="bph">Notificaciones${unread?` <a onclick="clearBell()" style="font-size:11.5px;color:var(--acc);cursor:pointer;font-weight:600">Marcar leídas</a>`:''}</div>`
+  // El admin no usa "Marcar leídas" (los prospectos se atienden en su panel, no aquí).
+  const header=`<div class="bph">Notificaciones${(!isAdmin&&unread)?` <a onclick="clearBell()" style="font-size:11.5px;color:var(--acc);cursor:pointer;font-weight:600">Marcar leídas</a>`:''}</div>`;
+  const empty=isAdmin?'No hay prospectos nuevos por ahora.':'No tienes notificaciones por ahora.';
+  p.innerHTML=header
     + (items.length? items.map(n=>{
         const ic=_NOTIF_ICONS[n.kind]||_NOTIF_ICONS._default;
-        return `<div class="bellitem${n.is_read?'':' unread'}"><div class="bi-i${n.kind==='confirmed'?' ok':''}">${ic}</div><div><b>${esc(n.title||'')}</b><span>${esc(n.body||'')}</span><span class="bi-t">${fmtNotifTime(n.created_at)}</span></div></div>`;
+        const clk=n.kind==='lead'?' style="cursor:pointer" onclick="bellOpenLeads()"':'';
+        return `<div class="bellitem${n.is_read?'':' unread'}"${clk}><div class="bi-i${n.kind==='confirmed'?' ok':''}">${ic}</div><div><b>${esc(n.title||'')}</b><span>${esc(n.body||'')}</span><span class="bi-t">${fmtNotifTime(n.created_at)}</span></div></div>`;
       }).join('')
-      : `<div class="bellempty">No tienes notificaciones por ahora.</div>`);
+      : `<div class="bellempty">${empty}</div>`);
 }
 function _markNotifRead(){
   (NOTIF_CACHE||[]).forEach(n=>n.is_read=true);
@@ -1441,7 +1476,8 @@ function toggleBell(e){
   if(e) e.stopPropagation();
   const p=document.getElementById('bellPanel'); if(!p) return;
   const open=p.classList.toggle('open');
-  if(open){ renderBellPanel(); if((NOTIF_CACHE||[]).some(n=>!n.is_read)) _markNotifRead(); }
+  // Admin: abrir la campanita NO marca los prospectos como atendidos (eso se hace en su panel).
+  if(open){ renderBellPanel(); if(!(ME&&ME.is_admin) && (NOTIF_CACHE||[]).some(n=>!n.is_read)) _markNotifRead(); }
 }
 document.addEventListener('click',e=>{ const p=document.getElementById('bellPanel'),b=document.getElementById('bellBtn'); if(p&&p.classList.contains('open')&&!p.contains(e.target)&&b&&!b.contains(e.target)) p.classList.remove('open'); });
 
