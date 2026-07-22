@@ -11,6 +11,7 @@ from app.api.v1 import (
     intelligence,
     leads,
     me,
+    reports,
     requests,
     shows,
     users,
@@ -29,3 +30,4 @@ api_router.include_router(chat.router)
 api_router.include_router(intelligence.router)
 api_router.include_router(leads.router)
 api_router.include_router(me.router)
+api_router.include_router(reports.router)

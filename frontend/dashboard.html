@@ -138,6 +138,14 @@
   .grid2{display:grid;grid-template-columns:1.35fr 1fr;gap:16px}
   .grid2b{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:1000px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2,.grid2b{grid-template-columns:1fr}}
+  .kpis.kpi5{grid-template-columns:repeat(5,1fr)}
+  @media(max-width:1200px){.kpis.kpi5{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:700px){.kpis.kpi5{grid-template-columns:repeat(2,1fr)}}
+  .contable-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+  .contable-grid .cbox{background:var(--ov);border:1px solid var(--line);border-radius:11px;padding:13px 14px;display:flex;flex-direction:column;gap:5px}
+  .contable-grid .cbox span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .contable-grid .cbox b{font-size:18px;font-weight:750;letter-spacing:-.3px}
+  @media(max-width:1000px){.contable-grid{grid-template-columns:repeat(2,1fr)}}
 
   .box{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px;box-shadow:var(--shadow)}
   .box h3{font-size:13.5px;font-weight:650;margin-bottom:3px;display:flex;align-items:center;gap:8px}
@@ -796,6 +804,7 @@
     </div>
     <div class="navlbl">Operación</div>
     <div class="nav on" data-p="home"><span class="ic">🏠</span> Dashboard</div>
+    <div class="nav" data-p="master" style="display:none"><span class="ic">🖥️</span> Master</div>
     <div class="nav" data-p="artists" style="display:none"><span class="ic">🎭</span> Artistas</div>
     <div class="nav" data-p="cal"><span class="ic">🗓️</span> Actuaciones</div>
     <div class="nav" data-p="reqs"><span class="ic">📣</span> Solicitudes</div>
@@ -833,6 +842,7 @@
     <div class="monthpop" id="monthPop"></div>
     <div class="wrap">
       <div class="panel on" id="panel-home"><div class="load">Cargando…</div></div>
+      <div class="panel" id="panel-master"></div>
       <div class="panel" id="panel-artists"></div>
       <div class="panel" id="panel-cal"></div>
       <div class="panel" id="panel-reqs"></div>
@@ -1136,6 +1146,7 @@ function applyRole(){
   show('bill', isArtist || canPartner);                 // facturación (artist self / hotel)
   show('profile', isArtist);                            // artist-only self-service
   show('leads', ME.is_admin);                            // Prospectos: solo el administrador (master); oculto para hoteles/artistas
+  show('master', ME.is_admin);                           // Master: panel de control interno, solo administrador
   show('cal', true);                                     // actuaciones / historial de agenda
   if(isArtist){
     setNavLabel('home','🏠','Dashboard'); setNavLabel('cal','🗓️','Mis actuaciones'); setNavLabel('chat','💬','Mis chats');
@@ -1207,6 +1218,7 @@ async function reload(){
 }
 
 const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Actuaciones","Agenda de shows por venue"],
+  master:["Master","Panel de control interno · resumen general de operaciones"],
   artists:["Buscar Artistas","Encuentra y contrata el talento ideal para tu hotel"],
   reqs:["Solicitudes","Tablero de pedidos abiertos"],chat:["Chat","Conversaciones hotel · artista"],
   leads:["Prospectos","Hoteles que solicitaron acceso"],
@@ -2348,7 +2360,84 @@ function selectInvoice(i){
     </tbody></table>`;
 }
 
+// ---- Master (panel de control interno) — helpers de gráficas ----
+const DCOL=['#8b5cf6','#3b82f6','#10b981','#f59e0b','#f43f5e','#6366f1','#14b8a6','#eab308'];
+const _kFmt=n=>{n=Math.round(n||0);return Math.abs(n)>=1000?'$'+Math.round(n/1000)+'k':'$'+n;};
+function deltaChip(d){
+  if(d==null) return '';
+  const up=d>=0;
+  return `<span style="color:${up?'#10b981':'#f43f5e'};font-weight:600">${up?'▲':'▼'} ${Math.abs(d)}%</span> <span style="color:var(--mut2)">vs mes ant.</span>`;
+}
+// Gráfica de líneas Ingresos vs Egresos (SVG inline, sin dependencias)
+function lineChartIE(series){
+  const W=620,H=210,pl=46,pr=14,pt=14,pb=26,n=series.length;
+  const maxV=Math.max(1,...series.map(s=>Math.max(s.ingresos,s.egresos)));
+  const x=i=>pl+(n>1?(W-pl-pr)/(n-1)*i:0);
+  const y=v=>pt+(H-pt-pb)*(1-v/maxV);
+  const pts=arr=>arr.map((s,i)=>`${x(i).toFixed(1)},${y(s).toFixed(1)}`).join(' ');
+  const ing=series.map(s=>s.ingresos), egr=series.map(s=>s.egresos);
+  const area=`${x(0)},${y(0)} ${pts(ing)} ${x(n-1)},${y(0)}`;
+  const grid=[0,.5,1].map(f=>{const v=maxV*f;return `<line x1="${pl}" y1="${y(v).toFixed(1)}" x2="${W-pr}" y2="${y(v).toFixed(1)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-8}" y="${(y(v)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--mut2)">${_kFmt(v)}</text>`;}).join('');
+  const xl=series.map((s,i)=>`<text x="${x(i).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="9" fill="var(--mut2)">${esc(s.label)}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;margin-top:6px" role="img">
+    <defs><linearGradient id="mIeGrad" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".28"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs>
+    ${grid}
+    <polygon points="${area}" fill="url(#mIeGrad)"/>
+    <polyline points="${pts(ing)}" fill="none" stroke="#8b5cf6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="${pts(egr)}" fill="none" stroke="#f43f5e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${ing.map((v,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="2.6" fill="#8b5cf6"/>`).join('')}
+    ${xl}
+  </svg>`;
+}
+function donutDist(dist,total){
+  let acc=0;
+  const segs=dist.map((d,i)=>{const from=(acc/total*360);acc+=d.monto;const to=(acc/total*360);return `${DCOL[i%DCOL.length]} ${from.toFixed(1)}deg ${to.toFixed(1)}deg`;}).join(',');
+  return `<div class="donut" style="background:conic-gradient(${segs||'var(--line) 0 360deg'})"><div class="dc"><b>${_kFmt(total)}</b><span>total</span></div></div>`;
+}
+
 const RENDER = {
+  async master(box){
+    const y=PERIOD.year, m=PERIOD.month;
+    const d=await api(`/reports/executive?year=${y}&month=${m}`);
+    const k=d.kpis, c=d.contable, rates=d.rates;
+    const distTotal=(d.distribucion||[]).reduce((a,b)=>a+b.monto,0);
+    const maxMus=Math.max(1,...(d.top_musicos||[]).map(x=>x.monto));
+    const maxEmp=Math.max(1,...(d.top_empresas||[]).map(x=>x.monto));
+    box.innerHTML=`
+     <div class="kpis kpi5">
+       <div class="kpi"><div class="orb"></div><div class="kh"><div><div class="k">💰 Ingresos totales</div><div class="v">${MXN(k.ingresos.value)}</div><div class="d">${deltaChip(k.ingresos.delta)||'—'}</div></div></div></div>
+       <div class="kpi"><div class="orb"></div><div class="kh"><div><div class="k">📅 Contrataciones</div><div class="v">${k.contrataciones.value}</div><div class="d">${deltaChip(k.contrataciones.delta)||'—'}</div></div></div></div>
+       <div class="kpi"><div class="orb"></div><div class="kh"><div><div class="k">🎤 Talentos activos</div><div class="v">${k.talentos.value}</div><div class="d">en la plataforma</div></div></div></div>
+       <div class="kpi"><div class="orb"></div><div class="kh"><div><div class="k">🏨 Empresas activas</div><div class="v">${k.empresas.value}</div><div class="d">hoteles y clientes</div></div></div></div>
+       <div class="kpi"><div class="orb"></div><div class="kh"><div><div class="k">🧾 Facturas emitidas</div><div class="v">${k.facturas.value}</div><div class="d">${deltaChip(k.facturas.delta)||'—'}</div></div></div></div>
+     </div>
+     <div class="grid2">
+       <div class="box"><h3>📈 Evolución Ingresos / Egresos</h3><div class="hint">Últimos 6 meses · <span style="color:#8b5cf6;font-weight:700">— Ingresos</span> &nbsp; <span style="color:#f43f5e;font-weight:700">— Egresos</span></div>${lineChartIE(d.series||[])}</div>
+       <div class="box"><h3>🍩 Distribución de ingresos</h3><div class="hint">Por concepto · ${esc(d.period.label)}</div>
+         ${distTotal>0?`<div class="donutwrap">${donutDist(d.distribucion,distTotal)}
+           <div style="flex:1;min-width:150px">${d.distribucion.map((x,i)=>`<div style="display:flex;align-items:center;gap:8px;margin:7px 0;font-size:12.5px"><span style="width:10px;height:10px;border-radius:3px;background:${DCOL[i%DCOL.length]};flex:none"></span><span style="text-transform:capitalize">${esc(x.concepto)}</span><span style="margin-left:auto;font-weight:650">${MXN(x.monto)}</span><span class="hint" style="margin:0;width:42px;text-align:right">${x.pct}%</span></div>`).join('')}</div>
+         </div>`:'<div class="hint" style="margin:0">Sin ingresos registrados en este periodo.</div>'}
+       </div>
+     </div>
+     <div class="grid2" style="margin-top:16px">
+       <div class="box"><h3>🏆 Top músicos por ingresos</h3><div class="hint">${esc(d.period.label)}</div>
+         ${(d.top_musicos||[]).length?bars(d.top_musicos.map(x=>({lbl:x.name,pct:Math.round(x.monto/maxMus*100),val:MXN(x.monto)}))):'<div class="hint" style="margin:0">Sin datos en el periodo.</div>'}</div>
+       <div class="box"><h3>🏢 Top empresas por facturación</h3><div class="hint">${esc(d.period.label)}</div>
+         ${(d.top_empresas||[]).length?bars(d.top_empresas.map(x=>({lbl:x.name,pct:Math.round(x.monto/maxEmp*100),val:MXN(x.monto)}))):'<div class="hint" style="margin:0">Sin datos en el periodo.</div>'}</div>
+     </div>
+     <div class="box" style="margin-top:16px"><h3>🧮 Resumen contable</h3><div class="hint">Estimado · comisión ${Math.round(rates.comision*100)}%, IVA ${Math.round(rates.iva*100)}%, ISR ${Math.round(rates.isr*100)}% — tasas configurables</div>
+       <div class="contable-grid">
+         <div class="cbox"><span>Ingresos</span><b>${MXN(c.ingresos)}</b></div>
+         <div class="cbox"><span>Egresos (pagos a talento)</span><b>${MXN(c.egresos)}</b></div>
+         <div class="cbox"><span>Utilidad neta</span><b style="color:#10b981">${MXN(c.utilidad)}</b></div>
+         <div class="cbox"><span>Margen de utilidad</span><b>${c.margen}%</b></div>
+         <div class="cbox"><span>IVA por pagar</span><b>${MXN(c.iva)}</b></div>
+         <div class="cbox"><span>ISR estimado</span><b>${MXN(c.isr)}</b></div>
+         <div class="cbox"><span>Por cobrar</span><b>${MXN(d.cobros.por_cobrar)}</b></div>
+         <div class="cbox"><span>Depositado</span><b>${MXN(d.cobros.depositado)}</b></div>
+       </div>
+     </div>`;
+  },
   async leads(box){
     const rows = await api('/leads/hotel');
     if(!rows.length){
