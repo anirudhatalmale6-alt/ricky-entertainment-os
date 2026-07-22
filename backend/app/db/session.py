@@ -35,6 +35,8 @@ _SQLITE_ADDED_COLUMNS = [
     ("artists", "profile_image_url", "VARCHAR(500)"),
     ("request_proposals", "images", "JSON"),
     ("bookings", "notified_at", "DATETIME"),
+    ("bookings", "invoice_paid", "BOOLEAN DEFAULT 0"),
+    ("bookings", "payout_paid", "BOOLEAN DEFAULT 0"),
 ]
 
 

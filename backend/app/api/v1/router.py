@@ -2,6 +2,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    admin,
     artists,
     auth,
     bookings,
@@ -31,3 +32,4 @@ api_router.include_router(intelligence.router)
 api_router.include_router(leads.router)
 api_router.include_router(me.router)
 api_router.include_router(reports.router)
+api_router.include_router(admin.router)

@@ -19,6 +19,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     Enum as SQLEnum,
     ForeignKey,
@@ -91,6 +92,12 @@ class Booking(Base, TimestampMixin):
     cancellation_reason: Mapped[str | None] = mapped_column(String(255))
 
     notes: Mapped[str | None] = mapped_column(Text)
+
+    # --- Contaduría reconciliation (Master console) --------------------
+    # invoice_paid: la factura emitida al cliente fue cobrada (ingreso).
+    # payout_paid:  el recibo/pago al talento fue liquidado (egreso).
+    invoice_paid: Mapped[bool] = mapped_column(Boolean, default=False)
+    payout_paid: Mapped[bool] = mapped_column(Boolean, default=False)
 
     show: Mapped["Show | None"] = relationship()      # noqa: F821
     venue: Mapped["Venue | None"] = relationship()    # noqa: F821
