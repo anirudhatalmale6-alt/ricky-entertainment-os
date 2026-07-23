@@ -29,6 +29,7 @@ from app.models.company import Company
 from app.models.enums import BookingStatus
 from app.models.media import ArtistDocument
 from app.models.show import Show
+from app.models.tax_figure import TaxFigure
 from app.models.venue import Venue
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -518,3 +519,118 @@ async def mark_paid(
         booking.payout_paid = paid
     await db.commit()
     return {"ok": True, "booking_id": booking_id, "kind": kind, "paid": paid}
+
+
+# --------------------------------------------------------------------------- #
+# CONFIGURACIÓN · Impuestos (figuras fiscales) — catálogo editable
+# --------------------------------------------------------------------------- #
+def _tax_out(t) -> dict:
+    return {
+        "id": t.id,
+        "name": t.name,
+        "commission_pct": float(t.commission_pct or 0),
+        "isr_ret_pct": float(t.isr_ret_pct or 0),
+        "iva_ret_pct": float(t.iva_ret_pct or 0),
+        "notes": t.notes,
+        "is_default": bool(t.is_default),
+        "active": bool(t.active),
+    }
+
+
+def _pct(v) -> float:
+    """Normaliza un porcentaje: acepta 16 o '16' → 16.0, acota a 0–100."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        f = 0.0
+    return max(0.0, min(100.0, round(f, 4)))
+
+
+@router.get("/config/taxes")
+async def taxes_list(scope: CurrentScope, db: DbSession):
+    _admin_only(scope)
+    rows = (
+        await db.execute(select(TaxFigure).order_by(TaxFigure.is_default.desc(), TaxFigure.name))
+    ).scalars().all()
+    return {"items": [_tax_out(t) for t in rows]}
+
+
+@router.post("/config/taxes")
+async def taxes_create(
+    scope: CurrentScope,
+    db: DbSession,
+    name: str = Body(...),
+    commission_pct: float = Body(default=0.0),
+    isr_ret_pct: float = Body(default=0.0),
+    iva_ret_pct: float = Body(default=0.0),
+    notes: str | None = Body(default=None),
+    is_default: bool = Body(default=False),
+):
+    _admin_only(scope)
+    name = (name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="El nombre de la figura fiscal es obligatorio.")
+    if is_default:  # solo una figura por defecto
+        for t in (await db.execute(select(TaxFigure).where(TaxFigure.is_default.is_(True)))).scalars().all():
+            t.is_default = False
+    fig = TaxFigure(
+        name=name,
+        commission_pct=_pct(commission_pct),
+        isr_ret_pct=_pct(isr_ret_pct),
+        iva_ret_pct=_pct(iva_ret_pct),
+        notes=(notes or None),
+        is_default=is_default,
+        active=True,
+    )
+    db.add(fig)
+    await db.commit()
+    await db.refresh(fig)
+    return _tax_out(fig)
+
+
+@router.patch("/config/taxes/{tax_id}")
+async def taxes_update(
+    tax_id: int,
+    scope: CurrentScope,
+    db: DbSession,
+    payload: dict = Body(...),
+):
+    _admin_only(scope)
+    fig = await db.get(TaxFigure, tax_id)
+    if not fig:
+        raise HTTPException(status_code=404, detail="Figura fiscal no encontrada.")
+    if "name" in payload:
+        nm = (payload["name"] or "").strip()
+        if not nm:
+            raise HTTPException(status_code=400, detail="El nombre no puede quedar vacío.")
+        fig.name = nm
+    if "commission_pct" in payload:
+        fig.commission_pct = _pct(payload["commission_pct"])
+    if "isr_ret_pct" in payload:
+        fig.isr_ret_pct = _pct(payload["isr_ret_pct"])
+    if "iva_ret_pct" in payload:
+        fig.iva_ret_pct = _pct(payload["iva_ret_pct"])
+    if "notes" in payload:
+        fig.notes = (payload["notes"] or None)
+    if "active" in payload:
+        fig.active = bool(payload["active"])
+    if payload.get("is_default"):
+        for t in (await db.execute(select(TaxFigure).where(TaxFigure.is_default.is_(True)))).scalars().all():
+            t.is_default = False
+        fig.is_default = True
+    elif "is_default" in payload:
+        fig.is_default = False
+    await db.commit()
+    await db.refresh(fig)
+    return _tax_out(fig)
+
+
+@router.delete("/config/taxes/{tax_id}")
+async def taxes_delete(tax_id: int, scope: CurrentScope, db: DbSession):
+    _admin_only(scope)
+    fig = await db.get(TaxFigure, tax_id)
+    if not fig:
+        raise HTTPException(status_code=404, detail="Figura fiscal no encontrada.")
+    await db.delete(fig)
+    await db.commit()
+    return {"ok": True, "id": tax_id}

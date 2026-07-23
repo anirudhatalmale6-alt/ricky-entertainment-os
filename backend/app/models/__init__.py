@@ -15,6 +15,7 @@ from app.models.conversation import Conversation, Message
 from app.models.hotel_lead import HotelLead
 from app.models.notification import ArtistNotification
 from app.models.blocked_date import ArtistBlockedDate
+from app.models.tax_figure import TaxFigure
 from app.models.enums import (
     PayoutSpeed,
     RiskTier,
@@ -55,6 +56,7 @@ __all__ = [
     "HotelLead",
     "ArtistNotification",
     "ArtistBlockedDate",
+    "TaxFigure",
     "PayoutSpeed",
     "RiskTier",
     "BookingStatus",
