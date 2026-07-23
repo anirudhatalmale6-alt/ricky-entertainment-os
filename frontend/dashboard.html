@@ -736,6 +736,25 @@
   .mrow>b{text-align:right;word-break:break-word;font-weight:600}
   @media(max-width:820px){.mcon{flex-direction:column}.msb{width:100%;position:static;display:flex;flex-wrap:wrap;gap:4px}
     .msb .mlbl{width:100%;padding:6px 8px 2px}.msb .mi{flex:1 1 auto}}
+
+  /* ===== Master intranet mode — private hidden page (/master) ===== */
+  body.intranet .side,body.intranet .top{display:none!important}
+  body.intranet .app{grid-template-columns:1fr}
+  body.intranet .wrap{padding:0}
+  body.intranet .mcon{padding:20px 26px}
+  .mtop{display:none}
+  body.intranet .mtop{display:flex;align-items:center;gap:12px;padding:13px 24px;
+    background:var(--bg2);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:6}
+  body.intranet .mtop .mtbrand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.4px;font-size:15px}
+  body.intranet .mtop .mtbrand .m{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+    color:#fff;font-size:14px;background:var(--grad);box-shadow:0 6px 16px rgba(56,44,161,.35)}
+  body.intranet .mtop .mtbrand small{display:block;font-size:8.5px;letter-spacing:2.6px;color:var(--mut2);font-weight:700;margin-top:1px}
+  body.intranet .mtop .sp{flex:1}
+  body.intranet .mtop .mtuser{font-size:12.5px;color:var(--mut);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  body.intranet .mtop .mtout{border:1px solid var(--line);background:var(--bg);color:var(--mut);
+    border-radius:9px;padding:7px 13px;cursor:pointer;font-size:12.5px;font-weight:600;transition:.14s}
+  body.intranet .mtop .mtout:hover{color:var(--txt);border-color:var(--mut2)}
+  @media(max-width:560px){body.intranet .mtop .mtuser{display:none}body.intranet .mcon{padding:14px 14px}}
 </style>
 </head>
 <body>
@@ -987,10 +1006,41 @@ function paintNavIcons(){
   document.querySelectorAll('.side .nav').forEach(n=>{ const k=n.dataset.p; const ic=n.querySelector('.ic'); if(ic&&NAVICON[k]) ic.innerHTML=NAVICON[k]; });
 }
 const BASE = (window.RICKY_API ?? "");   // "" local, "/ricky" live — for page redirects
+// Master intranet: a private, hidden page (/master) that boots straight into the
+// internal console — separate from the Hotel/Artist login and not linked from it.
+// Admins only; anyone else who reaches it is bounced back to the sign-in.
+const INTRANET = /\/master\/?$/.test(location.pathname) || location.hash==='#master';
+function applyIntranetLogin(){
+  if(!INTRANET) return;
+  document.body.classList.add('intranet');
+  document.title='SHOWMA · Master';
+  try{
+    // Turn the public sign-in into a private admin sign-in: drop the register
+    // column, the audience switch and the hotel/artist marketing bits.
+    const panes=document.querySelectorAll('.lg-pane');
+    if(panes[1]) panes[1].style.display='none';
+    ['.lg-trust','.lg-switch','.lg-feats','.lg-bot'].forEach(s=>{const el=document.querySelector(s); if(el) el.style.display='none';});
+    const ht=document.getElementById('heroTitle'); if(ht) ht.innerHTML='Panel interno.<br>Operación y contaduría.<br><span class="p">Acceso administración.</span>';
+    const hs=document.getElementById('heroSub'); if(hs) hs.textContent='Área privada de SHOWMA. Ingresa con tu cuenta de administrador.';
+    const hk=document.getElementById('heroKicker'); if(hk) hk.textContent='PANEL MASTER';
+    const lp=panes[0];
+    const h2=lp&&lp.querySelector('h2'); if(h2) h2.textContent='Acceso administración';
+    const lead=lp&&lp.querySelector('.lead'); if(lead) lead.textContent='Área privada · solo personal autorizado';
+  }catch(e){}
+}
+document.addEventListener('DOMContentLoaded', applyIntranetLogin);
 async function afterAuth(token){
   TOKEN=token;
   try{ localStorage.setItem('ricky_token', token); }catch(e){}
   ME = await api("/auth/me");
+  if(INTRANET && !ME.is_admin){
+    // Private area — administración only. Bounce everyone else back to sign-in.
+    TOKEN=null; ME=null; try{localStorage.removeItem('ricky_token');}catch(e){}
+    document.getElementById('app').style.display='none';
+    document.getElementById('login').style.display='';
+    const el=document.getElementById('lerr'); if(el) el.textContent='Esta área es solo para administración.';
+    return;
+  }
   document.getElementById('login').style.display="none";
   document.getElementById('app').style.display="grid";
   applyRole();
@@ -1202,7 +1252,7 @@ function applyRole(){
   show('bill', isArtist || canPartner);                 // facturación (artist self / hotel)
   show('profile', isArtist);                            // artist-only self-service
   show('leads', ME.is_admin);                            // Prospectos: solo el administrador (master); oculto para hoteles/artistas
-  show('master', ME.is_admin);                           // Master: panel de control interno, solo administrador
+  show('master', false);                                 // Master: vive solo en su página privada (/master), fuera de este menú
   show('cal', true);                                     // actuaciones / historial de agenda
   if(isArtist){
     setNavLabel('home','🏠','Dashboard'); setNavLabel('cal','🗓️','Mis actuaciones'); setNavLabel('chat','💬','Mis chats');
@@ -1244,7 +1294,8 @@ async function boot(){
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));
   const first=[...document.querySelectorAll('.nav')].find(n=>n.style.display!=='none');
   document.querySelectorAll('.panel').forEach(x=>{x.dataset.loaded="";});
-  if(first){ first.classList.add('on'); await show(first.dataset.p,true); }
+  if(INTRANET){ await show('master',true); }        // private page boots straight into the console
+  else if(first){ first.classList.add('on'); await show(first.dataset.p,true); }
   loadNotifications();
   refreshLeadsBadge();   // globito rojo junto a "Prospectos" (admin) desde el arranque
   startNotifPoll();
@@ -2477,7 +2528,10 @@ function mShell(){
     ? `<div class="mlbl">${esc(it.sec)}</div>`
     : `<div class="mi${it.v===MASTER.view?' on':''}" data-v="${it.v}" onclick="mNav('${it.v}')"><span class="ic">${it.ic}</span> ${esc(it.label)}</div>`
   ).join('');
-  return `<div class="mcon"><aside class="msb">${items}</aside><div class="mmain" id="mbody"><div class="load">Cargando…</div></div></div>`;
+  const top = INTRANET
+    ? `<div class="mtop"><div class="mtbrand"><span class="m">S</span><div>SHOWMA<small>PANEL MASTER</small></div></div><div class="sp"></div><span class="mtuser">${esc((ME&&ME.full_name)||'Administración')}</span><button class="mtout" onclick="logout()" title="Cerrar sesión">↪ Salir</button></div>`
+    : '';
+  return `${top}<div class="mcon"><aside class="msb">${items}</aside><div class="mmain" id="mbody"><div class="load">Cargando…</div></div></div>`;
 }
 
 async function mNav(v){

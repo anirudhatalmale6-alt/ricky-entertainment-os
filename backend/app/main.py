@@ -110,6 +110,18 @@ async def dashboard():
     )
 
 
+@app.get("/master", include_in_schema=False)
+async def master_console():
+    """Private Master console — a hidden 'intranet' entrypoint, separate from the
+    Hotel/Artist login and not linked from it. Serves the same single-file app;
+    the frontend detects the /master path and boots straight into the internal
+    console (admin-only; anyone else is bounced back to the sign-in)."""
+    return _serve_html(
+        _frontend_file(),
+        "<h1>SHOWMA · Master</h1><p>Panel interno.</p>",
+    )
+
+
 @app.get("/registro", include_in_schema=False)
 async def registro():
     """The artist registration hoja (fotos, precios, redes, datos fiscales).
