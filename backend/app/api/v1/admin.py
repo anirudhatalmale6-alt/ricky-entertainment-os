@@ -30,6 +30,11 @@ from app.models.enums import BookingStatus
 from app.models.media import ArtistDocument
 from app.models.show import Show
 from app.models.tax_figure import TaxFigure
+from app.models.contract import (
+    ARTIST_CONTRACT_SLUG,
+    ContractAcceptance,
+    ContractTemplate,
+)
 from app.models.venue import Venue
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -634,3 +639,102 @@ async def taxes_delete(tax_id: int, scope: CurrentScope, db: DbSession):
     await db.delete(fig)
     await db.commit()
     return {"ok": True, "id": tax_id}
+
+
+# --------------------------------------------------------------------------- #
+# CONFIGURACIÓN · Plantillas · Contrato de Artistas
+# El contrato se guarda versionado: cada "Publicar" crea una versión nueva, para
+# que las aceptaciones de los artistas queden ancladas a un texto exacto.
+# --------------------------------------------------------------------------- #
+async def _current_contract(db, slug: str = ARTIST_CONTRACT_SLUG):
+    return (await db.execute(
+        select(ContractTemplate)
+        .where(ContractTemplate.slug == slug)
+        .order_by(ContractTemplate.version.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+
+def _contract_out(t) -> dict:
+    return {
+        "id": t.id,
+        "slug": t.slug,
+        "version": t.version,
+        "title": t.title,
+        "body": t.body,
+        "updated_at": t.created_at.isoformat() if t.created_at else None,
+    }
+
+
+@router.get("/config/contract")
+async def contract_get(scope: CurrentScope, db: DbSession):
+    _admin_only(scope)
+    cur = await _current_contract(db)
+    hist = (await db.execute(
+        select(ContractTemplate.version, ContractTemplate.created_at)
+        .where(ContractTemplate.slug == ARTIST_CONTRACT_SLUG)
+        .order_by(ContractTemplate.version.desc())
+    )).all()
+    accepted_total = (await db.execute(
+        select(func.count()).select_from(ContractAcceptance)
+        .where(ContractAcceptance.slug == ARTIST_CONTRACT_SLUG)
+    )).scalar() or 0
+    accepted_current = 0
+    if cur is not None:
+        accepted_current = (await db.execute(
+            select(func.count()).select_from(ContractAcceptance)
+            .where(
+                ContractAcceptance.slug == ARTIST_CONTRACT_SLUG,
+                ContractAcceptance.version == cur.version,
+            )
+        )).scalar() or 0
+    return {
+        "contract": _contract_out(cur) if cur else None,
+        "history": [
+            {"version": v, "created_at": c.isoformat() if c else None}
+            for v, c in hist
+        ],
+        "accepted_total": accepted_total,
+        "accepted_current": accepted_current,
+    }
+
+
+@router.post("/config/contract")
+async def contract_publish(
+    scope: CurrentScope,
+    db: DbSession,
+    title: str = Body(default=""),
+    body: str = Body(...),
+):
+    """Publica una versión nueva del contrato (no edita la anterior)."""
+    _admin_only(scope)
+    title = (title or "").strip() or "Contrato de Artistas"
+    body = (body or "").strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="El contenido del contrato no puede quedar vacío.")
+    prev = await _current_contract(db)
+    ver = (prev.version + 1) if prev else 1
+    t = ContractTemplate(slug=ARTIST_CONTRACT_SLUG, version=ver, title=title, body=body)
+    db.add(t)
+    await db.commit()
+    await db.refresh(t)
+    return _contract_out(t)
+
+
+@router.get("/config/contract/acceptances")
+async def contract_acceptances(scope: CurrentScope, db: DbSession):
+    """Constancias de aceptación (firma electrónica) para revisión / exportación."""
+    _admin_only(scope)
+    rows = (await db.execute(
+        select(ContractAcceptance)
+        .where(ContractAcceptance.slug == ARTIST_CONTRACT_SLUG)
+        .order_by(ContractAcceptance.created_at.desc())
+    )).scalars().all()
+    return {"items": [{
+        "id": r.id,
+        "signer_name": r.signer_name,
+        "artist_id": r.artist_id,
+        "version": r.version,
+        "ip": r.ip,
+        "accepted_at": r.created_at.isoformat() if r.created_at else None,
+    } for r in rows]}

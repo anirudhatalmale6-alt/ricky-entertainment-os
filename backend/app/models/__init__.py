@@ -16,6 +16,7 @@ from app.models.hotel_lead import HotelLead
 from app.models.notification import ArtistNotification
 from app.models.blocked_date import ArtistBlockedDate
 from app.models.tax_figure import TaxFigure
+from app.models.contract import ContractTemplate, ContractAcceptance
 from app.models.enums import (
     PayoutSpeed,
     RiskTier,
@@ -57,6 +58,8 @@ __all__ = [
     "ArtistNotification",
     "ArtistBlockedDate",
     "TaxFigure",
+    "ContractTemplate",
+    "ContractAcceptance",
     "PayoutSpeed",
     "RiskTier",
     "BookingStatus",

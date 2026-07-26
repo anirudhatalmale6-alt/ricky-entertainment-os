@@ -770,6 +770,36 @@
   .maddbox .marow .mtin{flex:1;min-width:130px;border:1px solid var(--line);background:var(--card);border-radius:7px;height:34px;padding:0 10px;font-size:12.8px;color:var(--txt);font-family:inherit}
   .maddbox .marow .mtin.nn{flex:none;min-width:96px;text-align:right}
   .maddbox .marow .mtin:focus{outline:none;border-color:var(--acc)}
+
+  /* ===== Configuración · Plantillas · Contrato (editor) ===== */
+  .mcform{display:flex;flex-direction:column;gap:14px}
+  .mcform .mfrow{display:flex;flex-direction:column;gap:6px}
+  .mcform .mfrow label{font-size:12px;font-weight:700;color:var(--mut);letter-spacing:.2px}
+  .mcform .mtin{width:100%;border:1px solid var(--line);background:var(--card);border-radius:8px;height:36px;padding:0 11px;font-size:13px;color:var(--txt);font-family:inherit}
+  .mcform .mtin:focus{outline:none;border-color:var(--acc)}
+  .mcform textarea.mtxa{height:auto;min-height:340px;padding:12px 13px;line-height:1.6;resize:vertical;white-space:pre-wrap}
+  .mcbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:13px}
+  .mcbar .mcmeta{font-size:12.5px;color:var(--mut)}
+  .mcbar .mcmeta b{color:var(--txt)}
+
+  /* ===== Contrato · compuerta de aceptación del artista (bloqueante) ===== */
+  .cgate{position:fixed;inset:0;z-index:9999;background:rgba(15,17,26,.72);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:20px}
+  .cgcard{background:var(--card);border:1px solid var(--line);border-radius:16px;max-width:720px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.4);overflow:hidden}
+  .cgh{padding:20px 24px 14px;border-bottom:1px solid var(--line)}
+  .cgbrand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.4px;font-size:15px;color:var(--txt)}
+  .cgbrand .m{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px;background:linear-gradient(135deg,var(--acc),var(--acc2))}
+  .cgt{font-size:16px;font-weight:800;color:var(--txt);margin-top:12px;line-height:1.35}
+  .cgs{font-size:12.8px;color:var(--mut);margin-top:6px;line-height:1.55}
+  .cgbody{padding:18px 24px;overflow-y:auto;white-space:pre-wrap;font-size:13px;line-height:1.62;color:var(--txt);flex:1}
+  .cgchk{display:flex;align-items:flex-start;gap:9px;padding:14px 24px;border-top:1px solid var(--line);font-size:12.8px;color:var(--txt);line-height:1.5;cursor:pointer}
+  .cgchk input{margin-top:2px;width:16px;height:16px;flex:none}
+  .cgbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 24px 20px}
+  .cgbar .cgout{background:none;border:0;color:var(--mut);font-size:13px;cursor:pointer;font-family:inherit}
+  .cgbar .cgout:hover{color:var(--txt);text-decoration:underline}
+  .cgbar .cgbtn{background:var(--acc);color:#fff;border:0;border-radius:9px;height:40px;padding:0 22px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit}
+  .cgbar .cgbtn:hover{background:var(--acc2)}
+  .cgbar .cgbtn:disabled{opacity:.45;cursor:not-allowed}
+  @media(max-width:560px){.cgt{font-size:15px}.cgbody{padding:14px 16px}.cgh,.cgchk,.cgbar{padding-left:16px;padding-right:16px}}
 </style>
 </head>
 <body>
@@ -1059,7 +1089,46 @@ async function afterAuth(token){
   document.getElementById('login').style.display="none";
   document.getElementById('app').style.display="grid";
   applyRole();
+  // Antes de operar, el artista debe aceptar el contrato vigente (Opción A):
+  // obligatorio en el onboarding y aviso a los que ya existen. Si falta, se
+  // muestra la compuerta bloqueante y NO se arranca el tablero hasta aceptar.
+  if(ME.artist_id){
+    try{
+      const c = await api('/me/contract');
+      if(c && c.required){ showContractGate(c.contract); return; }
+    }catch(e){ /* si falla la verificación no bloqueamos el acceso */ }
+  }
   await boot();
+}
+/* ---- Contrato: compuerta de aceptación (firma electrónica) ---- */
+function showContractGate(c){
+  const g=document.createElement('div'); g.id='contractGate'; g.className='cgate';
+  g.innerHTML=`<div class="cgcard">
+    <div class="cgh">
+      <div class="cgbrand"><span class="m">S</span> SHOWMA</div>
+      <div class="cgt">${esc((c&&c.title)||'Contrato de Artistas')}</div>
+      <div class="cgs">Para poder operar en la plataforma necesitas leer y aceptar este contrato. Tu aceptación queda registrada (nombre, fecha, hora e IP) y equivale a tu firma.</div>
+    </div>
+    <div class="cgbody">${esc((c&&c.body)||'')}</div>
+    <label class="cgchk"><input type="checkbox" id="cgOk" onchange="var b=document.getElementById('cgAccept');if(b)b.disabled=!this.checked"> He leído y acepto el contrato, los Términos y Condiciones y el Aviso de Privacidad.</label>
+    <div class="cgbar">
+      <button class="cgout" onclick="logout()">Salir</button>
+      <button class="cgbtn" id="cgAccept" disabled onclick="acceptContractGate()">Aceptar y continuar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(g);
+}
+async function acceptContractGate(){
+  const btn=document.getElementById('cgAccept');
+  if(btn){ btn.disabled=true; btn.textContent='Registrando…'; }
+  try{
+    await post('/me/contract/accept',{});
+    const g=document.getElementById('contractGate'); if(g) g.remove();
+    await boot();
+  }catch(e){
+    toast('No se pudo registrar la aceptación: '+e.message,true);
+    if(btn){ btn.disabled=false; btn.textContent='Aceptar y continuar'; }
+  }
 }
 async function login(){
   const el=document.getElementById('lerr'); el.textContent="";
@@ -2566,6 +2635,7 @@ async function mNav(v){
     else if(v==='pagos')     await mPagos(body);
     else if(v==='reportes')  mReportes(body);
     else if(v==='cfg_taxes') await mTaxes(body);
+    else if(v==='cfg_plantillas') await mPlantillas(body);
     else                     mConfig(body, v);
   }catch(e){ body.innerHTML = `<div class="mempty"><div class="big">⚠️</div>No se pudo cargar: ${esc(e.message)}</div>`; }
 }
@@ -3005,6 +3075,60 @@ async function mDelTax(id){
   try{ await del('/admin/config/taxes/'+id); toast('Figura eliminada'); mLoadTaxes(); }
   catch(e){ toast('No se pudo eliminar: '+e.message,true); }
 }
+/* ============ CONFIGURACIÓN · Plantillas · Contrato de Artistas ============ */
+async function mPlantillas(box){
+  box.innerHTML = mHead('Plantillas · Contrato de Artistas','Contrato marco talento–plataforma con aceptación electrónica (firma)')
+    + `<div class="mnote">Este es el contrato que cada artista debe aceptar antes de poder operar. La aceptación queda registrada con nombre, fecha/hora, versión e IP, y equivale a su firma autógrafa. Al publicar se crea una versión nueva; los artistas que ya habían aceptado una versión anterior deberán aceptar la nueva la próxima vez que entren.</div>
+       <div id="mres"><div class="load">Cargando…</div></div>`;
+  await mLoadContract();
+}
+async function mLoadContract(){
+  const res=document.getElementById('mres'); if(!res) return;
+  const d=await api('/admin/config/contract');
+  MASTER.cache.contract=d;
+  const c=d.contract||{title:'Contrato de Artistas',body:'',version:0,updated_at:null};
+  res.innerHTML = `<div class="mcform">
+      <div class="mfrow"><label>Título</label>
+        <input class="mtin" id="ct_title" value="${esc(c.title||'')}" placeholder="Título del contrato"></div>
+      <div class="mfrow"><label>Texto del contrato</label>
+        <textarea class="mtin mtxa" id="ct_body" placeholder="Pega aquí el texto del contrato…">${esc(c.body||'')}</textarea></div>
+      <div class="mcbar">
+        <div class="mcmeta">Versión vigente: <b>v${c.version||'—'}</b>${c.updated_at?` · actualizada ${mDay(c.updated_at)}`:''} · Aceptaciones: <b>${d.accepted_current}</b> en esta versión · ${d.accepted_total} en total</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="mbtn ghost" onclick="mViewAcceptances()">Ver constancias (${d.accepted_total})</button>
+          <button class="mbtn solid" onclick="mPublishContract()">Publicar versión</button>
+        </div>
+      </div>
+    </div>`;
+}
+async function mPublishContract(){
+  const body=mVal('ct_body');
+  if(!body){ toast('El contrato no puede quedar vacío.',true); return; }
+  if(!confirm('¿Publicar una versión nueva del contrato? Los artistas que ya lo habían aceptado deberán aceptar la nueva versión la próxima vez que entren.')) return;
+  try{
+    await post('/admin/config/contract',{title:mVal('ct_title'),body});
+    toast('Contrato publicado ✓'); mLoadContract();
+  }catch(e){ toast('No se pudo publicar: '+e.message,true); }
+}
+async function mViewAcceptances(){
+  try{
+    const d=await api('/admin/config/contract/acceptances');
+    const items=d.items||[]; MASTER.cache.acceptances=items;
+    const fmt=iso=>{ if(!iso) return '—'; const dt=new Date(iso); return mDay(iso)+' '+dt.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}); };
+    const rows=items.map(i=>`<tr><td>${esc(i.signer_name)}</td><td class="num">v${i.version}</td><td>${fmt(i.accepted_at)}</td><td>${esc(i.ip||'—')}</td></tr>`).join('');
+    mModal(`<div class="mch"><div><h3>Constancias de aceptación</h3><div class="sub">Firma electrónica · ${items.length} registro(s)</div></div><button class="mx" onclick="mClose()">✕</button></div>
+      ${items.length
+        ? `<div class="mtw"><table class="mt"><thead><tr><th>Artista</th><th class="num">Versión</th><th>Fecha y hora</th><th>IP</th></tr></thead><tbody>${rows}</tbody></table></div>
+           <div style="margin-top:12px;text-align:right"><button class="mbtn ghost" onclick="mExportAcceptances()">⬇️ Exportar Excel</button></div>`
+        : `<div class="mempty"><div class="big">🖊️</div>Aún no hay aceptaciones registradas.</div>`}`);
+  }catch(e){ toast('No se pudo cargar: '+e.message,true); }
+}
+function mExportAcceptances(){
+  const items=MASTER.cache.acceptances||[];
+  mCSV('constancias_contrato.csv',['Artista','Version','Fecha y hora','IP'],
+    items.map(i=>[i.signer_name,'v'+i.version, i.accepted_at? new Date(i.accepted_at).toLocaleString('es-MX'):'', i.ip||'']));
+}
+
 function mConfig(box, key){
   const titles={cfg_usuarios:['Usuarios y roles','Gestión de usuarios y permisos'],
     cfg_general:['Configuración general','Parámetros del sistema'],

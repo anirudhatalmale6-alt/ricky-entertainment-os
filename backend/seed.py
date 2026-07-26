@@ -8,7 +8,76 @@ from sqlalchemy import select
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal, init_db
+from app.models.contract import ARTIST_CONTRACT_SLUG, ContractTemplate
 from app.models.user import Permission, Role, User
+
+# Versión preliminar del Contrato Marco talento–plataforma (David, 2026-07-26).
+# Se siembra como v1 sólo si aún no existe ninguna versión; el Master lo edita
+# después desde Configuración / Plantillas y esto no vuelve a tocarlo.
+ARTIST_CONTRACT_TITLE = (
+    "Contrato Marco de Prestación de Servicios y Uso de la Plataforma SHOWMA"
+)
+ARTIST_CONTRACT_BODY = """CONTRATO MARCO DE PRESTACIÓN DE SERVICIOS Y USO DE LA PLATAFORMA SHOWMA
+SHOWMA GROUP, S.A. DE C.V.
+
+Modelo para aceptación electrónica. Debe ser revisado por asesor jurídico antes de su uso definitivo.
+
+ACEPTACIÓN ELECTRÓNICA
+La aceptación mediante la plataforma produce efectos legales equivalentes a la firma autógrafa conforme a la legislación mexicana aplicable.
+
+PARTES
+SHOWMA GROUP, S.A. DE C.V. y el prestador de servicios registrado ('EL ARTISTA').
+
+OBJETO
+Plataforma tecnológica para promoción artística, contratación, administración de eventos, generación de documentación administrativa y fiscal y programación de pagos.
+
+RELACIÓN
+El Artista es un prestador independiente; no existe relación laboral con SHOWMA.
+
+CONTRATACIONES
+Cada evento confirmado constituye una Orden de Servicio.
+
+FACTURACIÓN
+SHOWMA podrá generar el CFDI para revisión del Artista, quien es responsable de mantener correcta su información fiscal.
+
+PAGOS
+Sujetos a prestación del servicio, validación administrativa, documentación completa y CFDI correcto.
+
+COMISIONES
+Se aplicarán conforme al porcentaje vigente publicado en la plataforma.
+
+OBLIGACIONES
+Puntualidad, profesionalismo, cumplimiento de reglamentos y actualización de información fiscal y bancaria.
+
+CANCELACIONES
+Las cancelaciones injustificadas podrán generar penalizaciones y suspensión.
+
+NO CIRCUNVENCIÓN
+El Artista se compromete a no contratar directamente con clientes presentados por SHOWMA durante 24 meses, sujeto a validación legal.
+
+PROPIEDAD INTELECTUAL
+El Artista conserva sus derechos y concede una licencia no exclusiva para promoción.
+
+USO DE IMAGEN
+Autorización para utilizar fotografías y videos con fines promocionales.
+
+DATOS PERSONALES
+Tratamiento conforme al Aviso de Privacidad.
+
+LIMITACIÓN DE RESPONSABILIDAD
+SHOWMA no responde por accidentes, pérdidas de equipo, incumplimientos atribuibles al cliente, fuerza mayor ni daños indirectos.
+
+INDEMNIZACIÓN
+El Artista mantendrá a SHOWMA en paz y a salvo frente a reclamaciones derivadas de sus incumplimientos.
+
+TERMINACIÓN
+SHOWMA podrá suspender o cancelar cuentas por fraude, documentación falsa o incumplimientos.
+
+JURISDICCIÓN
+Leyes de México y tribunales competentes del domicilio social de SHOWMA GROUP, S.A. DE C.V.
+
+ACEPTACIÓN FINAL
+El Artista declara haber leído y aceptado el contrato, los Términos y Condiciones y el Aviso de Privacidad."""
 
 PERMISSIONS = [
     ("user.manage", "Create / edit / deactivate users"),
@@ -71,6 +140,18 @@ async def main() -> None:
                     role_id=role_by_name["admin"].id,
                 )
             )
+
+        # Contrato de artistas (versión preliminar) — sólo si no existe ninguna
+        res = await db.execute(
+            select(ContractTemplate).where(ContractTemplate.slug == ARTIST_CONTRACT_SLUG)
+        )
+        if not res.scalars().first():
+            db.add(ContractTemplate(
+                slug=ARTIST_CONTRACT_SLUG,
+                version=1,
+                title=ARTIST_CONTRACT_TITLE,
+                body=ARTIST_CONTRACT_BODY,
+            ))
 
         await db.commit()
     print("Seed complete.")

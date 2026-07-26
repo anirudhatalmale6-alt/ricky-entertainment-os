@@ -10,7 +10,7 @@ descripciones and gestiona sus publicaciones (shows).
 import uuid
 from datetime import date as date_cls
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, select, update
 from sqlalchemy.orm import selectinload
@@ -20,6 +20,11 @@ from app.core.config import settings
 from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
 from app.models.blocked_date import ArtistBlockedDate
+from app.models.contract import (
+    ARTIST_CONTRACT_SLUG,
+    ContractAcceptance,
+    ContractTemplate,
+)
 from app.models.notification import ArtistNotification
 from app.models.media import ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
@@ -220,6 +225,77 @@ async def mark_notifications_read(scope: CurrentScope, db: DbSession):
             .values(is_read=True)
         )
         await db.commit()
+
+
+# --- Contrato (aceptación electrónica = firma) ----------------------------
+
+async def _current_contract(db: DbSession):
+    return (await db.execute(
+        select(ContractTemplate)
+        .where(ContractTemplate.slug == ARTIST_CONTRACT_SLUG)
+        .order_by(ContractTemplate.version.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+
+@router.get("/contract")
+async def my_contract(scope: CurrentScope, db: DbSession):
+    """Contrato vigente + si el artista ya aceptó ESTA versión.
+
+    El front usa `required` para bloquear el onboarding / mostrar el aviso a los
+    artistas que ya existen hasta que acepten la versión actual.
+    """
+    artist_id = await _require_artist(scope)
+    cur = await _current_contract(db)
+    if cur is None:
+        # Sin contrato publicado todavía: no hay nada que aceptar, no bloquea.
+        return {"required": False, "accepted": True, "contract": None}
+    accepted = (await db.execute(
+        select(ContractAcceptance).where(
+            ContractAcceptance.slug == ARTIST_CONTRACT_SLUG,
+            ContractAcceptance.version == cur.version,
+            ContractAcceptance.user_id == scope.user.id,
+        ).limit(1)
+    )).scalar_one_or_none()
+    return {
+        "required": accepted is None,
+        "accepted": accepted is not None,
+        "accepted_at": accepted.created_at.isoformat() if accepted and accepted.created_at else None,
+        "contract": {"version": cur.version, "title": cur.title, "body": cur.body},
+    }
+
+
+@router.post("/contract/accept")
+async def accept_contract(request: Request, scope: CurrentScope, db: DbSession):
+    """Registra la aceptación de la versión vigente = firma electrónica.
+
+    Guarda nombre, versión, fecha/hora (created_at) e IP. Idempotente: aceptar
+    dos veces la misma versión no duplica la constancia.
+    """
+    artist_id = await _require_artist(scope)
+    cur = await _current_contract(db)
+    if cur is None:
+        raise HTTPException(status_code=404, detail="No hay un contrato vigente por aceptar.")
+    existing = (await db.execute(
+        select(ContractAcceptance).where(
+            ContractAcceptance.slug == ARTIST_CONTRACT_SLUG,
+            ContractAcceptance.version == cur.version,
+            ContractAcceptance.user_id == scope.user.id,
+        ).limit(1)
+    )).scalar_one_or_none()
+    if existing is None:
+        fwd = request.headers.get("x-forwarded-for", "")
+        ip = (fwd.split(",")[0].strip() if fwd else "") or (request.client.host if request.client else None)
+        db.add(ContractAcceptance(
+            slug=ARTIST_CONTRACT_SLUG,
+            version=cur.version,
+            user_id=scope.user.id,
+            artist_id=artist_id,
+            signer_name=scope.user.full_name,
+            ip=ip,
+        ))
+        await db.commit()
+    return {"accepted": True, "version": cur.version}
 
 
 # --- Availability blocks (vacaciones / enfermedad) ------------------------
