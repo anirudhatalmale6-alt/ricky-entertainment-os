@@ -534,8 +534,10 @@ def _tax_out(t) -> dict:
         "id": t.id,
         "name": t.name,
         "commission_pct": float(t.commission_pct or 0),
-        "isr_ret_pct": float(t.isr_ret_pct or 0),
+        "iva_traslado_pct": float(getattr(t, "iva_traslado_pct", 16) or 0),
         "iva_ret_pct": float(t.iva_ret_pct or 0),
+        "isr_ret_pct": float(t.isr_ret_pct or 0),
+        "isr_variable": bool(getattr(t, "isr_variable", False)),
         "notes": t.notes,
         "is_default": bool(t.is_default),
         "active": bool(t.active),
@@ -566,8 +568,10 @@ async def taxes_create(
     db: DbSession,
     name: str = Body(...),
     commission_pct: float = Body(default=0.0),
-    isr_ret_pct: float = Body(default=0.0),
+    iva_traslado_pct: float = Body(default=16.0),
     iva_ret_pct: float = Body(default=0.0),
+    isr_ret_pct: float = Body(default=0.0),
+    isr_variable: bool = Body(default=False),
     notes: str | None = Body(default=None),
     is_default: bool = Body(default=False),
 ):
@@ -581,8 +585,10 @@ async def taxes_create(
     fig = TaxFigure(
         name=name,
         commission_pct=_pct(commission_pct),
-        isr_ret_pct=_pct(isr_ret_pct),
+        iva_traslado_pct=_pct(iva_traslado_pct),
         iva_ret_pct=_pct(iva_ret_pct),
+        isr_ret_pct=_pct(isr_ret_pct),
+        isr_variable=bool(isr_variable),
         notes=(notes or None),
         is_default=is_default,
         active=True,
@@ -611,10 +617,14 @@ async def taxes_update(
         fig.name = nm
     if "commission_pct" in payload:
         fig.commission_pct = _pct(payload["commission_pct"])
-    if "isr_ret_pct" in payload:
-        fig.isr_ret_pct = _pct(payload["isr_ret_pct"])
+    if "iva_traslado_pct" in payload:
+        fig.iva_traslado_pct = _pct(payload["iva_traslado_pct"])
     if "iva_ret_pct" in payload:
         fig.iva_ret_pct = _pct(payload["iva_ret_pct"])
+    if "isr_ret_pct" in payload:
+        fig.isr_ret_pct = _pct(payload["isr_ret_pct"])
+    if "isr_variable" in payload:
+        fig.isr_variable = bool(payload["isr_variable"])
     if "notes" in payload:
         fig.notes = (payload["notes"] or None)
     if "active" in payload:

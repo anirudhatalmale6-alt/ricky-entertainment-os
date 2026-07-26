@@ -9,7 +9,29 @@ from sqlalchemy import select
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal, init_db
 from app.models.contract import ARTIST_CONTRACT_SLUG, ContractTemplate
+from app.models.tax_figure import TaxFigure
 from app.models.user import Permission, Role, User
+
+# 4 figuras fiscales que definió David con su contador (2026-07-26). La comisión
+# SHOWMA va como placeholder (15%, la que ya usa el sistema) hasta que David
+# confirme el % por figura; todo es editable desde Master → Impuestos.
+# Se siembran sólo si el catálogo está vacío (no resucita lo que él borre/edite).
+ARTIST_TAX_FIGURES = [
+    dict(name="Persona Física – Actividad Empresarial y Profesional",
+         commission_pct=15, iva_traslado_pct=16, iva_ret_pct=10.6667, isr_ret_pct=10,
+         isr_variable=False, is_default=True,
+         notes="Aplica retenciones. Neto = Subtotal + IVA − Ret. IVA − Ret. ISR."),
+    dict(name="Persona Física – RESICO",
+         commission_pct=15, iva_traslado_pct=16, iva_ret_pct=10.6667, isr_ret_pct=1.25,
+         isr_variable=True, is_default=False,
+         notes="ISR variable (1% a 2.5%), configurable por artista. Aplica retenciones."),
+    dict(name="Persona Moral – Régimen General",
+         commission_pct=15, iva_traslado_pct=16, iva_ret_pct=0, isr_ret_pct=0,
+         isr_variable=False, is_default=False, notes="Sin retenciones. Neto = Subtotal + IVA."),
+    dict(name="Persona Moral – Otros regímenes vigentes",
+         commission_pct=15, iva_traslado_pct=16, iva_ret_pct=0, isr_ret_pct=0,
+         isr_variable=False, is_default=False, notes="Sin retenciones. Neto = Subtotal + IVA."),
+]
 
 # Versión preliminar del Contrato Marco talento–plataforma (David, 2026-07-26).
 # Se siembra como v1 sólo si aún no existe ninguna versión; el Master lo edita
@@ -152,6 +174,12 @@ async def main() -> None:
                 title=ARTIST_CONTRACT_TITLE,
                 body=ARTIST_CONTRACT_BODY,
             ))
+
+        # Figuras fiscales — sólo si el catálogo está totalmente vacío
+        res = await db.execute(select(TaxFigure).limit(1))
+        if not res.scalars().first():
+            for fig in ARTIST_TAX_FIGURES:
+                db.add(TaxFigure(**fig, active=True))
 
         await db.commit()
     print("Seed complete.")

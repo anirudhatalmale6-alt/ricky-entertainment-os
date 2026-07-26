@@ -761,7 +761,9 @@
   table.mtax td{vertical-align:middle}
   table.mtax .mtin{width:100%;border:1px solid var(--line);background:var(--card);border-radius:7px;height:32px;padding:0 9px;font-size:12.8px;color:var(--txt);font-family:inherit}
   table.mtax .mtin:focus{outline:none;border-color:var(--acc)}
-  table.mtax .mtin.nn{width:90px;text-align:right}
+  table.mtax .mtin.nn{width:76px;text-align:right}
+  .mvchk{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--mut);white-space:nowrap}
+  .mvchk input{width:15px;height:15px}
   .mbtn.solid{background:var(--acc);color:#fff;border:0}
   .mbtn.solid:hover{background:var(--acc2)}
   .maddbox{margin-top:14px;background:var(--bg2);border:1px dashed var(--line);border-radius:12px;padding:14px 16px}
@@ -2996,11 +2998,11 @@ function mReportes(box){
       <div style="max-width:440px;margin:8px auto 0;font-size:13px">En esta primera etapa la información se consulta en pantalla y se exporta a Excel desde cada listado. Cuando definas el diseño de Reportes, armo aquí los reportes consolidados.</div></div></div>`;
 }
 /* ============ CONFIGURACIÓN · Impuestos (figuras fiscales) ============ */
-const TAX_SUGERENCIAS = ['RESICO (Persona Física)','Persona Física con Actividad Empresarial y Profesional',
-  'Persona Moral','Régimen de Arrendamiento','Régimen de Honorarios (Servicios Profesionales)','Persona Física Asalariada'];
+const TAX_SUGERENCIAS = ['Persona Física – Actividad Empresarial y Profesional','Persona Física – RESICO',
+  'Persona Moral – Régimen General','Persona Moral – Otros regímenes vigentes'];
 async function mTaxes(box){
-  box.innerHTML = mHead('Impuestos','Figuras fiscales · comisión y retenciones (ISR/IVA)')
-    + `<div class="mnote">Cada talento factura bajo una figura fiscal. La comisión y las retenciones de ISR/IVA que definas aquí alimentan el cálculo de egresos (lo que se paga al talento). Marca una figura como predeterminada; las demás quedan como excepción. Los porcentajes se guardan por figura.</div>
+  box.innerHTML = mHead('Impuestos','Figuras fiscales · comisión, IVA trasladado y retenciones (IVA/ISR)')
+    + `<div class="mnote">Cada talento factura bajo una figura fiscal. Por figura defines: la comisión SHOWMA, el IVA trasladado (se suma al subtotal) y las retenciones de IVA e ISR (se restan). Neto a pagar = Subtotal + IVA − Ret. IVA − Ret. ISR. Marca "ISR var." cuando el ISR se ajusta por artista (RESICO, 1%–2.5%). Marca una figura como predeterminada; las demás quedan como excepción.</div>
        <div id="mres"><div class="load">Cargando…</div></div>`;
   await mLoadTaxes();
 }
@@ -3010,9 +3012,9 @@ async function mLoadTaxes(){
   MASTER.cache.taxes=d.items;
   const rows=(d.items||[]).map(mTaxRow).join('');
   res.innerHTML = `<div class="mtw"><table class="mt mtax"><thead><tr>
-      <th>Figura fiscal</th><th class="num">Comisión %</th><th class="num">Ret. ISR %</th><th class="num">Ret. IVA %</th>
-      <th style="text-align:center">Predet.</th><th>Notas</th><th></th></tr></thead><tbody>
-    ${rows || `<tr><td colspan="7"><div class="mempty" style="padding:26px"><div class="big">🧮</div>Aún no hay figuras fiscales. Agrega la primera abajo.</div></td></tr>`}
+      <th>Figura fiscal</th><th class="num">Comisión %</th><th class="num">IVA tras. %</th><th class="num">Ret. IVA %</th><th class="num">Ret. ISR %</th>
+      <th style="text-align:center">ISR var.</th><th style="text-align:center">Predet.</th><th>Notas</th><th></th></tr></thead><tbody>
+    ${rows || `<tr><td colspan="9"><div class="mempty" style="padding:26px"><div class="big">🧮</div>Aún no hay figuras fiscales. Agrega la primera abajo.</div></td></tr>`}
     </tbody></table></div>
     ${mTaxAddForm()}`;
 }
@@ -3020,8 +3022,10 @@ function mTaxRow(t){
   return `<tr data-id="${t.id}">
     <td><input class="mtin" id="tx_n_${t.id}" value="${esc(t.name)}"></td>
     <td class="num"><input class="mtin nn" id="tx_c_${t.id}" type="number" step="0.01" min="0" max="100" value="${t.commission_pct}"></td>
+    <td class="num"><input class="mtin nn" id="tx_t_${t.id}" type="number" step="0.01" min="0" max="100" value="${t.iva_traslado_pct}"></td>
+    <td class="num"><input class="mtin nn" id="tx_v_${t.id}" type="number" step="0.0001" min="0" max="100" value="${t.iva_ret_pct}"></td>
     <td class="num"><input class="mtin nn" id="tx_i_${t.id}" type="number" step="0.01" min="0" max="100" value="${t.isr_ret_pct}"></td>
-    <td class="num"><input class="mtin nn" id="tx_v_${t.id}" type="number" step="0.01" min="0" max="100" value="${t.iva_ret_pct}"></td>
+    <td style="text-align:center"><input type="checkbox" id="tx_var_${t.id}" ${t.isr_variable?'checked':''} title="ISR configurable por artista (RESICO 1%–2.5%)"></td>
     <td style="text-align:center"><input type="radio" name="txdef" ${t.is_default?'checked':''} onclick="mSetTaxDefault(${t.id})" title="Marcar como predeterminada"></td>
     <td><input class="mtin" id="tx_o_${t.id}" value="${esc(t.notes||'')}" placeholder="—"></td>
     <td style="white-space:nowrap;text-align:right">
@@ -3036,8 +3040,10 @@ function mTaxAddForm(){
       <input class="mtin" id="tx_new_n" list="txsug" placeholder="Nombre / régimen fiscal">
       <datalist id="txsug">${TAX_SUGERENCIAS.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
       <input class="mtin nn" id="tx_new_c" type="number" step="0.01" min="0" max="100" placeholder="Comisión %">
-      <input class="mtin nn" id="tx_new_i" type="number" step="0.01" min="0" max="100" placeholder="ISR %">
-      <input class="mtin nn" id="tx_new_v" type="number" step="0.01" min="0" max="100" placeholder="IVA %">
+      <input class="mtin nn" id="tx_new_t" type="number" step="0.01" min="0" max="100" placeholder="IVA tras. %" value="16">
+      <input class="mtin nn" id="tx_new_v" type="number" step="0.0001" min="0" max="100" placeholder="Ret. IVA %">
+      <input class="mtin nn" id="tx_new_i" type="number" step="0.01" min="0" max="100" placeholder="Ret. ISR %">
+      <label class="mvchk"><input type="checkbox" id="tx_new_var"> ISR var.</label>
       <input class="mtin" id="tx_new_o" placeholder="Notas (opcional)">
       <button class="mbtn solid" onclick="mAddTax()">+ Agregar</button>
     </div>
@@ -3048,8 +3054,10 @@ async function mSaveTax(id){
     await patch('/admin/config/taxes/'+id,{
       name:mVal('tx_n_'+id),
       commission_pct:Number(mVal('tx_c_'+id))||0,
-      isr_ret_pct:Number(mVal('tx_i_'+id))||0,
+      iva_traslado_pct:Number(mVal('tx_t_'+id))||0,
       iva_ret_pct:Number(mVal('tx_v_'+id))||0,
+      isr_ret_pct:Number(mVal('tx_i_'+id))||0,
+      isr_variable:!!(document.getElementById('tx_var_'+id)||{}).checked,
       notes:mVal('tx_o_'+id)});
     toast('Figura actualizada ✓'); mLoadTaxes();
   }catch(e){ toast('No se pudo guardar: '+e.message,true); }
@@ -3064,8 +3072,10 @@ async function mAddTax(){
   try{
     await post('/admin/config/taxes',{name,
       commission_pct:Number(mVal('tx_new_c'))||0,
-      isr_ret_pct:Number(mVal('tx_new_i'))||0,
+      iva_traslado_pct:mVal('tx_new_t')===''?16:(Number(mVal('tx_new_t'))||0),
       iva_ret_pct:Number(mVal('tx_new_v'))||0,
+      isr_ret_pct:Number(mVal('tx_new_i'))||0,
+      isr_variable:!!(document.getElementById('tx_new_var')||{}).checked,
       notes:mVal('tx_new_o')});
     toast('Figura agregada ✓'); mLoadTaxes();
   }catch(e){ toast('No se pudo agregar: '+e.message,true); }

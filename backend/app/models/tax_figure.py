@@ -19,10 +19,14 @@ class TaxFigure(Base, TimestampMixin):
     __tablename__ = "tax_figures"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(160))                     # nombre / régimen fiscal
-    commission_pct: Mapped[float] = mapped_column(Float, default=0.0)  # comisión SHOWMA %
-    isr_ret_pct: Mapped[float] = mapped_column(Float, default=0.0)     # retención ISR %
-    iva_ret_pct: Mapped[float] = mapped_column(Float, default=0.0)     # retención IVA %
-    notes: Mapped[str | None] = mapped_column(String(400))             # notas / casos especiales
-    is_default: Mapped[bool] = mapped_column(Boolean, default=False)   # figura por defecto
+    name: Mapped[str] = mapped_column(String(160))                       # nombre / régimen fiscal
+    commission_pct: Mapped[float] = mapped_column(Float, default=0.0)    # comisión SHOWMA %
+    iva_traslado_pct: Mapped[float] = mapped_column(Float, default=16.0) # IVA trasladado % (se suma al subtotal)
+    iva_ret_pct: Mapped[float] = mapped_column(Float, default=0.0)       # retención de IVA %
+    isr_ret_pct: Mapped[float] = mapped_column(Float, default=0.0)       # retención de ISR %
+    # RESICO: el ISR es variable (1%–2.5%) y se define por artista; aquí isr_ret_pct
+    # queda como valor por defecto y la marca indica que se ajusta por talento.
+    isr_variable: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str | None] = mapped_column(String(400))              # notas / casos especiales
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)     # figura por defecto
     active: Mapped[bool] = mapped_column(Boolean, default=True)

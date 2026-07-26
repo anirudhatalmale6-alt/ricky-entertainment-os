@@ -37,6 +37,8 @@ _SQLITE_ADDED_COLUMNS = [
     ("bookings", "notified_at", "DATETIME"),
     ("bookings", "invoice_paid", "BOOLEAN DEFAULT 0"),
     ("bookings", "payout_paid", "BOOLEAN DEFAULT 0"),
+    ("tax_figures", "iva_traslado_pct", "FLOAT DEFAULT 16"),
+    ("tax_figures", "isr_variable", "BOOLEAN DEFAULT 0"),
 ]
 
 
