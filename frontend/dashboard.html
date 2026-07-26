@@ -3002,7 +3002,7 @@ const TAX_SUGERENCIAS = ['Persona Física – Actividad Empresarial y Profesiona
   'Persona Moral – Régimen General','Persona Moral – Otros regímenes vigentes'];
 async function mTaxes(box){
   box.innerHTML = mHead('Impuestos','Figuras fiscales · comisión, IVA trasladado y retenciones (IVA/ISR)')
-    + `<div class="mnote">Cada talento factura bajo una figura fiscal. Por figura defines: la comisión SHOWMA, el IVA trasladado (se suma al subtotal) y las retenciones de IVA e ISR (se restan). Neto a pagar = Subtotal + IVA − Ret. IVA − Ret. ISR. Marca "ISR var." cuando el ISR se ajusta por artista (RESICO, 1%–2.5%). Marca una figura como predeterminada; las demás quedan como excepción.</div>
+    + `<div class="mnote">Cada talento factura bajo una figura fiscal. Por figura defines: la comisión SHOWMA al músico ("Platform Services", 3.7%), el IVA trasladado (se suma al subtotal) y las retenciones de IVA e ISR (se restan). Neto a pagar = Subtotal + IVA − Ret. IVA − Ret. ISR. Marca "ISR var." cuando el ISR se ajusta por artista (RESICO, 1%–2.5%). Marca una figura como predeterminada; las demás quedan como excepción. (El cargo al hotel, "Service Fee" 7.2%, se aplica del lado de ingresos.)</div>
        <div id="mres"><div class="load">Cargando…</div></div>`;
   await mLoadTaxes();
 }

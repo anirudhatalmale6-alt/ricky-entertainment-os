@@ -13,23 +13,24 @@ from app.models.tax_figure import TaxFigure
 from app.models.user import Permission, Role, User
 
 # 4 figuras fiscales que definió David con su contador (2026-07-26). La comisión
-# SHOWMA va como placeholder (15%, la que ya usa el sistema) hasta que David
-# confirme el % por figura; todo es editable desde Master → Impuestos.
-# Se siembran sólo si el catálogo está vacío (no resucita lo que él borre/edite).
+# SHOWMA al músico es 3.7% ("Platform Services"); en el lado hotel se cobra 7.2%
+# ("Service Fee") sobre ingresos — ese va aparte, no en la figura del artista.
+# Todo es editable desde Master → Impuestos. Se siembran sólo si el catálogo está
+# vacío (no resucita lo que él borre/edite).
 ARTIST_TAX_FIGURES = [
     dict(name="Persona Física – Actividad Empresarial y Profesional",
-         commission_pct=15, iva_traslado_pct=16, iva_ret_pct=10.6667, isr_ret_pct=10,
+         commission_pct=3.7, iva_traslado_pct=16, iva_ret_pct=10.6667, isr_ret_pct=10,
          isr_variable=False, is_default=True,
          notes="Aplica retenciones. Neto = Subtotal + IVA − Ret. IVA − Ret. ISR."),
     dict(name="Persona Física – RESICO",
-         commission_pct=15, iva_traslado_pct=16, iva_ret_pct=10.6667, isr_ret_pct=1.25,
+         commission_pct=3.7, iva_traslado_pct=16, iva_ret_pct=10.6667, isr_ret_pct=1.25,
          isr_variable=True, is_default=False,
          notes="ISR variable (1% a 2.5%), configurable por artista. Aplica retenciones."),
     dict(name="Persona Moral – Régimen General",
-         commission_pct=15, iva_traslado_pct=16, iva_ret_pct=0, isr_ret_pct=0,
+         commission_pct=3.7, iva_traslado_pct=16, iva_ret_pct=0, isr_ret_pct=0,
          isr_variable=False, is_default=False, notes="Sin retenciones. Neto = Subtotal + IVA."),
     dict(name="Persona Moral – Otros regímenes vigentes",
-         commission_pct=15, iva_traslado_pct=16, iva_ret_pct=0, isr_ret_pct=0,
+         commission_pct=3.7, iva_traslado_pct=16, iva_ret_pct=0, isr_ret_pct=0,
          isr_variable=False, is_default=False, notes="Sin retenciones. Neto = Subtotal + IVA."),
 ]
 
