@@ -28,9 +28,13 @@ _MONTHS_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
               "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 # Base assumptions — configurables. Returned in the payload so the UI shows them.
-DEFAULT_COMMISSION = 0.15   # comisión promedio de SHOWMA sobre el bruto contratado
+DEFAULT_COMMISSION = 0.15   # (legado) comisión plana
 IVA_RATE = 0.16             # IVA México
 ISR_RATE = 0.30             # ISR estimado sobre la utilidad
+# Modelo de comisiones fijo: Service Fee al hotel + Platform Services al músico.
+SERVICE_FEE = 0.072
+PLATFORM_SERVICES = 0.037
+SHOWMA_TAKE = SERVICE_FEE + PLATFORM_SERVICES   # ingreso total de SHOWMA por actuación
 
 
 def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
@@ -128,7 +132,7 @@ async def executive_dashboard(
     for (yy, mm) in reversed(trail):
         s, e = _month_bounds(yy, mm)
         ing = await _sum_ingresos(db, s, e)
-        egr = round(ing * (1 - DEFAULT_COMMISSION), 2)   # pagos a talento
+        egr = round(ing * (1 - PLATFORM_SERVICES), 2)   # pagos a talento (neto de Platform Services)
         series.append({"label": _MONTHS_ES[mm - 1], "year": yy,
                        "ingresos": round(ing, 2), "egresos": egr})
 
@@ -173,8 +177,8 @@ async def executive_dashboard(
     top_empresas = [{"name": n or "—", "monto": round(float(t), 2)} for n, t in top_emp_rows]
 
     # ---- Resumen contable (estimado, tasas configurables) ----
-    egresos = round(ingresos * (1 - DEFAULT_COMMISSION), 2)     # pagos a talento
-    utilidad = round(ingresos - egresos, 2)                     # comisión SHOWMA
+    egresos = round(ingresos * (1 - PLATFORM_SERVICES), 2)      # pagos a talento
+    utilidad = round(ingresos * SHOWMA_TAKE, 2)                 # Service Fee + Platform Services
     margen = round(utilidad / ingresos * 100, 1) if ingresos else 0
     iva = round(utilidad * IVA_RATE, 2)
     isr = round(utilidad * ISR_RATE, 2)
@@ -209,5 +213,6 @@ async def executive_dashboard(
             "utilidad": utilidad, "margen": margen, "iva": iva, "isr": isr,
         },
         "cobros": {"por_cobrar": round(por_cobrar, 2), "depositado": round(depositado, 2)},
-        "rates": {"comision": DEFAULT_COMMISSION, "iva": IVA_RATE, "isr": ISR_RATE},
+        "rates": {"comision": SHOWMA_TAKE, "service_fee": SERVICE_FEE,
+                  "platform_services": PLATFORM_SERVICES, "iva": IVA_RATE, "isr": ISR_RATE},
     }

@@ -85,6 +85,9 @@ class Artist(Base, TimestampMixin):
     rfc: Mapped[str | None] = mapped_column(String(20))
     cfdi_use: Mapped[str | None] = mapped_column(String(20))
     tax_regime: Mapped[str | None] = mapped_column(String(120))
+    # Figura fiscal asignada (catálogo Impuestos). Define las retenciones IVA/ISR
+    # que se aplican en el cálculo de egresos. Null = usa la figura predeterminada.
+    tax_figure_id: Mapped[int | None] = mapped_column(Integer, default=None)
     legal_name: Mapped[str | None] = mapped_column(String(255))
     fiscal_postal_code: Mapped[str | None] = mapped_column(String(10))
     bank_name: Mapped[str | None] = mapped_column(String(120))

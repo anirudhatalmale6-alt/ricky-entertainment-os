@@ -40,8 +40,11 @@ from app.models.venue import Venue
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 # Tasas base (configurables desde el Dashboard ejecutivo / reports.py).
-DEFAULT_COMMISSION = 0.15   # comisión SHOWMA sobre el bruto contratado
+DEFAULT_COMMISSION = 0.15   # (legado) comisión plana — reemplazada por las 2 fijas
 IVA_RATE = 0.16             # IVA México
+# Modelo de comisiones fijo (David 2026-07-26): dos cargos, sobre el subtotal.
+SERVICE_FEE = 0.072         # "Service Fee" al hotel (lado ingresos, se suma)
+PLATFORM_SERVICES = 0.037   # "Platform Services" al músico (lado egresos, se resta)
 
 _BOOKED = (BookingStatus.CONFIRMED, BookingStatus.COMPLETED)
 _ACTIVE = (BookingStatus.CONFIRMED, BookingStatus.COMPLETED, BookingStatus.PENDING)
@@ -91,6 +94,46 @@ def _recibo(prefix: str, b: Booking) -> str:
     return f"{prefix}-{dt.year}{dt.month:02d}-{b.id:04d}"
 
 
+async def _figuras_map(db):
+    """Catálogo de figuras fiscales indexado por id + la predeterminada."""
+    rows = (await db.execute(select(TaxFigure))).scalars().all()
+    by_id = {t.id: t for t in rows}
+    default = next((t for t in rows if t.is_default), (rows[0] if rows else None))
+    return by_id, default
+
+
+def _money(subtotal, figura) -> dict:
+    """Desglose de una actuación según la figura fiscal del músico.
+
+    Base = subtotal (tarifa). El IVA trasladado se suma; las retenciones de IVA e
+    ISR se restan (van al SAT); el Service Fee lo paga el hotel (se suma al ingreso)
+    y Platform Services lo cubre el músico (se resta del egreso).
+        Ingreso (hotel) = subtotal + IVA + Service Fee
+        Egreso  (músico) = subtotal + IVA − Ret. IVA − Ret. ISR − Platform Services
+    """
+    sub = float(subtotal or 0)
+    iva_r = (float(figura.iva_traslado_pct) if figura and figura.iva_traslado_pct is not None
+             else IVA_RATE * 100) / 100.0
+    riva_r = (float(figura.iva_ret_pct) if figura else 0.0) / 100.0
+    risr_r = (float(figura.isr_ret_pct) if figura else 0.0) / 100.0
+    iva = round(sub * iva_r, 2)
+    ret_iva = round(sub * riva_r, 2)
+    ret_isr = round(sub * risr_r, 2)
+    service_fee = round(sub * SERVICE_FEE, 2)
+    platform = round(sub * PLATFORM_SERVICES, 2)
+    return {
+        "subtotal": round(sub, 2),
+        "iva": iva,
+        "ret_iva": ret_iva,
+        "ret_isr": ret_isr,
+        "service_fee": service_fee,
+        "platform_services": platform,
+        "ingreso_total": round(sub + iva + service_fee, 2),           # lo que paga el hotel
+        "egreso_neto": round(sub + iva - ret_iva - ret_isr - platform, 2),  # neto al músico
+        "figura": figura.name if figura else None,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # ADMINISTRACIÓN · Talentos
 # --------------------------------------------------------------------------- #
@@ -125,6 +168,7 @@ async def list_talents(
         .where(ArtistDocument.doc_type == "constancia_sat")
     )).all()
     constancia = {aid: url for aid, url in doc_rows}
+    by_id, default_fig = await _figuras_map(db)
 
     stmt = select(Artist)
     if q:
@@ -152,6 +196,7 @@ async def list_talents(
         if fac_max is not None and fac > fac_max:
             continue
         ubic = " / ".join([p for p in (a.city, a.region, a.country) if p]) or None
+        fig = by_id.get(a.tax_figure_id) or default_fig
         out.append({
             "id": a.id,
             "nombre": a.stage_name,
@@ -165,6 +210,10 @@ async def list_talents(
             "facturacion": fac,
             "actuaciones": counts.get(a.id, 0),
             "disponible": bool(a.available_to_travel),
+            # Figura fiscal asignada (o la predeterminada si no tiene una propia)
+            "tax_figure_id": a.tax_figure_id,
+            "figura_fiscal": (fig.name if fig else None),
+            "figura_asignada": a.tax_figure_id is not None,
             # Pop-up financiero
             "financiero": {
                 "banco": a.bank_name,
@@ -175,8 +224,10 @@ async def list_talents(
                 "constancia_url": constancia.get(a.id),
                 "beneficiario": a.bank_account_holder or a.legal_name,
                 "moneda": a.preferred_currency,
-                "retencion_isr": None,       # configurable por talento (pendiente)
-                "retencion_iva": None,
+                "figura_fiscal": (fig.name if fig else None),
+                "comision": float(getattr(fig, "commission_pct", 0) or 0) if fig else PLATFORM_SERVICES * 100,
+                "retencion_isr": (float(fig.isr_ret_pct or 0) if fig else None),
+                "retencion_iva": (float(fig.iva_ret_pct or 0) if fig else None),
             },
             # Pop-up perfil
             "perfil": {
@@ -191,6 +242,27 @@ async def list_talents(
     # Regímenes disponibles para poblar el filtro.
     regimenes = sorted({a.tax_regime for a in artists if a.tax_regime})
     return {"total": len(out), "items": out, "regimenes": regimenes}
+
+
+@router.patch("/talents/{artist_id}/figura")
+async def set_talent_figura(
+    artist_id: int,
+    scope: CurrentScope,
+    db: DbSession,
+    tax_figure_id: int | None = Body(default=None, embed=True),
+):
+    """Asigna la figura fiscal de un talento (None = usar la predeterminada)."""
+    _admin_only(scope)
+    artist = await db.get(Artist, artist_id)
+    if not artist:
+        raise HTTPException(status_code=404, detail="Talento no encontrado.")
+    if tax_figure_id is not None:
+        fig = await db.get(TaxFigure, tax_figure_id)
+        if not fig:
+            raise HTTPException(status_code=404, detail="Figura fiscal no encontrada.")
+    artist.tax_figure_id = tax_figure_id
+    await db.commit()
+    return {"ok": True, "id": artist_id, "tax_figure_id": tax_figure_id}
 
 
 # --------------------------------------------------------------------------- #
@@ -364,7 +436,7 @@ async def list_events(
 async def _billable(db, extra=None):
     """Bookings que generan factura: confirmadas o realizadas."""
     stmt = (
-        select(Booking, Artist.stage_name, Company.name)
+        select(Booking, Artist.stage_name, Company.name, Artist.tax_figure_id)
         .outerjoin(Artist, Artist.id == Booking.artist_id)
         .outerjoin(Company, Company.id == Booking.company_id)
         .where(Booking.status.in_(_BOOKED))
@@ -384,10 +456,10 @@ async def contaduria_ingresos(
 ):
     _admin_only(scope)
     rows = await _billable(db)
+    by_id, default = await _figuras_map(db)
     out = []
-    for b, artist_name, company_name in rows:
-        monto = float(b.agreed_price or 0)
-        iva = round(monto * IVA_RATE, 2)
+    for b, artist_name, company_name, fig_id in rows:
+        m = _money(b.agreed_price, by_id.get(fig_id) or default)
         pagada = bool(getattr(b, "invoice_paid", False))
         if estado == "pagada" and not pagada:
             continue
@@ -402,14 +474,15 @@ async def contaduria_ingresos(
             "dias": _days_since(b.starts_at),
             "cliente": company_name or "—",
             "metodo_pago": "Transferencia electrónica de fondos",
-            "monto": round(monto, 2),
-            "iva": iva,
-            "total": round(monto + iva, 2),
+            "monto": m["subtotal"],            # subtotal (tarifa)
+            "iva": m["iva"],
+            "service_fee": m["service_fee"],   # Service Fee 7.2% al hotel
+            "total": m["ingreso_total"],       # subtotal + IVA + Service Fee
             "moneda": b.currency,
             "pagada": pagada,
         })
-    total = round(sum(r["monto"] for r in out), 2)
-    pend = round(sum(r["monto"] for r in out if not r["pagada"]), 2)
+    total = round(sum(r["total"] for r in out), 2)
+    pend = round(sum(r["total"] for r in out if not r["pagada"]), 2)
     return {"total": len(out), "items": out, "suma": total, "pendiente": pend}
 
 
@@ -425,10 +498,10 @@ async def contaduria_egresos(
 ):
     _admin_only(scope)
     rows = await _billable(db)
+    by_id, default = await _figuras_map(db)
     out = []
-    for b, artist_name, company_name in rows:
-        bruto = float(b.agreed_price or 0)
-        pago = round(bruto * (1 - _commission(b)), 2)     # neto al talento
+    for b, artist_name, company_name, fig_id in rows:
+        m = _money(b.agreed_price, by_id.get(fig_id) or default)
         pagada = bool(getattr(b, "payout_paid", False))
         if estado == "pagada" and not pagada:
             continue
@@ -442,7 +515,13 @@ async def contaduria_egresos(
             "fecha": (b.starts_at.isoformat() if b.starts_at else None),
             "dias": _days_since(b.starts_at),
             "talento": artist_name or "—",
-            "monto": pago,
+            "figura": m["figura"] or "—",
+            "subtotal": m["subtotal"],
+            "iva": m["iva"],
+            "ret_iva": m["ret_iva"],
+            "ret_isr": m["ret_isr"],
+            "comision": m["platform_services"],   # Platform Services 3.7%
+            "monto": m["egreso_neto"],             # neto al talento
             "moneda": b.currency,
             "pagada": pagada,
         })
@@ -463,9 +542,10 @@ async def contaduria_pagos(
 ):
     _admin_only(scope)
     rows = await _billable(db)
+    by_id, default = await _figuras_map(db)
     out = []
-    for b, artist_name, company_name in rows:
-        bruto = float(b.agreed_price or 0)
+    for b, artist_name, company_name, fig_id in rows:
+        m = _money(b.agreed_price, by_id.get(fig_id) or default)
         # Depósito del cliente (ingreso)
         out.append({
             "booking_id": b.id, "kind": "ingreso",
@@ -474,7 +554,7 @@ async def contaduria_pagos(
             "contraparte": company_name or "—",
             "tipo": "Depósito de cliente",
             "referencia": _recibo("F", b),
-            "monto": round(bruto * (1 + IVA_RATE), 2),
+            "monto": m["ingreso_total"],           # subtotal + IVA + Service Fee
             "moneda": b.currency,
             "conciliado": bool(getattr(b, "invoice_paid", False)),
         })
@@ -486,7 +566,7 @@ async def contaduria_pagos(
             "contraparte": artist_name or "—",
             "tipo": "Pago a proveedor",
             "referencia": _recibo("R", b),
-            "monto": round(bruto * (1 - _commission(b)), 2),
+            "monto": m["egreso_neto"],             # neto al talento
             "moneda": b.currency,
             "conciliado": bool(getattr(b, "payout_paid", False)),
         })

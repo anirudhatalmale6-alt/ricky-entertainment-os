@@ -2728,17 +2728,37 @@ async function mLoadTalento(){
     </tr>`).join('')}</tbody></table></div>`;
 }
 function _mFindT(id){ return (MASTER.cache.talento||[]).find(t=>t.id===id); }
-function mFichaTalento(id){
+async function mFichaTalento(id){
   const t=_mFindT(id); if(!t) return; const x=t.financiero;
+  let figs = MASTER.cache.taxes;
+  if(!figs){ try{ figs=(await api('/admin/config/taxes')).items; MASTER.cache.taxes=figs; }catch(e){ figs=[]; } }
+  const selStyle="min-width:240px;border:1px solid var(--line);background:var(--card);border-radius:7px;height:32px;padding:0 8px;font-size:12.5px;color:var(--txt);font-family:inherit";
+  const opts=`<option value="">— Predeterminada del catálogo —</option>`+(figs||[]).map(f=>`<option value="${f.id}" ${t.tax_figure_id===f.id?'selected':''}>${esc(f.name)}</option>`).join('');
   mModal(`<div class="mch"><div><h3>${esc(t.nombre)}</h3><div class="sub">Datos financieros y fiscales</div></div><button class="mx" onclick="mClose()">✕</button></div>
     <div class="mcb">
       ${mR('Banco',x.banco)}${mR('CLABE interbancaria',x.clabe)}${mR('Número de cuenta',x.cuenta)}
-      ${mR('RFC',x.rfc)}${mR('Régimen fiscal',x.regimen_fiscal)}
+      ${mR('RFC',x.rfc)}${mR('Régimen fiscal (SAT)',x.regimen_fiscal)}
       ${mRlink('Constancia de situación fiscal',x.constancia_url,'Ver PDF')}
       ${mR('Beneficiario',x.beneficiario)}${mR('Moneda de pago',x.moneda)}
-      ${mR('Retención de ISR',x.retencion_isr!=null?x.retencion_isr+'%':null)}
+      <div class="mrow" style="align-items:center"><span>Figura fiscal (SHOWMA)</span>
+        <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+          <select id="talFig" style="${selStyle}">${opts}</select>
+          <button class="mbtn solid" onclick="mSetTalentFigura(${t.id})">Guardar</button></span></div>
+      ${mR('Comisión (Platform Services)',x.comision!=null?x.comision+'%':null)}
       ${mR('Retención de IVA',x.retencion_iva!=null?x.retencion_iva+'%':null)}
+      ${mR('Retención de ISR',x.retencion_isr!=null?x.retencion_isr+'%':null)}
+      ${!t.figura_asignada?'<div class="mnote" style="margin-top:10px">Este talento no tiene figura propia asignada: se aplica la predeterminada del catálogo de Impuestos.</div>':''}
     </div>`);
+}
+async function mSetTalentFigura(id){
+  const sel=document.getElementById('talFig'); if(!sel) return;
+  const v=sel.value===''?null:Number(sel.value);
+  try{
+    await patch('/admin/talents/'+id+'/figura',{tax_figure_id:v});
+    toast('Figura fiscal actualizada ✓');
+    await mLoadTalento();
+    mFichaTalento(id);
+  }catch(e){ toast('No se pudo actualizar: '+e.message,true); }
 }
 function mFichaTalentoPerfil(id){
   const t=_mFindT(id); if(!t) return; const x=t.perfil;
@@ -2893,18 +2913,19 @@ async function mLoadIngresos(){
       <div class="mtcard"><div class="k">Total facturado</div><div class="v">${MXN(d.suma)}</div></div>
       <div class="mtcard"><div class="k">Por cobrar</div><div class="v" style="color:var(--warn)">${MXN(d.pendiente)}</div></div></div>`;
   if(!d.items.length){ res.innerHTML=head+mEmpty('No hay facturas que coincidan con el filtro.'); return; }
-  res.innerHTML = head + `<div class="mtw"><table class="mt"><thead><tr>
-      <th>Nº recibo</th><th>Fecha</th><th class="num">Días</th><th>Cliente</th><th>Método de pago</th><th class="num">Monto</th><th class="num">IVA</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody>
+  res.innerHTML = head + `<div class="mnote">Total al hotel = Subtotal + IVA (16%) + Service Fee (7.2%). El Service Fee es la comisión de la plataforma al hotel.</div>
+    <div class="mtw"><table class="mt"><thead><tr>
+      <th>Nº recibo</th><th>Fecha</th><th class="num">Días</th><th>Cliente</th><th>Método de pago</th><th class="num">Subtotal</th><th class="num">IVA</th><th class="num">Service Fee</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody>
     ${d.items.map(r=>`<tr>
       <td><b>${esc(r.recibo)}</b></td><td>${mDay(r.fecha)}</td><td class="num">${r.dias!=null?r.dias:'—'}</td>
       <td>${esc(r.cliente)}</td><td>${esc(r.metodo_pago)}</td>
-      <td class="num">${MXN(r.monto)}</td><td class="num">${MXN(r.iva)}</td><td class="num"><b>${MXN(r.total)}</b></td>
+      <td class="num">${MXN(r.monto)}</td><td class="num">${MXN(r.iva)}</td><td class="num">${MXN(r.service_fee)}</td><td class="num"><b>${MXN(r.total)}</b></td>
       <td><button class="mtog ${r.pagada?'paid':'due'}" onclick="mTogglePaid('ingreso',${r.id},${r.pagada})">${r.pagada?'✓ Pagada':'Impagada'}</button></td>
     </tr>`).join('')}</tbody></table></div>`;
 }
 function mExpIngresos(){
-  const rows=(MASTER.cache.ingresos||[]).map(r=>[r.recibo,mDay(r.fecha),r.dias,r.cliente,r.metodo_pago,r.monto,r.iva,r.total,r.pagada?'Pagada':'Impagada']);
-  mCSV('ingresos_showma.csv',['Nº recibo','Fecha','Días','Cliente','Método de pago','Monto','IVA','Total','Estado'],rows);
+  const rows=(MASTER.cache.ingresos||[]).map(r=>[r.recibo,mDay(r.fecha),r.dias,r.cliente,r.metodo_pago,r.monto,r.iva,r.service_fee,r.total,r.pagada?'Pagada':'Impagada']);
+  mCSV('ingresos_showma.csv',['Nº recibo','Fecha','Días','Cliente','Método de pago','Subtotal','IVA','Service Fee','Total','Estado'],rows);
 }
 
 /* ============ CONTADURÍA · Facturación Egresos ============ */
@@ -2931,17 +2952,21 @@ async function mLoadEgresos(){
       <div class="mtcard"><div class="k">Total a talento</div><div class="v">${MXN(d.suma)}</div></div>
       <div class="mtcard"><div class="k">Por pagar</div><div class="v" style="color:var(--warn)">${MXN(d.pendiente)}</div></div></div>`;
   if(!d.items.length){ res.innerHTML=head+mEmpty('No hay recibos que coincidan con el filtro.'); return; }
-  res.innerHTML = head + `<div class="mtw"><table class="mt"><thead><tr>
-      <th>Nº recibo</th><th>Fecha</th><th class="num">Días</th><th>Talento</th><th class="num">Monto</th><th>Estado</th></tr></thead><tbody>
+  res.innerHTML = head + `<div class="mnote">Neto al músico = Subtotal + IVA (16%) − Ret. IVA − Ret. ISR − Comisión (Platform Services 3.7%). Las retenciones dependen de la figura fiscal de cada talento (se asigna en Talentos).</div>
+    <div class="mtw"><table class="mt"><thead><tr>
+      <th>Nº recibo</th><th>Fecha</th><th>Talento</th><th>Figura fiscal</th><th class="num">Subtotal</th><th class="num">IVA</th><th class="num">Ret. IVA</th><th class="num">Ret. ISR</th><th class="num">Comisión</th><th class="num">Neto</th><th>Estado</th></tr></thead><tbody>
     ${d.items.map(r=>`<tr>
-      <td><b>${esc(r.recibo)}</b></td><td>${mDay(r.fecha)}</td><td class="num">${r.dias!=null?r.dias:'—'}</td>
-      <td>${esc(r.talento)}</td><td class="num"><b>${MXN(r.monto)}</b></td>
+      <td><b>${esc(r.recibo)}</b></td><td>${mDay(r.fecha)}</td>
+      <td>${esc(r.talento)}</td><td style="font-size:11.5px;color:var(--mut)">${esc(r.figura||'—')}</td>
+      <td class="num">${MXN(r.subtotal)}</td><td class="num">${MXN(r.iva)}</td>
+      <td class="num">${MXN(r.ret_iva)}</td><td class="num">${MXN(r.ret_isr)}</td><td class="num">${MXN(r.comision)}</td>
+      <td class="num"><b>${MXN(r.monto)}</b></td>
       <td><button class="mtog ${r.pagada?'paid':'due'}" onclick="mTogglePaid('egreso',${r.id},${r.pagada})">${r.pagada?'✓ Pagado':'Impagado'}</button></td>
     </tr>`).join('')}</tbody></table></div>`;
 }
 function mExpEgresos(){
-  const rows=(MASTER.cache.egresos||[]).map(r=>[r.recibo,mDay(r.fecha),r.dias,r.talento,r.monto,r.pagada?'Pagado':'Impagado']);
-  mCSV('egresos_showma.csv',['Nº recibo','Fecha','Días','Talento','Monto','Estado'],rows);
+  const rows=(MASTER.cache.egresos||[]).map(r=>[r.recibo,mDay(r.fecha),r.talento,r.figura,r.subtotal,r.iva,r.ret_iva,r.ret_isr,r.comision,r.monto,r.pagada?'Pagado':'Impagado']);
+  mCSV('egresos_showma.csv',['Nº recibo','Fecha','Talento','Figura fiscal','Subtotal','IVA','Ret. IVA','Ret. ISR','Comisión','Neto','Estado'],rows);
 }
 
 /* ============ CONTADURÍA · Pagos y depósitos ============ */
@@ -3185,7 +3210,7 @@ const RENDER = {
        <div class="box"><h3>🏢 Top empresas por facturación</h3><div class="hint">${esc(d.period.label)}</div>
          ${(d.top_empresas||[]).length?bars(d.top_empresas.map(x=>({lbl:x.name,pct:Math.round(x.monto/maxEmp*100),val:MXN(x.monto)}))):'<div class="hint" style="margin:0">Sin datos en el periodo.</div>'}</div>
      </div>
-     <div class="box" style="margin-top:16px"><h3>🧮 Resumen contable</h3><div class="hint">Estimado · comisión ${Math.round(rates.comision*100)}%, IVA ${Math.round(rates.iva*100)}%, ISR ${Math.round(rates.isr*100)}% — tasas configurables</div>
+     <div class="box" style="margin-top:16px"><h3>🧮 Resumen contable</h3><div class="hint">Estimado · Service Fee ${((rates.service_fee||0)*100).toFixed(1)}% + Platform Services ${((rates.platform_services||0)*100).toFixed(1)}%, IVA ${Math.round(rates.iva*100)}% — tasas configurables</div>
        <div class="contable-grid">
          <div class="cbox"><span>Ingresos</span><b>${MXN(c.ingresos)}</b></div>
          <div class="cbox"><span>Egresos (pagos a talento)</span><b>${MXN(c.egresos)}</b></div>
