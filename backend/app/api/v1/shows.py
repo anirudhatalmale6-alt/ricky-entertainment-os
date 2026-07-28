@@ -54,7 +54,30 @@ async def list_shows(
     if active_only:
         stmt = stmt.where(Show.is_active.is_(True))
     res = await db.execute(stmt)
-    return list(res.scalars().unique().all())
+    shows = list(res.scalars().unique().all())
+
+    # Enriquecer con nombre del artista + una imagen: foto del show (la marcada como
+    # perfil, o la primera) y, si el show no tiene fotos, la foto de perfil del artista.
+    artist_ids = {s.artist_id for s in shows if s.artist_id}
+    names: dict[int, str] = {}
+    avatars: dict[int, str | None] = {}
+    if artist_ids:
+        rows = (await db.execute(
+            select(Artist.id, Artist.stage_name, Artist.profile_image_url)
+            .where(Artist.id.in_(artist_ids))
+        )).all()
+        for aid, nm, av in rows:
+            names[aid] = nm
+            avatars[aid] = av
+    for s in shows:
+        imgs = list(s.images or [])
+        show_img = None
+        if imgs:
+            profile = next((i for i in imgs if i.is_profile), None)
+            show_img = (profile or imgs[0]).url
+        s.artist_name = names.get(s.artist_id)
+        s.image_url = show_img or avatars.get(s.artist_id)
+    return shows
 
 
 @router.get("/shows/price-benchmark", response_model=PriceBenchmarkOut)

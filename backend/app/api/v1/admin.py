@@ -162,12 +162,19 @@ async def list_talents(
         .where(Booking.status != BookingStatus.CANCELLED).group_by(Booking.artist_id)
     )).all()
     counts = {aid: int(c) for aid, c in cnt_rows if aid}
-    # Constancia de situación fiscal (SAT) por talento.
+    # Documentos legales por talento (para verlos/descargarlos desde Contacto en MASTER).
     doc_rows = (await db.execute(
-        select(ArtistDocument.artist_id, ArtistDocument.url)
-        .where(ArtistDocument.doc_type == "constancia_sat")
+        select(ArtistDocument.artist_id, ArtistDocument.doc_type,
+               ArtistDocument.url, ArtistDocument.filename)
     )).all()
-    constancia = {aid: url for aid, url in doc_rows}
+    docs_by_artist: dict[int, list] = {}
+    constancia: dict[int, str] = {}
+    for aid, dtype, url, fname in doc_rows:
+        docs_by_artist.setdefault(aid, []).append(
+            {"doc_type": dtype, "url": url, "filename": fname}
+        )
+        if dtype == "constancia_sat":
+            constancia[aid] = url
     by_id, default_fig = await _figuras_map(db)
 
     stmt = select(Artist)
@@ -238,6 +245,9 @@ async def list_talents(
                 "web": a.website,
                 "contacto_emergencia": None,
             },
+            # Documentos legales subidos (Contacto → ver/descargar)
+            "documentos": docs_by_artist.get(a.id, []),
+            "es_partner": bool(a.is_partner),
         })
     # Regímenes disponibles para poblar el filtro.
     regimenes = sorted({a.tax_regime for a in artists if a.tax_regime})

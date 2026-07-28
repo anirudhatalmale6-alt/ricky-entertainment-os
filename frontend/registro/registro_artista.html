@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Showcase · Registro de Artista</title>
+<title>SHOWMA · Registro de Artista</title>
 <style>
 :root{
   --bg:#f4f5f7; --card:#ffffff; --border:#e7e9ee; --border2:#eef0f3;
@@ -146,6 +146,10 @@ textarea{resize:vertical;min-height:70px}
 .doc .di{font-size:20px;color:var(--violet);margin-bottom:6px}
 .doc b{font-size:11.5px;display:block;font-weight:600}
 .doc span{font-size:10px;color:var(--text3)}
+.doc.up{border-style:solid;border-color:var(--green);background:var(--green-bg)}
+.doc.up .di{color:var(--green)}
+.doc.busy{opacity:.6;pointer-events:none}
+.doc .fname{display:block;font-size:9.5px;color:var(--green);margin-top:4px;font-weight:600;word-break:break-all}
 .consent{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:var(--text2);margin-top:11px}
 .consent input{width:16px;height:16px;margin-top:1px;accent-color:var(--violet)}
 .consent a{color:var(--violet-d);font-weight:600}
@@ -169,7 +173,7 @@ textarea{resize:vertical;min-height:70px}
   <div class="top">
     <div class="brand">
       <div class="logo">S</div>
-      <div><h1>SHOW<span>CASE</span></h1><p>Registro de artista · plataforma de entretenimiento para hoteles y eventos</p></div>
+      <div><h1>SHOW<span>MA</span></h1><p>Registro de artista · plataforma de entretenimiento para hoteles y eventos</p></div>
     </div>
     <div class="help">Proceso 100% seguro · <b>Tus datos están protegidos</b></div>
   </div>
@@ -208,13 +212,14 @@ textarea{resize:vertical;min-height:70px}
       <div class="sub">Dónde estás basado y hasta dónde te mueves.</div>
       <div class="grid three">
         <label class="f"><span>País</span><input id="p_country" value="México"></label>
-        <label class="f"><span>Estado <i>*</i></span><input id="p_state" placeholder="Quintana Roo"></label>
+        <label class="f"><span>Estado <i>*</i></span><select id="p_state"></select></label>
         <label class="f"><span>Ciudad base <i>*</i></span><input id="p_city" placeholder="Cancún"></label>
       </div>
       <div class="grid" style="margin-top:14px">
         <label class="f"><span>Radio de trabajo (km)</span><input id="p_radius" value="100"></label>
         <label class="f"><span>Estados donde trabajas</span>
-          <div class="chips" id="stateChips"><span class="chip">Quintana Roo <b onclick="delChip(this)">×</b></span><span class="chip">Yucatán <b onclick="delChip(this)">×</b></span><span class="chip add" onclick="addChip('stateChips','Estado')">+ Agregar</span></div>
+          <div class="chips" id="stateChips"><span class="chip">Quintana Roo <b onclick="delChip(this)">×</b></span><span class="chip">Yucatán <b onclick="delChip(this)">×</b></span></div>
+          <select id="stateAdd" style="margin-top:7px" onchange="addStateChip(this)"></select>
         </label>
       </div>
       <div class="grid" style="margin-top:14px">
@@ -259,7 +264,7 @@ textarea{resize:vertical;min-height:70px}
         <label class="f"><span>RFC <i>*</i></span><input id="f_rfc" placeholder="XAXX010101000"></label>
         <label class="f"><span>Uso CFDI</span><select id="f_cfdi"><option value="G03">G03 - Gastos en general</option><option value="P01">P01 - Por definir</option></select></label>
         <label class="f"><span>Razón social</span><input id="f_legal" placeholder="Nombre o razón social"></label>
-        <label class="f"><span>Régimen fiscal</span><input id="f_regime" placeholder="612 - Personas Físicas con Actividad Empresarial"></label>
+        <label class="f"><span>Régimen fiscal</span><select id="f_regime"></select></label>
         <label class="f"><span>Código postal fiscal</span><input id="f_cp" placeholder="77500"></label>
       </div>
       <div class="sec-t">Información bancaria · para tus pagos</div>
@@ -278,25 +283,26 @@ textarea{resize:vertical;min-height:70px}
   <section class="panel" data-p="3">
     <div class="card">
       <h2><span class="ic">📎</span> Documentos legales</h2>
-      <div class="sub">Sube tus documentos y acepta los términos para finalizar tu registro. (La carga de documentos estará disponible desde tu panel una vez dentro.)</div>
-      <div class="docs">
-        <div class="doc"><div class="di">🆔</div><b>Identificación</b><span>INE / Pasaporte</span></div>
-        <div class="doc"><div class="di">🏠</div><b>Comprobante</b><span>de domicilio</span></div>
-        <div class="doc"><div class="di">📄</div><b>Constancia SAT</b><span>situación fiscal</span></div>
-        <div class="doc"><div class="di">✍️</div><b>Contrato Showcase</b><span>firmado</span></div>
-        <div class="doc"><div class="di">🎚️</div><b>Rider técnico</b><span>PDF</span></div>
-        <div class="doc"><div class="di">🛎️</div><b>Rider hospitalidad</b><span>PDF</span></div>
-        <div class="doc"><div class="di">📰</div><b>Press Kit</b><span>PDF</span></div>
-        <div class="doc"><div class="di">🏦</div><b>Comprobante banco</b><span>PDF</span></div>
+      <div class="sub">Sube tus documentos y acepta los términos para finalizar tu registro. Los marcados con <i style="color:var(--red);font-style:normal">*</i> son obligatorios; el resto son opcionales y los puedes agregar después.</div>
+      <div class="docs" id="docGrid">
+        <div class="doc" data-doc="identificacion" data-req="1" onclick="pickDoc(this)"><div class="di">🆔</div><b>ID Oficial <i style="color:var(--red);font-style:normal">*</i></b><span>INE / Pasaporte</span></div>
+        <div class="doc" data-doc="comprobante_domicilio" data-req="1" onclick="pickDoc(this)"><div class="di">🏠</div><b>Comprobante <i style="color:var(--red);font-style:normal">*</i></b><span>de domicilio</span></div>
+        <div class="doc" data-doc="constancia_sat" data-req="1" onclick="pickDoc(this)"><div class="di">📄</div><b>Constancia SAT <i style="color:var(--red);font-style:normal">*</i></b><span>situación fiscal</span></div>
+        <div class="doc" data-doc="contrato" onclick="pickDoc(this)"><div class="di">✍️</div><b>Contrato SHOWMA</b><span>firmado</span></div>
+        <div class="doc" data-doc="rider_tecnico" onclick="pickDoc(this)"><div class="di">🎚️</div><b>Rider técnico</b><span>PDF</span></div>
+        <div class="doc" data-doc="rider_hospitalidad" onclick="pickDoc(this)"><div class="di">🛎️</div><b>Rider hospitalidad</b><span>PDF</span></div>
+        <div class="doc" data-doc="press_kit" onclick="pickDoc(this)"><div class="di">📰</div><b>Press Kit</b><span>PDF</span></div>
+        <div class="doc" data-doc="comprobante_bancario" onclick="pickDoc(this)"><div class="di">🏦</div><b>Comprobante banco</b><span>PDF</span></div>
       </div>
-      <label class="consent"><input type="checkbox" id="c_terms"> He leído y acepto los <a>Términos y Condiciones</a> de Showcase.</label>
+      <input type="file" id="docInput" accept="image/*,application/pdf" style="display:none" onchange="onDocPicked(this)">
+      <label class="consent"><input type="checkbox" id="c_terms"> He leído y acepto los <a>Términos y Condiciones</a> de SHOWMA.</label>
       <label class="consent"><input type="checkbox" id="c_privacy"> Acepto el <a>Aviso de Privacidad</a>.</label>
       <label class="consent"><input type="checkbox" id="c_data"> Autorizo el uso de mis datos para fines de operación y promoción.</label>
     </div>
     <div class="foot"><button class="btn prev" onclick="go(2)">← Anterior</button><button class="btn fin" onclick="finalizar(this)">Finalizar registro ✓</button></div>
   </section>
 
-  <div class="foot-note">🔒 Tu información está 100% segura con nosotros · Showcase Entertainment OS</div>
+  <div class="foot-note">🔒 Tu información está 100% segura con nosotros · SHOWMA Entertainment OS</div>
 </div>
 
 <script>
@@ -329,6 +335,55 @@ const PRETTY={"Musica":"Música","Produccion":"Producción","Fotografia y Video"
   "Fotografia":"Fotografía","Iluminacion":"Iluminación"};
 const pretty=s=>PRETTY[s]||s;
 const opts=arr=>arr.map(v=>`<option value="${v}">${pretty(v)}</option>`).join('');
+
+// ---- Estados de México (lista fija, evita errores de ortografía) ----
+const ESTADOS_MX=["Aguascalientes","Baja California","Baja California Sur","Campeche","Chiapas","Chihuahua","Ciudad de México","Coahuila","Colima","Durango","Estado de México","Guanajuato","Guerrero","Hidalgo","Jalisco","Michoacán","Morelos","Nayarit","Nuevo León","Oaxaca","Puebla","Querétaro","Quintana Roo","San Luis Potosí","Sinaloa","Sonora","Tabasco","Tamaulipas","Tlaxcala","Veracruz","Yucatán","Zacatecas"];
+// ---- Régimen fiscal SAT (clave - descripción) ----
+const REGIMENES_SAT=[
+  "612 - Personas Físicas con Actividades Empresariales y Profesionales",
+  "626 - Régimen Simplificado de Confianza (RESICO)",
+  "605 - Sueldos y Salarios e Ingresos Asimilados a Salarios",
+  "606 - Arrendamiento",
+  "607 - Régimen de Enajenación o Adquisición de Bienes",
+  "608 - Demás ingresos",
+  "611 - Ingresos por Dividendos (socios y accionistas)",
+  "614 - Ingresos por intereses",
+  "615 - Régimen de los ingresos por obtención de premios",
+  "616 - Sin obligaciones fiscales",
+  "621 - Incorporación Fiscal",
+  "622 - Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras",
+  "625 - Actividades Empresariales con ingresos a través de Plataformas Tecnológicas",
+  "601 - General de Ley Personas Morales",
+  "603 - Personas Morales con Fines no Lucrativos"
+];
+function fillSelect(id,arr,placeholder){
+  const el=document.getElementById(id); if(!el) return;
+  const ph=placeholder?`<option value="">${placeholder}</option>`:'';
+  el.innerHTML=ph+arr.map(v=>`<option value="${v}">${v}</option>`).join('');
+}
+function addStateChip(sel){
+  const v=sel.value; if(!v){ return; }
+  const c=document.getElementById('stateChips');
+  const exists=[...c.querySelectorAll('.chip')].some(ch=>ch.firstChild.textContent.trim()===v);
+  if(!exists){
+    const chip=document.createElement('span'); chip.className='chip';
+    chip.innerHTML=v+' <b onclick="delChip(this)">×</b>';
+    c.appendChild(chip);
+  }
+  sel.value='';
+}
+// ---- Formato de moneda en los campos de precio ($ 12,345) ----
+function fmtMoney(inp){
+  const raw=(inp.value||'').replace(/[^0-9.]/g,'');
+  if(raw==='' || raw==='.'){ inp.value=''; return; }
+  const n=parseFloat(raw); if(isNaN(n)){ inp.value=''; return; }
+  inp.value='$ '+n.toLocaleString('es-MX',{maximumFractionDigits:2});
+}
+// Delegación: cualquier input de precio (clase p-*) se formatea al salir del campo.
+const MONEY_SEL='.p-hotel,.p-corp,.p-wedding,.p-private,.p-restaurant,.p-festival,.p-extrahour,.p-transport';
+document.addEventListener('blur',function(e){
+  if(e.target && e.target.matches && e.target.matches(MONEY_SEL)) fmtMoney(e.target);
+},true);
 
 // ---- Stepper ----
 function go(n){
@@ -459,6 +514,27 @@ function delPhoto(x,n){
   const add=row.querySelector('.ph.add'); if(add) add.style.display='flex';
 }
 
+// ---- Document upload (legal docs) ----
+const DOCS_UP={};   // doc_type -> {url, filename}
+let _docTarget=null;
+function pickDoc(tile){ _docTarget=tile; document.getElementById('docInput').click(); }
+async function onDocPicked(input){
+  const file=input.files[0]; input.value=''; const tile=_docTarget; _docTarget=null;
+  if(!file||!tile) return;
+  if(file.size>10*1024*1024){ err('El documento "'+file.name+'" supera 10 MB.'); return; }
+  const dtype=tile.dataset.doc;
+  tile.classList.add('busy');
+  try{
+    const fd=new FormData(); fd.append('file',file); fd.append('doc_type',dtype);
+    const r=await fetch(API+'/me/artist/documents',{method:'POST',headers:authHeaders(),body:fd});
+    if(!r.ok) throw await errOf(r,'documento'); const d=await r.json();
+    DOCS_UP[dtype]={url:d.url,filename:d.filename||file.name};
+    tile.classList.remove('busy'); tile.classList.add('up');
+    let fn=tile.querySelector('.fname'); if(!fn){ fn=document.createElement('span'); fn.className='fname'; tile.appendChild(fn); }
+    fn.textContent='✓ '+(d.filename||file.name);
+  }catch(e){ tile.classList.remove('busy'); err('No se pudo subir el documento: '+e.message); }
+}
+
 // ---- Collect + submit ----
 const numOf=s=>{ const x=(s||'').replace(/[^0-9.]/g,''); return x?parseFloat(x):null; };
 const intOf=s=>{ const x=(s||'').replace(/[^0-9]/g,''); return x?parseInt(x,10):null; };
@@ -540,6 +616,8 @@ async function finalizar(btn){
   const prof=collectProfile();
   if(!validate(prof)) return;
   if(!chk('c_terms')||!chk('c_privacy')||!chk('c_data')){ go(3); err('Debes aceptar los términos, el aviso de privacidad y el uso de datos.'); return; }
+  const reqDocs=[['identificacion','ID Oficial (INE / Pasaporte)'],['comprobante_domicilio','Comprobante de domicilio'],['constancia_sat','Constancia de Situación Fiscal']];
+  for(const rd of reqDocs){ if(!DOCS_UP[rd[0]]){ go(3); err('Falta subir el documento obligatorio: '+rd[1]+'.'); return; } }
   const shows=[...document.querySelectorAll('.show')].map(collectShow).filter(Boolean);
   btn.disabled=true; const t0=btn.textContent; btn.textContent='Guardando…';
   try{
@@ -552,12 +630,27 @@ async function finalizar(btn){
 
 // ---- Init: prefill from the just-created profile ----
 (async function init(){
+  fillSelect('p_state',ESTADOS_MX,'Selecciona…');
+  fillSelect('stateAdd',ESTADOS_MX,'+ Agregar estado…');
+  fillSelect('f_regime',REGIMENES_SAT,'Selecciona…');
   addShow();
   try{
     const a=await apiGet('/me/artist');
     const set=(id,val)=>{ const n=document.getElementById(id); if(n&&val) n.value=val; };
     set('p_stage',a.stage_name); set('p_email',a.email); set('p_phone',a.phone); set('p_city',a.base_city);
     if(a.first_name) set('p_first',a.first_name); if(a.last_name) set('p_last',a.last_name);
+    if(a.region) set('p_state',a.region); if(a.tax_regime) set('f_regime',a.tax_regime);
+    // Marca los documentos ya subidos (registro retomado)
+    try{
+      const docs=await apiGet('/me/artist/documents');
+      (docs||[]).forEach(dc=>{
+        const tile=document.querySelector('.doc[data-doc="'+dc.doc_type+'"]'); if(!tile) return;
+        DOCS_UP[dc.doc_type]={url:dc.url,filename:dc.filename};
+        tile.classList.add('up');
+        let fn=tile.querySelector('.fname'); if(!fn){ fn=document.createElement('span'); fn.className='fname'; tile.appendChild(fn); }
+        fn.textContent='✓ '+(dc.filename||'Subido');
+      });
+    }catch(_){}
   }catch(e){
     if(String(e).indexOf('401')>-1){ try{ localStorage.removeItem('ricky_token'); }catch(_){} location.href=BASE+'/'; }
   }

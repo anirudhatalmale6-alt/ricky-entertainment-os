@@ -157,6 +157,10 @@ class ShowOut(ShowBase):
     seasonal_rates: list[SeasonalRateOut] = []
     images: list[ShowImageOut] = []
     created_at: datetime
+    # Enriquecidos por el endpoint de catálogo (para las listas del calendario):
+    # nombre del artista y una imagen (foto del show o, si no hay, foto de perfil).
+    artist_name: str | None = None
+    image_url: str | None = None
 
 
 class PriceBenchmarkOut(BaseModel):

@@ -355,6 +355,8 @@
   .vname .vx:hover{background:var(--bad);color:#fff}
   .mcell{position:relative;min-height:66px;border:1.5px dashed var(--line);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:5px;transition:.12s}
   .mcell.over{background:rgba(56,44,161,.09);border-color:var(--acc);border-style:solid}
+  .mcell.past{background:repeating-linear-gradient(135deg,transparent,transparent 6px,rgba(24,28,52,.03) 6px,rgba(24,28,52,.03) 12px);border-style:solid;border-color:var(--line)}
+  .mcell.past.empty{opacity:.6}
   /* "+" to add an actuación (search artist) into this venue+day */
   .cadd{position:absolute;border:0;cursor:pointer;display:grid;place-items:center;line-height:1;padding:0;font-weight:600}
   .mcell.empty .cadd{inset:0;margin:auto;width:26px;height:26px;border-radius:50%;background:var(--ov);color:var(--mut2);font-size:18px;border:1px dashed var(--line);transition:.12s}
@@ -715,6 +717,7 @@
   .mlink{color:var(--acc);cursor:pointer;font-weight:600}
   .mlink:hover{text-decoration:underline}
   .mchip{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:700;white-space:nowrap}
+  .pbadge{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:800;color:#5546d6;background:rgba(109,94,240,.14);vertical-align:middle}
   .mempty{padding:40px 20px;text-align:center;color:var(--mut)}
   .mempty .big{font-size:30px;margin-bottom:6px}
   .mtog{border:1px solid var(--line);background:var(--ov);color:var(--txt);font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;transition:.14s}
@@ -1314,7 +1317,7 @@ function applyRole(){
   if(isArtist){
     promo.style.display=''; promo.innerHTML='<div class="pi">'+PROMOICON.crown+'</div><b>Top Performer</b>'
       +'<p>Publica más shows y mantén tu perfil completo para subir en las búsquedas.</p>'
-      +'<button onclick="show(\'market\')">Ver beneficios</button>';
+      +'<button onclick="topPerformerInfo()">Ver beneficios</button>';
   } else if(ME.is_admin || isDirector){
     promo.style.display=''; promo.innerHTML='<div class="pi">'+PROMOICON.robot+'</div><b>IA SHOWMA</b>'
       +'<p>Tu asistente para programación, sugerencias de talento y más.</p>'
@@ -1426,7 +1429,9 @@ document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));
   n.classList.add('on'); show(n.dataset.p);
 });
+let CUR_SCREEN=null;
 async function show(p,force){
+  CUR_SCREEN=p;
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
   document.getElementById('panel-'+p).classList.add('on');
   document.getElementById('ptitle').textContent=TITLES[p][0];
@@ -1565,8 +1570,9 @@ function renderMaestro(){
     html+=`<div class="vname" style="--vc:${th.bd};--vc-bg:${th.bg};--vc-hd:${th.hd}">${v.id?`<button class="vx" title="Eliminar venue" onclick="delVenue(${v.id},'${esc(v.name).replace(/'/g,"\\'")}',${vc})">✕</button>`:''}${esc(v.name)}<span>${vc} ${vc===1?'actuación':'actuaciones'}</span></div>`;
     days.forEach(d=>{
       const ds=ymd(d);
+      const past=ds<todayStr;   // no se agenda en fechas pasadas
       const cards=bk.filter(b=>(b.venue_id||0)===(v.id||0)&&ymd(new Date(b.starts_at))===ds).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
-      html+=`<div class="mcell${cards.length?'':' empty'}" data-vid="${v.id||''}" data-date="${ds}">${cards.map(b=>maestroCard(b,vi)).join('')}<button class="cadd" title="Agregar actuación" onclick="openAddAct(${v.id},'${ds}')">+</button></div>`;
+      html+=`<div class="mcell${cards.length?'':' empty'}${past?' past':''}" data-vid="${v.id||''}" data-date="${ds}">${cards.map(b=>maestroCard(b,vi)).join('')}${past?'':`<button class="cadd" title="Agregar actuación" onclick="openAddAct(${v.id},'${ds}')">+</button>`}</div>`;
     });
   });
   if(!venues.length) html+=`<div style="grid-column:1/-1;padding:26px;text-align:center" class="muted">Aún no hay actuaciones programadas en esta cadena.</div>`;
@@ -1611,14 +1617,23 @@ async function saveAndNotify(){
   }catch(e){ updateNotifyBtn(); toast('No se pudo notificar: '+(e.message||''),true); }
 }
 // ---- Bell inbox (artist / hotel notifications) ----
+let _LAST_UNREAD=null;
 async function loadNotifications(){
   if(ME&&ME.is_admin) return loadAdminNotifications();
   try{
     const d=await api('/me/artist/notifications');
     NOTIF_CACHE=(d&&d.items)||[];
+    const unread=(d&&d.unread)||0;
     const dot=document.getElementById('bellDot');
-    if(dot) dot.style.display=(d&&d.unread>0)?'':'none';
+    if(dot) dot.style.display=unread>0?'':'none';
     renderBellPanel();
+    // Si llega un aviso nuevo y el artista está viendo su calendario/dashboard,
+    // refresca la vista para que la nueva actuación aparezca sola (David rev.3).
+    if(_LAST_UNREAD!==null && unread>_LAST_UNREAD && (CUR_SCREEN==='home'||CUR_SCREEN==='cal')){
+      const box=document.getElementById('panel-'+CUR_SCREEN);
+      if(box){ box.dataset.loaded=''; show(CUR_SCREEN,true); toast('Agenda actualizada'); }
+    }
+    _LAST_UNREAD=unread;
   }catch(_){ /* not an artist / not logged in — leave bell empty */ }
 }
 // The master/admin bell surfaces new prospectos (hoteles que dejaron sus datos).
@@ -1717,6 +1732,7 @@ document.addEventListener('click',e=>{ const pop=document.getElementById('monthP
 
 async function dropBooking(vid,date){
   const bid=DRAG_BID; DRAG_BID=null; if(!bid) return;
+  if(date<ymd(new Date())){ toast('No se puede reprogramar a una fecha pasada.',true); renderMaestro(); return; }
   const bk=CACHE.homeBk||[]; const b=bk.find(x=>String(x.id)===String(bid)); if(!b) return;
   const old=new Date(b.starts_at); const [Y,M,D]=date.split('-').map(Number);
   const nd=new Date(Y,M-1,D,old.getHours(),old.getMinutes(),0,0);
@@ -1816,6 +1832,7 @@ async function ensureShows(){
 }
 async function openAddAct(venueId,dateStr){
   if(!venueId){ toast('Este bloque no tiene venue asignado.',true); return; }
+  if(dateStr<ymd(new Date())){ toast('No se pueden agendar actuaciones en fechas pasadas.',true); return; }
   const bk=CACHE.homeBk||[]; const vb=bk.find(b=>(b.venue_id||0)===venueId&&b.venue_name);
   const vc=(CACHE.venues||[]).find(v=>v.id===venueId);   // cubre venues nuevos/vacíos
   ADDACT={venueId,venueName:vb?vb.venue_name:(vc?vc.name:'Venue'),date:dateStr,showId:null,price:0};
@@ -2717,7 +2734,7 @@ async function mLoadTalento(){
       <th>Talento</th><th>Fecha ingreso</th><th>Ubicación</th><th>Estatus</th><th>Régimen fiscal</th>
       <th class="num">Facturación</th><th>Disponible</th><th>Ficha</th></tr></thead><tbody>
     ${d.items.map(t=>`<tr>
-      <td><b>${esc(t.nombre)}</b>${t.tipo?`<div class="sub" style="color:var(--mut);font-size:11px">${esc(t.tipo)}</div>`:''}</td>
+      <td><b>${esc(t.nombre)}</b>${t.es_partner?' <span class="pbadge" title="Partner Verificado">P · Partner</span>':''}${t.tipo?`<div class="sub" style="color:var(--mut);font-size:11px">${esc(t.tipo)}</div>`:''}</td>
       <td>${mDay(t.fecha_ingreso)}</td>
       <td>${esc(t.ubicacion||'—')}</td>
       <td>${t.activo?mEstChip('confirmed','Activo'):mEstChip('','Inactivo')}</td>
@@ -2760,12 +2777,19 @@ async function mSetTalentFigura(id){
     mFichaTalento(id);
   }catch(e){ toast('No se pudo actualizar: '+e.message,true); }
 }
+const DOC_LABELS={identificacion:'ID Oficial (INE / Pasaporte)',comprobante_domicilio:'Comprobante de domicilio',constancia_sat:'Constancia de situación fiscal',contrato:'Contrato SHOWMA',rider_tecnico:'Rider técnico',rider_hospitalidad:'Rider de hospitalidad',press_kit:'Press Kit',comprobante_bancario:'Comprobante bancario',otro:'Otro documento'};
 function mFichaTalentoPerfil(id){
   const t=_mFindT(id); if(!t) return; const x=t.perfil;
+  const docs=t.documentos||[];
+  const docsHtml=docs.length
+    ? docs.map(d=>mRlink(DOC_LABELS[d.doc_type]||d.doc_type,d.url,d.filename||'Ver documento')).join('')
+    : '<div class="mnote" style="margin-top:8px">Este talento aún no ha subido documentos.</div>';
   mModal(`<div class="mch"><div><h3>${esc(t.nombre)}</h3><div class="sub">Datos de contacto</div></div><button class="mx" onclick="mClose()">✕</button></div>
     <div class="mcb">
       ${mR('Teléfono móvil',x.telefono)}${mR('WhatsApp',x.whatsapp)}${mR('Correo electrónico',x.correo)}
       ${mR('Dirección',x.direccion)}${mRlink('Página web',x.web,x.web)}${mR('Contacto de emergencia',x.contacto_emergencia)}
+      <div class="mrow" style="border-bottom:0;padding-top:14px"><span style="font-weight:700;color:var(--txt)">Documentos</span></div>
+      ${docsHtml}
     </div>`);
 }
 function mExpTalento(){
@@ -3622,8 +3646,8 @@ const RENDER = {
     CACHE.tax=tax;
     const sl=p.social_links||{};
     const partner = p.is_partner
-      ? `<div class="partner"><div class="cr">👑</div><div><b>Eres Partner ✓</b><p>Tienes acceso a Market Intelligence, prioridad en el tablero y tu insignia Partner visible para los hoteles.</p></div></div>`
-      : `<div class="partner"><div class="cr">🚀</div><div style="flex:1"><b>Conviértete en Partner</b><p>Desbloquea Market Intelligence (tu precio vs. mercado, demanda por zona), prioridad en solicitudes y la insignia Partner que ven los hoteles.</p></div><button class="btn" onclick="becomePartner()">Activar Partner</button></div>`;
+      ? `<div class="partner"><div class="cr">👑</div><div><b>Eres Partner ✓</b><p>Conectas con otros artistas y empresas, puedes subcontratar talento y tu insignia Partner Verificado es visible para los hoteles.</p></div></div>`
+      : `<div class="partner"><div class="cr">🚀</div><div style="flex:1"><b>Conviértete en Partner</b><p>Conecta con otros artistas y empresas, subcontrata talento de la plataforma, obtén prioridad en solicitudes y la insignia Partner Verificado que ven los hoteles.</p></div><button class="btn" onclick="becomePartner()">Activar Partner</button></div>`;
     const gal=[]; (p.shows||[]).forEach(s=>(s.images||[]).forEach(im=>{ if(im.url && !gal.includes(im.url)) gal.push(im.url); }));
     const pfUrl=p.profile_image_url||null;
     box.innerHTML=`
@@ -3662,6 +3686,24 @@ const RENDER = {
         </div>
         <div class="field"><label>YouTube (opcional)</label><input id="pf_yt" value="${esc(sl.youtube||'')}" placeholder="Enlace o usuario de tu canal de YouTube"></div>
         <div class="saverow"><button class="btn" onclick="saveProfile(this)">Guardar cambios</button><span class="saved" id="pf_saved">Guardado ✓</span></div>
+      </div>
+      <div class="box" style="margin-bottom:16px">
+        <h3>🧾 Datos fiscales y bancarios</h3><div class="hint">Para emitir CFDI y liquidar tus pagos. Solo tú y la administración los ven.</div>
+        <div class="fgrid">
+          <div class="field"><label>RFC</label><input id="pf_rfc" value="${esc(p.rfc||'')}" placeholder="XAXX010101000"></div>
+          <div class="field"><label>Régimen fiscal (SAT)</label><select id="pf_regime">${regimenOptions(p.tax_regime||'')}</select></div>
+        </div>
+        <div class="field"><label>Razón social (opcional)</label><input id="pf_legal" value="${esc(p.legal_name||'')}" placeholder="Nombre o razón social"></div>
+        <div style="font-weight:700;font-size:12.5px;color:var(--mut);margin:14px 0 8px">Datos bancarios</div>
+        <div class="fgrid">
+          <div class="field"><label>Banco</label><input id="pf_bank" value="${esc(p.bank_name||'')}" placeholder="BBVA"></div>
+          <div class="field"><label>Titular de la cuenta</label><input id="pf_holder" value="${esc(p.bank_account_holder||'')}" placeholder="Nombre del titular"></div>
+        </div>
+        <div class="fgrid">
+          <div class="field"><label>Cuenta</label><input id="pf_account" value="${esc(p.bank_account||'')}" placeholder="Número de cuenta"></div>
+          <div class="field"><label>CLABE interbancaria</label><input id="pf_clabe" value="${esc(p.bank_clabe||'')}" placeholder="18 dígitos" inputmode="numeric"></div>
+        </div>
+        <div class="saverow"><button class="btn" onclick="saveFiscal(this)">Guardar datos fiscales</button><span class="saved" id="pf_fsaved">Guardado ✓</span></div>
       </div>
       <div class="box">
         <h3>🎭 Mis publicaciones</h3><div class="hint">Tus shows en el catálogo · edita tarifas y descripciones, o publica uno nuevo</div>
@@ -3988,11 +4030,9 @@ async function artistHome(box){
           <div class="srow"><div class="ic2">💬</div><div class="lb">Mensajes sin leer<s>de hoteles</s></div><div class="nb">${unread}</div></div>
           <div class="srow"><div class="ic2">🎭</div><div class="lb">Actuaciones próximas<s>confirmadas o pendientes</s></div><div class="nb">${upcoming.length}</div></div>
         </div>
-        <div class="box"><h3>📈 Market Intelligence ${p.is_partner?'':'<span class="pro">PRO</span>'}</h3><div class="hint">Tu posición en el mercado</div>
-          ${mktAvg?`<div class="srow"><div class="ic2">🏷️</div><div class="lb">Tu tarifa vs. mercado<s>${esc(pretty(primary.category))}${vsMkt!=null?` · ${vsMkt>=0?'+':''}${vsMkt}% ${vsMkt>=0?'sobre':'bajo'} el promedio`:''}</s></div>
-            <div class="nb" style="text-align:right;line-height:1.2">${myPrice!=null?MXN(myPrice):'—'}<div class="d" style="font-weight:400">prom. ${MXN(mktAvg)}</div></div></div>`
-          :`<div class="hint" style="margin:0 0 4px">Publica un show con tarifa en Mi Perfil para compararte con el mercado.</div>`}
-          <div class="srow"><div class="ic2">🔥</div><div class="lb">Hoteles buscando<s>${primary?'en tu categoría':'en el tablero'}</s></div><div class="nb">${buscando}</div></div>
+        <div class="box"><h3>👑 Top Performer</h3><div class="hint">Sube en las búsquedas y gana el distintivo de confianza</div>
+          <div class="srow" style="cursor:pointer" onclick="topPerformerInfo()"><div class="ic2">⭐</div><div class="lb">Ver beneficios<s>visibilidad, oportunidades y herramientas premium</s></div><div class="nb">›</div></div>
+          <div class="srow"><div class="ic2">🎭</div><div class="lb">Shows publicados<s>completa tu catálogo para destacar</s></div><div class="nb">${(p.shows||[]).length}</div></div>
         </div>
       </div>
     </div>
@@ -4055,6 +4095,18 @@ async function saveProfile(btn){
   catch(e){ alert('No se pudo guardar: '+e.message); }
   btn.disabled=false;
 }
+async function saveFiscal(btn){
+  btn.disabled=true;
+  const clabe=(gv('pf_clabe')||'').replace(/\s+/g,'');
+  if(clabe && clabe.replace(/[^0-9]/g,'').length!==18){ alert('La CLABE interbancaria debe tener 18 dígitos.'); btn.disabled=false; return; }
+  const body={rfc:gv('pf_rfc')||null,tax_regime:gv('pf_regime')||null,legal_name:gv('pf_legal')||null,
+    bank_name:gv('pf_bank')||null,bank_account_holder:gv('pf_holder')||null,
+    bank_account:gv('pf_account')||null,bank_clabe:clabe||null};
+  try{ CACHE.profile=await patch('/me/artist',body); flash('pf_fsaved'); }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
+  btn.disabled=false;
+}
+window.saveFiscal=saveFiscal;
 async function saveShow(id,btn){
   btn.disabled=true;
   const body={show_name:gv('sh_name_'+id),description:gv('sh_desc_'+id)||null,
@@ -4077,10 +4129,52 @@ async function addShow(btn){
   catch(e){ alert('No se pudo publicar: '+e.message); btn.disabled=false; }
 }
 async function becomePartner(){
-  if(!confirm('¿Activar tu plan Partner? Tendrás Market Intelligence y prioridad en el tablero.'))return;
+  if(!confirm('¿Activar tu plan Partner? Conecta con otros artistas y empresas, subcontrata talento y obtén tu insignia Partner Verificado.'))return;
   try{ CACHE.profile=await patch('/me/artist',{is_partner:true}); refreshIdentity(); show('profile',true); }
   catch(e){ alert('No se pudo activar: '+e.message); }
 }
+// ---- Régimen fiscal SAT (para Mi Perfil) ----
+const REGIMENES_SAT=[
+  "612 - Personas Físicas con Actividades Empresariales y Profesionales",
+  "626 - Régimen Simplificado de Confianza (RESICO)",
+  "605 - Sueldos y Salarios e Ingresos Asimilados a Salarios",
+  "606 - Arrendamiento",
+  "607 - Régimen de Enajenación o Adquisición de Bienes",
+  "608 - Demás ingresos",
+  "611 - Ingresos por Dividendos (socios y accionistas)",
+  "614 - Ingresos por intereses",
+  "615 - Régimen de los ingresos por obtención de premios",
+  "616 - Sin obligaciones fiscales",
+  "621 - Incorporación Fiscal",
+  "622 - Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras",
+  "625 - Actividades Empresariales con ingresos a través de Plataformas Tecnológicas",
+  "601 - General de Ley Personas Morales",
+  "603 - Personas Morales con Fines no Lucrativos"
+];
+function regimenOptions(sel){
+  return '<option value="">Selecciona…</option>'+REGIMENES_SAT.map(r=>`<option value="${esc(r)}"${sel===r?' selected':''}>${esc(r)}</option>`).join('');
+}
+// ---- Pop-up de beneficios "Top Performer" ----
+function topPerformerInfo(){
+  let ov=document.getElementById('tpMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='tpMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) ov.style.display='none'; }); }
+  const li=t=>`<li style="margin:5px 0">${t}</li>`;
+  ov.innerHTML=`<div class="amod" style="position:relative;max-width:560px">
+    <button class="ax" onclick="document.getElementById('tpMov').style.display='none'" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>👑 Top Performer</b><span class="as">El distintivo de confianza dentro de SHOWMA</span></div>
+    <div style="padding:4px 4px 8px;font-size:13px;line-height:1.5;color:var(--txt)">
+      <p style="margin-bottom:12px">Si <b>Top Performer</b> es un distintivo dentro de SHOWMA, representa <b>confianza y menor riesgo</b>, no solo popularidad. Eso lo hace valioso tanto para hoteles como para artistas.</p>
+      <div style="font-weight:800;margin:10px 0 2px">Mayor visibilidad</div>
+      <ul style="margin:0 0 10px 18px">${li('Aparición prioritaria en los resultados de búsqueda.')}${li('Prioridad en las recomendaciones de IA.')}${li('Inclusión en la sección "Artistas Recomendados".')}</ul>
+      <div style="font-weight:800;margin:10px 0 2px">Más oportunidades</div>
+      <ul style="margin:0 0 10px 18px">${li('Invitaciones automáticas a solicitudes privadas.')}${li('Acceso anticipado a eventos de alto presupuesto.')}${li('Mayor probabilidad de recibir contrataciones recurrentes.')}</ul>
+      <div style="font-weight:800;margin:10px 0 2px">Herramientas premium</div>
+      <ul style="margin:0 0 6px 18px">${li('Perfil destacado.')}${li('Galería ampliada de fotos y videos.')}${li('Estadísticas avanzadas.')}${li('Insignia visible en el perfil.')}</ul>
+    </div></div>`;
+  ov.style.display='flex';
+}
+window.topPerformerInfo=topPerformerInfo;
 
 /* ---- Imágenes: redimensiona en el navegador y sube (perfil + propuestas) ---- */
 function _resizeImage(file, max=1280, q=0.85){

@@ -10,7 +10,7 @@ descripciones and gestiona sus publicaciones (shows).
 import uuid
 from datetime import date as date_cls
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, select, update
 from sqlalchemy.orm import selectinload
@@ -26,7 +26,7 @@ from app.models.contract import (
     ContractTemplate,
 )
 from app.models.notification import ArtistNotification
-from app.models.media import ShowImage
+from app.models.media import ArtistDocument, ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
 from app.schemas.artist import ArtistOut, ArtistUpdate
@@ -141,6 +141,84 @@ async def upload_image(scope: CurrentScope, file: UploadFile = File(...)):
     name = f"{scope.artist_id}_{uuid.uuid4().hex}.{ext}"
     (ensure_upload_dir() / name).write_bytes(data)
     return {"url": f"{settings.ROOT_PATH}/uploads/{name}"}
+
+
+# --- Legal documents ------------------------------------------------------
+# Tipos de documento admitidos (coincide con el registro de artista y /MASTER).
+_DOC_TYPES = {
+    "identificacion", "comprobante_domicilio", "constancia_sat", "contrato",
+    "rider_tecnico", "rider_hospitalidad", "press_kit", "comprobante_bancario", "otro",
+}
+_ALLOWED_DOC_TYPES = {
+    "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+}
+_MAX_DOC_BYTES = 10 * 1024 * 1024
+
+
+def _doc_out(d: ArtistDocument) -> dict:
+    return {"id": d.id, "doc_type": d.doc_type, "url": d.url, "filename": d.filename}
+
+
+@router.get("/artist/documents")
+async def list_my_documents(scope: CurrentScope, db: DbSession):
+    """Los documentos legales que el artista ya subió."""
+    artist_id = await _require_artist(scope)
+    res = await db.execute(
+        select(ArtistDocument).where(ArtistDocument.artist_id == artist_id)
+    )
+    return [_doc_out(d) for d in res.scalars().all()]
+
+
+@router.post("/artist/documents", status_code=status.HTTP_201_CREATED)
+async def upload_document(
+    scope: CurrentScope,
+    db: DbSession,
+    file: UploadFile = File(...),
+    doc_type: str = Form(...),
+):
+    """Sube (o reemplaza) un documento legal del artista.
+
+    Un solo archivo por tipo: si ya existe uno de ese `doc_type` se reemplaza,
+    para que el registro y /MASTER siempre muestren el vigente.
+    """
+    artist_id = await _require_artist(scope)
+    if doc_type not in _DOC_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de documento no válido.")
+    ext = _ALLOWED_DOC_TYPES.get((file.content_type or "").lower())
+    if ext is None:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Formato no admitido. Usa PDF, JPG, PNG o WEBP.",
+        )
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archivo vacío.")
+    if len(data) > _MAX_DOC_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="El documento es muy grande (máximo 10 MB).",
+        )
+    name = f"doc_{artist_id}_{doc_type}_{uuid.uuid4().hex}.{ext}"
+    (ensure_upload_dir() / name).write_bytes(data)
+    url = f"{settings.ROOT_PATH}/uploads/{name}"
+    filename = (file.filename or f"{doc_type}.{ext}")[:255]
+
+    res = await db.execute(
+        select(ArtistDocument).where(
+            ArtistDocument.artist_id == artist_id,
+            ArtistDocument.doc_type == doc_type,
+        )
+    )
+    doc = res.scalar_one_or_none()
+    if doc is None:
+        doc = ArtistDocument(artist_id=artist_id, doc_type=doc_type, url=url, filename=filename)
+        db.add(doc)
+    else:
+        doc.url = url
+        doc.filename = filename
+    await db.commit()
+    await db.refresh(doc)
+    return _doc_out(doc)
 
 
 # --- Shows (publicaciones) ------------------------------------------------
