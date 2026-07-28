@@ -27,6 +27,7 @@ from app.api.deps import CurrentScope, DbSession
 from app.core.config import settings
 from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
+from app.models.booker import Booker
 from app.models.booking import Booking
 from app.models.company import Company
 from app.models.enums import BookingStatus
@@ -316,12 +317,18 @@ async def list_companies(
 ):
     _admin_only(scope)
 
-    # ¿Tiene actuaciones? -> Activo; si no, Prospecto.
+    # Una empresa queda "Activo" en cuanto se le da de alta la cuenta (al aceptar
+    # el prospecto se le crea su login/Booker) o en cuanto tiene actuaciones. Solo
+    # las empresas importadas sin cuenta ni actuaciones siguen como "Prospecto".
     booked_rows = (await db.execute(
         select(Booking.company_id, func.count())
         .where(Booking.status.in_(_BOOKED)).group_by(Booking.company_id)
     )).all()
     booked = {cid: int(c) for cid, c in booked_rows if cid}
+    account_rows = (await db.execute(
+        select(Booker.company_id).where(Booker.company_id.isnot(None)).distinct()
+    )).all()
+    has_account = {cid for (cid,) in account_rows if cid}
 
     stmt = select(Company)
     if q:
@@ -340,7 +347,7 @@ async def list_companies(
 
     out = []
     for c in companies:
-        activo = c.id in booked
+        activo = (c.id in booked) or (c.id in has_account)
         est = "Activo" if activo else "Prospecto"
         if estatus in ("activo", "prospecto") and estatus != est.lower():
             continue
