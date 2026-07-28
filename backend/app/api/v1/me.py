@@ -19,7 +19,11 @@ from app.api.deps import CurrentScope, DbSession
 from app.core.config import settings
 from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
+from app.models.artist_client_rate import ArtistClientRate
 from app.models.blocked_date import ArtistBlockedDate
+from app.models.booking import Booking
+from app.models.company import Company
+from app.models.property_group import PropertyGroup
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
     ContractAcceptance,
@@ -418,4 +422,106 @@ async def unblock_date(day: date_cls, scope: CurrentScope, db: DbSession):
             ArtistBlockedDate.blocked_on == day,
         )
     )
+    await db.commit()
+
+
+# --- Tarifas especiales por cliente (descuento del músico a un hotel/cadena) ---
+
+class ClientRateIn(BaseModel):
+    company_id: int | None = None
+    group_id: int | None = None
+    special_price: float | None = None
+    discount_pct: float | None = None
+
+
+def _rate_out(r: ArtistClientRate, company_name=None, group_name=None) -> dict:
+    return {
+        "id": r.id,
+        "company_id": r.company_id,
+        "group_id": r.group_id,
+        "company_name": company_name,
+        "group_name": group_name,
+        "special_price": float(r.special_price) if r.special_price is not None else None,
+        "discount_pct": float(r.discount_pct) if r.discount_pct is not None else None,
+    }
+
+
+@router.get("/artist/clients")
+async def my_clients(scope: CurrentScope, db: DbSession):
+    """Hoteles (y cadenas) con los que el artista ha trabajado — para elegir a
+    quién ponerle una tarifa especial."""
+    artist_id = await _require_artist(scope)
+    cids = (await db.execute(
+        select(Booking.company_id).where(
+            Booking.artist_id == artist_id, Booking.company_id.isnot(None)
+        ).distinct()
+    )).scalars().all()
+    companies = []
+    groups = {}
+    if cids:
+        rows = (await db.execute(
+            select(Company.id, Company.name, Company.group_id).where(Company.id.in_(cids))
+        )).all()
+        for cid, name, gid in rows:
+            companies.append({"id": cid, "name": name, "group_id": gid})
+            if gid is not None:
+                groups[gid] = None
+    if groups:
+        grows = (await db.execute(
+            select(PropertyGroup.id, PropertyGroup.name).where(PropertyGroup.id.in_(groups.keys()))
+        )).all()
+        groups = {gid: name for gid, name in grows}
+    return {
+        "companies": companies,
+        "groups": [{"id": gid, "name": name} for gid, name in groups.items()],
+    }
+
+
+@router.get("/artist/client-rates")
+async def list_client_rates(scope: CurrentScope, db: DbSession):
+    artist_id = await _require_artist(scope)
+    rates = (await db.execute(
+        select(ArtistClientRate).where(ArtistClientRate.artist_id == artist_id)
+    )).scalars().all()
+    cids = {r.company_id for r in rates if r.company_id}
+    gids = {r.group_id for r in rates if r.group_id}
+    cnames = {cid: nm for cid, nm in (await db.execute(
+        select(Company.id, Company.name).where(Company.id.in_(cids)))).all()} if cids else {}
+    gnames = {gid: nm for gid, nm in (await db.execute(
+        select(PropertyGroup.id, PropertyGroup.name).where(PropertyGroup.id.in_(gids)))).all()} if gids else {}
+    return [_rate_out(r, cnames.get(r.company_id), gnames.get(r.group_id)) for r in rates]
+
+
+@router.post("/artist/client-rates", status_code=status.HTTP_201_CREATED)
+async def add_client_rate(payload: ClientRateIn, scope: CurrentScope, db: DbSession):
+    artist_id = await _require_artist(scope)
+    if not payload.company_id and not payload.group_id:
+        raise HTTPException(status_code=400, detail="Elige un hotel o una cadena.")
+    if payload.company_id and payload.group_id:
+        raise HTTPException(status_code=400, detail="Elige un hotel O una cadena, no ambos.")
+    if payload.special_price is None and payload.discount_pct is None:
+        raise HTTPException(status_code=400, detail="Indica un precio especial o un % de descuento.")
+    if payload.discount_pct is not None and not (0 < payload.discount_pct <= 100):
+        raise HTTPException(status_code=400, detail="El descuento debe estar entre 1 y 100%.")
+    # Reemplaza cualquier tarifa previa para el mismo cliente.
+    await db.execute(sa_delete(ArtistClientRate).where(
+        ArtistClientRate.artist_id == artist_id,
+        ArtistClientRate.company_id == payload.company_id,
+        ArtistClientRate.group_id == payload.group_id,
+    ))
+    rate = ArtistClientRate(
+        artist_id=artist_id, company_id=payload.company_id, group_id=payload.group_id,
+        special_price=payload.special_price, discount_pct=payload.discount_pct,
+    )
+    db.add(rate)
+    await db.commit()
+    await db.refresh(rate)
+    return _rate_out(rate)
+
+
+@router.delete("/artist/client-rates/{rate_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_client_rate(rate_id: int, scope: CurrentScope, db: DbSession):
+    artist_id = await _require_artist(scope)
+    await db.execute(sa_delete(ArtistClientRate).where(
+        ArtistClientRate.id == rate_id, ArtistClientRate.artist_id == artist_id))
     await db.commit()

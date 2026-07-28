@@ -6,11 +6,12 @@ browses and benchmarks SHOWS, since a hotel books a show, not a person.
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import CurrentUser, DbSession, require_permission
+from app.api.deps import CurrentScope, CurrentUser, DbSession, require_permission
 from app.models.artist import Artist
+from app.models.artist_client_rate import ArtistClientRate
 from app.models.media import ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
@@ -37,7 +38,7 @@ async def _get_show_or_404(db: DbSession, show_id: int) -> Show:
 @router.get("/shows", response_model=list[ShowOut])
 async def list_shows(
     db: DbSession,
-    _: CurrentUser,
+    scope: CurrentScope,
     category: str | None = Query(None, description="Filter by category"),
     subcategory: str | None = Query(None, description="Filter by subcategory"),
     region: str | None = Query(None, description="Filter by the profile's region"),
@@ -74,6 +75,24 @@ async def list_shows(
             avatars[aid] = av
             cities[aid] = city
             partners[aid] = bool(partner)
+    # Tarifas especiales: si el hotel/cadena que consulta tiene una tarifa pactada
+    # con el artista, el precio efectivo la refleja (sin tocar el precio público).
+    rate_by_artist: dict[int, ArtistClientRate] = {}
+    if artist_ids and (scope.company_id is not None or scope.group_id is not None):
+        conds = []
+        if scope.company_id is not None:
+            conds.append(ArtistClientRate.company_id == scope.company_id)
+        if scope.group_id is not None:
+            conds.append(ArtistClientRate.group_id == scope.group_id)
+        rrows = (await db.execute(
+            select(ArtistClientRate).where(
+                ArtistClientRate.artist_id.in_(artist_ids), or_(*conds))
+        )).scalars().all()
+        for r in rrows:
+            # una tarifa por artista; la específica del hotel gana sobre la de cadena
+            if r.artist_id not in rate_by_artist or r.company_id is not None:
+                rate_by_artist[r.artist_id] = r
+
     for s in shows:
         imgs = list(s.images or [])
         show_img = None
@@ -84,6 +103,16 @@ async def list_shows(
         s.image_url = show_img or avatars.get(s.artist_id)
         s.artist_city = cities.get(s.artist_id)
         s.artist_partner = partners.get(s.artist_id, False)
+        base = float(s.price_hotel) if s.price_hotel is not None else None
+        eff = base
+        r = rate_by_artist.get(s.artist_id)
+        if r is not None:
+            if r.special_price is not None:
+                eff = float(r.special_price)
+            elif r.discount_pct is not None and base is not None:
+                eff = round(base * (1 - float(r.discount_pct) / 100.0), 2)
+            s.has_special_rate = eff is not None and eff != base
+        s.effective_price = eff
     return shows
 
 

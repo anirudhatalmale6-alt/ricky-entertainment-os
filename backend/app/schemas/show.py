@@ -163,6 +163,10 @@ class ShowOut(ShowBase):
     image_url: str | None = None
     artist_city: str | None = None
     artist_partner: bool = False
+    # Precio efectivo para el hotel que consulta (aplica la tarifa especial del
+    # músico para ese cliente/cadena si existe); si no, es el precio público.
+    effective_price: float | None = None
+    has_special_rate: bool = False
 
 
 class PriceBenchmarkOut(BaseModel):
