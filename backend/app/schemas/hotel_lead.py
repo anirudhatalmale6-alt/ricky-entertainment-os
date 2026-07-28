@@ -34,9 +34,35 @@ class HotelLeadStatusIn(BaseModel):
 
 
 class HotelLeadConvertIn(BaseModel):
-    """Optional password when the admin turns a prospecto into a real hotel account.
-    If omitted, the server generates a temporary one."""
+    """Ficha de alta: el admin acepta el prospecto y resguarda todos los datos de
+    la propiedad. Todo es opcional excepto que, si no hay password, se genera uno.
+    Los campos poblan la empresa (Company) que se crea al convertir."""
     password: str | None = Field(default=None, min_length=6, max_length=128)
+    # Datos generales
+    company_name: str | None = Field(default=None, max_length=255)   # nombre comercial
+    legal_name: str | None = Field(default=None, max_length=255)     # razón social
+    tax_id: str | None = Field(default=None, max_length=20)          # RFC
+    fiscal_constancia_url: str | None = Field(default=None, max_length=500)
+    address: str | None = Field(default=None, max_length=255)        # dirección fiscal
+    city: str | None = Field(default=None, max_length=120)
+    region: str | None = Field(default=None, max_length=120)
+    country: str | None = Field(default=None, max_length=80)
+    website: str | None = Field(default=None, max_length=255)
+    contact_person: str | None = Field(default=None, max_length=255) # nombre completo
+    position: str | None = Field(default=None, max_length=120)       # cargo
+    contact_phone: str | None = Field(default=None, max_length=40)
+    whatsapp: str | None = Field(default=None, max_length=40)
+    contact_email: str | None = Field(default=None, max_length=255)
+    # Información hotelera / comercial
+    company_type: str | None = Field(default=None, max_length=40)    # hotel/resort/centro/eventos
+    star_rating: int | None = None
+    rooms: int | None = None
+    avg_daily_rate: float | None = None
+    # Datos financieros
+    bank_name: str | None = Field(default=None, max_length=120)
+    bank_clabe: str | None = Field(default=None, max_length=20)
+    preferred_currency: str | None = Field(default=None, max_length=8)
+    agreed_payment_days: int | None = None
 
 
 class HotelLeadConvertOut(BaseModel):

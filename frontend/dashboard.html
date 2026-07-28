@@ -55,6 +55,8 @@
   .promo button{position:relative;width:100%;border:0;background:var(--acc);color:#fff;
     font-weight:650;font-size:12px;padding:9px;border-radius:9px;cursor:pointer;transition:.15s}
   .promo button:hover{background:#2c2280}
+  .help-btn{margin-top:12px;width:100%;background:rgba(255,255,255,.05);border:1px solid var(--s-line);color:var(--s-txt);padding:10px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:600;transition:.15s;font-family:inherit}
+  .help-btn:hover{background:rgba(255,255,255,.10);border-color:var(--acc)}
   .side-user{margin-top:14px;display:flex;align-items:center;gap:10px;padding:13px 8px 4px;border-top:1px solid var(--s-line)}
   .su-av{width:36px;height:36px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;flex:none}
   .su-meta{min-width:0;flex:1}
@@ -353,7 +355,7 @@
   .vname .vx{position:absolute;top:6px;right:6px;width:17px;height:17px;border-radius:50%;border:0;background:rgba(24,28,52,.06);color:var(--mut);font-size:12px;line-height:1;cursor:pointer;display:none;place-items:center;padding:0}
   .vname:hover .vx{display:grid}
   .vname .vx:hover{background:var(--bad);color:#fff}
-  .mcell{position:relative;min-height:66px;border:1.5px dashed var(--line);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:5px;transition:.12s}
+  .mcell{position:relative;min-height:92px;border:1.5px dashed var(--line);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:6px;transition:.12s}
   .mcell.over{background:rgba(56,44,161,.09);border-color:var(--acc);border-style:solid}
   .mcell.past{background:repeating-linear-gradient(135deg,transparent,transparent 6px,rgba(24,28,52,.03) 6px,rgba(24,28,52,.03) 12px);border-style:solid;border-color:var(--line)}
   .mcell.past.empty{opacity:.6}
@@ -423,14 +425,17 @@
   .apsh-t{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
   .apsh-t b{font-size:14px;font-weight:700}
   .apsh-p{font-size:13.5px;font-weight:750;color:var(--acc);white-space:nowrap}
-  .mcard{position:relative;background:var(--mc-bg,var(--card));border:1px solid rgba(24,28,52,.06);border-left:4px solid var(--mc-bd,var(--acc));border-radius:7px;padding:6px 7px 6px 9px;font-size:11px;cursor:grab;box-shadow:0 1px 2px rgba(24,28,52,.05);user-select:none}
-  .mcard:hover{box-shadow:0 4px 12px rgba(56,44,161,.16)}
+  .mcard{position:relative;background:var(--mc-bg,var(--card));border:1px solid rgba(24,28,52,.06);border-left:5px solid var(--mc-bd,var(--acc));border-radius:8px;padding:7px 9px 8px 10px;font-size:11.5px;cursor:grab;box-shadow:0 1px 3px rgba(24,28,52,.06);user-select:none}
+  .mcard:hover{box-shadow:0 6px 16px rgba(56,44,161,.18)}
   .mcard.completed{opacity:.74} .mcard.cancelled{opacity:.5}
   .mcard.fixed{cursor:default}
+  .mcard .mch2{display:flex;align-items:center;gap:6px}
+  .mcard .mav{width:22px;height:22px;border-radius:50%;flex:none;background-size:cover;background-position:center;box-shadow:0 1px 2px rgba(24,28,52,.2)}
+  .mcard .mav.ini{display:grid;place-items:center;color:#fff;font-size:10px;font-weight:800}
   .mcard .mdot{position:absolute;top:7px;right:7px;width:8px;height:8px;border-radius:50%;background:var(--ok)}
   .mcard.pending .mdot{background:var(--warn)} .mcard.confirmed .mdot{background:var(--ok)}
   .mcard.completed .mdot{background:var(--info)} .mcard.cancelled .mdot{background:var(--bad)}
-  .mcard b{display:block;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:11px}
+  .mcard b{display:block;flex:1;min-width:0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:11px}
   .mcard .mt{color:var(--mut);font-size:10px;display:flex;justify-content:space-between;gap:6px}
   .mcard .mwho{color:var(--mut);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
   .mcard.dragging{opacity:.35}
@@ -944,6 +949,7 @@
     <div class="nav" data-p="demand"><span class="ic">🔥</span> Tendencias <span class="pro">PRO</span></div>
     <div class="nav" data-p="news"><span class="ic">📰</span> Noticias <span class="pro">PRO</span></div>
     <div class="promo" id="sidePromo" style="display:none"></div>
+    <button class="help-btn" id="helpBtn" onclick="openHelp()">🆘 Ayuda · escríbele a MASTER</button>
     <div class="side-user">
       <div class="su-av" id="suAv">RA</div>
       <div class="su-meta"><b id="suName">Mi cuenta</b><span id="suRole">SHOWMA</span></div>
@@ -1323,6 +1329,8 @@ function applyRole(){
       +'<p>Tu asistente para programación, sugerencias de talento y más.</p>'
       +'<button onclick="show(\'demand\')">Ver sugerencias</button>';
   } else { promo.style.display='none'; }
+  // Botón de Ayuda -> mensaje a MASTER (para artistas y hoteles; el admin ES master)
+  const hb=document.getElementById('helpBtn'); if(hb) hb.style.display=ME.is_admin?'none':'';
   // sidebar user chip (with Log Out)
   document.getElementById('suAv').textContent=initials||'RA';
   document.getElementById('suName').textContent=ME.full_name||'Mi cuenta';
@@ -1548,11 +1556,14 @@ function maestroCard(b,vi){
   const th=cellTheme(vi);
   const who=b.artist_name&&b.artist_name!==b.show_name?b.artist_name:'';
   const nm=(b.show_name||b.artist_name||'Actuación').replace(/'/g,"\\'");
+  const img=b.artist_image||'';
+  const ini=(who||b.show_name||'A').trim().charAt(0).toUpperCase();
+  const av=img?`<span class="mav" style="background-image:url('${esc(img)}')"></span>`:`<span class="mav ini" style="background:${th.bd}">${esc(ini)}</span>`;
   return `<div class="mcard ${b.status}${fixed?' fixed':''}" ${fixed?'':'draggable="true"'} data-bid="${b.id}" data-vid="${b.venue_id||''}" style="--mc-bg:${th.bg};--mc-bd:${th.bd}">
     <span class="mdot"></span>
     ${fixed?'':`<button class="med" title="Cambiar fecha y hora" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();openEditAct(${b.id})">✎</button>`}
     <button class="mx" title="Quitar del calendario" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();delBooking(${b.id},'${nm}')">✕</button>
-    <b>${esc(b.show_name||b.artist_name||'Actuación')}</b>
+    <div class="mch2">${av}<b>${esc(b.show_name||b.artist_name||'Actuación')}</b></div>
     <div class="mt"><span>${hh}</span><span>${b.agreed_price?MXN(b.agreed_price):''}</span></div>
     ${who?`<div class="mwho">${esc(who)}</div>`:''}</div>`;
 }
@@ -2609,7 +2620,9 @@ function donutDist(dist,total){
 const MASTER = { view:'dashboard', f:{}, cache:{} };
 const M_MENU = [
   {v:'dashboard', ic:'📊', label:'Dashboard'},
+  {v:'soporte',   ic:'🆘', label:'Ayuda / Soporte'},
   {sec:'Administración'},
+  {v:'prospectos', ic:'📇', label:'Prospectos'},
   {v:'talento',  ic:'🎤', label:'Músicos / Talento'},
   {v:'empresas', ic:'🏨', label:'Empresas asociadas'},
   {v:'eventos',  ic:'🎫', label:'Eventos / Shows'},
@@ -2646,6 +2659,8 @@ async function mNav(v){
   body.innerHTML = '<div class="load">Cargando…</div>';
   try{
     if(v==='dashboard')      await RENDER._mDash(body);
+    else if(v==='soporte')   await mSoporte(body);
+    else if(v==='prospectos') await mProspectos(body);
     else if(v==='talento')   await mTalentos(body);
     else if(v==='empresas')  await mEmpresas(body);
     else if(v==='eventos')   await mEventos(body);
@@ -2698,6 +2713,155 @@ function mEstChip(k, label){
           : k==='cancelled'?['#c02626','rgba(239,68,68,.12)']
           : ['#697089','var(--ov2)'];
   return `<span class="mchip" style="color:${c[0]};background:${c[1]}">${esc(label)}</span>`;
+}
+
+/* ============ Ayuda / Soporte (mensajes de usuarios a MASTER) ============ */
+const _ROLE_LBL={artist:'Artista',hotel:'Hotel / Empresa',admin:'Administración'};
+async function mSoporte(box){
+  box.innerHTML = mHead('Ayuda / Soporte','Mensajes que los usuarios envían a MASTER pidiendo ayuda o correcciones')
+    + `<div id="mres"><div class="load">Cargando…</div></div>`;
+  await mLoadSoporte();
+}
+async function mLoadSoporte(){
+  const res=document.getElementById('mres'); if(!res) return;
+  const d=await api('/support');
+  MASTER.cache.soporte=d.items;
+  if(!d.items.length){ res.innerHTML=mEmpty('No hay mensajes de ayuda por ahora.'); return; }
+  res.innerHTML=`<div class="mtw"><table class="mt"><thead><tr>
+      <th>De</th><th>Rol</th><th>Asunto</th><th>Mensaje</th><th>Fecha</th><th>Estatus</th><th>Acción</th></tr></thead><tbody>
+    ${d.items.map(m=>`<tr>
+      <td><b>${esc(m.from_name||'—')}</b>${m.from_email?`<div class="sub" style="color:var(--mut);font-size:11px">${esc(m.from_email)}</div>`:''}</td>
+      <td>${esc(_ROLE_LBL[m.from_role]||m.from_role||'—')}</td>
+      <td>${esc(m.subject||'—')}</td>
+      <td style="max-width:340px;white-space:pre-wrap">${esc(m.body||'')}</td>
+      <td>${mDay(m.created_at)}</td>
+      <td>${m.status==='resolved'?mEstChip('confirmed','Resuelto'):mEstChip('pending','Abierto')}</td>
+      <td>${m.status==='resolved'
+          ? `<span class="mlink" onclick="mSoporteStatus(${m.id},'open')">Reabrir</span>`
+          : `<span class="mlink" onclick="mSoporteStatus(${m.id},'resolved')">Marcar resuelto</span>`}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+async function mSoporteStatus(id,st){
+  try{ await patch('/support/'+id,{status:st}); toast('Mensaje actualizado ✓'); await mLoadSoporte(); }
+  catch(e){ toast('No se pudo actualizar: '+e.message,true); }
+}
+
+/* ============ ADMINISTRACIÓN · Prospectos ============ */
+const _PROS_ST={new:['Nuevo','#b5730a','rgba(245,158,11,.14)'],contacted:['Contactado','#2f66c9','rgba(59,130,246,.14)'],converted:['Convertido','#0a8f63','rgba(16,185,129,.14)'],discarded:['Descartado','#c02626','rgba(239,68,68,.12)']};
+function mProsChip(s){ const c=_PROS_ST[s]||['—','#697089','var(--ov2)']; return `<span class="mchip" style="color:${c[1]};background:${c[2]}">${c[0]}</span>`; }
+async function mProspectos(box){
+  box.innerHTML = mHead('Prospectos','Hoteles y empresas que dejaron sus datos · acepta para darlos de alta')
+    + `<div id="mres"><div class="load">Cargando…</div></div>`;
+  await mLoadProspectos();
+}
+async function mLoadProspectos(){
+  const res=document.getElementById('mres'); if(!res) return;
+  const rows=await api('/leads/hotel');
+  MASTER.cache.prospectos=rows;
+  if(!rows.length){ res.innerHTML=mEmpty('Aún no hay prospectos. Cuando un hotel deje sus datos aparecerá aquí.'); return; }
+  res.innerHTML=`<div class="mtw"><table class="mt"><thead><tr>
+      <th>Empresa</th><th>Contacto</th><th>Correo / Teléfono</th><th>Fecha</th><th>Estatus</th><th>Acciones</th></tr></thead><tbody>
+    ${rows.map(l=>`<tr>
+      <td><b>${esc(l.company_name||'—')}</b>${l.message?`<div class="sub" style="color:var(--mut);font-size:11px">${esc(l.message)}</div>`:''}</td>
+      <td>${esc(l.full_name||'—')}${l.position?`<div class="sub" style="color:var(--mut);font-size:11px">${esc(l.position)}</div>`:''}</td>
+      <td>${esc(l.email||'—')}${l.phone?`<div class="sub" style="color:var(--mut);font-size:11px">${esc(l.phone)}</div>`:''}</td>
+      <td>${mDay(l.created_at)}</td>
+      <td>${mProsChip(l.status)}</td>
+      <td>${l.status==='converted'
+          ? '<span class="mchip" style="color:#0a8f63;background:rgba(16,185,129,.14)">✓ Cuenta creada</span>'
+          : `<span class="mlink" onclick="mProspectoFicha(${l.id})">📝 Aceptar / Dar de alta</span>`
+            + (l.status==='new'?` · <span class="mlink" onclick="mProspectoStatus(${l.id},'contacted')">Contactado</span>`:'')
+            + (l.status!=='discarded'?` · <span class="mlink" style="color:var(--bad)" onclick="mProspectoStatus(${l.id},'discarded')">Descartar</span>`:'')
+        }</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+async function mProspectoStatus(id,st){
+  try{ await patch('/leads/hotel/'+id,{status:st}); toast('Prospecto actualizado ✓'); await mLoadProspectos(); }
+  catch(e){ toast('No se pudo actualizar: '+e.message,true); }
+}
+let _PROS_CONSTANCIA=null;
+function mProspectoFicha(id){
+  const l=(MASTER.cache.prospectos||[]).find(x=>x.id===id); if(!l) return;
+  _PROS_CONSTANCIA=null;
+  const inS="width:100%;border:1px solid var(--line);background:var(--card);border-radius:7px;height:34px;padding:0 9px;font-size:12.5px;color:var(--txt);font-family:inherit";
+  const lb=t=>`<div style="font-size:11px;font-weight:700;color:var(--mut);margin:0 0 4px">${t}</div>`;
+  const fld=(id2,label,val,ph,type)=>`<div>${lb(label)}<input id="${id2}" style="${inS}" value="${esc(val||'')}" placeholder="${esc(ph||'')}"${type?` type="${type}"`:''}></div>`;
+  const sec=t=>`<div style="grid-column:1/-1;font-weight:800;font-size:12.5px;margin:8px 0 2px;color:var(--txt)">${t}</div>`;
+  mModal(`<div class="mch"><div><h3>Alta de prospecto</h3><div class="sub">${esc(l.company_name||'')} · resguarda todos los datos de la propiedad</div></div><button class="mx" onclick="mClose()">✕</button></div>
+    <div class="mcb" style="max-height:70vh;overflow:auto">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 14px">
+        ${sec('Datos generales')}
+        ${fld('pr_name','Nombre comercial',l.company_name,'Hotel Paraíso')}
+        ${fld('pr_legal','Razón social','','Razón social S.A. de C.V.')}
+        ${fld('pr_rfc','RFC','','XAXX010101000')}
+        <div>${lb('Constancia de situación fiscal (PDF)')}<input type="file" id="pr_const_file" accept="application/pdf,image/*" onchange="mProsUploadConstancia(this)" style="${inS};height:auto;padding:6px 9px"><div id="pr_const_st" class="sub" style="font-size:11px;color:var(--mut);margin-top:3px"></div></div>
+        ${fld('pr_addr','Dirección fiscal','','Calle, número, colonia')}
+        ${fld('pr_city','Ciudad','','Cancún')}
+        ${fld('pr_region','Estado','','Quintana Roo')}
+        ${fld('pr_country','País','México','México')}
+        ${fld('pr_web','Sitio web','','https://')}
+        ${fld('pr_person','Nombre completo',l.full_name,'Nombre del responsable')}
+        ${fld('pr_pos','Cargo',l.position,'Gerente de A&B')}
+        ${fld('pr_phone','Teléfono',l.phone,'+52 998 123 4567')}
+        ${fld('pr_wa','WhatsApp',l.phone,'+52 998 123 4567')}
+        ${fld('pr_email','Correo electrónico',l.email,'correo@hotel.com')}
+        ${sec('Información hotelera / comercial')}
+        <div>${lb('Categoría (estrellas)')}<select id="pr_stars" style="${inS}"><option value="">—</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} estrella${n>1?'s':''}</option>`).join('')}</select></div>
+        ${fld('pr_rooms','Cantidad de habitaciones','','120','number')}
+        ${fld('pr_adr','Tarifa promedio (MXN)','','2500','number')}
+        <div>${lb('Tipo de propiedad')}<select id="pr_type" style="${inS}">
+          <option value="hotel">Hotel</option><option value="resort">Resort</option>
+          <option value="convenciones">Centro de Convenciones</option><option value="eventos">Empresa de Eventos</option></select></div>
+        ${sec('Datos financieros')}
+        ${fld('pr_bank','Banco','','BBVA')}
+        ${fld('pr_clabe','CLABE interbancaria','','18 dígitos')}
+        <div>${lb('Moneda habitual')}<select id="pr_curr" style="${inS}"><option value="MXN">MXN</option><option value="USD">USD</option></select></div>
+        ${fld('pr_credit','Días de crédito solicitados','','30','number')}
+        ${sec('Acceso')}
+        ${fld('pr_pass','Contraseña (opcional)','','Se genera una si lo dejas vacío')}
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+        <button class="mbtn ghost" onclick="mClose()">Cancelar</button>
+        <button class="mbtn solid" id="pr_go" onclick="mConvertProspecto(${id})">Dar de alta y crear cuenta</button>
+      </div>
+    </div>`);
+}
+async function mProsUploadConstancia(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const st=document.getElementById('pr_const_st'); if(st) st.textContent='Subiendo…';
+  try{
+    const fd=new FormData(); fd.append('file',f);
+    const r=await fetch(API+'/admin/upload',{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
+    if(!r.ok) throw new Error('Error '+r.status); const d=await r.json();
+    _PROS_CONSTANCIA=d.url; if(st){ st.style.color='var(--ok)'; st.textContent='✓ '+(d.filename||'Subido'); }
+  }catch(e){ if(st){ st.style.color='var(--bad)'; st.textContent='No se pudo subir: '+e.message; } }
+}
+async function mConvertProspecto(id){
+  const gv=i=>{ const el=document.getElementById(i); return el?(el.value||'').trim():''; };
+  const numv=i=>{ const v=gv(i).replace(/[^0-9.]/g,''); return v?parseFloat(v):null; };
+  const clabe=gv('pr_clabe').replace(/\s+/g,'');
+  if(clabe && clabe.replace(/[^0-9]/g,'').length!==18){ toast('La CLABE debe tener 18 dígitos.',true); return; }
+  const body={
+    password:gv('pr_pass')||null,
+    company_name:gv('pr_name')||null, legal_name:gv('pr_legal')||null, tax_id:gv('pr_rfc')||null,
+    fiscal_constancia_url:_PROS_CONSTANCIA, address:gv('pr_addr')||null, city:gv('pr_city')||null,
+    region:gv('pr_region')||null, country:gv('pr_country')||null, website:gv('pr_web')||null,
+    contact_person:gv('pr_person')||null, position:gv('pr_pos')||null, contact_phone:gv('pr_phone')||null,
+    whatsapp:gv('pr_wa')||null, contact_email:gv('pr_email')||null,
+    company_type:gv('pr_type')||null, star_rating:numv('pr_stars'), rooms:numv('pr_rooms'),
+    avg_daily_rate:numv('pr_adr'), bank_name:gv('pr_bank')||null, bank_clabe:clabe||null,
+    preferred_currency:gv('pr_curr')||null, agreed_payment_days:numv('pr_credit'),
+  };
+  const btn=document.getElementById('pr_go'); if(btn){ btn.disabled=true; btn.textContent='Creando…'; }
+  try{
+    const r=await post('/leads/hotel/'+id+'/convert',body);
+    mModal(`<div class="mch"><div><h3>✓ Cuenta creada</h3><div class="sub">Comparte estas credenciales con ${esc(r.company_name||'el hotel')}</div></div><button class="mx" onclick="mClose()">✕</button></div>
+      <div class="mcb">
+        ${mR('Empresa',r.company_name)}${mR('Correo (usuario)',r.email)}${mR('Contraseña',r.password)}
+        <div class="mnote" style="margin-top:10px">Guarda la contraseña ahora: por seguridad no se vuelve a mostrar.</div>
+      </div>`);
+    await mLoadProspectos();
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent='Dar de alta y crear cuenta'; } toast('No se pudo dar de alta: '+e.message,true); }
 }
 
 /* ============ ADMINISTRACIÓN · Talentos ============ */
@@ -4175,6 +4339,41 @@ function topPerformerInfo(){
   ov.style.display='flex';
 }
 window.topPerformerInfo=topPerformerInfo;
+
+// ---- Ayuda: mandar un mensaje a MASTER ----
+function openHelp(){
+  let ov=document.getElementById('helpMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='helpMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) closeHelp(); }); }
+  ov.innerHTML=`<div class="amod" style="position:relative;max-width:520px">
+    <button class="ax" onclick="closeHelp()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>🆘 Ayuda</b><span class="as">Escríbele a MASTER: dudas, ayuda o alguna corrección</span></div>
+    <div style="padding:6px 2px">
+      <div style="font-size:12px;font-weight:700;color:var(--mut);margin:0 0 4px">Asunto (opcional)</div>
+      <input id="help_subject" placeholder="Ej. Error al subir un documento" style="width:100%;border:1px solid var(--line);background:var(--card);border-radius:8px;height:38px;padding:0 11px;font-size:13.5px;color:var(--txt);font-family:inherit;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--mut);margin:0 0 4px">Mensaje</div>
+      <textarea id="help_body" placeholder="Cuéntanos qué necesitas o qué hay que corregir…" style="width:100%;min-height:120px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:10px 11px;font-size:13.5px;color:var(--txt);font-family:inherit;resize:vertical"></textarea>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+        <button class="btn ghost" onclick="closeHelp()">Cancelar</button>
+        <button class="btn" id="help_go" onclick="sendHelp()">Enviar a MASTER</button>
+      </div>
+    </div></div>`;
+  ov.style.display='flex';
+  setTimeout(()=>{ const t=document.getElementById('help_body'); if(t) t.focus(); },100);
+}
+function closeHelp(){ const o=document.getElementById('helpMov'); if(o) o.style.display='none'; }
+async function sendHelp(){
+  const subj=(document.getElementById('help_subject')?.value||'').trim();
+  const body=(document.getElementById('help_body')?.value||'').trim();
+  if(body.length<3){ toast('Escribe tu mensaje.',true); return; }
+  const btn=document.getElementById('help_go'); if(btn){ btn.disabled=true; btn.textContent='Enviando…'; }
+  try{
+    await post('/support',{subject:subj||null,body});
+    closeHelp();
+    toast('Mensaje enviado a MASTER ✓ Te responderemos pronto');
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent='Enviar a MASTER'; } toast('No se pudo enviar: '+(e.message||''),true); }
+}
+window.openHelp=openHelp;window.closeHelp=closeHelp;window.sendHelp=sendHelp;
 
 /* ---- Imágenes: redimensiona en el navegador y sube (perfil + propuestas) ---- */
 function _resizeImage(file, max=1280, q=0.85){

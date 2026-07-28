@@ -68,6 +68,12 @@ class Company(Base, TimestampMixin):
     # window has enough history to auto-classify the tier.
     agreed_payment_days: Mapped[int | None] = mapped_column(Integer)
 
+    # --- Datos financieros / fiscales del prospecto (ficha de alta en MASTER) ---
+    fiscal_constancia_url: Mapped[str | None] = mapped_column(String(500))  # Constancia SAT (PDF)
+    bank_name: Mapped[str | None] = mapped_column(String(120))
+    bank_clabe: Mapped[str | None] = mapped_column(String(20))
+    preferred_currency: Mapped[str] = mapped_column(String(8), default="MXN")
+
     group: Mapped["PropertyGroup | None"] = relationship(  # noqa: F821
         back_populates="properties"
     )

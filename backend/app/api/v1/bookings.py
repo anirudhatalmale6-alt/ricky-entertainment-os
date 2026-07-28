@@ -63,6 +63,7 @@ def _decorate(
     venue: Venue | None,
     show: Show | None,
     company: Company | None = None,
+    artist: Artist | None = None,
 ) -> BookingOut:
     out = BookingOut.model_validate(booking)
     return out.model_copy(update={
@@ -70,6 +71,8 @@ def _decorate(
         "venue_name": venue.name if venue else None,
         "show_name": show.show_name if show else None,
         "company_name": company.name if company else None,
+        "artist_name": artist.stage_name if artist else None,
+        "artist_image": artist.profile_image_url if artist else None,
     })
 
 
@@ -185,10 +188,11 @@ async def list_bookings(
     stmt = stmt.order_by(Booking.starts_at)
 
     bookings = list((await db.execute(stmt)).scalars().all())
-    # batch-load venue / show / company names for the cards
+    # batch-load venue / show / company / artist names (+ foto) for the cards
     vids = {b.venue_id for b in bookings if b.venue_id}
     sids = {b.show_id for b in bookings if b.show_id}
     cids = {b.company_id for b in bookings if b.company_id}
+    aids = {b.artist_id for b in bookings if b.artist_id}
     venues = {v.id: v for v in (
         (await db.execute(select(Venue).where(Venue.id.in_(vids)))).scalars().all()
         if vids else []
@@ -201,7 +205,12 @@ async def list_bookings(
         (await db.execute(select(Company).where(Company.id.in_(cids)))).scalars().all()
         if cids else []
     )}
-    return [_decorate(b, venues.get(b.venue_id), shows.get(b.show_id), companies.get(b.company_id)) for b in bookings]
+    artists = {a.id: a for a in (
+        (await db.execute(select(Artist).where(Artist.id.in_(aids)))).scalars().all()
+        if aids else []
+    )}
+    return [_decorate(b, venues.get(b.venue_id), shows.get(b.show_id),
+                      companies.get(b.company_id), artists.get(b.artist_id)) for b in bookings]
 
 
 @router.get("/mine", response_model=list[BookingOut])

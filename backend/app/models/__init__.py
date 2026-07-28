@@ -17,6 +17,7 @@ from app.models.notification import ArtistNotification
 from app.models.blocked_date import ArtistBlockedDate
 from app.models.tax_figure import TaxFigure
 from app.models.contract import ContractTemplate, ContractAcceptance
+from app.models.support import SupportMessage
 from app.models.enums import (
     PayoutSpeed,
     RiskTier,
@@ -55,6 +56,7 @@ __all__ = [
     "Conversation",
     "Message",
     "HotelLead",
+    "SupportMessage",
     "ArtistNotification",
     "ArtistBlockedDate",
     "TaxFigure",

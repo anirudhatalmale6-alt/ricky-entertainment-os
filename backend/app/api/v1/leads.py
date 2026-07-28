@@ -113,7 +113,30 @@ async def convert_hotel_lead(
     if await _email_taken(db, lead.email):
         raise HTTPException(status.HTTP_409_CONFLICT, "Ya existe una cuenta con ese correo.")
 
-    company = Company(name=lead.company_name)
+    # Empresa (Company) con toda la ficha de alta que llenó el admin en MASTER.
+    company = Company(
+        name=(payload.company_name or lead.company_name),
+        legal_name=payload.legal_name,
+        tax_id=payload.tax_id,
+        fiscal_constancia_url=payload.fiscal_constancia_url,
+        address=payload.address,
+        city=payload.city,
+        region=payload.region,
+        country=(payload.country or "Mexico"),
+        website=payload.website,
+        contact_person=(payload.contact_person or lead.full_name),
+        contact_email=(payload.contact_email or lead.email),
+        contact_phone=(payload.contact_phone or lead.phone),
+        whatsapp=payload.whatsapp,
+        company_type=(payload.company_type or "hotel"),
+        star_rating=payload.star_rating,
+        rooms=payload.rooms,
+        avg_daily_rate=payload.avg_daily_rate,
+        bank_name=payload.bank_name,
+        bank_clabe=payload.bank_clabe,
+        preferred_currency=(payload.preferred_currency or "MXN"),
+        agreed_payment_days=payload.agreed_payment_days,
+    )
     db.add(company)
     await db.flush()
 
@@ -121,7 +144,7 @@ async def convert_hotel_lead(
     plain = payload.password or _gen_password()
     user = User(
         email=lead.email,
-        full_name=lead.full_name,
+        full_name=(payload.contact_person or lead.full_name),
         hashed_password=security.hash_password(plain),
         role_id=role.id if role else None,
     )
@@ -131,8 +154,8 @@ async def convert_hotel_lead(
     booker = Booker(
         user_id=user.id,
         company_id=company.id,
-        position=lead.position,
-        phone=lead.phone,
+        position=(payload.position or lead.position),
+        phone=(payload.contact_phone or lead.phone),
     )
     db.add(booker)
     lead.status = "converted"

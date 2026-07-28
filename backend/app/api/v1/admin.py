@@ -17,12 +17,15 @@ they stay stable across reloads without a separate invoice table (first stage �
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Body, HTTPException, Query, status
+from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentScope, DbSession
+from app.core.config import settings
+from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
 from app.models.booking import Booking
 from app.models.company import Company
@@ -59,6 +62,29 @@ def _admin_only(scope) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo el administrador puede acceder al panel Master.",
         )
+
+
+_ADMIN_UPLOAD_TYPES = {
+    "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+}
+_ADMIN_UPLOAD_MAX = 10 * 1024 * 1024
+
+
+@router.post("/upload")
+async def admin_upload(scope: CurrentScope, file: UploadFile = File(...)):
+    """Subida genérica para MASTER (p. ej. la constancia de un prospecto)."""
+    _admin_only(scope)
+    ext = _ADMIN_UPLOAD_TYPES.get((file.content_type or "").lower())
+    if ext is None:
+        raise HTTPException(status_code=415, detail="Formato no admitido. Usa PDF, JPG, PNG o WEBP.")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Archivo vacío.")
+    if len(data) > _ADMIN_UPLOAD_MAX:
+        raise HTTPException(status_code=413, detail="El archivo es muy grande (máximo 10 MB).")
+    name = f"master_{uuid.uuid4().hex}.{ext}"
+    (ensure_upload_dir() / name).write_bytes(data)
+    return {"url": f"{settings.ROOT_PATH}/uploads/{name}", "filename": (file.filename or name)[:255]}
 
 
 def _naive(dt: datetime | None) -> datetime | None:

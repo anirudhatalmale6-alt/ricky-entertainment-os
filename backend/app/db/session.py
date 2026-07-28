@@ -40,6 +40,11 @@ _SQLITE_ADDED_COLUMNS = [
     ("tax_figures", "iva_traslado_pct", "FLOAT DEFAULT 16"),
     ("tax_figures", "isr_variable", "BOOLEAN DEFAULT 0"),
     ("artists", "tax_figure_id", "INTEGER"),
+    # Ficha de alta del prospecto (datos financieros/fiscales de la empresa)
+    ("companies", "fiscal_constancia_url", "VARCHAR(500)"),
+    ("companies", "bank_name", "VARCHAR(120)"),
+    ("companies", "bank_clabe", "VARCHAR(20)"),
+    ("companies", "preferred_currency", "VARCHAR(8) DEFAULT 'MXN'"),
 ]
 
 

@@ -88,6 +88,8 @@ class BookingOut(BaseModel):
     venue_name: str | None = None
     show_name: str | None = None
     company_name: str | None = None
+    artist_name: str | None = None
+    artist_image: str | None = None
 
     @computed_field
     @property
