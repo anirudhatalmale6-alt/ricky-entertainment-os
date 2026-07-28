@@ -1339,8 +1339,12 @@ function applyRole(){
   const lbls=document.querySelectorAll('.navlbl');       // [0]=Operación, [1]=Inteligencia·Partner
   const canPartner = ME.is_admin || isDirector;          // chain-level analytics need a group scope
   const isHotel = !isArtist;                             // admin or contratante/hotel side
-  show('news', canPartner); show('market', canPartner); show('demand', canPartner);
-  if(lbls[1]) lbls[1].style.display = canPartner?'':'none';
+  // Inteligencia de mercado: MASTER y directores de hotel, MÁS los artistas Partner
+  // (es el add-on de pago que se les cobra por su plan Partner).
+  const isPartnerArtist = isArtist && !!ME.is_partner;
+  const canIntel = canPartner || isPartnerArtist;
+  show('news', canIntel); show('market', canIntel); show('demand', canIntel);
+  if(lbls[1]) lbls[1].style.display = canIntel?'':'none';
   // Home is the consolidated view for a chain/admin, AND the artist's personal dashboard.
   show('home', ME.is_admin || isDirector || isArtist);
   show('artists', isHotel);                              // hotels browse the talent catalog
@@ -3810,8 +3814,8 @@ const RENDER = {
     CACHE.tax=tax;
     const sl=p.social_links||{};
     const partner = p.is_partner
-      ? `<div class="partner"><div class="cr">👑</div><div><b>Eres Partner ✓</b><p>Conectas con otros artistas y empresas, puedes subcontratar talento y tu insignia Partner Verificado es visible para los hoteles.</p></div></div>`
-      : `<div class="partner"><div class="cr">🚀</div><div style="flex:1"><b>Conviértete en Partner</b><p>Conecta con otros artistas y empresas, subcontrata talento de la plataforma, obtén prioridad en solicitudes y la insignia Partner Verificado que ven los hoteles.</p></div><button class="btn" onclick="becomePartner()">Activar Partner</button></div>`;
+      ? `<div class="partner"><div class="cr">👑</div><div><b>Eres Partner ✓</b><p>Conectas con otros artistas y empresas, puedes subcontratar talento, tienes acceso a Market Intelligence y tu insignia Partner Verificado es visible para los hoteles.</p></div></div>`
+      : `<div class="partner"><div class="cr">🚀</div><div style="flex:1"><b>Conviértete en Partner</b><p>Conecta con otros artistas y empresas, subcontrata talento de la plataforma, desbloquea Market Intelligence, obtén prioridad en solicitudes y la insignia Partner Verificado que ven los hoteles.</p></div><button class="btn" onclick="becomePartner()">Activar Partner</button></div>`;
     const gal=[]; (p.shows||[]).forEach(s=>(s.images||[]).forEach(im=>{ if(im.url && !gal.includes(im.url)) gal.push(im.url); }));
     const pfUrl=p.profile_image_url||null;
     box.innerHTML=`
@@ -4238,6 +4242,7 @@ function fillSub(catId,subId,ph){
 }
 function refreshIdentity(){
   const p=CACHE.profile; if(!p)return; ME.artist_name=p.stage_name;
+  if('is_partner' in p) ME.is_partner=!!p.is_partner;   // reflejar Partner recién activado en el menú
   setSelfAvatar(p.profile_image_url, p.stage_name||ME.full_name);
 }
 // Pinta la foto (o iniciales) del propio usuario en los avatares del menú.
@@ -4293,8 +4298,8 @@ async function addShow(btn){
   catch(e){ alert('No se pudo publicar: '+e.message); btn.disabled=false; }
 }
 async function becomePartner(){
-  if(!confirm('¿Activar tu plan Partner? Conecta con otros artistas y empresas, subcontrata talento y obtén tu insignia Partner Verificado.'))return;
-  try{ CACHE.profile=await patch('/me/artist',{is_partner:true}); refreshIdentity(); show('profile',true); }
+  if(!confirm('¿Activar tu plan Partner? Conecta con otros artistas y empresas, subcontrata talento, obtén tu insignia Partner Verificado y desbloquea Market Intelligence.'))return;
+  try{ CACHE.profile=await patch('/me/artist',{is_partner:true}); refreshIdentity(); applyRole(); show('profile',true); }
   catch(e){ alert('No se pudo activar: '+e.message); }
 }
 // ---- Régimen fiscal SAT (para Mi Perfil) ----

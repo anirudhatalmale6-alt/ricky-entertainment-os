@@ -47,6 +47,7 @@ class MeOut(BaseModel):
     group_id: int | None = None
     artist_name: str | None = None
     company_name: str | None = None
+    is_partner: bool = False
 
 
 class LoginRequest(BaseModel):

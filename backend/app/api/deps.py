@@ -58,6 +58,26 @@ def require_permission(code: str):
     return _guard
 
 
+async def require_intelligence_access(user: CurrentUser, db: DbSession) -> User:
+    """Gate for Market Intelligence / Tendencias / Noticias.
+
+    Abierto para quien tiene ``report.view`` (MASTER y directores de hotel) y,
+    ademas, para los artistas marcados como Partner: es el add-on de pago que se
+    les cobra, asi que su plan Partner les da acceso a la inteligencia de mercado.
+    """
+    if user.has_permission("report.view"):
+        return user
+    artist = (
+        await db.execute(select(Artist).where(Artist.user_id == user.id))
+    ).scalar_one_or_none()
+    if artist and artist.is_partner:
+        return user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Market Intelligence requiere permiso de reportes o plan Partner.",
+    )
+
+
 @dataclass
 class Scope:
     """Who the caller is and what slice of the marketplace they own.

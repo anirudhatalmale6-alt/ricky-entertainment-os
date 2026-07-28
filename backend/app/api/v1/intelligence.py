@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import case, func, select
 
-from app.api.deps import DbSession, require_permission
+from app.api.deps import DbSession, require_intelligence_access
 from app.models.booking import Booking
 from app.models.company import Company
 from app.models.enums import BookingStatus
@@ -105,7 +105,7 @@ async def _spend_by_category(db, company_ids, start, end) -> dict[str, float]:
 @router.get(
     "/market",
     response_model=MarketIntelligenceOut,
-    dependencies=[Depends(require_permission("report.view"))],
+    dependencies=[Depends(require_intelligence_access)],
 )
 async def market_intelligence(
     db: DbSession,
@@ -318,7 +318,7 @@ def _demand_rows(req_cur, book_cur, req_prev, book_prev, limit=None) -> list[Dem
 @router.get(
     "/demand",
     response_model=DemandIntelligenceOut,
-    dependencies=[Depends(require_permission("report.view"))],
+    dependencies=[Depends(require_intelligence_access)],
 )
 async def demand_intelligence(
     db: DbSession,
@@ -368,7 +368,7 @@ async def demand_intelligence(
 @router.get(
     "/zones",
     response_model=ZoneIntelligenceOut,
-    dependencies=[Depends(require_permission("report.view"))],
+    dependencies=[Depends(require_intelligence_access)],
 )
 async def zone_intelligence(
     db: DbSession,
@@ -435,7 +435,7 @@ async def zone_intelligence(
 @router.get(
     "/destinations",
     response_model=DestinationStudyOut,
-    dependencies=[Depends(require_permission("report.view"))],
+    dependencies=[Depends(require_intelligence_access)],
 )
 async def destination_study(
     db: DbSession,
@@ -556,7 +556,7 @@ async def destination_study(
 @router.get(
     "/seasonality",
     response_model=SeasonalityOut,
-    dependencies=[Depends(require_permission("report.view"))],
+    dependencies=[Depends(require_intelligence_access)],
 )
 async def seasonality(
     db: DbSession,
@@ -610,7 +610,7 @@ async def seasonality(
 @router.get(
     "/price-ranges",
     response_model=PriceRangesOut,
-    dependencies=[Depends(require_permission("report.view"))],
+    dependencies=[Depends(require_intelligence_access)],
 )
 async def price_ranges(
     db: DbSession,
