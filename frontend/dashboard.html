@@ -381,6 +381,14 @@
   .amod .asrch input{width:100%;border:1px solid var(--line);background:var(--inp);border-radius:10px;padding:10px 12px 10px 34px;font-size:13.5px;color:var(--txt)}
   .amod .asrch .ai{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mut2)}
   .amod .alist{flex:1;overflow-y:auto;padding:4px 10px 8px}
+  /* Tarjeta de artista para pickers (reemplazo / agendar) */
+  .acard2{display:flex;align-items:center;gap:11px;padding:9px 8px;border-bottom:1px solid var(--line)}
+  .acard2:last-child{border-bottom:0}
+  .acard2 .ac2-av{width:40px;height:40px;border-radius:11px;flex:none;background:var(--acc);background-size:cover;background-position:center;display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px}
+  .acard2 .ac2-b{flex:1;min-width:0;display:flex;flex-direction:column}
+  .acard2 .ac2-b b{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acard2 .ac2-b span{font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acard2 .ac2-b .ac2-p{color:var(--acc);font-weight:700;margin-top:1px}
   .arow2{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:11px;cursor:pointer;border:1.5px solid transparent}
   .arow2:hover{background:var(--ov)}
   .arow2.sel{border-color:var(--acc);background:#382ca10d}
@@ -1644,6 +1652,7 @@ async function saveAndNotify(){
 let _LAST_UNREAD=null;
 async function loadNotifications(){
   if(ME&&ME.is_admin) return loadAdminNotifications();
+  if(!(ME&&ME.artist_id)) return loadHotelAlerts();   // hoteles: avisos de cancelación
   try{
     const d=await api('/me/artist/notifications');
     NOTIF_CACHE=(d&&d.items)||[];
@@ -1679,6 +1688,22 @@ async function loadAdminNotifications(){
     renderBellPanel();
   }catch(_){ /* silent */ }
 }
+// Campanita del hotel: actuaciones que un músico canceló, con acción de reemplazo.
+async function loadHotelAlerts(){
+  try{
+    const d=await api('/bookings/alerts');
+    NOTIF_CACHE=((d&&d.items)||[]).map(a=>({
+      kind:'cancel_alert', is_read:false, booking_id:a.booking_id, venue_id:a.venue_id,
+      title:'Un músico canceló una actuación',
+      body:`${a.artist_name||'El artista'} canceló ${a.show_name||'su actuación'} en ${a.venue_name||'el lugar'}`
+        +(a.starts_at?` · ${fmtDate(a.starts_at)}`:'')+(a.reason?` · ${a.reason}`:''),
+      created_at:a.starts_at
+    }));
+    const dot=document.getElementById('bellDot');
+    if(dot) dot.style.display=NOTIF_CACHE.length?'':'none';
+    renderBellPanel();
+  }catch(_){ /* el hotel no siempre tiene avisos */ }
+}
 function bellOpenLeads(){
   const p=document.getElementById('bellPanel'); if(p) p.classList.remove('open');
   const n=document.querySelector(".nav[data-p='leads']");
@@ -1690,6 +1715,8 @@ function fmtNotifTime(iso){ if(!iso) return ''; try{ const d=new Date(iso); retu
 const _NOTIF_ICONS={
   confirmed:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M20 6 9 17l-5-5"/></svg>',
   reschedule:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  cancelled:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>',
+  cancel_alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M10.3 3.9 1.8 18a1.7 1.7 0 0 0 1.5 2.6h17.4a1.7 1.7 0 0 0 1.5-2.6L13.7 3.9a1.7 1.7 0 0 0-3 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
   lead:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h.01M9 13h.01M9 17h.01M14 9h.01M14 13h.01M14 17h.01"/></svg>',
   _default:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
 };
@@ -1705,7 +1732,8 @@ function renderBellPanel(){
     + (items.length? items.map(n=>{
         const ic=_NOTIF_ICONS[n.kind]||_NOTIF_ICONS._default;
         const clk=n.kind==='lead'?' style="cursor:pointer" onclick="bellOpenLeads()"':'';
-        return `<div class="bellitem${n.is_read?'':' unread'}"${clk}><div class="bi-i${n.kind==='confirmed'?' ok':''}">${ic}</div><div><b>${esc(n.title||'')}</b><span>${esc(n.body||'')}</span><span class="bi-t">${fmtNotifTime(n.created_at)}</span></div></div>`;
+        const act=n.kind==='cancel_alert'?`<button class="mini" style="margin-top:6px" onclick="openReplacements(${n.booking_id},${n.venue_id||'null'})">Buscar reemplazo</button>`:'';
+        return `<div class="bellitem${n.is_read?'':' unread'}"${clk}><div class="bi-i${n.kind==='confirmed'?' ok':''}">${ic}</div><div><b>${esc(n.title||'')}</b><span>${esc(n.body||'')}</span>${act}<span class="bi-t">${fmtNotifTime(n.created_at)}</span></div></div>`;
       }).join('')
       : `<div class="bellempty">${empty}</div>`);
 }
@@ -2491,9 +2519,12 @@ function renderAgenda(fromRange){
         ? '<span class="muted">—</span>'
         : `<button class="mini" onclick="openEditAct(${b.id})">Editar</button>`}</td>`;
     }
-    return `<td>${b.status==='pending'
-      ? `<div class="agact"><button class="mini ok" onclick="artistRespond(${b.id},'accept')">Aceptar</button><button class="mini no" onclick="artistRespond(${b.id},'reject')">Rechazar</button></div>`
-      : '<span class="muted">—</span>'}</td>`; };
+    const fut = b.starts_at && new Date(b.starts_at) > new Date();
+    if(b.status==='pending')
+      return `<td><div class="agact"><button class="mini ok" onclick="artistRespond(${b.id},'accept')">Aceptar</button><button class="mini no" onclick="artistRespond(${b.id},'reject')">Rechazar</button></div></td>`;
+    if(b.status==='confirmed' && fut)
+      return `<td><button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></td>`;
+    return `<td><span class="muted">—</span></td>`; };
   body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
       <td class="muted">${esc(b.venue_name||'—')}</td><td>${MXN(b.agreed_price)}</td>
       <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
@@ -2510,6 +2541,50 @@ async function artistRespond(id,action){
   }catch(e){ toast('No se pudo procesar: '+(e.message||''),true); }
 }
 window.artistRespond=artistRespond;
+async function artistCancel(id){
+  const reason=prompt('¿Por qué cancelas esta actuación? El hotel será notificado y podrá buscar un reemplazo.\nPor ejemplo: Enfermedad, imprevisto…');
+  if(reason===null) return;   // cerró el prompt
+  try{
+    await post(`/bookings/${id}/artist-cancel?reason=${encodeURIComponent(reason.trim()||'Cancelada por el artista')}`);
+    const b=(CACHE.agenda||[]).find(x=>x.id===id); if(b) b.status='cancelled';
+    toast('Actuación cancelada. El hotel fue avisado.');
+    renderAgenda();
+  }catch(e){ toast('No se pudo cancelar: '+(e.message||''),true); }
+}
+window.artistCancel=artistCancel;
+// ---- Reemplazo inmediato: artistas disponibles para cubrir una actuación cancelada ----
+let _RPL=null;
+async function openReplacements(bookingId, venueId){
+  let ov=document.getElementById('rplMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='rplMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) ov.style.display='none'; }); }
+  const p=document.getElementById('bellPanel'); if(p) p.classList.remove('open');
+  ov.innerHTML=`<div class="amod" style="max-width:580px"><div class="ah"><b>🔎 Buscar reemplazo</b><span class="as">Artistas disponibles para esa fecha y hora</span></div><div class="alist" id="rplList"><div class="load" style="padding:24px;text-align:center;color:var(--mut)">Cargando…</div></div><div style="padding:10px 16px;text-align:right;border-top:1px solid var(--line)"><button class="btn ghost" onclick="document.getElementById('rplMov').style.display='none'">Cerrar</button></div></div>`;
+  ov.style.display='flex';
+  try{
+    const d=await api(`/bookings/${bookingId}/replacements`);
+    _RPL={venue_id:d.venue_id, starts_at:d.starts_at};
+    const items=d.items||[]; const list=document.getElementById('rplList');
+    if(!items.length){ list.innerHTML='<div class="bellempty" style="padding:24px;text-align:center">No hay artistas disponibles para ese horario ahora mismo.</div>'; return; }
+    list.innerHTML=items.map(a=>{
+      const av=a.image_url?`style="background-image:url('${esc(a.image_url)}')"`:'';
+      const ini=esc((a.artist_name||'A').trim().charAt(0).toUpperCase());
+      return `<div class="acard2"><div class="ac2-av" ${av}>${a.image_url?'':ini}</div><div class="ac2-b"><b>${esc(a.artist_name||'Artista')}</b><span>${esc(a.show_name||'')}${a.subcategory?' · '+esc(pretty(a.subcategory)):''}${a.city?' · '+esc(a.city):''}</span><span class="ac2-p">${a.price!=null?MXN(a.price):'Precio a convenir'}</span></div><button class="mini ok" onclick="bookReplacement(${a.show_id},'${esc((a.artist_name||'').replace(/'/g,"\\'"))}')">Contratar</button></div>`;
+    }).join('');
+  }catch(e){ const list=document.getElementById('rplList'); if(list) list.innerHTML='<div class="bellempty" style="padding:24px;text-align:center">No se pudo cargar. '+esc(e.message||'')+'</div>'; }
+}
+async function bookReplacement(showId, name){
+  if(!_RPL) return;
+  if(!confirm('¿Contratar a '+name+' para cubrir esta actuación?')) return;
+  try{
+    await post('/bookings',{show_id:showId, venue_id:_RPL.venue_id, starts_at:_RPL.starts_at});
+    toast('Reemplazo agendado ✓ Recuerda pulsar "Guardar y notificar" para avisar al artista.');
+    const ov=document.getElementById('rplMov'); if(ov) ov.style.display='none';
+    loadNotifications();
+    if(CUR_SCREEN==='home'||CUR_SCREEN==='cal'){ const box=document.getElementById('panel-'+CUR_SCREEN); if(box){ box.dataset.loaded=''; show(CUR_SCREEN,true); } }
+  }catch(e){ toast('No se pudo agendar: '+(e.message||''),true); }
+}
+window.openReplacements=openReplacements; window.bookReplacement=bookReplacement;
 /* ---- Facturación hoteles (screen 6): agrupa actuaciones facturables por hotel+mes ---- */
 async function hotelBill(box){
   const bk=await api(`/bookings?group_id=${GID}`);

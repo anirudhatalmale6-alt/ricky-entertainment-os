@@ -45,6 +45,10 @@ _SQLITE_ADDED_COLUMNS = [
     ("companies", "bank_name", "VARCHAR(120)"),
     ("companies", "bank_clabe", "VARCHAR(20)"),
     ("companies", "preferred_currency", "VARCHAR(8) DEFAULT 'MXN'"),
+    ("companies", "logo_url", "VARCHAR(500)"),          # imagen/logo de la propiedad
+    # REVISION 4: cancelación por el músico + foto del venue en solicitudes
+    ("bookings", "cancelled_by", "VARCHAR(16)"),         # artist | hotel | admin
+    ("product_requests", "venue_photo_url", "VARCHAR(500)"),
 ]
 
 

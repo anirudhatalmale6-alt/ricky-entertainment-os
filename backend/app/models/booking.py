@@ -90,6 +90,7 @@ class Booking(Base, TimestampMixin):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancellation_reason: Mapped[str | None] = mapped_column(String(255))
+    cancelled_by: Mapped[str | None] = mapped_column(String(16))  # artist | hotel | admin
 
     notes: Mapped[str | None] = mapped_column(Text)
 

@@ -262,6 +262,44 @@ async def my_bookings(
     return [_decorate(b, venues.get(b.venue_id), shows.get(b.show_id), companies.get(b.company_id)) for b in bookings]
 
 
+@router.get("/alerts")
+async def hotel_alerts(scope: CurrentScope, db: DbSession):
+    """Avisos para el hotel: actuaciones que un músico canceló (y que siguen en el
+    futuro), para que el hotel busque reemplazo. Scoped a su empresa/cadena.
+    (Se registra antes de /{booking_id} para que la ruta no la capture.)"""
+    stmt = select(Booking).where(
+        Booking.status == BookingStatus.CANCELLED,
+        Booking.cancelled_by == "artist",
+        Booking.starts_at >= _now(),
+    ).order_by(Booking.cancelled_at.desc()).limit(50)
+    if not scope.is_admin:
+        if scope.group_id is not None:
+            sub = select(Company.id).where(Company.group_id == scope.group_id)
+            stmt = stmt.where(Booking.company_id.in_(sub))
+        elif scope.company_id is not None:
+            stmt = stmt.where(Booking.company_id == scope.company_id)
+        else:
+            return {"total": 0, "items": []}
+    rows = (await db.execute(stmt)).scalars().all()
+    aids = {b.artist_id for b in rows if b.artist_id}
+    vids = {b.venue_id for b in rows if b.venue_id}
+    sids = {b.show_id for b in rows if b.show_id}
+    artists = {a.id: a for a in (await db.execute(select(Artist).where(Artist.id.in_(aids)))).scalars()} if aids else {}
+    venues = {v.id: v for v in (await db.execute(select(Venue).where(Venue.id.in_(vids)))).scalars()} if vids else {}
+    shows = {s.id: s for s in (await db.execute(select(Show).where(Show.id.in_(sids)))).scalars()} if sids else {}
+    items = []
+    for b in rows:
+        a = artists.get(b.artist_id); v = venues.get(b.venue_id); s = shows.get(b.show_id)
+        items.append({
+            "booking_id": b.id, "artist_name": a.stage_name if a else None,
+            "show_name": s.show_name if s else None,
+            "venue_name": v.name if v else None, "venue_id": b.venue_id,
+            "starts_at": b.starts_at.isoformat() if b.starts_at else None,
+            "reason": b.cancellation_reason,
+        })
+    return {"total": len(items), "items": items}
+
+
 @router.get(
     "/{booking_id}",
     response_model=BookingOut,
@@ -325,12 +363,32 @@ async def confirm_booking(booking_id: int, db: DbSession):
     return _decorate(booking, venue, show)
 
 
+async def _notify_artist_cancel(db: DbSession, booking: Booking, reason: str | None):
+    """Aviso al músico de que el hotel canceló su actuación."""
+    if not booking.artist_id:
+        return
+    venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
+    show = await db.get(Show, booking.show_id) if booking.show_id else None
+    st = _naive(booking.starts_at) if booking.starts_at else None
+    when = st.strftime("%d/%m/%Y a las %H:%M") if st else "una fecha próxima"
+    vname = venue.name if venue else "el lugar"
+    sname = (show.show_name if show else None) or "tu actuación"
+    body = f"El hotel canceló {sname} en {vname} del {when}."
+    if reason:
+        body += f" Motivo: {reason}"
+    db.add(ArtistNotification(
+        artist_id=booking.artist_id, booking_id=booking.id,
+        kind="cancelled", title="Actuación cancelada por el hotel",
+        body=body, starts_at=booking.starts_at,
+    ))
+
+
 @router.post(
     "/{booking_id}/cancel",
     response_model=BookingOut,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def cancel_booking(booking_id: int, db: DbSession, reason: str | None = None):
+async def cancel_booking(booking_id: int, scope: CurrentScope, db: DbSession, reason: str | None = None):
     booking = await _get_or_404(db, booking_id)
     if booking.status in (BookingStatus.CANCELLED, BookingStatus.COMPLETED):
         raise HTTPException(status_code=409, detail="La actuacion ya esta finalizada o cancelada")
@@ -346,11 +404,79 @@ async def cancel_booking(booking_id: int, db: DbSession, reason: str | None = No
     booking.status = BookingStatus.CANCELLED
     booking.cancelled_at = _now()
     booking.cancellation_reason = reason
+    booking.cancelled_by = "admin" if scope.is_admin else "hotel"
+    await _notify_artist_cancel(db, booking, reason)   # avisar al músico
     await db.commit()
     await db.refresh(booking)
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
     show = await db.get(Show, booking.show_id) if booking.show_id else None
     return _decorate(booking, venue, show)
+
+
+@router.post("/{booking_id}/artist-cancel", response_model=BookingOut)
+async def artist_cancel_booking(
+    booking_id: int, scope: CurrentScope, db: DbSession, reason: str | None = None
+):
+    """El músico cancela su propia actuación (enfermedad, imprevisto, etc.).
+
+    Deja la actuación como cancelada por el artista para que el hotel lo vea en
+    sus avisos y pueda buscar un reemplazo de inmediato.
+    """
+    if scope.artist_id is None:
+        raise HTTPException(status_code=403, detail="Solo el artista puede cancelar su actuación.")
+    booking = await _get_or_404(db, booking_id)
+    if booking.artist_id != scope.artist_id:
+        raise HTTPException(status_code=403, detail="Esta actuación no es tuya.")
+    if booking.status in (BookingStatus.CANCELLED, BookingStatus.COMPLETED):
+        raise HTTPException(status_code=409, detail="La actuación ya está finalizada o cancelada.")
+    booking.status = BookingStatus.CANCELLED
+    booking.cancelled_at = _now()
+    booking.cancellation_reason = reason
+    booking.cancelled_by = "artist"
+    await db.commit()
+    await db.refresh(booking)
+    venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
+    show = await db.get(Show, booking.show_id) if booking.show_id else None
+    return _decorate(booking, venue, show)
+
+
+@router.get("/{booking_id}/replacements")
+async def booking_replacements(booking_id: int, scope: CurrentScope, db: DbSession):
+    """Artistas disponibles para cubrir una actuación (misma categoría, libres a esa
+    hora). Se usa para reemplazar de inmediato cuando un músico cancela."""
+    booking = await _get_or_404(db, booking_id)
+    orig_show = await db.get(Show, booking.show_id) if booking.show_id else None
+    category = orig_show.category if orig_show else None
+    slot = _naive(booking.starts_at)
+    # Artistas ocupados a esa hora (dentro del buffer de traslado) quedan fuera.
+    busy_rows = (await db.execute(
+        select(Booking.artist_id, Booking.starts_at).where(Booking.status.in_(_ACTIVE))
+    )).all()
+    busy = set()
+    for aid, st in busy_rows:
+        if aid and st is not None and abs((_naive(st) - slot).total_seconds()) < TRAVEL_BUFFER_HOURS * 3600:
+            busy.add(aid)
+    stmt = select(Show, Artist).join(Artist, Show.artist_id == Artist.id).where(
+        Show.is_active.is_(True), Artist.is_active.is_(True)
+    )
+    if category:
+        stmt = stmt.where(Show.category == category)
+    rows = (await db.execute(stmt)).all()
+    out = []
+    for sh, ar in rows:
+        if ar.id in busy or ar.id == booking.artist_id:
+            continue
+        out.append({
+            "show_id": sh.id, "show_name": sh.show_name, "artist_id": ar.id,
+            "artist_name": ar.stage_name, "image_url": ar.profile_image_url,
+            "category": sh.category, "subcategory": sh.subcategory,
+            "city": ar.base_city,
+            "price": float(sh.price_hotel) if sh.price_hotel is not None else (
+                float(sh.base_price) if sh.base_price is not None else None),
+        })
+    out.sort(key=lambda x: (x["price"] is None, x["price"] or 0))
+    return {"category": category, "starts_at": booking.starts_at.isoformat() if booking.starts_at else None,
+            "venue_id": booking.venue_id, "total": len(out), "items": out}
 
 
 @router.post("/{booking_id}/artist-respond", response_model=BookingOut)

@@ -57,6 +57,9 @@ class ProductRequest(Base, TimestampMixin):
     budget_max: Mapped[float | None] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(3), default="MXN")
 
+    # Foto del área/venue para que el talento visualice el espacio al cotizar (rev.4)
+    venue_photo_url: Mapped[str | None] = mapped_column(String(500))
+
     status: Mapped[RequestStatus] = mapped_column(
         SQLEnum(RequestStatus, values_callable=lambda e: [m.value for m in e]),
         default=RequestStatus.OPEN,
