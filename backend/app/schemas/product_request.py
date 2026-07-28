@@ -21,6 +21,7 @@ class ProductRequestBase(BaseModel):
     budget_min: float | None = None
     budget_max: float | None = None
     currency: str = "MXN"
+    venue_photo_url: str | None = None   # foto del área/venue para la cotización
 
     @model_validator(mode="after")
     def _check_budget(self):
@@ -47,6 +48,7 @@ class ProductRequestUpdate(BaseModel):
     budget_min: float | None = None
     budget_max: float | None = None
     currency: str | None = None
+    venue_photo_url: str | None = None
     status: RequestStatus | None = None
 
 
@@ -59,6 +61,7 @@ class ProductRequestOut(ProductRequestBase):
     created_at: datetime
     # filled by the endpoint
     company_name: str | None = None
+    company_logo: str | None = None
     proposals_count: int = 0
 
 

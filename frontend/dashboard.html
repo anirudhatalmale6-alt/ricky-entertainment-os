@@ -403,6 +403,16 @@
   .amod .af .fld input{border:1px solid var(--line);background:var(--inp);border-radius:9px;padding:8px 10px;font-size:13px;color:var(--txt);width:100px}
   .amod .af .ago{margin-left:auto;background:var(--grad);border:0;color:#fff;font-weight:650;font-size:13px;padding:10px 18px;border-radius:10px;cursor:pointer}
   .amod .af .ago:disabled{opacity:.45;cursor:not-allowed}
+  /* Subida de imágenes en la solicitud (logo propiedad + foto venue) */
+  .imgrow{display:flex;gap:10px}
+  .imgtile{flex:1;min-height:74px;border:1.5px dashed var(--line);border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:var(--mut);font-size:11.5px;text-align:center;padding:8px;position:relative;overflow:hidden;transition:.12s}
+  .imgtile:hover{border-color:var(--acc);color:var(--acc)}
+  .imgtile.has{border-style:solid;color:#fff}
+  .imgtile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .imgtile.has span{position:relative;z-index:1;background:rgba(12,16,30,.55);padding:2px 8px;border-radius:20px;font-weight:600}
+  /* Imagen en la tarjeta de solicitud */
+  .reqc-img{margin:-2px -2px 10px;height:104px;border-radius:11px;overflow:hidden;background:var(--inp)}
+  .reqc-img img{width:100%;height:100%;object-fit:cover;display:block}
   /* Form modals (crear solicitud / cargar presupuesto) + section headers */
   .amod.rqmod{max-width:540px}
   .amod .rqbody{padding:16px 18px 4px;overflow-y:auto}
@@ -2128,6 +2138,14 @@ async function openReqForm(){
         <div class="chipset" id="rq_size">${TAMANOS.map(s=>`<button type="button" class="spchip" data-v="${esc(s)}" onclick="pickSize(this)">${esc(s)}</button>`).join('')}</div>
       </div>
       <div class="field"><label>Descripción *</label><textarea id="rq_desc" placeholder="Detalles del evento, horario, requisitos…"></textarea></div>
+      <div class="field"><label>Imágenes <span class="muted" style="font-weight:400">(opcional · ayudan al artista a cotizar)</span></label>
+        <div class="imgrow">
+          <div class="imgtile" id="rq_logo_tile" onclick="pickReqImg('logo')"><span>🏨 Logo de la propiedad</span></div>
+          <div class="imgtile" id="rq_venue_tile" onclick="pickReqImg('venue')"><span>📸 Foto del venue / área</span></div>
+        </div>
+        <input type="file" id="rq_imgfile" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="onReqImgPicked(this)">
+        <input type="hidden" id="rq_venue_url">
+      </div>
     </div>
     <div class="af"><button class="ago" id="rq_go" onclick="submitReq(this)">Publicar solicitud</button></div>
   </div>`;
@@ -2135,6 +2153,24 @@ async function openReqForm(){
   fillSub('rq_cat','rq_sub','— Selecciona —');
 }
 function reqClose(){ const ov=document.getElementById('reqMov'); if(ov) ov.style.display='none'; }
+// Imágenes de la solicitud: logo de la propiedad (se guarda en el hotel) y foto del venue (por solicitud)
+let _reqImgKind=null;
+function pickReqImg(kind){
+  if(kind==='logo'){ const c=document.getElementById('rq_comp'); if(c && !c.value){ toast('Primero selecciona el hotel para guardar su logo.',true); return; } }
+  _reqImgKind=kind; const f=document.getElementById('rq_imgfile'); if(f){ f.value=''; f.click(); }
+}
+function _setImgTile(id,url,label){ const t=document.getElementById(id); if(t){ t.classList.add('has'); t.innerHTML=`<img src="${esc(url)}" alt=""><span>${esc(label)}</span>`; } }
+async function onReqImgPicked(inp){
+  const file=inp.files&&inp.files[0]; if(!file) return;
+  const kind=_reqImgKind;
+  const fd=new FormData(); fd.append('file',file);
+  try{
+    const r=await fetch(API+'/requests/upload-image',{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
+    if(!r.ok) throw new Error('No se pudo subir'); const d=await r.json();
+    if(kind==='venue'){ document.getElementById('rq_venue_url').value=d.url; _setImgTile('rq_venue_tile',d.url,'Foto lista ✓'); }
+    else { const c=document.getElementById('rq_comp'); await patch('/companies/'+c.value,{logo_url:d.url}); _setImgTile('rq_logo_tile',d.url,'Logo guardado ✓'); toast('Logo de la propiedad guardado ✓'); }
+  }catch(e){ toast('No se pudo subir la imagen: '+(e.message||''),true); }
+}
 async function submitReq(btn){
   const g=id=>document.getElementById(id);
   const focusEl=id=>{ const e=g(id); if(e){ try{ e.scrollIntoView({block:'center',behavior:'smooth'}); e.focus(); }catch(_){} } };
@@ -2181,6 +2217,7 @@ async function submitReq(btn){
     event_date:dt+'T'+hini+':00',
     budget_min:+bmin, budget_max:+bmax };
   if(comp&&comp.value) body.company_id=+comp.value;
+  const vurl=(g('rq_venue_url')||{}).value; if(vurl) body.venue_photo_url=vurl;
   btn.disabled=true; btn.textContent='Publicando…';
   try{ await post('/requests',body); reqClose(); toast('Solicitud publicada ✓'); show('reqs',true); }
   catch(e){ btn.disabled=false; btn.textContent='Publicar solicitud'; toast('No se pudo publicar: '+(e.message||''),true); }
@@ -3844,7 +3881,7 @@ const RENDER = {
         ${ME.artist_id?'':`<button class="btn" onclick="openReqForm()">＋ Crear solicitud</button>`}
       </div>
       <div class="reqs">${rs.map(r=>`
-      <div class="reqc" onclick="openReqDetail(${r.id})"><div class="t">${esc(r.title)}</div>
+      <div class="reqc" onclick="openReqDetail(${r.id})">${(r.venue_photo_url||r.company_logo)?`<div class="reqc-img"><img src="${esc(r.venue_photo_url||r.company_logo)}" alt="" loading="lazy"></div>`:''}<div class="t">${esc(r.title)}</div>
         <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
         <div class="meta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
         <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>

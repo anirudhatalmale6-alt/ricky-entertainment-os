@@ -11,11 +11,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import uuid
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentScope, DbSession, get_current_user, require_permission
 from app.api.v1.bookings import _check_travel_buffer, _now
+from app.core.config import settings
+from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
 from app.models.booking import Booking
 from app.models.company import Company
@@ -42,15 +46,19 @@ async def _get_request_or_404(db: DbSession, request_id: int) -> ProductRequest:
 async def _decorate(db: DbSession, req: ProductRequest) -> ProductRequestOut:
     out = ProductRequestOut.model_validate(req)
     company_name = None
+    company_logo = None
     if req.company_id:
         c = await db.get(Company, req.company_id)
-        company_name = c.name if c else None
+        if c:
+            company_name = c.name
+            company_logo = c.logo_url
     count = (
         await db.execute(
             select(func.count(RequestProposal.id)).where(RequestProposal.request_id == req.id)
         )
     ).scalar_one()
-    return out.model_copy(update={"company_name": company_name, "proposals_count": count})
+    return out.model_copy(update={
+        "company_name": company_name, "company_logo": company_logo, "proposals_count": count})
 
 
 # --- Solicitudes ----------------------------------------------------------
@@ -69,6 +77,27 @@ async def create_request(payload: ProductRequestCreate, db: DbSession):
     await db.commit()
     await db.refresh(req)
     return await _decorate(db, req)
+
+
+_UPLOAD_IMG_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+_UPLOAD_MAX = 6 * 1024 * 1024
+
+
+@router.post("/upload-image", dependencies=[Depends(require_permission("booking.manage"))])
+async def upload_request_image(file: UploadFile = File(...)):
+    """Sube una imagen (foto del venue o logo de la propiedad) y devuelve su URL.
+    La usa el hotel al crear una solicitud o al configurar la imagen de su propiedad."""
+    ext = _UPLOAD_IMG_TYPES.get((file.content_type or "").lower())
+    if ext is None:
+        raise HTTPException(status_code=415, detail="Formato no admitido. Usa JPG, PNG o WEBP.")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Archivo vacío.")
+    if len(data) > _UPLOAD_MAX:
+        raise HTTPException(status_code=413, detail="La imagen es muy grande (máximo 6 MB).")
+    name = f"req_{uuid.uuid4().hex}.{ext}"
+    (ensure_upload_dir() / name).write_bytes(data)
+    return {"url": f"{settings.ROOT_PATH}/uploads/{name}"}
 
 
 @router.get(
@@ -120,14 +149,18 @@ async def list_requests(
         counts = {rid: n for rid, n in rows}
     cids = {r.company_id for r in reqs if r.company_id}
     names: dict[int, str] = {}
+    logos: dict[int, str] = {}
     if cids:
-        rows = (await db.execute(select(Company.id, Company.name).where(Company.id.in_(cids)))).all()
-        names = {cid: name for cid, name in rows}
+        rows = (await db.execute(
+            select(Company.id, Company.name, Company.logo_url).where(Company.id.in_(cids)))).all()
+        names = {cid: name for cid, name, _ in rows}
+        logos = {cid: logo for cid, _, logo in rows}
 
     out = []
     for r in reqs:
         out.append(ProductRequestOut.model_validate(r).model_copy(update={
             "company_name": names.get(r.company_id),
+            "company_logo": logos.get(r.company_id),
             "proposals_count": counts.get(r.id, 0),
         }))
     return out
