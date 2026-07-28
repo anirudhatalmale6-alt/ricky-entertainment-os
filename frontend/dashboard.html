@@ -345,17 +345,22 @@
   .mbtn:hover{background:var(--inp)}
   .mbtn.today{color:var(--acc)}
   .maestro{overflow-x:auto;padding-bottom:4px}
-  .mgrid{display:grid;grid-template-columns:116px repeat(7,minmax(84px,1fr));gap:5px;min-width:0}
+  .mgrid{display:grid;grid-template-columns:150px repeat(7,minmax(86px,1fr));gap:5px;min-width:0}
   .mhd{font-size:10.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;text-align:center;padding:4px 0}
   .mhd.today{color:#fff;background:var(--grad);border-radius:7px}
   .mhd .dn{font-size:14px;font-weight:800;display:block;color:var(--txt)}
   .mhd.today .dn{color:#fff}
-  .vname{position:relative;display:flex;flex-direction:column;justify-content:center;padding:8px 22px 8px 13px;background:var(--vc-bg,var(--inp));border-radius:9px;border-left:4px solid var(--vc,transparent);font-size:12px;font-weight:700;line-height:1.25;color:var(--vc-hd,var(--txt))}
-  .vname span{font-size:10px;color:var(--mut);font-weight:400;margin-top:1px}
+  /* Venue rows are intentionally colourless (clean) — sólo el nombre + capacidad.
+     El color vive en las actuaciones, no en los venues (David rev.4). */
+  .vname{position:relative;display:flex;flex-direction:column;justify-content:center;padding:8px 22px 8px 10px;background:transparent;border-right:2px solid var(--line);font-size:12.5px;font-weight:750;line-height:1.25;color:var(--txt)}
+  .vname .vnh{display:flex;align-items:center;gap:6px}
+  .vname .vico{width:22px;height:22px;border-radius:7px;background:var(--inp);display:grid;place-items:center;font-size:12px;flex:none}
+  .vname .vnm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vname span{font-size:10px;color:var(--mut);font-weight:500;margin-top:2px;padding-left:28px}
   .vname .vx{position:absolute;top:6px;right:6px;width:17px;height:17px;border-radius:50%;border:0;background:rgba(24,28,52,.06);color:var(--mut);font-size:12px;line-height:1;cursor:pointer;display:none;place-items:center;padding:0}
   .vname:hover .vx{display:grid}
   .vname .vx:hover{background:var(--bad);color:#fff}
-  .mcell{position:relative;min-height:92px;border:1.5px dashed var(--line);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:6px;transition:.12s}
+  .mcell{position:relative;min-height:96px;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:6px;transition:.12s}
   .mcell.over{background:rgba(56,44,161,.09);border-color:var(--acc);border-style:solid}
   .mcell.past{background:repeating-linear-gradient(135deg,transparent,transparent 6px,rgba(24,28,52,.03) 6px,rgba(24,28,52,.03) 12px);border-style:solid;border-color:var(--line)}
   .mcell.past.empty{opacity:.6}
@@ -1534,10 +1539,10 @@ const isoLocal = d => { const p=n=>String(n).padStart(2,'0'); return d.getFullYe
 function maestroVenues(bk){
   const m=new Map();
   // Venues reales de la cadena -> así los lugares vacíos/nuevos también salen como fila.
-  (CACHE.venues||[]).forEach(v=>{ if(v&&v.id) m.set(v.id,{id:v.id,name:v.name}); });
+  (CACHE.venues||[]).forEach(v=>{ if(v&&v.id) m.set(v.id,{id:v.id,name:v.name,capacity:(v.capacity!=null?v.capacity:null)}); });
   // require a real venue name: a booking whose venue was deleted may keep a dangling
   // venue_id (no name) — those must not spawn a "Sin venue" row.
-  bk.forEach(b=>{ if(!b.venue_id||!b.venue_name) return; if(!m.has(b.venue_id)) m.set(b.venue_id,{id:b.venue_id,name:b.venue_name}); });
+  bk.forEach(b=>{ if(!b.venue_id||!b.venue_name) return; if(!m.has(b.venue_id)) m.set(b.venue_id,{id:b.venue_id,name:b.venue_name,capacity:(b.venue_capacity!=null?b.venue_capacity:null)}); });
   return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name));
 }
 // Per-venue colour identity (base tints from David's model palette + extra distinct
@@ -1554,10 +1559,14 @@ const CELLTHEME=[
   {bg:'#def1fb',bd:'#0ea5e9',hd:'#0a7cb0'}, // cielo
 ];
 const cellTheme = vi => CELLTHEME[(vi||0)%CELLTHEME.length];
+// Cada actuación se colorea por su show (no por el venue): así un mismo acto
+// mantiene su color a lo largo de la semana, como en el diseño de referencia.
+function _hashStr(s){ s=String(s||''); let h=0; for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; } return h; }
+const actTheme = b => CELLTHEME[ _hashStr((b.show_id!=null?('s'+b.show_id):(b.show_name||b.artist_name||'a'))) % CELLTHEME.length ];
 function maestroCard(b,vi){
   const st=new Date(b.starts_at); const hh=String(st.getHours()).padStart(2,'0')+':'+String(st.getMinutes()).padStart(2,'0');
   const fixed=['completed','cancelled'].includes(b.status);
-  const th=cellTheme(vi);
+  const th=actTheme(b);
   const who=b.artist_name&&b.artist_name!==b.show_name?b.artist_name:'';
   const nm=(b.show_name||b.artist_name||'Actuación').replace(/'/g,"\\'");
   const img=b.artist_image||'';
@@ -1581,8 +1590,8 @@ function renderMaestro(){
   days.forEach((d,i)=>{ const t=ymd(d)===todayStr; html+=`<div class="mhd${t?' today':''}">${DN[i]}<span class="dn">${d.getDate()}</span></div>`; });
   venues.forEach((v,vi)=>{
     const vc=bk.filter(b=>(b.venue_id||0)===(v.id||0)).length;
-    const th=cellTheme(vi);
-    html+=`<div class="vname" style="--vc:${th.bd};--vc-bg:${th.bg};--vc-hd:${th.hd}">${v.id?`<button class="vx" title="Eliminar venue" onclick="delVenue(${v.id},'${esc(v.name).replace(/'/g,"\\'")}',${vc})">✕</button>`:''}${esc(v.name)}<span>${vc} ${vc===1?'actuación':'actuaciones'}</span></div>`;
+    const capTxt=(v.capacity!=null&&v.capacity!=='')?('Cap. '+v.capacity):`${vc} ${vc===1?'actuación':'actuaciones'}`;
+    html+=`<div class="vname">${v.id?`<button class="vx" title="Eliminar venue" onclick="delVenue(${v.id},'${esc(v.name).replace(/'/g,"\\'")}',${vc})">✕</button>`:''}<div class="vnh"><span class="vico">📍</span><span class="vnm">${esc(v.name)}</span></div><span>${capTxt}</span></div>`;
     days.forEach(d=>{
       const ds=ymd(d);
       const past=ds<todayStr;   // no se agenda en fechas pasadas
@@ -3503,7 +3512,7 @@ const RENDER = {
     const wc={}; bk.forEach(b=>{const k=ymd(mondayOf(new Date(b.starts_at)));wc[k]=(wc[k]||0)+1;});
     let bestW=null,bestN=-1; for(const k in wc){ if(wc[k]>bestN){bestN=wc[k];bestW=k;} }
     // Lista real de venues de la cadena (para mostrar también los vacíos/nuevos en el Maestro).
-    CACHE.venues = (gb.comps||[]).flatMap(c=>(c.venues||[]).map(v=>({id:v.id,name:v.name,company_id:c.id,company_name:c.name})));
+    CACHE.venues = (gb.comps||[]).flatMap(c=>(c.venues||[]).map(v=>({id:v.id,name:v.name,capacity:(v.capacity!=null?v.capacity:null),company_id:c.id,company_name:c.name})));
     CACHE.homeBk = bk; CACHE.homeBudget = budget; if(!MAESTRO_REF) MAESTRO_REF = bestW? new Date(bestW+'T00:00:00') : new Date();
     box.innerHTML=`
       <div class="kpis">
