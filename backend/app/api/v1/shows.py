@@ -61,14 +61,19 @@ async def list_shows(
     artist_ids = {s.artist_id for s in shows if s.artist_id}
     names: dict[int, str] = {}
     avatars: dict[int, str | None] = {}
+    cities: dict[int, str | None] = {}
+    partners: dict[int, bool] = {}
     if artist_ids:
         rows = (await db.execute(
-            select(Artist.id, Artist.stage_name, Artist.profile_image_url)
+            select(Artist.id, Artist.stage_name, Artist.profile_image_url,
+                   Artist.base_city, Artist.is_partner)
             .where(Artist.id.in_(artist_ids))
         )).all()
-        for aid, nm, av in rows:
+        for aid, nm, av, city, partner in rows:
             names[aid] = nm
             avatars[aid] = av
+            cities[aid] = city
+            partners[aid] = bool(partner)
     for s in shows:
         imgs = list(s.images or [])
         show_img = None
@@ -77,6 +82,8 @@ async def list_shows(
             show_img = (profile or imgs[0]).url
         s.artist_name = names.get(s.artist_id)
         s.image_url = show_img or avatars.get(s.artist_id)
+        s.artist_city = cities.get(s.artist_id)
+        s.artist_partner = partners.get(s.artist_id, False)
     return shows
 
 

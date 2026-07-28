@@ -161,6 +161,8 @@ class ShowOut(ShowBase):
     # nombre del artista y una imagen (foto del show o, si no hay, foto de perfil).
     artist_name: str | None = None
     image_url: str | None = None
+    artist_city: str | None = None
+    artist_partner: bool = False
 
 
 class PriceBenchmarkOut(BaseModel):

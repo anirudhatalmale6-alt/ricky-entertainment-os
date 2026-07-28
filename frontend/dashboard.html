@@ -397,6 +397,28 @@
   .arow2 .az b{display:block;font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .arow2 .az span{font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
   .arow2 .ap{font-size:12.5px;font-weight:700;color:var(--acc);flex:none}
+  /* Picker de artistas al agendar (tarjetas ricas: foto, ubicación, idiomas, video, mensaje) */
+  .amod.actpick{max-width:640px}
+  .artgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:6px 14px 10px}
+  .acard3{display:flex;gap:10px;border:1.5px solid var(--line);border-radius:13px;padding:9px;cursor:pointer;transition:.12s;background:var(--card)}
+  .acard3:hover{border-color:var(--acc);box-shadow:0 6px 16px rgba(56,44,161,.12)}
+  .acard3.sel{border-color:var(--acc);background:#382ca10d;box-shadow:0 0 0 2px #382ca133 inset}
+  .acard3 .ac3-ph{width:74px;height:74px;border-radius:11px;flex:none;background-size:cover;background-position:center;display:grid;place-items:center;color:#fff;font-size:22px;position:relative;overflow:hidden}
+  .acard3 .ac3-disp{position:absolute;left:4px;bottom:4px;font-size:8.5px;font-weight:700;color:#fff;background:rgba(16,185,129,.92);padding:1px 5px;border-radius:10px}
+  .acard3 .ac3-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .acard3 .ac3-h{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+  .acard3 .ac3-h b{font-size:13px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acard3 .ac3-price{font-size:12px;font-weight:750;color:var(--acc);flex:none}
+  .acard3 .ac3-sub{font-size:11px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acard3 .ac3-meta{font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acard3 .ac3-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+  .acard3 .atag{font-size:9.5px;font-weight:650;padding:1px 6px;border-radius:20px;background:var(--ov);color:var(--mut)}
+  .acard3 .atag.part{background:#382ca114;color:var(--acc)}
+  .acard3 .atag.aud{background:#10b98118;color:#0c8a62}
+  .acard3 .atag.vid{background:#ef444418;color:#dc2626;cursor:pointer}
+  .acard3 .ac3-act{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:auto;padding-top:4px}
+  .acard3 .ac3-pick{font-size:11px;font-weight:700;color:var(--acc)}
+  @media(max-width:560px){ .artgrid{grid-template-columns:1fr} }
   .amod .af{border-top:1px solid var(--line);padding:13px 18px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
   .amod .af .fld{display:flex;flex-direction:column;gap:4px}
   .amod .af .fld label{font-size:10.5px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
@@ -1903,11 +1925,11 @@ async function openAddAct(venueId,dateStr){
     ov.addEventListener('click',e=>{ if(e.target===ov) actClose(); }); }
   const d=new Date(dateStr+'T00:00:00');
   const dl=d.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'});
-  ov.innerHTML=`<div class="amod" style="position:relative">
+  ov.innerHTML=`<div class="amod actpick" style="position:relative">
     <button class="ax" onclick="actClose()" aria-label="Cerrar">✕</button>
     <div class="ah"><b>Agregar actuación</b><span class="as">${esc(ADDACT.venueName)} · ${dl}</span></div>
     <div class="asrch"><span class="ai">🔎</span><input id="actQ" placeholder="Buscar artista, show o categoría…" oninput="actRender()" autocomplete="off"></div>
-    <div class="alist" id="actList"><div class="muted" style="padding:16px;text-align:center">Cargando artistas…</div></div>
+    <div class="alist artgrid" id="actList"><div class="muted" style="padding:16px;text-align:center">Cargando artistas…</div></div>
     <div class="af">
       <div class="fld"><label>Hora</label><input id="actTime" type="time" value="20:00"></div>
       <div class="fld"><label>Precio (MXN)</label><input id="actPrice" type="number" min="0" step="100" value="" oninput="ADDACT.price=+this.value||0"></div>
@@ -1926,14 +1948,26 @@ function actRender(){
   if(!items.length){ list.innerHTML='<div class="muted" style="padding:16px;text-align:center">Sin resultados.</div>'; return; }
   list.innerHTML=items.map(s=>{
     const col=CATCOL[s.category]||'#382ca1';
-    const av=s.image_url?`style="background-image:url('${s.image_url}')"`:`style="background:linear-gradient(135deg,${col},#8b5cf6)"`;
+    const ph=s.image_url?`style="background-image:url('${esc(s.image_url)}')"`:`style="background:linear-gradient(135deg,${col},#8b5cf6)"`;
     const cat=[pretty(s.category)].concat(s.subcategory?[pretty(s.subcategory)]:[]).filter(Boolean).join(' · ');
-    const who=s.artist_name&&s.artist_name!=='—'?esc(s.artist_name):'';
-    const meta=[who,esc(cat)].filter(Boolean).join(' · ')||'Show';
-    return `<div class="arow2${ADDACT.showId===s.id?' sel':''}" onclick="actPick(${s.id})">
-      <div class="aav" ${av}>${s.image_url?'':'🎭'}</div>
-      <div class="az"><b>${esc(s.show_name||'Show')}</b><span>${meta}</span></div>
-      ${s.price_hotel?`<span class="ap">${MXN(s.price_hotel)}</span>`:''}</div>`;
+    const who=s.artist_name&&s.artist_name!=='—'?esc(s.artist_name):esc(s.show_name||'Artista');
+    const langs=(s.show_languages||[]).slice(0,3).join(', ');
+    const tags=[];
+    if(s.artist_partner) tags.push('<span class="atag part">✓ Partner</span>');
+    if(s.offers_audition) tags.push('<span class="atag aud">🎤 Acepta audiciones</span>');
+    if(s.video_url) tags.push(`<span class="atag vid" onclick="event.stopPropagation();window.open('${esc(s.video_url)}','_blank')">▶ Video</span>`);
+    return `<div class="acard3${ADDACT.showId===s.id?' sel':''}" onclick="actPick(${s.id})">
+      <div class="ac3-ph" ${ph}>${s.image_url?'':'🎭'}<span class="ac3-disp">● Disponible</span></div>
+      <div class="ac3-b">
+        <div class="ac3-h"><b>${who}</b>${s.price_hotel?`<span class="ac3-price">${MXN(s.price_hotel)}</span>`:''}</div>
+        <div class="ac3-sub">${esc(s.show_name||'Show')} · ${esc(cat)||'—'}</div>
+        <div class="ac3-meta">${s.artist_city?`📍 ${esc(s.artist_city)}`:''}${(s.artist_city&&langs)?' · ':''}${langs?`🗣️ ${esc(langs)}`:''}</div>
+        ${tags.length?`<div class="ac3-tags">${tags.join('')}</div>`:''}
+        <div class="ac3-act">
+          <span class="ac3-pick">${ADDACT.showId===s.id?'✓ Seleccionado':'Seleccionar'}</span>
+          ${s.artist_id?`<button class="mini" onclick="event.stopPropagation();pickerMessage(${s.artist_id})">💬 Mensaje</button>`:''}
+        </div>
+      </div></div>`;
   }).join('');
 }
 function actPick(showId){
@@ -1943,6 +1977,19 @@ function actPick(showId){
   const go=document.getElementById('actGo'); if(go) go.disabled=false;
   actRender();
 }
+// "Mandar mensaje" desde la vista previa del artista al agendar
+async function pickerMessage(artistId){
+  if(!artistId){ toast('Artista no válido.',true); return; }
+  try{
+    const cid=await anyCompanyId();
+    if(!cid){ toast('No hay un hotel asociado para iniciar el chat.',true); return; }
+    const conv=await post('/conversations',{artist_id:artistId,company_id:cid});
+    actClose();
+    await show('chat',true);
+    if(conv&&conv.id) openConv(conv.id);
+  }catch(e){ toast('No se pudo abrir el chat: '+(e.message||''),true); }
+}
+window.pickerMessage=pickerMessage;
 async function actConfirm(){
   if(!ADDACT.showId){ toast('Elige un artista primero.',true); return; }
   const t=document.getElementById('actTime')?.value||'20:00';
