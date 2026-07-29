@@ -481,9 +481,12 @@
   .apsh-t{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
   .apsh-t b{font-size:14px;font-weight:700}
   .apsh-p{font-size:13.5px;font-weight:750;color:var(--acc);white-space:nowrap}
-  /* Un solo color de relleno por venue, plano y sin sombras (pedido de David). */
-  .mcard{position:relative;background:var(--mc-bg,var(--card));border:1px solid var(--mc-bd,var(--acc));border-left:4px solid var(--mc-bd,var(--acc));border-radius:8px;padding:7px 9px 8px 10px;font-size:11.5px;cursor:grab;user-select:none}
-  .mcard:hover{filter:brightness(.97)}
+  /* Un solo color de relleno por venue, plano y sin sombras (pedido de David).
+     OJO: hay otro .mcard más abajo (modales del panel Master, línea ~791) con la
+     misma especificidad que le inyectaba una sombra de 24px. Se scopea a .maestro
+     (mayor especificidad) y se fuerza box-shadow:none para que la tarjeta sea plana. */
+  .maestro .mcard{position:relative;background:var(--mc-bg,var(--card));border:1px solid var(--mc-bd,var(--acc));border-left:4px solid var(--mc-bd,var(--acc));border-radius:8px;padding:7px 9px 8px 10px;font-size:11.5px;cursor:grab;user-select:none;box-shadow:none;max-width:none;overflow:visible}
+  .maestro .mcard:hover{filter:brightness(.97)}
   .mcard.completed{opacity:.74} .mcard.cancelled{opacity:.5}
   .mcard.fixed{cursor:default}
   /* Formato de cuadro (David): 1) Hora  2) Estilo (DJ, Violín, Solista…)  3) Foto + Nombre. Sin precio. */

@@ -448,32 +448,20 @@ def _rate_out(r: ArtistClientRate, company_name=None, group_name=None) -> dict:
 
 @router.get("/artist/clients")
 async def my_clients(scope: CurrentScope, db: DbSession):
-    """Hoteles (y cadenas) con los que el artista ha trabajado — para elegir a
-    quién ponerle una tarifa especial."""
-    artist_id = await _require_artist(scope)
-    cids = (await db.execute(
-        select(Booking.company_id).where(
-            Booking.artist_id == artist_id, Booking.company_id.isnot(None)
-        ).distinct()
-    )).scalars().all()
-    companies = []
-    groups = {}
-    if cids:
-        rows = (await db.execute(
-            select(Company.id, Company.name, Company.group_id).where(Company.id.in_(cids))
-        )).all()
-        for cid, name, gid in rows:
-            companies.append({"id": cid, "name": name, "group_id": gid})
-            if gid is not None:
-                groups[gid] = None
-    if groups:
-        grows = (await db.execute(
-            select(PropertyGroup.id, PropertyGroup.name).where(PropertyGroup.id.in_(groups.keys()))
-        )).all()
-        groups = {gid: name for gid, name in grows}
+    """Todos los hoteles y cadenas de la plataforma (no solo con los que ya trabajó),
+    para que el músico pueda fijarle una tarifa especial a cualquiera. David: darle
+    la lista completa da más margen para negociar volumen; cada músico gestiona sus
+    propios descuentos."""
+    await _require_artist(scope)
+    crows = (await db.execute(
+        select(Company.id, Company.name, Company.group_id).order_by(Company.name)
+    )).all()
+    grows = (await db.execute(
+        select(PropertyGroup.id, PropertyGroup.name).order_by(PropertyGroup.name)
+    )).all()
     return {
-        "companies": companies,
-        "groups": [{"id": gid, "name": name} for gid, name in groups.items()],
+        "companies": [{"id": cid, "name": name, "group_id": gid} for cid, name, gid in crows],
+        "groups": [{"id": gid, "name": name} for gid, name in grows],
     }
 
 
