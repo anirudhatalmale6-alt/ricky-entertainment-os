@@ -634,6 +634,7 @@
   .acard .ab .rt{font-size:11.5px;color:#f59e0b;font-weight:700;white-space:nowrap}
   .acard .ab .ty{font-size:11.5px;color:var(--mut);margin-top:2px}
   .acard .ab .from{font-size:12.5px;font-weight:700;color:var(--acc);margin-top:6px}
+  .acard .ab .from .spbadge{display:inline-block;font-size:9.5px;font-weight:700;color:#b45309;background:#f59e0b1f;padding:1px 6px;border-radius:20px;vertical-align:middle;margin-left:2px}
   .acard .tgs{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
   .acard .tgs span{font-size:10.5px;background:var(--inp);color:var(--mut);padding:3px 8px;border-radius:6px}
   .acard .loc{font-size:11px;color:var(--mut);margin-top:9px;display:flex;gap:12px;flex-wrap:wrap}
@@ -996,7 +997,7 @@
     <div class="navlbl">Operación</div>
     <div class="nav on" data-p="home"><span class="ic">🏠</span> Dashboard</div>
     <div class="nav" data-p="master" style="display:none"><span class="ic">🖥️</span> Master</div>
-    <div class="nav" data-p="artists" style="display:none"><span class="ic">🎭</span> Artistas</div>
+    <div class="nav" data-p="artists" style="display:none"><span class="ic">🎭</span> Proveedores</div>
     <div class="nav" data-p="cal"><span class="ic">🗓️</span> Actuaciones</div>
     <div class="nav" data-p="reqs"><span class="ic">📣</span> Solicitudes</div>
     <div class="nav" data-p="leads" style="display:none"><span class="ic">📇</span> Prospectos <span class="badge" id="leadsBadge" style="display:none"></span></div>
@@ -1488,7 +1489,7 @@ async function reload(){
 
 const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Actuaciones","Agenda de shows por venue"],
   master:["Master","Panel de control interno · resumen general de operaciones"],
-  artists:["Buscar Artistas","Encuentra y contrata el talento ideal para tu hotel"],
+  artists:["Buscar Proveedores","Encuentra y contrata proveedores para tu hotel y eventos"],
   reqs:["Solicitudes","Tablero de pedidos abiertos"],chat:["Chat","Conversaciones hotel · artista"],
   leads:["Prospectos","Hoteles que solicitaron acceso"],
   budget:["Presupuesto","Planifica y controla el gasto de entretenimiento"],
@@ -2372,7 +2373,7 @@ function artistCard(i){
     <div class="ab">
       <div class="arow"><h4>${esc(i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
       <div class="ty">${esc(i.show)} · ${esc(pretty(i.cat))}</div>
-      ${i.price?`<div class="from">Desde ${MXN(i.price)}</div>`:''}
+      ${i.price?`<div class="from">${i.specialRate&&i.publicPrice&&i.publicPrice!=i.price?`Desde <s style="color:var(--mut);font-weight:400">${MXN(i.publicPrice)}</s> ${MXN(i.price)} <span class="spbadge">🏷️ Tarifa especial</span>`:`Desde ${MXN(i.price)}`}</div>`:''}
       <div class="tgs">${tags.map(g=>`<span>${esc(g)}</span>`).join('')}</div>
       <div class="loc"><span>📍 ${esc(i.city||'México')}</span>${i.langs&&i.langs.length?`<span>🗣 ${esc(i.langs.slice(0,2).join(', '))}</span>`:''}</div>
     </div></div>`;
@@ -2384,16 +2385,17 @@ function applyArtistFilters(){
   const maxEl=document.getElementById('af_max'); const max=maxEl?+maxEl.value:60000;
   let r=items.filter(i=>{
     if(AF.cat && i.cat!==AF.cat) return false;
+    if(AF.loc && (i.city||'')!==AF.loc) return false;
     if(max<60000 && i.price && i.price>max) return false;
     if(q){ const hay=(i.name+' '+i.show+' '+i.cat+' '+(i.sub||'')+' '+(i.genres||[]).join(' ')).toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
   });
   if(sort==='price') r.sort((a,b)=>(a.price||1e9)-(b.price||1e9));
-  const grid=document.getElementById('af_grid'); if(grid) grid.innerHTML=r.map(artistCard).join('')||'<div class="muted" style="grid-column:1/-1;padding:34px;text-align:center">No hay artistas que coincidan con tu búsqueda.</div>';
-  const cnt=document.getElementById('af_count'); if(cnt) cnt.textContent=r.length+(r.length===1?' artista encontrado':' artistas encontrados');
+  const grid=document.getElementById('af_grid'); if(grid) grid.innerHTML=r.map(artistCard).join('')||'<div class="muted" style="grid-column:1/-1;padding:34px;text-align:center">No hay proveedores que coincidan con tu búsqueda.</div>';
+  const cnt=document.getElementById('af_count'); if(cnt) cnt.textContent=r.length+(r.length===1?' proveedor encontrado':' proveedores encontrados');
   document.querySelectorAll('.catrow').forEach(el=>el.classList.toggle('on', (el.dataset.cat||'')===AF.cat));
 }
-function pickArtCat(c){ AF.cat=c; const s=document.getElementById('af_cat'); if(s) s.value=c; applyArtistFilters(); }
+function pickArtCat(c){ AF.cat=c; applyArtistFilters(); }
 
 /* ---- Perfil del artista (ventana emergente desde Buscar Artistas) ---- */
 const SOCNAME={instagram:'Instagram',facebook:'Facebook',youtube:'YouTube',tiktok:'TikTok',spotify:'Spotify',twitter:'X',x:'X',soundcloud:'SoundCloud'};
@@ -3777,18 +3779,22 @@ const RENDER = {
     (shows||[]).filter(s=>s.is_active!==false).forEach(s=>{
       const key=(s.artist_id||'')+'|'+s.show_name; if(seen.has(key))return; seen.add(key);
       const a=amap[s.artist_id]||{}; const img=(s.images&&s.images[0]&&s.images[0].url)||a.profileImg||null;
+      const pub=(s.price_hotel!=null?s.price_hotel:s.base_price);
+      const eff=(s.effective_price!=null?s.effective_price:pub);
       items.push({id:s.id,artistId:s.artist_id,name:a.name||s.show_name,show:s.show_name,cat:s.category,sub:s.subcategory,
-        price:s.price_hotel||s.base_price||null,rating:s.rating,img,city:a.city,partner:a.partner,langs:a.langs,
+        price:(eff!=null?eff:null),publicPrice:(pub!=null?pub:null),specialRate:!!s.has_special_rate,
+        rating:s.rating,img,city:(a.city||s.artist_city||null),partner:a.partner,langs:a.langs,
         isNew:s.created_at?(now-new Date(s.created_at).getTime())<7*864e5:false,genres:s.genres||[]});
     });
-    CACHE.artistItems=items; AF={cat:''};
+    CACHE.artistItems=items; AF={cat:'',loc:''};
+    const locs=[...new Set(items.map(i=>i.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     const catCount={}; items.forEach(i=>{catCount[i.cat]=(catCount[i.cat]||0)+1;});
     const cats=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
     box.innerHTML=`
       <div class="filters">
         <div class="filtrow">
           <div class="field" style="margin:0"><label>Buscar</label><input id="af_q" oninput="applyArtistFilters()" placeholder="Nombre, tipo de show, instrumento…"></div>
-          <div class="field" style="margin:0"><label>Categoría</label><select id="af_cat" onchange="AF.cat=this.value;applyArtistFilters()"><option value="">Todas las categorías</option>${cats.map(([c])=>`<option value="${esc(c)}">${esc(pretty(c))}</option>`).join('')}</select></div>
+          <div class="field" style="margin:0"><label>Locación</label><select id="af_loc" onchange="AF.loc=this.value;applyArtistFilters()"><option value="">Todas las locaciones</option>${locs.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div>
           <div class="field" style="margin:0"><label>Presupuesto máx.</label><input id="af_max" type="range" min="5000" max="60000" step="1000" value="60000" oninput="document.getElementById('af_maxv').textContent=(+this.value>=60000?'Sin límite':MXN(+this.value));applyArtistFilters()"><span id="af_maxv" class="hint" style="margin-top:4px">Sin límite</span></div>
           <div class="field" style="margin:0"><label>Ordenar por</label><select id="af_sort" onchange="applyArtistFilters()"><option value="best">Mejor coincidencia</option><option value="price">Menor precio</option></select></div>
         </div>
@@ -3804,7 +3810,7 @@ const RENDER = {
             ${cats.map(([c,n])=>`<div class="catrow" data-cat="${esc(c)}" onclick="pickArtCat('${esc(c)}')">${esc(pretty(c))}<span>${n}</span></div>`).join('')}
           </div>
           <div class="catbox"><h4>¿No encuentras lo que buscas?</h4>
-            <div class="hint" style="margin-bottom:11px">Cuéntanos qué necesitas en Solicitudes y los artistas te envían propuestas.</div>
+            <div class="hint" style="margin-bottom:11px">Cuéntanos qué necesitas en Solicitudes y los proveedores te envían propuestas.</div>
             <button class="btn ghost" style="width:100%" onclick="show('reqs')">Ir a Solicitudes →</button></div>
         </div>
       </div>`;
