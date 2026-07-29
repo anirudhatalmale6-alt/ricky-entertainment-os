@@ -400,7 +400,11 @@
   .arow2 .az span{font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
   .arow2 .ap{font-size:12.5px;font-weight:700;color:var(--acc);flex:none}
   /* Picker de artistas al agendar (tarjetas ricas: foto, ubicación, idiomas, video, mensaje) */
-  .amod.actpick{max-width:640px}
+  .amod.actpick{max-width:780px}
+  /* Fila de filtros: búsqueda + ubicación (con miras a operar a nivel nacional) */
+  .amod.actpick .afilters{display:flex;gap:8px;margin:14px 18px 8px;align-items:center;flex-wrap:wrap}
+  .amod.actpick .afilters .asrch{margin:0;flex:1;min-width:180px}
+  .afsel{border:1px solid var(--line);background:var(--inp);border-radius:10px;padding:9px 11px;font-size:12.5px;color:var(--txt);cursor:pointer;max-width:230px;flex:none}
   .artgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:6px 14px 10px}
   .acard3{display:flex;gap:10px;border:1.5px solid var(--line);border-radius:13px;padding:9px;cursor:pointer;transition:.12s;background:var(--card)}
   .acard3:hover{border-color:var(--acc);box-shadow:0 6px 16px rgba(56,44,161,.12)}
@@ -1937,7 +1941,10 @@ async function openAddAct(venueId,dateStr){
   ov.innerHTML=`<div class="amod actpick" style="position:relative">
     <button class="ax" onclick="actClose()" aria-label="Cerrar">✕</button>
     <div class="ah"><b>Agregar actuación</b><span class="as">${esc(ADDACT.venueName)} · ${dl}</span></div>
-    <div class="asrch"><span class="ai">🔎</span><input id="actQ" placeholder="Buscar artista, show o categoría…" oninput="actRender()" autocomplete="off"></div>
+    <div class="afilters">
+      <div class="asrch"><span class="ai">🔎</span><input id="actQ" placeholder="Buscar artista, show o categoría…" oninput="actRender()" autocomplete="off"></div>
+      <select id="actLoc" class="afsel" onchange="actRender()"><option value="">📍 Todas las ubicaciones</option></select>
+    </div>
     <div class="alist artgrid" id="actList"><div class="muted" style="padding:16px;text-align:center">Cargando artistas…</div></div>
     <div class="af">
       <div class="fld"><label>Hora</label><input id="actTime" type="time" value="20:00"></div>
@@ -1945,14 +1952,23 @@ async function openAddAct(venueId,dateStr){
       <button class="ago" id="actGo" onclick="actConfirm()" disabled>Agregar</button>
     </div></div>`;
   ov.style.display='flex';
-  await ensureShows(); actRender();
+  await ensureShows();
+  // Poblar el filtro de ubicación con las ciudades de los artistas disponibles.
+  const locSel=document.getElementById('actLoc');
+  if(locSel){
+    const cities=[...new Set((CACHE.shows||[]).map(s=>s.artist_city).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    locSel.innerHTML='<option value="">📍 Todas las ubicaciones</option>'+cities.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  }
+  actRender();
 }
 function actClose(){ const ov=document.getElementById('actMov'); if(ov) ov.style.display='none'; }
 function actRender(){
   const list=document.getElementById('actList'); if(!list) return;
   const q=(document.getElementById('actQ')?.value||'').trim().toLowerCase();
+  const loc=(document.getElementById('actLoc')?.value||'');
   let items=CACHE.shows||[];
   if(q) items=items.filter(s=>((s.show_name||'')+' '+(s.artist_name||'')+' '+pretty(s.category||'')+' '+pretty(s.subcategory||'')).toLowerCase().includes(q));
+  if(loc) items=items.filter(s=>(s.artist_city||'')===loc);
   items=items.slice(0,60);
   if(!items.length){ list.innerHTML='<div class="muted" style="padding:16px;text-align:center">Sin resultados.</div>'; return; }
   list.innerHTML=items.map(s=>{
