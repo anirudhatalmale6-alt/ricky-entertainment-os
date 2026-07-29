@@ -1071,19 +1071,31 @@ const PRETTY={"Musica":"Música","Produccion":"Producción","Fotografia y Video"
   "Musica en vivo":"Música en vivo","Fotografia":"Fotografía","Iluminacion":"Iluminación"};
 const pretty = s => PRETTY[s]||s||"";
 
+// Saca el motivo real que manda el backend (detail) para que el usuario vea
+// "Ya existe una cuenta con ese correo" en vez de un "…/convert 409" críptico.
+async function _errMsg(r,path){
+  try{ const d=await r.clone().json(); const dt=d&&d.detail;
+    if(typeof dt==='string'&&dt) return dt;
+    if(Array.isArray(dt)&&dt[0]&&dt[0].msg) return dt[0].msg;
+  }catch(e){}
+  return path+" "+r.status;
+}
 async function api(path){
   const r = await fetch(API+path,{headers:{Authorization:"Bearer "+TOKEN}});
-  if(!r.ok) throw new Error(path+" "+r.status);
+  if(!r.ok) throw new Error(await _errMsg(r,path));
   return r.json();
 }
 async function post(path,body){
   const r = await fetch(API+path,{method:"POST",headers:{Authorization:"Bearer "+TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body||{})});
-  if(!r.ok) throw new Error(path+" "+r.status); return r.json();
+  if(!r.ok) throw new Error(await _errMsg(r,path)); return r.json();
 }
 async function put(path,body){
   const r = await fetch(API+path,{method:"PUT",headers:{Authorization:"Bearer "+TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body||{})});
-  if(!r.ok) throw new Error(path+" "+r.status); return r.json();
+  if(!r.ok) throw new Error(await _errMsg(r,path)); return r.json();
 }
+// Estados de la República para los desplegables de ubicación.
+const MX_ESTADOS=["Aguascalientes","Baja California","Baja California Sur","Campeche","Chiapas","Chihuahua","Ciudad de México","Coahuila","Colima","Durango","Estado de México","Guanajuato","Guerrero","Hidalgo","Jalisco","Michoacán","Morelos","Nayarit","Nuevo León","Oaxaca","Puebla","Querétaro","Quintana Roo","San Luis Potosí","Sinaloa","Sonora","Tabasco","Tamaulipas","Tlaxcala","Veracruz","Yucatán","Zacatecas"];
+const mxEstadoOpts=(sel)=>`<option value="">—</option>`+MX_ESTADOS.map(e=>`<option value="${esc(e)}"${sel&&sel===e?' selected':''}>${esc(e)}</option>`).join('');
 
 const val = id => (document.getElementById(id).value||"").trim();
 function authTab(t){
@@ -3002,7 +3014,7 @@ function mProspectoFicha(id){
         <div>${lb('Constancia de situación fiscal (PDF)')}<input type="file" id="pr_const_file" accept="application/pdf,image/*" onchange="mProsUploadConstancia(this)" style="${inS};height:auto;padding:6px 9px"><div id="pr_const_st" class="sub" style="font-size:11px;color:var(--mut);margin-top:3px"></div></div>
         ${fld('pr_addr','Dirección fiscal','','Calle, número, colonia')}
         ${fld('pr_city','Ciudad','','Cancún')}
-        ${fld('pr_region','Estado','','Quintana Roo')}
+        <div>${lb('Estado')}<select id="pr_region" style="${inS}">${mxEstadoOpts('')}</select></div>
         ${fld('pr_country','País','México','México')}
         ${fld('pr_web','Sitio web','','https://')}
         ${fld('pr_person','Nombre completo',l.full_name,'Nombre del responsable')}
@@ -3012,7 +3024,7 @@ function mProspectoFicha(id){
         ${fld('pr_email','Correo electrónico',l.email,'correo@hotel.com')}
         ${sec('Información hotelera / comercial')}
         <div>${lb('Categoría (estrellas)')}<select id="pr_stars" style="${inS}"><option value="">—</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} estrella${n>1?'s':''}</option>`).join('')}</select></div>
-        ${fld('pr_rooms','Cantidad de habitaciones','','120','number')}
+        ${fld('pr_rooms','Número de habitaciones / asientos','','120','number')}
         ${fld('pr_adr','Tarifa promedio (MXN)','','2500','number')}
         <div>${lb('Tipo de propiedad')}<select id="pr_type" style="${inS}">
           <option value="hotel">Hotel</option><option value="resort">Resort</option>
