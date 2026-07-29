@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import CurrentScope, CurrentUser, DbSession, require_permission
 from app.models.artist import Artist
 from app.models.artist_client_rate import ArtistClientRate
+from app.models.company import Company
 from app.models.media import ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
@@ -77,13 +78,22 @@ async def list_shows(
             partners[aid] = bool(partner)
     # Tarifas especiales: si el hotel/cadena que consulta tiene una tarifa pactada
     # con el artista, el precio efectivo la refleja (sin tocar el precio público).
+    scope_company_id = scope.company_id
+    scope_group_id = scope.group_id
+    # Si consulta un hotel (nivel empresa) pero la tarifa se pactó con la CADENA,
+    # igual debe aplicarle: resolvemos el grupo de su empresa para incluir las
+    # tarifas de cadena, no solo las específicas del hotel.
+    if scope_company_id is not None and scope_group_id is None:
+        scope_group_id = (await db.execute(
+            select(Company.group_id).where(Company.id == scope_company_id)
+        )).scalar_one_or_none()
     rate_by_artist: dict[int, ArtistClientRate] = {}
-    if artist_ids and (scope.company_id is not None or scope.group_id is not None):
+    if artist_ids and (scope_company_id is not None or scope_group_id is not None):
         conds = []
-        if scope.company_id is not None:
-            conds.append(ArtistClientRate.company_id == scope.company_id)
-        if scope.group_id is not None:
-            conds.append(ArtistClientRate.group_id == scope.group_id)
+        if scope_company_id is not None:
+            conds.append(ArtistClientRate.company_id == scope_company_id)
+        if scope_group_id is not None:
+            conds.append(ArtistClientRate.group_id == scope_group_id)
         rrows = (await db.execute(
             select(ArtistClientRate).where(
                 ArtistClientRate.artist_id.in_(artist_ids), or_(*conds))
