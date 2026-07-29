@@ -70,6 +70,8 @@ def _decorate(
         "venue_capacity": venue.capacity if venue else None,
         "venue_name": venue.name if venue else None,
         "show_name": show.show_name if show else None,
+        "show_category": show.category if show else None,
+        "show_subcategory": show.subcategory if show else None,
         "company_name": company.name if company else None,
         "artist_name": artist.stage_name if artist else None,
         "artist_image": artist.profile_image_url if artist else None,

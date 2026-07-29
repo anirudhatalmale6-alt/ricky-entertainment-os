@@ -341,22 +341,24 @@
   /* Calendario Maestro (executive hotel dashboard) */
   .mtoolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
   .mnav{display:inline-flex;align-items:center;gap:2px}
-  .mbtn{border:1px solid var(--line);background:var(--card);border-radius:8px;height:30px;min-width:30px;padding:0 10px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--txt);display:inline-flex;align-items:center;justify-content:center}
-  .mbtn:hover{background:var(--inp)}
-  .mbtn.today{color:var(--acc)}
+  /* Controles del calendario: siempre blancos/claros (scoped a .mtoolbar para no
+     heredar el .mbtn violeta de los modales, que se define más abajo). */
+  .mtoolbar .mbtn{border:1px solid var(--line);background:var(--card);border-radius:8px;height:30px;min-width:30px;padding:0 10px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--txt);display:inline-flex;align-items:center;justify-content:center}
+  .mtoolbar .mbtn:hover{background:var(--inp)}
+  .mtoolbar .mbtn.today{color:var(--acc)}
   .maestro{overflow-x:auto;padding-bottom:4px}
-  .mgrid{display:grid;grid-template-columns:150px repeat(7,minmax(86px,1fr));gap:5px;min-width:0}
+  .mgrid{display:grid;grid-template-columns:118px repeat(7,minmax(88px,1fr));gap:5px;min-width:0}
   .mhd{font-size:10.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;text-align:center;padding:4px 0}
   .mhd.today{color:#fff;background:var(--grad);border-radius:7px}
   .mhd .dn{font-size:14px;font-weight:800;display:block;color:var(--txt)}
   .mhd.today .dn{color:#fff}
   /* Venue rows are intentionally colourless (clean) — sólo el nombre + capacidad.
      El color vive en las actuaciones, no en los venues (David rev.4). */
-  .vname{position:relative;display:flex;flex-direction:column;justify-content:center;padding:8px 22px 8px 10px;background:transparent;border-right:2px solid var(--line);font-size:12.5px;font-weight:750;line-height:1.25;color:var(--txt)}
-  .vname .vnh{display:flex;align-items:center;gap:6px}
-  .vname .vico{width:22px;height:22px;border-radius:7px;background:var(--inp);display:grid;place-items:center;font-size:12px;flex:none}
+  .vname{position:relative;display:flex;flex-direction:column;justify-content:center;padding:8px 16px 8px 7px;background:transparent;border-right:2px solid var(--line);font-size:12px;font-weight:750;line-height:1.2;color:var(--txt)}
+  .vname .vnh{display:flex;align-items:center;gap:5px}
+  .vname .vico{width:18px;height:18px;border-radius:6px;background:var(--inp);display:grid;place-items:center;font-size:10px;flex:none}
   .vname .vnm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .vname span{font-size:10px;color:var(--mut);font-weight:500;margin-top:2px;padding-left:28px}
+  .vname span{font-size:9.5px;color:var(--mut);font-weight:500;margin-top:2px;padding-left:23px}
   .vname .vx{position:absolute;top:6px;right:6px;width:17px;height:17px;border-radius:50%;border:0;background:rgba(24,28,52,.06);color:var(--mut);font-size:12px;line-height:1;cursor:pointer;display:none;place-items:center;padding:0}
   .vname:hover .vx{display:grid}
   .vname .vx:hover{background:var(--bad);color:#fff}
@@ -479,15 +481,16 @@
   .mcard:hover{box-shadow:0 6px 16px rgba(56,44,161,.18)}
   .mcard.completed{opacity:.74} .mcard.cancelled{opacity:.5}
   .mcard.fixed{cursor:default}
-  .mcard .mch2{display:flex;align-items:center;gap:6px}
-  .mcard .mav{width:22px;height:22px;border-radius:50%;flex:none;background-size:cover;background-position:center;box-shadow:0 1px 2px rgba(24,28,52,.2)}
-  .mcard .mav.ini{display:grid;place-items:center;color:#fff;font-size:10px;font-weight:800}
+  /* Formato de cuadro (David): 1) Hora  2) Estilo (DJ, Violín, Solista…)  3) Foto + Nombre. Sin precio. */
+  .mcard .mtime{font-weight:800;font-size:11.5px;color:var(--txt);letter-spacing:.2px;padding-right:12px}
+  .mcard .mstyle{font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;padding-right:2px}
+  .mcard .mch2{display:flex;align-items:center;gap:6px;margin-top:3px}
+  .mcard .mnm{flex:1;min-width:0;font-size:10px;color:var(--mut);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mcard .mav{width:18px;height:18px;border-radius:50%;flex:none;background-size:cover;background-position:center;box-shadow:0 1px 2px rgba(24,28,52,.2)}
+  .mcard .mav.ini{display:grid;place-items:center;color:#fff;font-size:9px;font-weight:800}
   .mcard .mdot{position:absolute;top:7px;right:7px;width:8px;height:8px;border-radius:50%;background:var(--ok)}
   .mcard.pending .mdot{background:var(--warn)} .mcard.confirmed .mdot{background:var(--ok)}
   .mcard.completed .mdot{background:var(--info)} .mcard.cancelled .mdot{background:var(--bad)}
-  .mcard b{display:block;flex:1;min-width:0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:11px}
-  .mcard .mt{color:var(--mut);font-size:10px;display:flex;justify-content:space-between;gap:6px}
-  .mcard .mwho{color:var(--mut);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
   .mcard.dragging{opacity:.35}
   /* "X" to remove a booking (musician) from the board — like the venue X */
   .mcard .mx{position:absolute;top:4px;right:5px;width:15px;height:15px;border-radius:50%;border:0;background:rgba(24,28,52,.10);color:var(--mut);font-size:10px;line-height:1;cursor:pointer;display:none;place-items:center;padding:0;z-index:2}
@@ -1612,18 +1615,20 @@ function maestroCard(b,vi){
   const st=new Date(b.starts_at); const hh=String(st.getHours()).padStart(2,'0')+':'+String(st.getMinutes()).padStart(2,'0');
   const fixed=['completed','cancelled'].includes(b.status);
   const th=actTheme(b);
-  const who=b.artist_name&&b.artist_name!==b.show_name?b.artist_name:'';
+  // Formato pedido por David: Hora / Estilo (subcategoría o categoría) / Foto + Nombre. Sin precio.
+  const estilo=b.show_subcategory||b.show_category||b.show_name||'Actuación';
+  const nombre=b.artist_name||b.show_name||'Artista';
   const nm=(b.show_name||b.artist_name||'Actuación').replace(/'/g,"\\'");
   const img=b.artist_image||'';
-  const ini=(who||b.show_name||'A').trim().charAt(0).toUpperCase();
+  const ini=(nombre||'A').trim().charAt(0).toUpperCase();
   const av=img?`<span class="mav" style="background-image:url('${esc(img)}')"></span>`:`<span class="mav ini" style="background:${th.bd}">${esc(ini)}</span>`;
   return `<div class="mcard ${b.status}${fixed?' fixed':''}" ${fixed?'':'draggable="true"'} data-bid="${b.id}" data-vid="${b.venue_id||''}" style="--mc-bg:${th.bg};--mc-bd:${th.bd}">
     <span class="mdot"></span>
     ${fixed?'':`<button class="med" title="Cambiar fecha y hora" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();openEditAct(${b.id})">✎</button>`}
     <button class="mx" title="Quitar del calendario" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();delBooking(${b.id},'${nm}')">✕</button>
-    <div class="mch2">${av}<b>${esc(b.show_name||b.artist_name||'Actuación')}</b></div>
-    <div class="mt"><span>${hh}</span><span>${b.agreed_price?MXN(b.agreed_price):''}</span></div>
-    ${who?`<div class="mwho">${esc(who)}</div>`:''}</div>`;
+    <div class="mtime">${hh}</div>
+    <div class="mstyle">${esc(estilo)}</div>
+    <div class="mch2">${av}<span class="mnm">${esc(nombre)}</span></div></div>`;
 }
 function renderMaestro(){
   const grid=document.getElementById('maestroGrid'); if(!grid) return;

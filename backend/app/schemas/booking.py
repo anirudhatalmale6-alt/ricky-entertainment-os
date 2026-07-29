@@ -88,6 +88,8 @@ class BookingOut(BaseModel):
     venue_capacity: int | None = None
     venue_name: str | None = None
     show_name: str | None = None
+    show_category: str | None = None
+    show_subcategory: str | None = None
     company_name: str | None = None
     artist_name: str | None = None
     artist_image: str | None = None
