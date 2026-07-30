@@ -14,6 +14,7 @@ from app.core import security
 from app.models.booker import Booker
 from app.models.company import Company
 from app.models.hotel_lead import HotelLead
+from app.models.property_group import PropertyGroup
 from app.models.user import Role, User
 from app.schemas.hotel_lead import (
     HotelLeadConvertIn,
@@ -113,9 +114,26 @@ async def convert_hotel_lead(
     if await _email_taken(db, lead.email):
         raise HTTPException(status.HTTP_409_CONFLICT, "Ya existe una cuenta con ese correo.")
 
+    name = payload.company_name or lead.company_name
+    # Cada hotel/empresa que se da de alta es su propio "grupo" (aunque sea de una
+    # sola propiedad): así el usuario entra como DIRECTOR y ve el menú completo
+    # (Dashboard, Presupuesto, Facturación, Reportes) igual que la cuenta demo, y
+    # las tarifas pactadas a nivel cadena le aplican. Sin grupo, el menú salía
+    # "recortado" y el Dashboard quedaba vacío.
+    group = PropertyGroup(
+        name=name,
+        legal_name=payload.legal_name,
+        tax_id=payload.tax_id,
+        contact_email=(payload.contact_email or lead.email),
+        contact_phone=(payload.contact_phone or lead.phone),
+    )
+    db.add(group)
+    await db.flush()
+
     # Empresa (Company) con toda la ficha de alta que llenó el admin en MASTER.
     company = Company(
-        name=(payload.company_name or lead.company_name),
+        name=name,
+        group_id=group.id,
         legal_name=payload.legal_name,
         tax_id=payload.tax_id,
         fiscal_constancia_url=payload.fiscal_constancia_url,
@@ -154,6 +172,7 @@ async def convert_hotel_lead(
     booker = Booker(
         user_id=user.id,
         company_id=company.id,
+        group_id=group.id,
         position=(payload.position or lead.position),
         phone=(payload.contact_phone or lead.phone),
     )
