@@ -192,6 +192,7 @@ async def group_dashboard(group_id: int, db: DbSession):
         total_spend += float(spend)
         props.append(PropertySummary(
             id=c.id, name=c.name, company_type=c.company_type, city=c.city,
+            rooms=c.rooms,
             risk_tier=c.risk_tier, venues_count=n, total_capacity=int(cap),
             bookings_count=bn, total_spend=float(spend),
         ))

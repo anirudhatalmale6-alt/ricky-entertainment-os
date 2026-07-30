@@ -12,6 +12,7 @@ from app.core.security import decode_token
 from app.db.session import get_db
 from app.models.artist import Artist
 from app.models.booker import Booker
+from app.models.company import Company
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
@@ -56,6 +57,33 @@ def require_permission(code: str):
         return user
 
     return _guard
+
+
+async def ensure_company_access(user: User, company_id: int, db: AsyncSession) -> None:
+    """Guard access to one property's own resources (venues, budget).
+
+    Admins (``company.manage``) pass for any property. A hotel account passes
+    only for its OWN property: either the single property it manages, or any
+    property inside the chain it directs. Anyone else gets 403. This lets a
+    hotel/chain director self-manage its venues without exposing other clients'
+    properties or the fiscal CRUD (which stays admin-only).
+    """
+    if user.has_permission("company.manage"):
+        return
+    booker = (
+        await db.execute(select(Booker).where(Booker.user_id == user.id))
+    ).scalar_one_or_none()
+    if booker is not None:
+        if booker.company_id is not None and booker.company_id == company_id:
+            return
+        if booker.group_id is not None:
+            company = await db.get(Company, company_id)
+            if company is not None and company.group_id == booker.group_id:
+                return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="No tienes acceso a esta propiedad.",
+    )
 
 
 async def require_intelligence_access(user: CurrentUser, db: DbSession) -> User:

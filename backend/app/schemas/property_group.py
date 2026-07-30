@@ -35,6 +35,7 @@ class PropertySummary(BaseModel):
     name: str
     company_type: str
     city: str | None = None
+    rooms: int | None = None
     risk_tier: RiskTier
     venues_count: int = 0
     total_capacity: int = 0

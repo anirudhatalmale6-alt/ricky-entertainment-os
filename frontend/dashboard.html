@@ -1883,10 +1883,22 @@ async function delVenue(id,name,count){
   }catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
 }
 
+/* Propiedades del usuario. Un director (rol hotel) no puede pedir /companies
+   (es admin-only); sus propiedades salen del dashboard de su cadena. El admin
+   sí lista /companies. Así una cuenta de hotel ve su(s) propiedad(es) para
+   poder gestionar venues y presupuesto. */
+async function myProperties(){
+  if(CACHE.myProps && CACHE.myProps.length) return CACHE.myProps;
+  let comps=[];
+  try{ if(GID){ const d=await api(`/groups/${GID}/dashboard`);
+    comps=(d.properties||[]).map(p=>({id:p.id,name:p.name,city:p.city,rooms:p.rooms,company_type:p.company_type})); } }catch(e){}
+  if(!comps.length){ try{ comps=(await api('/companies')||[]).filter(c=>!GID||c.group_id===GID); }catch(e){ comps=[]; } }
+  CACHE.myProps=comps; return comps;
+}
+
 /* ---- "+ Añadir lugar": registrar un nuevo venue en una propiedad ---- */
 async function openAddVenue(){
-  let comps=CACHE.budgetComps;
-  if(!comps||!comps.length){ try{ comps=(await api('/companies')||[]).filter(c=>!GID||c.group_id===GID); CACHE.budgetComps=comps; }catch(e){ comps=[]; } }
+  let comps=await myProperties();
   if(!comps.length){ toast('Primero registra una propiedad en tu cadena.',true); return; }
   let ov=document.getElementById('venMov');
   if(!ov){ ov=document.createElement('div'); ov.id='venMov'; ov.className='mov'; document.body.appendChild(ov);
@@ -1895,7 +1907,9 @@ async function openAddVenue(){
     <button class="ax" onclick="venClose()" aria-label="Cerrar">✕</button>
     <div class="ah"><b>Añadir lugar</b><span class="as">Registra un nuevo venue en tu propiedad</span></div>
     <div class="rqbody">
-      <div class="field"><label>Propiedad *</label><select id="vn_comp">${comps.map(c=>`<option value="${c.id}">${esc(c.name)}${c.city?' · '+esc(c.city):''}</option>`).join('')}</select></div>
+      ${comps.length===1
+        ? `<div class="field"><label>Propiedad</label><select id="vn_comp" disabled>${comps.map(c=>`<option value="${c.id}">${esc(c.name)}${c.city?' · '+esc(c.city):''}</option>`).join('')}</select></div>`
+        : `<div class="field"><label>Propiedad *</label><select id="vn_comp">${comps.map(c=>`<option value="${c.id}">${esc(c.name)}${c.city?' · '+esc(c.city):''}</option>`).join('')}</select></div>`}
       <div class="field"><label>Nombre del lugar *</label><input id="vn_name" placeholder="p. ej. Terraza, Lobby Bar, Salón Principal"></div>
       <div class="fgrid">
         <div class="field"><label>Aforo</label><input id="vn_cap" type="number" min="0" step="10" placeholder="Personas"></div>
@@ -2320,9 +2334,12 @@ const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','
 // -> ese es el presupuesto total contra el que se compara el gasto. Antes solo se contaba el
 // mes en curso, por eso "no sumaba" al cargar otros meses.
 async function loadGroupBudgets(){
-  let comps=[]; try{ comps=(await api('/companies')||[]).filter(c=>!GID||c.group_id===GID); }catch(e){}
+  const comps=(await myProperties()).map(c=>({...c}));
   const rows=[];
-  for(const c of comps){ try{ const bs=await api(`/companies/${c.id}/budgets`); (bs||[]).forEach(b=>rows.push({...b,company_name:c.name,city:c.city,rooms:c.rooms})); }catch(e){} }
+  for(const c of comps){
+    try{ const bs=await api(`/companies/${c.id}/budgets`); (bs||[]).forEach(b=>rows.push({...b,company_name:c.name,city:c.city,rooms:c.rooms})); }catch(e){}
+    try{ c.venues=await api(`/companies/${c.id}/venues`)||[]; }catch(e){ c.venues=c.venues||[]; }
+  }
   rows.sort((a,b)=> (b.year-a.year)||(b.month-a.month)||(a.company_name||'').localeCompare(b.company_name||''));
   const total=rows.reduce((a,b)=>a+(+b.entertainment_budget||0),0);
   CACHE.budgetComps=comps; CACHE.budgetRows=rows; CACHE.budgetTotal=total;
