@@ -3,8 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from pydantic import BaseModel
+
 from app.api.deps import CurrentUser, DbSession, ensure_company_access, require_permission
+from app.models.booking import Booking
 from app.models.company import Company
+from app.models.enums import BookingStatus
 from app.models.property_budget import PropertyBudget
 from app.models.venue import Venue
 from app.schemas.company import (
@@ -208,3 +212,36 @@ async def delete_budget(budget_id: int, user: CurrentUser, db: DbSession):
     await ensure_company_access(user, row.company_id, db)
     await db.delete(row)
     await db.commit()
+
+
+# --- Facturación: marcar una factura (hotel + mes) como pagada/no pagada -----
+
+class InvoicePaidIn(BaseModel):
+    ym: str            # "YYYY-MM" del periodo de la factura
+    paid: bool = True
+
+
+@router.post("/{company_id}/invoice-paid")
+async def set_invoice_paid(
+    company_id: int, payload: InvoicePaidIn, user: CurrentUser, db: DbSession
+):
+    """Marca como pagada (o revierte) la factura de un hotel para un mes: pone
+    invoice_paid en todas sus actuaciones facturables de ese periodo. La factura
+    del hotel se agrupa por hotel + mes, así que este es el marcado a nivel factura."""
+    await ensure_company_access(user, company_id, db)
+    rows = (
+        await db.execute(
+            select(Booking).where(
+                Booking.company_id == company_id,
+                Booking.status.in_((BookingStatus.CONFIRMED, BookingStatus.COMPLETED)),
+            )
+        )
+    ).scalars().all()
+    n = 0
+    for b in rows:
+        dt = b.starts_at
+        if dt is not None and f"{dt.year}-{dt.month:02d}" == payload.ym:
+            b.invoice_paid = payload.paid
+            n += 1
+    await db.commit()
+    return {"updated": n, "paid": payload.paid}

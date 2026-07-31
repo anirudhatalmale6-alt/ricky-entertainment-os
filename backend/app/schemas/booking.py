@@ -81,6 +81,8 @@ class BookingOut(BaseModel):
     cancellation_reason: str | None
     cancelled_by: str | None = None
     notes: str | None
+    invoice_paid: bool = False
+    payout_paid: bool = False
     created_at: datetime
 
     # Venue capacity is carried alongside so occupancy can be computed. Filled by

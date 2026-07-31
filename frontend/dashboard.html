@@ -2666,7 +2666,7 @@ function renderAgenda(fromRange){
     : `${r.length} de ${bk.length} ${noun(bk.length)}`;
   const body=document.getElementById('ag_body'); if(!body) return;
   const isArtist=!!(ME&&ME.artist_id);
-  const cols=7;
+  const cols=isArtist?8:7;
   const actionCell=b=>{ if(!isArtist){
       // hotel / cadena: puede cambiar fecha y hora mientras la actuación siga vigente
       return `<td>${['completed','cancelled'].includes(b.status)
@@ -2680,7 +2680,7 @@ function renderAgenda(fromRange){
       return `<td><button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></td>`;
     return `<td><span class="muted">—</span></td>`; };
   body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
-      <td class="muted">${esc(b.venue_name||'—')}</td><td>${MXN(b.agreed_price)}</td>
+      ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}</td><td>${MXN(b.agreed_price)}</td>
       <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
     : `<tr><td colspan="${cols}" class="muted" style="text-align:center;padding:22px">Sin actuaciones para este filtro.</td></tr>`;
 }
@@ -2752,9 +2752,10 @@ async function hotelBill(box){
     const feePct=avg(v.rows.map(b=>b.commission_pct).filter(x=>x!=null))||5.2;
     const fee=subtotal*feePct/100, iva=subtotal*0.16, total=subtotal+iva;
     const allDone=v.rows.every(b=>b.status==='completed');
+    const allPaid=v.rows.length && v.rows.every(b=>b.invoice_paid);
     const d=new Date(v.ym+'-01T00:00:00'); const due=new Date(d); due.setMonth(due.getMonth()+1); due.setDate(14);
     // Vencida solo si ya pasó la fecha de vencimiento y no está pagada; si no, está por cobrar.
-    const status=allDone?'paid':(due<today?'overdue':'sent');
+    const status=(allDone||allPaid)?'paid':(due<today?'overdue':'sent');
     return {company:v.company,ym:v.ym,period:d.toLocaleDateString('es-MX',{month:'long',year:'numeric'}),rows:v.rows,
       subtotal,feePct,fee,iva,total,status,
       issue:d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}),
@@ -2788,10 +2789,10 @@ async function hotelBill(box){
         <div class="box" style="margin-bottom:16px"><div class="bhead"><h3 style="margin:0">Factura seleccionada</h3></div><div id="invDetail"></div></div>
         <div class="box"><div class="bhead"><h3 style="margin:0">Acciones</h3></div>
           <div class="qact">
-            <a onclick="qtool('Descargar PDF')">⬇ Descargar factura (PDF)</a>
-            <a onclick="qtool('Enviar por chat')">✉ Enviar al hotel por chat</a>
-            <a onclick="qtool('Marcar como pagada')">✓ Marcar como pagada</a>
-            <a onclick="qtool('Nota de crédito')">📝 Crear nota de crédito</a>
+            <a onclick="dlHotelInvoice()">⬇ Descargar factura (PDF)</a>
+            <a onclick="show('chat')">✉ Enviar al hotel por chat</a>
+            <a onclick="markInvoicePaid()">✓ Marcar como pagada</a>
+            <a onclick="hotelCreditNote()">📝 Crear nota de crédito</a>
           </div></div>
       </div>
     </div>
@@ -2800,6 +2801,7 @@ async function hotelBill(box){
 }
 function selectInvoice(i){
   const inv=(CACHE.invoices||[])[i]; if(!inv) return;
+  CACHE.selInvIdx=i;
   const AMAP=CACHE.AMAP||{}; const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
   document.querySelectorAll('#invTable tr[data-i]').forEach(r=>{r.style.background=(+r.dataset.i===i)?'var(--ov)':'';});
   document.getElementById('invDetail').innerHTML=`
@@ -2826,6 +2828,7 @@ function selectInvoice(i){
 /* ---- Facturación del artista: desglose fiscal del recibo (modelo David) ---- */
 function selectPayout(i){
   const inv=(CACHE.payouts||[])[i]; if(!inv) return;
+  CACHE.selPayoutIdx=i;
   const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
   document.querySelectorAll('#poTable tr[data-i]').forEach(r=>{r.style.background=(+r.dataset.i===i)?'var(--ov)':'';});
   const pct=x=>{const n=+x||0; return (Math.round(n*10000)/10000).toString()+'%';};
@@ -2841,7 +2844,7 @@ function selectPayout(i){
     </div>
     <table class="podesg"><thead><tr><th>Concepto</th><th class="num">Base</th><th class="num">%</th><th class="num">Importe</th></tr></thead><tbody>
       <tr><td><b>Honorarios contratados</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.honorarios)}</b></td></tr>
-      <tr><td>Comisión SHOWMA</td><td class="num">${MXN2(inv.honorarios)}</td><td class="num">${pct(inv.com_pct)}</td><td class="num neg">−${MXN2(inv.comision)}</td></tr>
+      <tr><td>Platform Service</td><td class="num">${MXN2(inv.honorarios)}</td><td class="num">${pct(inv.com_pct)}</td><td class="num neg">−${MXN2(inv.comision)}</td></tr>
       <tr class="sub"><td><b>Base para emitir CFDI</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.base_cfdi)}</b></td></tr>
       <tr><td>IVA trasladado</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${pct(inv.iva_pct)}</td><td class="num pos">+${MXN2(inv.iva)}</td></tr>
       <tr class="sub"><td><b>Subtotal con IVA</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.subtotal_iva)}</b></td></tr>
@@ -2859,7 +2862,114 @@ function selectPayout(i){
 function exportPayouts(btn){
   const L={paid:'Pagada',sent:'Enviada',overdue:'Vencida'};
   const rows=(CACHE.payouts||[]).map(inv=>[inv.no,inv.period,inv.company,inv.honorarios,inv.comision,inv.base_cfdi,inv.iva,inv.ret_iva,inv.ret_isr,inv.total_recibir,L[inv.status]||inv.status]);
-  mCSV('facturacion_artista.csv',['Factura','Periodo','Hotel','Honorarios','Comisión SHOWMA','Base CFDI','IVA','Ret. IVA','Ret. ISR','Total a recibir','Estado'],rows);
+  mCSV('facturacion_artista.csv',['Factura','Periodo','Hotel','Honorarios','Platform Service','Base CFDI','IVA','Ret. IVA','Ret. ISR','Total a recibir','Estado'],rows);
+}
+
+/* ---- Documentos imprimibles (Descargar PDF / Nota de crédito) ----
+   Abre una ventana con el documento y lanza la impresión del navegador; el
+   usuario elige "Guardar como PDF". Sin dependencias externas. */
+function printDoc(title, innerHTML){
+  const w=window.open('','_blank');
+  if(!w){ toast('Permite las ventanas emergentes para descargar el PDF'); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title>'
+    +'<style>'
+    +'*{box-sizing:border-box}'
+    +'body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#14141c;margin:38px;font-size:13px}'
+    +'.brand{font-weight:800;letter-spacing:2px;font-size:19px;color:#382ca1}'
+    +'.sub{color:#6b6b7b;font-size:11.5px}'
+    +'h1{font-size:20px;margin:0}'
+    +'.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #382ca1;padding-bottom:14px;margin-bottom:16px}'
+    +'table{width:100%;border-collapse:collapse;margin:8px 0}'
+    +'th,td{text-align:left;padding:7px 6px;border-bottom:1px solid #e4e4ee;font-size:12px}'
+    +'th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}'
+    +'.meta td{border:0;padding:2px 0;font-size:12px}'
+    +'.tot td{font-weight:800;font-size:14px;border-top:2px solid #382ca1;border-bottom:0}'
+    +'.sumt{max-width:340px;margin-left:auto}'
+    +'.foot{margin-top:26px;color:#8a8a9a;font-size:10.5px;border-top:1px solid #e4e4ee;padding-top:10px}'
+    +'@media print{body{margin:12mm}}'
+    +'</style></head><body>'+innerHTML
+    +'<div class="foot">SHOWMA · Entertainment OS — documento generado desde la plataforma.</div>'
+    +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},250);}</scr'+'ipt>'
+    +'</body></html>');
+  w.document.close();
+}
+function _docHead(kind, no){
+  return '<div class="head"><div><div class="brand">SHOWMA</div><div class="sub">Entertainment OS</div></div>'
+    +'<div style="text-align:right"><h1>'+kind+'</h1><div class="sub">'+esc(no)+'</div></div></div>';
+}
+// Factura del hotel (panel de Facturación del hotel/cadena)
+function dlHotelInvoice(){
+  const inv=(CACHE.invoices||[])[CACHE.selInvIdx||0]; if(!inv){ toast('Selecciona una factura primero'); return; }
+  const AMAP=CACHE.AMAP||{};
+  const lines=(inv.rows||[]).map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td><td>${esc(b.artist_name||AMAP[b.artist_id]||'—')}</td><td>${esc(b.venue_name||'—')}</td><td class="num">${MXN2(b.agreed_price)}</td></tr>`).join('');
+  printDoc('Factura '+inv.no, _docHead('Factura', inv.no)
+    +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Periodo:</b> <span style="text-transform:capitalize">${esc(inv.period)}</span></td></tr>`
+    +`<tr><td><b>Emitida:</b> ${esc(inv.issue)}</td><td style="text-align:right"><b>Vence:</b> ${esc(inv.due)}</td></tr></table>`
+    +`<table><thead><tr><th>Fecha</th><th>Show</th><th>Artista</th><th>Venue</th><th class="num">Importe</th></tr></thead><tbody>${lines}</tbody></table>`
+    +`<table class="sumt"><tr><td>Subtotal</td><td class="num">${MXN2(inv.subtotal)}</td></tr>`
+    +`<tr><td>Servicios de gestión SHOWMA (${inv.feePct.toFixed(1)}%)</td><td class="num">${MXN2(inv.fee)}</td></tr>`
+    +`<tr><td>IVA (16%)</td><td class="num">${MXN2(inv.iva)}</td></tr>`
+    +`<tr class="tot"><td>Total</td><td class="num">${MXN2(inv.total)} MXN</td></tr></table>`);
+}
+function hotelCreditNote(){
+  const inv=(CACHE.invoices||[])[CACHE.selInvIdx||0]; if(!inv){ toast('Selecciona una factura primero'); return; }
+  const no='NC-'+String(inv.no).replace(/^INV-/,'');
+  printDoc('Nota de crédito '+no, _docHead('Nota de crédito', no)
+    +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Factura de origen:</b> ${esc(inv.no)}</td></tr>`
+    +`<tr><td><b>Periodo:</b> <span style="text-transform:capitalize">${esc(inv.period)}</span></td><td style="text-align:right"><b>Concepto:</b> Cancelación / ajuste</td></tr></table>`
+    +`<table class="sumt"><tr><td>Subtotal</td><td class="num">−${MXN2(inv.subtotal)}</td></tr>`
+    +`<tr><td>Servicios de gestión SHOWMA (${inv.feePct.toFixed(1)}%)</td><td class="num">−${MXN2(inv.fee)}</td></tr>`
+    +`<tr><td>IVA (16%)</td><td class="num">−${MXN2(inv.iva)}</td></tr>`
+    +`<tr class="tot"><td>Total nota de crédito</td><td class="num">−${MXN2(inv.total)} MXN</td></tr></table>`);
+}
+// Recibo del artista (panel de Facturación del artista)
+function dlPayout(){
+  const inv=(CACHE.payouts||[])[CACHE.selPayoutIdx||0]; if(!inv){ toast('Selecciona una factura primero'); return; }
+  const fig=CACHE.payoutFigura?' ('+esc(CACHE.payoutFigura)+')':'';
+  const p=x=>((+x||0))+'%';
+  printDoc('Recibo '+inv.no, _docHead('Recibo de honorarios', inv.no)
+    +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Periodo:</b> <span style="text-transform:capitalize">${esc(inv.period)}</span></td></tr>`
+    +`<tr><td><b>Emitida:</b> ${esc(inv.issue)}</td><td style="text-align:right"><b>Vence:</b> ${esc(inv.due)}</td></tr></table>`
+    +`<table><thead><tr><th>Concepto</th><th class="num">Base</th><th class="num">%</th><th class="num">Importe</th></tr></thead><tbody>`
+    +`<tr><td><b>Honorarios contratados</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.honorarios)}</b></td></tr>`
+    +`<tr><td>Platform Service</td><td class="num">${MXN2(inv.honorarios)}</td><td class="num">${p(inv.com_pct)}</td><td class="num">−${MXN2(inv.comision)}</td></tr>`
+    +`<tr><td><b>Base para emitir CFDI</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.base_cfdi)}</b></td></tr>`
+    +`<tr><td>IVA trasladado</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${p(inv.iva_pct)}</td><td class="num">+${MXN2(inv.iva)}</td></tr>`
+    +`<tr><td><b>Subtotal con IVA</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.subtotal_iva)}</b></td></tr>`
+    +`<tr><td>Retención de IVA</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${p(inv.riva_pct)}</td><td class="num">−${MXN2(inv.ret_iva)}</td></tr>`
+    +`<tr><td>Retención de ISR${fig}</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${p(inv.risr_pct)}</td><td class="num">−${MXN2(inv.ret_isr)}</td></tr>`
+    +`<tr class="tot"><td>Total a recibir</td><td class="num"></td><td class="num"></td><td class="num">${MXN2(inv.total_recibir)} MXN</td></tr>`
+    +`</tbody></table>`);
+}
+
+async function markInvoicePaid(){
+  const i=CACHE.selInvIdx||0; const inv=(CACHE.invoices||[])[i];
+  if(!inv){ toast('Selecciona una factura primero'); return; }
+  if(inv.status==='paid'){ toast('Esta factura ya está pagada'); return; }
+  const cid=(inv.rows&&inv.rows[0]&&inv.rows[0].company_id)||null;
+  if(!cid){ toast('No se pudo identificar el hotel de la factura'); return; }
+  try{
+    await post(`/companies/${cid}/invoice-paid`, {ym:inv.ym, paid:true});
+    (inv.rows||[]).forEach(b=>b.invoice_paid=true); inv.status='paid';
+    const STL={paid:['Pagada','is-paid']};
+    const cell=document.querySelector(`#invTable tr[data-i="${i}"] .inv-status`);
+    if(cell){ cell.className='inv-status '+STL.paid[1]; cell.textContent=STL.paid[0]; }
+    selectInvoice(i);
+    toast('Factura marcada como pagada ✓');
+  }catch(e){ toast('No se pudo marcar como pagada'); }
+}
+async function markPayoutCobrada(){
+  const i=CACHE.selPayoutIdx||0; const inv=(CACHE.payouts||[])[i];
+  if(!inv){ toast('Selecciona una factura primero'); return; }
+  if(inv.status==='paid'){ toast('Este recibo ya está cobrado'); return; }
+  try{
+    await post('/me/payouts/mark', {company_id:inv.company_id, ym:inv.ym, paid:true});
+    inv.status='paid';
+    const cell=document.querySelector(`#poTable tr[data-i="${i}"] .inv-status`);
+    if(cell){ cell.className='inv-status is-paid'; cell.textContent='Pagada'; }
+    selectPayout(i);
+    toast('Recibo marcado como cobrado ✓');
+  }catch(e){ toast('No se pudo marcar como cobrado'); }
 }
 
 // ---- Master (panel de control interno) — helpers de gráficas ----
@@ -4028,7 +4138,7 @@ const RENDER = {
         <div class="field"><label>Estado</label><select id="ag_status" onchange="renderAgenda()"><option value="">Todos</option><option value="pending">Pendiente</option><option value="confirmed">Confirmada</option><option value="completed">Realizada</option><option value="cancelled">Cancelada</option></select></div>
         <button class="btn ghost" onclick="agendaReset()">Limpiar</button>
       </div></div>
-      <table><thead><tr><th>Fecha</th><th>Show</th><th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th><th>Acción</th></tr></thead>
+      <table><thead><tr><th>Fecha</th><th>Show</th>${ME.artist_id?'<th>Hotel</th>':''}<th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th><th>Acción</th></tr></thead>
       <tbody id="ag_body"></tbody></table></div>`;
     renderAgenda();
   },
@@ -4063,7 +4173,7 @@ const RENDER = {
     const vencN=invoices.filter(x=>x.status==='overdue').length;
     const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
     if(!invoices.length){ box.innerHTML=`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no tienes facturas</h3>
-      <p style="max-width:460px;margin:10px auto 0">En cuanto confirmes o realices actuaciones, aquí verás tu facturación agrupada por hotel y mes, con el desglose completo: comisión SHOWMA, IVA trasladado, retenciones y tu total a recibir.</p></div></div>`; return; }
+      <p style="max-width:460px;margin:10px auto 0">En cuanto confirmes o realices actuaciones, aquí verás tu facturación agrupada por hotel y mes, con el desglose completo: Platform Service, IVA trasladado, retenciones y tu total a recibir.</p></div></div>`; return; }
     box.innerHTML=`
       <div class="kpis">
         <div class="kpi"><div class="kh"><div><div class="k">Total a recibir</div><div class="v">${MXN(total)}</div><div class="d">${invoices.length} factura${invoices.length===1?'':'s'}</div></div><div class="kc violet">🧾</div></div></div>
@@ -4085,9 +4195,9 @@ const RENDER = {
           <div class="box" style="margin-bottom:16px"><div class="bhead"><h3 style="margin:0">Factura seleccionada</h3></div><div id="poDetail"></div></div>
           <div class="box"><div class="bhead"><h3 style="margin:0">Acciones</h3></div>
             <div class="qact">
-              <a onclick="qtool('Descargar PDF')">⬇ Descargar recibo (PDF)</a>
-              <a onclick="qtool('Enviar por chat')">✉ Enviar recibo al hotel por chat</a>
-              <a onclick="qtool('Marcar como cobrada')">✓ Marcar como cobrada</a>
+              <a onclick="dlPayout()">⬇ Descargar recibo (PDF)</a>
+              <a onclick="show('chat')">✉ Enviar recibo al hotel por chat</a>
+              <a onclick="markPayoutCobrada()">✓ Marcar como cobrada</a>
             </div></div>
         </div>
       </div>

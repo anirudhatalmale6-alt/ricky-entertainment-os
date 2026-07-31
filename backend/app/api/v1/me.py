@@ -207,7 +207,8 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
         issue = datetime(y, m, 1)
         due = datetime(y + 1, 1, 14) if m == 12 else datetime(y, m + 1, 14)
         all_done = all(b.status == BookingStatus.COMPLETED for b in rows)
-        status_s = "paid" if all_done else ("overdue" if due < today else "sent")
+        all_paid = bool(rows) and all(getattr(b, "payout_paid", False) for b in rows)
+        status_s = "paid" if (all_done or all_paid) else ("overdue" if due < today else "sent")
 
         invoices.append({
             "company_id": g["company_id"], "company": g["company"], "ym": g["ym"],
@@ -240,6 +241,36 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
         "isr_variable": bool(getattr(figura, "isr_variable", False)) if figura else False,
         "items": invoices,
     }
+
+
+class PayoutMarkIn(BaseModel):
+    company_id: int
+    ym: str            # "YYYY-MM"
+    paid: bool = True
+
+
+@router.post("/payouts/mark")
+async def mark_payout(payload: PayoutMarkIn, scope: CurrentScope, db: DbSession):
+    """El artista marca su recibo (hotel + mes) como cobrado o revierte el marcado:
+    pone payout_paid en sus actuaciones de ese hotel y periodo."""
+    artist_id = await _require_artist(scope)
+    rows = (
+        await db.execute(
+            select(Booking).where(
+                Booking.artist_id == artist_id,
+                Booking.company_id == payload.company_id,
+                Booking.status.in_((BookingStatus.CONFIRMED, BookingStatus.COMPLETED)),
+            )
+        )
+    ).scalars().all()
+    n = 0
+    for b in rows:
+        dt = b.starts_at
+        if dt is not None and f"{dt.year}-{dt.month:02d}" == payload.ym:
+            b.payout_paid = payload.paid
+            n += 1
+    await db.commit()
+    return {"updated": n, "paid": payload.paid}
 
 
 # --- Media upload ---------------------------------------------------------
