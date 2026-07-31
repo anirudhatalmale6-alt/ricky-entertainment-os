@@ -664,6 +664,13 @@
   .qact{display:flex;flex-direction:column;gap:2px}
   .qact a{display:flex;align-items:center;gap:9px;padding:9px 0;font-size:12.5px;color:var(--info);cursor:pointer;border-top:1px solid var(--line)}
   .qact a:first-child{border-top:0}
+  /* desglose fiscal del recibo del artista (modelo David) */
+  .podesg{width:100%;border-collapse:collapse;margin:10px 0 2px;font-size:12px}
+  .podesg th{font-size:10.5px;font-weight:600;color:var(--mut2);text-align:left;text-transform:uppercase;letter-spacing:.3px;padding:4px 0 6px;border-bottom:1px solid var(--line)}
+  .podesg td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+  .podesg th.num,.podesg td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:14px}
+  .podesg tr.sub td{background:var(--ov)}
+  .podesg .neg{color:#ef4444}.podesg .pos{color:#10b981}
 
   /* ===== Login Master (dark, full-screen) — David diseño 2026-07-15 ===== */
   .lg{position:fixed;inset:0;z-index:50;background:#0b0b13;color:#eef0f7;
@@ -1060,6 +1067,7 @@ const PERIOD = (()=>{ const d=new Date(); return {year:d.getFullYear(), month:d.
 let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company", NOTIF_CACHE=[];
 let BLOCKED=new Set();   // fechas 'YYYY-MM-DD' que el artista bloqueó (vacaciones/enfermedad)
 const MXN = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n||0);
+const MXN2 = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
 const CATCOL = {"Musica":"#382ca1","Shows":"#f59e0b","Fotografia y Video":"#3b82f6","Produccion":"#10b981"};
 const palette=["#382ca1","#3b82f6","#10b981","#f59e0b","#06b6d4","#ef4444"];
 const stars = n => n? '★'.repeat(n):'—';
@@ -2815,6 +2823,45 @@ function selectInvoice(i){
     </tbody></table>`;
 }
 
+/* ---- Facturación del artista: desglose fiscal del recibo (modelo David) ---- */
+function selectPayout(i){
+  const inv=(CACHE.payouts||[])[i]; if(!inv) return;
+  const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
+  document.querySelectorAll('#poTable tr[data-i]').forEach(r=>{r.style.background=(+r.dataset.i===i)?'var(--ov)':'';});
+  const pct=x=>{const n=+x||0; return (Math.round(n*10000)/10000).toString()+'%';};
+  const fig=CACHE.payoutFigura?` <span class="muted" style="font-size:11px">(${esc(CACHE.payoutFigura)})</span>`:'';
+  const d=document.getElementById('poDetail'); if(!d) return;
+  d.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><b style="font-variant-numeric:tabular-nums">${inv.no}</b><span class="inv-status ${STL[inv.status][1]}">${STL[inv.status][0]}</span></div>
+    <div class="invdetail">
+      <div class="idr"><span class="muted">Hotel</span><b>${esc(inv.company)}</b></div>
+      <div class="idr"><span class="muted">Periodo</span><span style="text-transform:capitalize">${inv.period}</span></div>
+      <div class="idr"><span class="muted">Emitida</span><span>${inv.issue}</span></div>
+      <div class="idr"><span class="muted">Vence</span><span>${inv.due}</span></div>
+    </div>
+    <table class="podesg"><thead><tr><th>Concepto</th><th class="num">Base</th><th class="num">%</th><th class="num">Importe</th></tr></thead><tbody>
+      <tr><td><b>Honorarios contratados</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.honorarios)}</b></td></tr>
+      <tr><td>Comisión SHOWMA</td><td class="num">${MXN2(inv.honorarios)}</td><td class="num">${pct(inv.com_pct)}</td><td class="num neg">−${MXN2(inv.comision)}</td></tr>
+      <tr class="sub"><td><b>Base para emitir CFDI</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.base_cfdi)}</b></td></tr>
+      <tr><td>IVA trasladado</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${pct(inv.iva_pct)}</td><td class="num pos">+${MXN2(inv.iva)}</td></tr>
+      <tr class="sub"><td><b>Subtotal con IVA</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.subtotal_iva)}</b></td></tr>
+      <tr><td>Retención de IVA</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${pct(inv.riva_pct)}</td><td class="num neg">−${MXN2(inv.ret_iva)}</td></tr>
+      <tr><td>Retención de ISR${fig}</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${pct(inv.risr_pct)}</td><td class="num neg">−${MXN2(inv.ret_isr)}</td></tr>
+    </tbody></table>
+    <div class="invdetail"><div class="idr tot"><span>Total a recibir</span><span>${MXN2(inv.total_recibir)} MXN</span></div></div>`;
+  const lines=document.getElementById('poLines'); if(!lines) return;
+  lines.innerHTML=`
+    <table><thead><tr><th>Fecha</th><th>Show</th><th>Venue</th><th class="num">Honorarios</th></tr></thead><tbody>
+    ${(inv.rows||[]).map(r=>`<tr><td class="muted">${fmtDate(r.fecha)}</td><td>${esc(r.show||'—')}</td><td class="muted">${esc(r.venue||'—')}</td><td class="num" style="font-weight:600">${MXN2(r.importe)}</td></tr>`).join('')}
+    <tr class="tot" style="font-weight:800"><td colspan="3" style="text-align:right">Honorarios contratados</td><td class="num">${MXN2(inv.honorarios)}</td></tr>
+    </tbody></table>`;
+}
+function exportPayouts(btn){
+  const L={paid:'Pagada',sent:'Enviada',overdue:'Vencida'};
+  const rows=(CACHE.payouts||[]).map(inv=>[inv.no,inv.period,inv.company,inv.honorarios,inv.comision,inv.base_cfdi,inv.iva,inv.ret_iva,inv.ret_isr,inv.total_recibir,L[inv.status]||inv.status]);
+  mCSV('facturacion_artista.csv',['Factura','Periodo','Hotel','Honorarios','Comisión SHOWMA','Base CFDI','IVA','Ret. IVA','Ret. ISR','Total a recibir','Estado'],rows);
+}
+
 // ---- Master (panel de control interno) — helpers de gráficas ----
 const DCOL=['#8b5cf6','#3b82f6','#10b981','#f59e0b','#f43f5e','#6366f1','#14b8a6','#eab308'];
 const _kFmt=n=>{n=Math.round(n||0);return Math.abs(n)>=1000?'$'+Math.round(n/1000)+'k':'$'+n;};
@@ -4005,40 +4052,47 @@ const RENDER = {
 
   async bill(box){
     if(!ME.artist_id) return hotelBill(box);   // hotels/admin -> invoicing screen (screen 6)
-    const bk = await api('/bookings/mine');
-    // an invoice exists once the money is committed (confirmed) and is "paid" once realizada
-    const inv = bk.filter(b=>['confirmed','completed'].includes(b.status))
-                  .sort((a,b)=>b.starts_at.localeCompare(a.starts_at));
-    const sum = f => inv.filter(f).reduce((a,b)=>a+(b.agreed_price||0),0);
-    const now=new Date(), total=sum(()=>true), pagado=sum(b=>b.status==='completed'),
-          pend=sum(b=>b.status==='confirmed'),
-          mes=sum(b=>{const d=new Date(b.starts_at);return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();});
-    // group by year-month, newest first
-    const groups={};
-    inv.forEach(b=>{const d=new Date(b.starts_at);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');(groups[k]=groups[k]||[]).push(b);});
-    const keys=Object.keys(groups).sort().reverse();
-    const monthName=k=>{const[y,m]=k.split('-');return new Date(y,m-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'});};
-    const invNo=b=>{const d=new Date(b.starts_at);return 'INV-'+d.getFullYear()+'-'+String(b.id).padStart(4,'0');};
+    const data = await api('/me/payouts');
+    const invoices = (data && data.items) || [];
+    CACHE.payouts = invoices; CACHE.payoutFigura = (data && data.figura) || null;
+    const sum = f => invoices.filter(f).reduce((a,b)=>a+(b.total_recibir||0),0);
+    const now=new Date();
+    const total=sum(()=>true), cobrado=sum(x=>x.status==='paid'),
+          porcobrar=sum(x=>x.status!=='paid'),
+          mes=sum(x=>{const[y,m]=x.ym.split('-');return (+y)===now.getFullYear()&&(+m)===now.getMonth()+1;});
+    const vencN=invoices.filter(x=>x.status==='overdue').length;
+    const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
+    if(!invoices.length){ box.innerHTML=`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no tienes facturas</h3>
+      <p style="max-width:460px;margin:10px auto 0">En cuanto confirmes o realices actuaciones, aquí verás tu facturación agrupada por hotel y mes, con el desglose completo: comisión SHOWMA, IVA trasladado, retenciones y tu total a recibir.</p></div></div>`; return; }
     box.innerHTML=`
       <div class="kpis">
-        <div class="kpi"><div class="orb"></div><div class="k">🧾 Total facturado</div><div class="v">${MXN(total)}</div><div class="d">${inv.length} factura${inv.length===1?'':'s'}</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">✅ Cobrado</div><div class="v">${MXN(pagado)}</div><div class="d">actuaciones realizadas</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">⏳ Por cobrar</div><div class="v">${MXN(pend)}</div><div class="d">confirmadas, aún no realizadas</div></div>
-        <div class="kpi"><div class="orb"></div><div class="k">📅 Este mes</div><div class="v">${MXN(mes)}</div><div class="d">${now.toLocaleDateString('es-MX',{month:'long'})}</div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Total a recibir</div><div class="v">${MXN(total)}</div><div class="d">${invoices.length} factura${invoices.length===1?'':'s'}</div></div><div class="kc violet">🧾</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Cobrado</div><div class="v">${MXN(cobrado)}</div><div class="d">${total>0?Math.round(cobrado/total*100):0}% del total</div></div><div class="kc green">✅</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Por cobrar</div><div class="v">${MXN(porcobrar)}</div><div class="d">${total>0?Math.round(porcobrar/total*100):0}% del total</div></div><div class="kc amber">⏳</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Este mes</div><div class="v">${MXN(mes)}</div><div class="d" style="text-transform:capitalize">${now.toLocaleDateString('es-MX',{month:'long'})}</div></div><div class="kc blue">📅</div></div></div>
       </div>
-      ${keys.length?`<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn ghost" onclick="exportInvoices(this)">⬇ Exportar CSV</button></div>`:''}
-      ${keys.length? keys.map(k=>{
-        const rows=groups[k]; const st=rows.reduce((a,b)=>a+(b.agreed_price||0),0);
-        return `<div class="box" style="margin-bottom:16px"><h3 style="text-transform:capitalize">${monthName(k)}</h3>
-          <div class="invtot"><b>${MXN(st)}</b><span>· ${rows.length} factura${rows.length===1?'':'s'}</span></div>
-          <table><thead><tr><th>Factura</th><th>Hotel</th><th>Concepto</th><th>Fecha</th><th>Monto</th><th>Estado</th></tr></thead><tbody>
-          ${rows.map(b=>`<tr><td style="font-variant-numeric:tabular-nums">${invNo(b)}</td>
-            <td>${esc(b.company_name||'—')}</td><td class="muted">${esc(showLabel(b))}</td>
-            <td class="muted">${fmtDate(b.starts_at)}</td><td style="font-weight:650">${MXN(b.agreed_price)}</td>
-            <td>${b.status==='completed'?'<span class="chip c-completed">Pagada</span>':'<span class="chip c-pending">Pendiente</span>'}</td></tr>`).join("")}
-          </tbody></table></div>`;
-      }).join("") : `<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no tienes facturas</h3>
-        <p style="max-width:420px;margin:10px auto 0">En cuanto confirmes o realices actuaciones, aquí verás tu historial de facturación mes a mes, con lo cobrado y lo pendiente.</p></div></div>`}`;
+      <div class="grid2">
+        <div class="box"><div class="bhead"><h3 style="margin:0">Facturas</h3><span class="hint" style="margin:0">${invoices.length} · más recientes primero</span></div>
+          <table id="poTable"><thead><tr><th>Factura</th><th>Periodo</th><th>Hotel</th><th>Total a recibir</th><th>Estado</th></tr></thead><tbody>
+          ${invoices.map((inv,i)=>`<tr data-i="${i}" onclick="selectPayout(${i})" style="cursor:pointer">
+            <td style="font-variant-numeric:tabular-nums">${inv.no}</td><td class="muted" style="text-transform:capitalize">${inv.period}</td>
+            <td>${esc(inv.company)}</td><td style="font-weight:650">${MXN2(inv.total_recibir)}</td>
+            <td><span class="inv-status ${STL[inv.status][1]}">${STL[inv.status][0]}</span></td></tr>`).join('')}
+          </tbody></table>
+          <div style="margin-top:12px"><button class="btn ghost" onclick="exportPayouts(this)">⬇ Exportar CSV</button></div>
+        </div>
+        <div>
+          <div class="box" style="margin-bottom:16px"><div class="bhead"><h3 style="margin:0">Factura seleccionada</h3></div><div id="poDetail"></div></div>
+          <div class="box"><div class="bhead"><h3 style="margin:0">Acciones</h3></div>
+            <div class="qact">
+              <a onclick="qtool('Descargar PDF')">⬇ Descargar recibo (PDF)</a>
+              <a onclick="qtool('Enviar por chat')">✉ Enviar recibo al hotel por chat</a>
+              <a onclick="qtool('Marcar como cobrada')">✓ Marcar como cobrada</a>
+            </div></div>
+        </div>
+      </div>
+      <div class="box" style="margin-top:16px"><div class="bhead"><h3 style="margin:0">Detalle de la factura</h3></div><div id="poLines"></div></div>`;
+    selectPayout(0);
   },
 
   async profile(box){

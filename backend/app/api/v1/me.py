@@ -8,7 +8,7 @@ what powers the "Mi Perfil" screen where a musician edits their tarifas,
 descripciones and gestiona sus publicaciones (shows).
 """
 import uuid
-from datetime import date as date_cls
+from datetime import date as date_cls, datetime, timedelta
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
@@ -23,7 +23,10 @@ from app.models.artist_client_rate import ArtistClientRate
 from app.models.blocked_date import ArtistBlockedDate
 from app.models.booking import Booking
 from app.models.company import Company
+from app.models.enums import BookingStatus
 from app.models.property_group import PropertyGroup
+from app.models.tax_figure import TaxFigure
+from app.models.venue import Venue
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
     ContractAcceptance,
@@ -115,6 +118,128 @@ async def update_my_profile(payload: ArtistUpdate, scope: CurrentScope, db: DbSe
         setattr(artist, field, value)
     await db.commit()
     return await _load_artist(db, artist_id)
+
+
+# --- Facturación / pagos del artista (desglose fiscal) --------------------
+
+# Comisión SHOWMA por defecto (Platform Services) si la figura no la define.
+_DEFAULT_COMMISSION_PCT = 3.7
+_MES_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+           "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+
+@router.get("/payouts")
+async def my_payouts(scope: CurrentScope, db: DbSession):
+    """Facturación del artista con el desglose fiscal completo, siguiendo el
+    modelo que definió David: los honorarios contratados menos la comisión SHOWMA
+    dan la base para emitir el CFDI; sobre esa base se calcula el IVA trasladado y
+    se restan las retenciones de IVA e ISR para llegar al total a recibir. Se
+    agrupa por hotel y mes, igual que la facturación del hotel. Los porcentajes
+    salen de la figura fiscal del talento (catálogo Impuestos)."""
+    artist_id = await _require_artist(scope)
+    artist = await db.get(Artist, artist_id)
+
+    # Figura fiscal del talento (o la predeterminada del catálogo).
+    figuras = (await db.execute(select(TaxFigure))).scalars().all()
+    by_id = {f.id: f for f in figuras}
+    default_fig = next((f for f in figuras if f.is_default), (figuras[0] if figuras else None))
+    figura = by_id.get(artist.tax_figure_id) if artist and artist.tax_figure_id else default_fig
+
+    com_pct = float(getattr(figura, "commission_pct", 0) or 0) if figura else 0.0
+    if not com_pct:
+        com_pct = _DEFAULT_COMMISSION_PCT
+    iva_pct = (float(figura.iva_traslado_pct) if figura and figura.iva_traslado_pct is not None else 16.0)
+    riva_pct = float(getattr(figura, "iva_ret_pct", 0) or 0) if figura else 0.0
+    risr_pct = float(getattr(figura, "isr_ret_pct", 0) or 0) if figura else 0.0
+
+    # Actuaciones facturables: confirmadas o realizadas (dinero comprometido),
+    # igual que la facturación del hotel. Los borradores (pending) no cuentan.
+    stmt = (
+        select(Booking)
+        .where(
+            Booking.artist_id == artist_id,
+            Booking.status.in_((BookingStatus.CONFIRMED, BookingStatus.COMPLETED)),
+        )
+        .order_by(Booking.starts_at)
+    )
+    bookings = list((await db.execute(stmt)).scalars().all())
+    cids = {b.company_id for b in bookings if b.company_id}
+    vids = {b.venue_id for b in bookings if b.venue_id}
+    sids = {b.show_id for b in bookings if b.show_id}
+    companies = {c.id: c for c in (
+        (await db.execute(select(Company).where(Company.id.in_(cids)))).scalars().all() if cids else []
+    )}
+    venues = {v.id: v for v in (
+        (await db.execute(select(Venue).where(Venue.id.in_(vids)))).scalars().all() if vids else []
+    )}
+    shows = {s.id: s for s in (
+        (await db.execute(select(Show).where(Show.id.in_(sids)))).scalars().all() if sids else []
+    )}
+
+    # Agrupa por hotel + mes.
+    groups: dict[str, dict] = {}
+    for b in bookings:
+        dt = b.starts_at
+        ym = f"{dt.year}-{dt.month:02d}"
+        key = f"{b.company_id or 0}|{ym}"
+        comp = companies.get(b.company_id)
+        g = groups.setdefault(key, {
+            "company_id": b.company_id,
+            "company": comp.name if comp else "—",
+            "ym": ym, "rows": [],
+        })
+        g["rows"].append(b)
+
+    today = datetime.utcnow()
+    invoices = []
+    for g in groups.values():
+        rows = g["rows"]
+        honorarios = round(sum(float(b.agreed_price or 0) for b in rows), 2)
+        comision = round(honorarios * com_pct / 100.0, 2)
+        base_cfdi = round(honorarios - comision, 2)
+        iva = round(base_cfdi * iva_pct / 100.0, 2)
+        subtotal_iva = round(base_cfdi + iva, 2)
+        ret_iva = round(base_cfdi * riva_pct / 100.0, 2)
+        ret_isr = round(base_cfdi * risr_pct / 100.0, 2)
+        total_recibir = round(subtotal_iva - ret_iva - ret_isr, 2)
+
+        y, m = int(g["ym"][:4]), int(g["ym"][5:7])
+        issue = datetime(y, m, 1)
+        due = datetime(y + 1, 1, 14) if m == 12 else datetime(y, m + 1, 14)
+        all_done = all(b.status == BookingStatus.COMPLETED for b in rows)
+        status_s = "paid" if all_done else ("overdue" if due < today else "sent")
+
+        invoices.append({
+            "company_id": g["company_id"], "company": g["company"], "ym": g["ym"],
+            "period": f"{_MES_ES[m - 1]} de {y}",
+            "issue": issue.strftime("%d/%m/%Y"),
+            "due": due.strftime("%d/%m/%Y"),
+            "status": status_s,
+            "honorarios": honorarios,
+            "com_pct": round(com_pct, 4), "comision": comision,
+            "base_cfdi": base_cfdi,
+            "iva_pct": round(iva_pct, 4), "iva": iva,
+            "subtotal_iva": subtotal_iva,
+            "riva_pct": round(riva_pct, 4), "ret_iva": ret_iva,
+            "risr_pct": round(risr_pct, 4), "ret_isr": ret_isr,
+            "total_recibir": total_recibir,
+            "rows": [{
+                "fecha": b.starts_at.isoformat() if b.starts_at else None,
+                "show": (shows.get(b.show_id).show_name if shows.get(b.show_id) else None),
+                "venue": (venues.get(b.venue_id).name if venues.get(b.venue_id) else None),
+                "importe": float(b.agreed_price or 0),
+            } for b in rows],
+        })
+
+    invoices.sort(key=lambda x: x["ym"], reverse=True)
+    for i, inv in enumerate(invoices):
+        inv["no"] = f"INV-{inv['ym'].replace('-', '')}-{i + 1:03d}"
+
+    return {
+        "figura": figura.name if figura else None,
+        "isr_variable": bool(getattr(figura, "isr_variable", False)) if figura else False,
+        "items": invoices,
+    }
 
 
 # --- Media upload ---------------------------------------------------------
