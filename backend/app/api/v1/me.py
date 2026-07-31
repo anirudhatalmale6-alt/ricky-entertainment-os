@@ -23,6 +23,7 @@ from app.models.artist_client_rate import ArtistClientRate
 from app.models.blocked_date import ArtistBlockedDate
 from app.models.booking import Booking
 from app.models.company import Company
+from app.models.conversation import Conversation, Message
 from app.models.enums import BookingStatus
 from app.models.property_group import PropertyGroup
 from app.models.tax_figure import TaxFigure
@@ -271,6 +272,49 @@ async def mark_payout(payload: PayoutMarkIn, scope: CurrentScope, db: DbSession)
             n += 1
     await db.commit()
     return {"updated": n, "paid": payload.paid}
+
+
+# --- Aviso al hotel: "voy en camino" / "llegué" (estilo Uber Eats) ----------
+
+class NotifyStatusIn(BaseModel):
+    status: str   # 'on_way' | 'arrived'
+
+
+@router.post("/bookings/{booking_id}/notify-status")
+async def notify_status(booking_id: int, payload: NotifyStatusIn, scope: CurrentScope, db: DbSession):
+    """El artista avisa al hotel, con un clic, que va en camino o que ya llegó a
+    la actuación (solo mensaje al chat, sin rastreo). Busca o crea la conversación
+    con el hotel de esa actuación y publica el aviso."""
+    artist_id = await _require_artist(scope)
+    booking = await db.get(Booking, booking_id)
+    if booking is None or booking.artist_id != artist_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Actuación no encontrada")
+    if booking.company_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta actuación no tiene un hotel asociado")
+    conv = (
+        await db.execute(
+            select(Conversation).where(
+                Conversation.artist_id == artist_id,
+                Conversation.company_id == booking.company_id,
+                Conversation.request_id.is_(None),
+            ).order_by(Conversation.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    if conv is None:
+        conv = Conversation(artist_id=artist_id, company_id=booking.company_id, booking_id=booking_id)
+        db.add(conv)
+        await db.flush()
+    dt = booking.starts_at
+    hhmm = dt.strftime("%H:%M") if dt else ""
+    if payload.status == "on_way":
+        body = "🚗 Voy en camino a la actuación" + (f" de las {hhmm}." if hhmm else ".")
+    elif payload.status == "arrived":
+        body = "📍 Llegué al lugar."
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Estado no válido")
+    db.add(Message(conversation_id=conv.id, sender_role="artist", body=body))
+    await db.commit()
+    return {"ok": True, "conversation_id": conv.id, "message": body}
 
 
 # --- Media upload ---------------------------------------------------------

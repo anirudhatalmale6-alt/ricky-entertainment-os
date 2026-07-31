@@ -602,7 +602,9 @@
   .qbar button .qi{font-size:18px}
   /* hotel selector (sidebar) */
   .hotelsel{display:flex;align-items:center;gap:10px;background:var(--s-hov);border:1px solid var(--s-line);border-radius:12px;padding:9px 10px;margin:0 0 6px;position:relative}
-  .hotelsel .hthumb{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#f6b73c,#e0912a);flex:none;display:grid;place-items:center;font-size:18px}
+  .hotelsel .hthumb{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#f6b73c,#e0912a);background-size:cover;background-position:center;flex:none;display:grid;place-items:center;font-size:18px}
+  .hotelsel .hthumb.editable{cursor:pointer;position:relative;z-index:2}
+  .hotelsel .hthumb.editable:hover::after{content:'✎';position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.45);border-radius:10px;font-size:14px;color:#fff}
   .hotelsel .hz{flex:1;min-width:0}
   .hotelsel .hz b{font-size:12.5px;color:#fff;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
   .hotelsel .hz span{font-size:10.5px;color:var(--s-mut)}
@@ -671,6 +673,8 @@
   .podesg th.num,.podesg td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:14px}
   .podesg tr.sub td{background:var(--ov)}
   .podesg .neg{color:#ef4444}.podesg .pos{color:#10b981}
+  .maplink{font-size:11px;color:var(--info);text-decoration:none;white-space:nowrap}
+  .maplink:hover{text-decoration:underline}
 
   /* ===== Login Master (dark, full-screen) — David diseño 2026-07-15 ===== */
   .lg{position:fixed;inset:0;z-index:50;background:#0b0b13;color:#eef0f7;
@@ -996,7 +1000,8 @@
       </div>
     </div>
     <div class="hotelsel" id="hotelSel" style="display:none">
-      <div class="hthumb">🏨</div>
+      <div class="hthumb" id="hotelThumb" onclick="pickHotelLogo()">🏨</div>
+      <input type="file" id="hotelLogoFile" accept="image/*" style="display:none" onchange="uploadHotelLogo(this)">
       <div class="hz"><b id="hotelName">Cadena</b><span id="hotelCity">Grupo hotelero</span></div>
       <span class="chev">▾</span>
       <select id="groupSel" onchange="reload()"></select>
@@ -1462,6 +1467,37 @@ function syncHotelCard(){
     nm.textContent = ME.group_name || ME.company_name || 'Tu cadena'; ct.textContent = ME.city || 'Grupo hotelero';
   }
 }
+// --- Imagen del hotel (clic en el ícono del encabezado) ---
+function setHotelThumb(url){
+  const t=document.getElementById('hotelThumb'); if(!t) return;
+  if(url){ t.style.backgroundImage=`url('${url}')`; t.textContent=''; }
+  else { t.style.backgroundImage=''; t.textContent='🏨'; }
+}
+async function loadHotelLogo(){
+  if(!ME||ME.is_admin||ME.artist_id) return;   // solo hoteles/directores editan su imagen
+  const t=document.getElementById('hotelThumb'); if(t){ t.classList.add('editable'); t.title='Cambiar imagen del hotel'; }
+  try{ const c=await api('/companies/mine'); CACHE.myCompany=c; setHotelThumb(c.logo_url); }catch(e){}
+}
+function pickHotelLogo(){
+  if(!ME||ME.is_admin||ME.artist_id) return;
+  const inp=document.getElementById('hotelLogoFile'); if(inp) inp.click();
+}
+async function uploadHotelLogo(input){
+  const f=input.files&&input.files[0]; if(!f){ return; }
+  const c=CACHE.myCompany;
+  if(!c||!c.id){ toast('No se pudo identificar tu hotel',true); input.value=''; return; }
+  if(!/^image\//.test(f.type)){ toast('El archivo no es una imagen',true); input.value=''; return; }
+  try{
+    toast('Subiendo imagen…');
+    const blob=await _resizeImage(f, 512, 0.9);
+    const fd=new FormData(); fd.append('file', blob, 'logo.jpg');
+    const r=await fetch(API+'/companies/'+c.id+'/logo',{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
+    if(!r.ok) throw new Error('status '+r.status);
+    const j=await r.json(); c.logo_url=j.logo_url; setHotelThumb(j.logo_url);
+    toast('Imagen del hotel actualizada ✓');
+  }catch(e){ toast('No se pudo subir la imagen',true); }
+  input.value='';
+}
 
 async function boot(){
   const sel=document.getElementById('groupSel');
@@ -1473,6 +1509,7 @@ async function boot(){
     GID = ME.group_id || null;
   }
   syncHotelCard();
+  loadHotelLogo();
   // land on the first visible section (home is hidden for artists / single hotels)
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));
   const first=[...document.querySelectorAll('.nav')].find(n=>n.style.display!=='none');
@@ -2677,12 +2714,26 @@ function renderAgenda(fromRange){
     if(b.status==='pending')
       return `<td><div class="agact"><button class="mini ok" onclick="artistRespond(${b.id},'accept')">Aceptar</button><button class="mini no" onclick="artistRespond(${b.id},'reject')">Rechazar</button></div></td>`;
     if(b.status==='confirmed' && fut)
-      return `<td><button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></td>`;
+      return `<td><div class="agact"><button class="mini" onclick="notifyStatus(${b.id},'on_way')">🚗 En camino</button><button class="mini ok" onclick="notifyStatus(${b.id},'arrived')">📍 Llegué</button><button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></div></td>`;
     return `<td><span class="muted">—</span></td>`; };
   body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
-      ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}</td><td>${MXN(b.agreed_price)}</td>
+      ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}${isArtist?mapsLink(b):''}</td><td>${MXN(b.agreed_price)}</td>
       <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
     : `<tr><td colspan="${cols}" class="muted" style="text-align:center;padding:22px">Sin actuaciones para este filtro.</td></tr>`;
+}
+function mapsUrl(b){
+  if(b.venue_map_url) return b.venue_map_url;
+  if(b.venue_lat!=null && b.venue_lng!=null) return `https://www.google.com/maps/search/?api=1&query=${b.venue_lat},${b.venue_lng}`;
+  const q=[b.venue_name,b.company_name].filter(Boolean).join(' ');
+  return q?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`:'';
+}
+function mapsLink(b){ const u=mapsUrl(b); return u?`<div><a href="${u}" target="_blank" rel="noopener" class="maplink" onclick="event.stopPropagation()">🗺️ Cómo llegar</a></div>`:''; }
+async function notifyStatus(id, st){
+  try{
+    await post(`/me/bookings/${id}/notify-status`,{status:st});
+    toast(st==='on_way'?'Avisaste al hotel: vas en camino 🚗':'Avisaste al hotel: llegaste 📍');
+    if(typeof syncChatBadge==='function') syncChatBadge();
+  }catch(e){ toast('No se pudo enviar el aviso',true); }
 }
 async function artistRespond(id,action){
   if(action==='reject' && !confirm('¿Rechazar esta actuación? El hotel será notificado y quedará cancelada.')) return;

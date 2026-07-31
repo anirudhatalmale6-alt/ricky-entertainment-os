@@ -69,6 +69,9 @@ def _decorate(
     return out.model_copy(update={
         "venue_capacity": venue.capacity if venue else None,
         "venue_name": venue.name if venue else None,
+        "venue_map_url": venue.map_url if venue else None,
+        "venue_lat": float(venue.latitude) if venue and venue.latitude is not None else None,
+        "venue_lng": float(venue.longitude) if venue and venue.longitude is not None else None,
         "show_name": show.show_name if show else None,
         "show_category": show.category if show else None,
         "show_subcategory": show.subcategory if show else None,

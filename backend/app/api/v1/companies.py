@@ -1,16 +1,23 @@
 """Company (contratante) endpoints: admin CRUD with nested venues."""
-from fastapi import APIRouter, Depends, HTTPException, status
+import uuid
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pydantic import BaseModel
 
-from app.api.deps import CurrentUser, DbSession, ensure_company_access, require_permission
+from app.api.deps import CurrentScope, CurrentUser, DbSession, ensure_company_access, require_permission
+from app.core.config import settings
+from app.core.storage import ensure_upload_dir
 from app.models.booking import Booking
 from app.models.company import Company
 from app.models.enums import BookingStatus
 from app.models.property_budget import PropertyBudget
 from app.models.venue import Venue
+
+_ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+_MAX_IMAGE_BYTES = 6 * 1024 * 1024
 from app.schemas.company import (
     CompanyCreate,
     CompanyOut,
@@ -51,6 +58,29 @@ async def _get_venue_or_404(db: DbSession, venue_id: int) -> Venue:
 async def list_companies(db: DbSession):
     res = await db.execute(select(Company).options(*_COMPANY_RELS).order_by(Company.name))
     return list(res.scalars().unique().all())
+
+
+@router.get("/mine")
+async def my_company(scope: CurrentScope, db: DbSession):
+    """La empresa (hotel) de la cuenta actual: su propia empresa, o la primera de
+    su cadena si es director. Devuelve lo mínimo para el encabezado del panel,
+    incluida su imagen (logo_url). (Debe ir antes de /{company_id}.)"""
+    company = None
+    if scope.company_id is not None:
+        company = await db.get(Company, scope.company_id)
+    elif scope.group_id is not None:
+        company = (
+            await db.execute(
+                select(Company).where(Company.group_id == scope.group_id).order_by(Company.id).limit(1)
+            )
+        ).scalar_one_or_none()
+    if company is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No hay empresa asociada a tu cuenta")
+    return {
+        "id": company.id, "name": company.name, "city": company.city,
+        "company_type": company.company_type, "logo_url": company.logo_url,
+        "group_id": company.group_id,
+    }
 
 
 @router.get(
@@ -245,3 +275,35 @@ async def set_invoice_paid(
             n += 1
     await db.commit()
     return {"updated": n, "paid": payload.paid}
+
+
+# --- Imagen del hotel (logo / foto de perfil de la propiedad) ---------------
+
+@router.post("/{company_id}/logo")
+async def set_company_logo(
+    company_id: int, user: CurrentUser, db: DbSession, file: UploadFile = File(...)
+):
+    """Sube y fija la imagen del hotel (logo_url). El hotel puede cambiar la suya
+    (o el director cualquiera de su cadena); el admin, cualquiera. La imagen ya
+    viene redimensionada desde el cliente."""
+    await ensure_company_access(user, company_id, db)
+    company = await _get_company_or_404(db, company_id)
+    ext = _ALLOWED_IMAGE_TYPES.get((file.content_type or "").lower())
+    if ext is None:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Formato no admitido. Usa JPG, PNG o WEBP.",
+        )
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archivo vacío.")
+    if len(data) > _MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen es muy grande (máximo 6 MB).",
+        )
+    name = f"company{company_id}_{uuid.uuid4().hex}.{ext}"
+    (ensure_upload_dir() / name).write_bytes(data)
+    company.logo_url = f"{settings.ROOT_PATH}/uploads/{name}"
+    await db.commit()
+    return {"logo_url": company.logo_url}

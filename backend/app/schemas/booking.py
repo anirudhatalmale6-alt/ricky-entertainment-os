@@ -89,6 +89,9 @@ class BookingOut(BaseModel):
     # the endpoint (from the loaded venue) - defaults to None if the venue is gone.
     venue_capacity: int | None = None
     venue_name: str | None = None
+    venue_map_url: str | None = None
+    venue_lat: float | None = None
+    venue_lng: float | None = None
     show_name: str | None = None
     show_category: str | None = None
     show_subcategory: str | None = None
