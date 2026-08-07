@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.api.deps import CurrentScope, DbSession, require_permission
+from app.core.config import settings
 from app.models.artist import Artist
 from app.models.booking import Booking
 from app.models.company import Company
@@ -536,6 +537,11 @@ async def register_attendance(booking_id: int, payload: AttendanceIn, db: DbSess
     booking.status = BookingStatus.COMPLETED
     await db.commit()
     await db.refresh(booking)
+    # Actuación realizada → timbrado automático del CFDI a nombre del músico.
+    # Es idempotente y no rompe la respuesta si algo falla (guarda el motivo).
+    if settings.FACTURAMA_ENABLED:
+        from app.services import facturacion
+        await facturacion.issue_cfdi_for_booking(db, booking)
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
     show = await db.get(Show, booking.show_id) if booking.show_id else None
     return _decorate(booking, venue, show)

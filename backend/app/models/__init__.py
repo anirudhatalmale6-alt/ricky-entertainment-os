@@ -16,6 +16,7 @@ from app.models.hotel_lead import HotelLead
 from app.models.notification import ArtistNotification
 from app.models.blocked_date import ArtistBlockedDate
 from app.models.tax_figure import TaxFigure
+from app.models.cfdi import Cfdi
 from app.models.contract import ContractTemplate, ContractAcceptance
 from app.models.support import SupportMessage
 from app.models.artist_client_rate import ArtistClientRate
@@ -62,6 +63,7 @@ __all__ = [
     "ArtistNotification",
     "ArtistBlockedDate",
     "TaxFigure",
+    "Cfdi",
     "ContractTemplate",
     "ContractAcceptance",
     "PayoutSpeed",

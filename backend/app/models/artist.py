@@ -90,6 +90,14 @@ class Artist(Base, TimestampMixin):
     tax_figure_id: Mapped[int | None] = mapped_column(Integer, default=None)
     legal_name: Mapped[str | None] = mapped_column(String(255))
     fiscal_postal_code: Mapped[str | None] = mapped_column(String(10))
+    # CSD / facturación electrónica (Facturama Multiemisor). El músico sube su
+    # Certificado de Sello Digital UNA vez; a partir de ahí SHOWMA timbra a su
+    # nombre automáticamente. Aquí sólo guardamos el estado — el certificado en
+    # sí vive en Facturama, indexado por RFC (nunca almacenamos el .key).
+    #   none = sin CSD · active = validado y listo · expired · error
+    csd_status: Mapped[str] = mapped_column(String(20), default="none")
+    csd_uploaded_at: Mapped[date | None] = mapped_column(Date)
+    csd_expires_at: Mapped[date | None] = mapped_column(Date)
     bank_name: Mapped[str | None] = mapped_column(String(120))
     bank_account: Mapped[str | None] = mapped_column(String(40))
     bank_account_holder: Mapped[str | None] = mapped_column(String(255))

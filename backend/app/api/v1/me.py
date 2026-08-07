@@ -27,7 +27,10 @@ from app.models.conversation import Conversation, Message
 from app.models.enums import BookingStatus
 from app.models.property_group import PropertyGroup
 from app.models.tax_figure import TaxFigure
+from app.models.cfdi import Cfdi
 from app.models.venue import Venue
+from app.services.facturama import FacturamaError, get_facturama
+from app.services import facturacion
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
     ContractAcceptance,
@@ -423,6 +426,209 @@ async def upload_document(
     await db.commit()
     await db.refresh(doc)
     return _doc_out(doc)
+
+
+# --- Facturación electrónica (CFDI) · datos fiscales + CSD -----------------
+# El músico llena sus datos fiscales UNA vez y sube su CSD (.cer + .key +
+# contraseña). Con eso, SHOWMA timbra a su nombre automáticamente en cada
+# actuación — sin trabajo manual por factura (requisito de David).
+
+# Régimenes fiscales SAT más comunes para talento (persona física) y hoteles.
+# El frontend los usa como catálogo del selector.
+_SAT_REGIMES = [
+    {"code": "612", "label": "Persona Física · Actividad Empresarial y Profesional"},
+    {"code": "626", "label": "Persona Física · RESICO"},
+    {"code": "621", "label": "Persona Física · Incorporación Fiscal"},
+    {"code": "605", "label": "Persona Física · Sueldos y Salarios"},
+    {"code": "606", "label": "Persona Física · Arrendamiento"},
+    {"code": "601", "label": "Persona Moral · Régimen General de Ley"},
+    {"code": "603", "label": "Persona Moral · Con Fines no Lucrativos"},
+    {"code": "620", "label": "Persona Moral · Sociedades Cooperativas de Producción"},
+]
+_SAT_CFDI_USES = [
+    {"code": "G03", "label": "G03 · Gastos en general"},
+    {"code": "G01", "label": "G01 · Adquisición de mercancías"},
+    {"code": "P01", "label": "P01 · Por definir"},
+    {"code": "S01", "label": "S01 · Sin efectos fiscales"},
+]
+
+# El .cer del SAT es DER binario; el .key es la llave privada. Aceptamos por
+# extensión (los navegadores no siempre mandan un content-type útil para ellos).
+_MAX_CSD_BYTES = 512 * 1024
+
+
+def _fiscal_out(a: Artist) -> dict:
+    ready = bool(
+        (a.csd_status == "active") and a.rfc and a.tax_regime and a.fiscal_postal_code
+    )
+    return {
+        "rfc": a.rfc,
+        "legal_name": a.legal_name,
+        "tax_regime": a.tax_regime,
+        "cfdi_use": a.cfdi_use,
+        "fiscal_postal_code": a.fiscal_postal_code,
+        "csd_status": a.csd_status or "none",
+        "csd_uploaded_at": a.csd_uploaded_at.isoformat() if a.csd_uploaded_at else None,
+        "csd_expires_at": a.csd_expires_at.isoformat() if a.csd_expires_at else None,
+        "ready": ready,
+        "regimes": _SAT_REGIMES,
+        "cfdi_uses": _SAT_CFDI_USES,
+    }
+
+
+class FiscalDataIn(BaseModel):
+    rfc: str | None = None
+    legal_name: str | None = None
+    tax_regime: str | None = None        # código SAT (p.ej. "612")
+    cfdi_use: str | None = None
+    fiscal_postal_code: str | None = None
+
+
+@router.get("/fiscal")
+async def get_my_fiscal(scope: CurrentScope, db: DbSession):
+    """Datos fiscales del músico + estado de su CSD para facturación."""
+    artist_id = await _require_artist(scope)
+    artist = await _load_artist(db, artist_id)
+    return _fiscal_out(artist)
+
+
+@router.post("/fiscal")
+async def save_my_fiscal(payload: FiscalDataIn, scope: CurrentScope, db: DbSession):
+    """Guarda los datos fiscales (RFC, razón social, régimen, CP, uso CFDI)."""
+    artist_id = await _require_artist(scope)
+    artist = await _load_artist(db, artist_id)
+    if payload.rfc is not None:
+        artist.rfc = payload.rfc.strip().upper() or None
+    if payload.legal_name is not None:
+        artist.legal_name = payload.legal_name.strip() or None
+    if payload.tax_regime is not None:
+        artist.tax_regime = payload.tax_regime.strip() or None
+    if payload.cfdi_use is not None:
+        artist.cfdi_use = payload.cfdi_use.strip() or None
+    if payload.fiscal_postal_code is not None:
+        artist.fiscal_postal_code = payload.fiscal_postal_code.strip() or None
+    await db.commit()
+    await db.refresh(artist)
+    return _fiscal_out(artist)
+
+
+@router.post("/fiscal/csd")
+async def upload_csd(
+    scope: CurrentScope,
+    db: DbSession,
+    cer: UploadFile = File(...),
+    key: UploadFile = File(...),
+    password: str = Form(...),
+    rfc: str = Form(...),
+):
+    """Sube y VALIDA el CSD del músico contra Facturama (una sola vez).
+
+    Facturama verifica que el certificado corresponda al RFC y que la contraseña
+    de la llave sea correcta; si algo no cuadra, devuelve el motivo y no se
+    marca como listo. En éxito, el RFC queda habilitado para timbrar a su nombre.
+    """
+    artist_id = await _require_artist(scope)
+    artist = await _load_artist(db, artist_id)
+
+    rfc = (rfc or "").strip().upper()
+    if not rfc:
+        raise HTTPException(status_code=400, detail="Indica tu RFC.")
+    if not (password or "").strip():
+        raise HTTPException(status_code=400, detail="Indica la contraseña de tu llave (.key).")
+
+    cer_bytes = await cer.read()
+    key_bytes = await key.read()
+    if not cer_bytes or not key_bytes:
+        raise HTTPException(status_code=400, detail="Faltan archivos: sube tu .cer y tu .key.")
+    if len(cer_bytes) > _MAX_CSD_BYTES or len(key_bytes) > _MAX_CSD_BYTES:
+        raise HTTPException(status_code=413, detail="Los archivos del CSD son demasiado grandes.")
+
+    client = get_facturama()
+    try:
+        result = await client.upload_csd(rfc, cer_bytes, key_bytes, password)
+    except FacturamaError as exc:
+        # No pudo validarse: marcamos el estado como error y devolvemos el motivo.
+        artist.csd_status = "error"
+        await db.commit()
+        raise HTTPException(status_code=422, detail=exc.message)
+
+    artist.rfc = rfc
+    artist.csd_status = "active"
+    artist.csd_uploaded_at = date_cls.today()
+    exp = (result or {}).get("CsdExpirationDate") if isinstance(result, dict) else None
+    if not exp:
+        # Un reemplazo (PUT) no siempre trae la vigencia; la leemos del CSD.
+        try:
+            csd = await client.get_csd(rfc)
+            exp = (csd or {}).get("CsdExpirationDate") if isinstance(csd, dict) else None
+        except FacturamaError:
+            exp = None
+    if exp:
+        try:
+            artist.csd_expires_at = datetime.fromisoformat(exp.replace("Z", "")).date()
+        except (ValueError, AttributeError):
+            artist.csd_expires_at = None
+    await db.commit()
+    await db.refresh(artist)
+    return _fiscal_out(artist)
+
+
+# --- CFDIs emitidos del músico --------------------------------------------
+
+def _cfdi_out(c: Cfdi) -> dict:
+    return {
+        "id": c.id,
+        "booking_id": c.booking_id,
+        "status": c.status,
+        "uuid": c.uuid,
+        "serie": c.serie,
+        "folio": c.folio,
+        "issuer_rfc": c.issuer_rfc,
+        "receiver_rfc": c.receiver_rfc,
+        "subtotal": float(c.subtotal) if c.subtotal is not None else None,
+        "total": float(c.total) if c.total is not None else None,
+        "stamped_at": c.stamped_at.isoformat() if c.stamped_at else None,
+        "error": c.error,
+    }
+
+
+@router.get("/cfdis")
+async def my_cfdis(scope: CurrentScope, db: DbSession):
+    """Lista los CFDI emitidos a nombre del músico (timbrados y con error)."""
+    artist_id = await _require_artist(scope)
+    rows = (
+        await db.execute(
+            select(Cfdi).where(Cfdi.artist_id == artist_id).order_by(Cfdi.id.desc())
+        )
+    ).scalars().all()
+    return {"items": [_cfdi_out(c) for c in rows]}
+
+
+@router.get("/cfdis/{cfdi_id}/file/{fmt}")
+async def download_cfdi(cfdi_id: int, fmt: str, scope: CurrentScope, db: DbSession):
+    """Descarga el PDF o XML de un CFDI timbrado del músico."""
+    from fastapi.responses import Response
+
+    artist_id = await _require_artist(scope)
+    cfdi = await db.get(Cfdi, cfdi_id)
+    if cfdi is None or cfdi.artist_id != artist_id:
+        raise HTTPException(status_code=404, detail="CFDI no encontrado.")
+    if cfdi.status != "stamped" or not cfdi.facturama_id:
+        raise HTTPException(status_code=409, detail="Este CFDI todavía no está timbrado.")
+    if fmt not in ("pdf", "xml"):
+        raise HTTPException(status_code=400, detail="Formato no válido.")
+    client = get_facturama()
+    try:
+        data = await client.get_cfdi_file(cfdi.facturama_id, fmt)
+    except FacturamaError as exc:
+        raise HTTPException(status_code=502, detail=exc.message)
+    media = "application/pdf" if fmt == "pdf" else "application/xml"
+    fname = f"CFDI_{cfdi.uuid or cfdi.id}.{fmt}"
+    return Response(
+        content=data,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 # --- Shows (publicaciones) ------------------------------------------------

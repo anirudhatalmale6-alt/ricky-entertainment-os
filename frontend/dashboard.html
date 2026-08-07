@@ -1102,6 +1102,10 @@ async function post(path,body){
   const r = await fetch(API+path,{method:"POST",headers:{Authorization:"Bearer "+TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body||{})});
   if(!r.ok) throw new Error(await _errMsg(r,path)); return r.json();
 }
+async function postForm(path,fd){
+  const r = await fetch(API+path,{method:"POST",headers:{Authorization:"Bearer "+TOKEN},body:fd});
+  if(!r.ok) throw new Error(await _errMsg(r,path)); return r.json();
+}
 async function put(path,body){
   const r = await fetch(API+path,{method:"PUT",headers:{Authorization:"Bearer "+TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body||{})});
   if(!r.ok) throw new Error(await _errMsg(r,path)); return r.json();
@@ -2910,6 +2914,43 @@ function selectPayout(i){
     <tr class="tot" style="font-weight:800"><td colspan="3" style="text-align:right">Honorarios contratados</td><td class="num">${MXN2(inv.honorarios)}</td></tr>
     </tbody></table>`;
 }
+async function loadCfdis(){
+  const box=document.getElementById('cfdiList'); if(!box) return;
+  try{
+    const d=await api('/me/cfdis');
+    const items=(d&&d.items)||[];
+    if(!items.length){ box.innerHTML='<div class="muted" style="padding:8px 0">Todavía no se ha emitido ningún CFDI. En cuanto realices una actuación (y tengas tu CSD activo), tu factura se timbra automáticamente y aparece aquí.</div>'; return; }
+    const rows=items.map(c=>{
+      if(c.status==='stamped'){
+        return `<tr>
+          <td style="font-variant-numeric:tabular-nums;font-size:11.5px">${esc(c.uuid||'—')}</td>
+          <td class="muted">${c.stamped_at?fmtDate(c.stamped_at):'—'}</td>
+          <td style="font-weight:600">${c.total!=null?MXN2(c.total):'—'}</td>
+          <td><span class="inv-status is-paid">Timbrada</span></td>
+          <td style="white-space:nowrap;text-align:right">
+            <button class="mini" onclick="dlCfdi(${c.id},'pdf')">PDF</button>
+            <button class="mini" onclick="dlCfdi(${c.id},'xml')">XML</button></td></tr>`;
+      }
+      return `<tr>
+        <td colspan="2" class="muted">Actuación #${c.booking_id||'—'}</td>
+        <td class="muted">—</td>
+        <td><span class="inv-status is-overdue" title="${esc(c.error||'')}">Pendiente</span></td>
+        <td class="muted" style="font-size:11.5px;text-align:right">${esc(c.error||'')}</td></tr>`;
+    }).join('');
+    box.innerHTML=`<table><thead><tr><th>Folio fiscal (UUID)</th><th>Fecha</th><th class="num">Total</th><th>Estado</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){ box.innerHTML='<div class="muted" style="padding:8px 0">No se pudieron cargar los comprobantes.</div>'; }
+}
+window.loadCfdis=loadCfdis;
+async function dlCfdi(id,fmt){
+  try{
+    const r=await fetch(API+`/me/cfdis/${id}/file/${fmt}`,{headers:{Authorization:'Bearer '+TOKEN}});
+    if(!r.ok) throw new Error(await _errMsg(r,'cfdi'));
+    const blob=await r.blob(); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=`CFDI_${id}.${fmt}`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }catch(e){ toast('No se pudo descargar: '+(e.message||''),true); }
+}
+window.dlCfdi=dlCfdi;
 function exportPayouts(btn){
   const L={paid:'Pagada',sent:'Enviada',overdue:'Vencida'};
   const rows=(CACHE.payouts||[]).map(inv=>[inv.no,inv.period,inv.company,inv.honorarios,inv.comision,inv.base_cfdi,inv.iva,inv.ret_iva,inv.ret_isr,inv.total_recibir,L[inv.status]||inv.status]);
@@ -4252,8 +4293,11 @@ const RENDER = {
             </div></div>
         </div>
       </div>
-      <div class="box" style="margin-top:16px"><div class="bhead"><h3 style="margin:0">Detalle de la factura</h3></div><div id="poLines"></div></div>`;
+      <div class="box" style="margin-top:16px"><div class="bhead"><h3 style="margin:0">Detalle de la factura</h3></div><div id="poLines"></div></div>
+      <div class="box" style="margin-top:16px"><div class="bhead"><h3 style="margin:0">Comprobantes CFDI emitidos</h3><span class="hint" style="margin:0">Facturas timbradas ante el SAT</span></div>
+        <div id="cfdiList"><div class="muted" style="padding:8px 0">Cargando…</div></div></div>`;
     selectPayout(0);
+    loadCfdis();
   },
 
   async profile(box){
@@ -4310,7 +4354,24 @@ const RENDER = {
           <div class="field"><label>RFC</label><input id="pf_rfc" value="${esc(p.rfc||'')}" placeholder="XAXX010101000"></div>
           <div class="field"><label>Régimen fiscal (SAT)</label><select id="pf_regime">${regimenOptions(p.tax_regime||'')}</select></div>
         </div>
+        <div class="fgrid">
+          <div class="field"><label>Código postal fiscal</label><input id="pf_cp" value="${esc(p.fiscal_postal_code||'')}" placeholder="77500" inputmode="numeric"></div>
+          <div class="field"><label>Uso de CFDI</label><select id="pf_use">${usoCfdiOptions(p.cfdi_use||'')}</select></div>
+        </div>
         <div class="field"><label>Razón social (opcional)</label><input id="pf_legal" value="${esc(p.legal_name||'')}" placeholder="Nombre o razón social"></div>
+
+        <div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin:14px 0 4px;background:var(--ov)">
+          <div style="font-weight:700;font-size:13.5px;margin-bottom:2px">💳 Sello Digital (CSD) para facturación</div>
+          <div class="hint" style="margin:0 0 10px">Sube tu Certificado de Sello Digital una sola vez. Con él, SHOWMA emite tus facturas (CFDI) automáticamente cada vez que realizas una actuación — no tienes que hacer nada más. Tu contraseña y tu llave nunca se comparten con los hoteles.</div>
+          <div id="csd_status" class="hint" style="margin-bottom:10px">Cargando estado…</div>
+          <div class="fgrid">
+            <div class="field"><label>Certificado (.cer)</label><input type="file" id="csd_cer" accept=".cer"></div>
+            <div class="field"><label>Llave privada (.key)</label><input type="file" id="csd_key" accept=".key"></div>
+          </div>
+          <div class="field"><label>Contraseña de la llave</label><input type="password" id="csd_pass" placeholder="Contraseña de tu llave privada" autocomplete="off"></div>
+          <div class="saverow"><button class="btn" onclick="uploadCSD(this)">Validar y activar facturación</button><span class="saved" id="csd_saved">Activado ✓</span></div>
+        </div>
+
         <div style="font-weight:700;font-size:12.5px;color:var(--mut);margin:14px 0 8px">Datos bancarios</div>
         <div class="fgrid">
           <div class="field"><label>Banco</label><input id="pf_bank" value="${esc(p.bank_name||'')}" placeholder="BBVA"></div>
@@ -4354,6 +4415,7 @@ const RENDER = {
       </div>`;
     fillSub('ns_cat','ns_sub');
     loadClientRates();
+    loadFiscalStatus();
   },
 
   async market(box){
@@ -4733,6 +4795,7 @@ async function saveFiscal(btn){
   const clabe=(gv('pf_clabe')||'').replace(/\s+/g,'');
   if(clabe && clabe.replace(/[^0-9]/g,'').length!==18){ alert('La CLABE interbancaria debe tener 18 dígitos.'); btn.disabled=false; return; }
   const body={rfc:gv('pf_rfc')||null,tax_regime:gv('pf_regime')||null,legal_name:gv('pf_legal')||null,
+    fiscal_postal_code:gv('pf_cp')||null,cfdi_use:gv('pf_use')||null,
     bank_name:gv('pf_bank')||null,bank_account_holder:gv('pf_holder')||null,
     bank_account:gv('pf_account')||null,bank_clabe:clabe||null};
   try{ CACHE.profile=await patch('/me/artist',body); flash('pf_fsaved'); }
@@ -4740,6 +4803,56 @@ async function saveFiscal(btn){
   btn.disabled=false;
 }
 window.saveFiscal=saveFiscal;
+
+// ---- Facturación electrónica (CFDI): estado del CSD + carga/validación ----
+const USOS_CFDI=['G03 - Gastos en general','G01 - Adquisición de mercancías',
+  'P01 - Por definir','S01 - Sin efectos fiscales'];
+function usoCfdiOptions(sel){
+  const code=(sel||'').trim();
+  return '<option value="">Selecciona…</option>'+USOS_CFDI.map(u=>{
+    const c=u.split(' ')[0];
+    return `<option value="${esc(u)}"${(code===u||code===c)?' selected':''}>${esc(u)}</option>`;
+  }).join('');
+}
+window.usoCfdiOptions=usoCfdiOptions;
+async function loadFiscalStatus(){
+  const box=document.getElementById('csd_status'); if(!box) return;
+  try{
+    const f=await api('/me/fiscal');
+    let html;
+    if(f.csd_status==='active'){
+      const exp=f.csd_expires_at?(' · vigente hasta '+fmtDate(f.csd_expires_at)):'';
+      html=`<span style="color:var(--ok,#1a9d5a);font-weight:700">✓ Facturación activa</span> — tu Sello Digital está validado${exp}. Ya emitimos tus CFDI automáticamente.`;
+    }else if(f.csd_status==='error'){
+      html=`<span style="color:var(--bad,#c0392b);font-weight:700">⚠ No se pudo validar tu CSD.</span> Revisa que el .cer y el .key correspondan a tu RFC y que la contraseña sea correcta, y vuelve a intentar.`;
+    }else{
+      html=`Aún no has activado la facturación. Sube tu .cer, tu .key y su contraseña para activarla (una sola vez).`;
+    }
+    box.innerHTML=html;
+  }catch(e){ box.textContent='No se pudo cargar el estado de facturación.'; }
+}
+window.loadFiscalStatus=loadFiscalStatus;
+async function uploadCSD(btn){
+  const cer=(document.getElementById('csd_cer')||{}).files||[];
+  const key=(document.getElementById('csd_key')||{}).files||[];
+  const pass=gv('csd_pass'); const rfc=(gv('pf_rfc')||'').trim();
+  if(!rfc){ alert('Primero escribe tu RFC arriba y guarda tus datos fiscales.'); return; }
+  if(!cer.length||!key.length){ alert('Selecciona tu archivo .cer y tu archivo .key.'); return; }
+  if(!pass){ alert('Escribe la contraseña de tu llave privada (.key).'); return; }
+  const fd=new FormData();
+  fd.append('cer',cer[0]); fd.append('key',key[0]); fd.append('password',pass); fd.append('rfc',rfc);
+  btn.disabled=true; const old=btn.textContent; btn.textContent='Validando…';
+  try{
+    await postForm('/me/fiscal/csd',fd);
+    (document.getElementById('csd_pass')||{}).value='';
+    flash('csd_saved'); loadFiscalStatus();
+    toast('Facturación activada ✓');
+  }catch(e){
+    loadFiscalStatus();
+    alert('No se pudo validar el CSD: '+(e.message||''));
+  }finally{ btn.disabled=false; btn.textContent=old; }
+}
+window.uploadCSD=uploadCSD;
 // ---- Tarifas especiales por cliente (descuento del músico a un hotel/cadena) ----
 function crToggle(){
   const t=(document.getElementById('cr_type')||{}).value;

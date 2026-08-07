@@ -47,9 +47,29 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: str = "*"
 
+    # --- Facturama (CFDI e-invoicing / timbrado) -----------------------
+    # SHOWMA emite CFDI reales a nombre de cada músico (modalidad Multiemisor:
+    # cada músico factura con su propio RFC tras subir su CSD una sola vez).
+    # Deja FACTURAMA_ENABLED en False hasta tener credenciales; así la
+    # plataforma corre igual y la sección de facturación se muestra "no
+    # configurada" en lugar de romper. Sandbox = ambiente de pruebas (gratis,
+    # sin folios reales); en producción se apunta a api.facturama.mx.
+    FACTURAMA_ENABLED: bool = False
+    FACTURAMA_USER: str = ""
+    FACTURAMA_PASSWORD: str = ""
+    FACTURAMA_SANDBOX: bool = True
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def facturama_base_url(self) -> str:
+        return (
+            "https://apisandbox.facturama.mx"
+            if self.FACTURAMA_SANDBOX
+            else "https://api.facturama.mx"
+        )
 
 
 @lru_cache
