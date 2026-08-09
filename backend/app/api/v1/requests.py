@@ -16,7 +16,7 @@ import uuid
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 
-from app.api.deps import CurrentScope, DbSession, get_current_user, require_permission
+from app.api.deps import CurrentScope, DbSession, require_permission
 from app.api.v1.bookings import _check_travel_buffer, _now
 from app.core.config import settings
 from app.core.storage import ensure_upload_dir
@@ -61,6 +61,45 @@ async def _decorate(db: DbSession, req: ProductRequest) -> ProductRequestOut:
         "company_name": company_name, "company_logo": company_logo, "proposals_count": count})
 
 
+def _today_start() -> datetime:
+    """Medianoche de hoy: todo evento anterior se considera vencido."""
+    return _now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+async def _own_company_ids(db: DbSession, scope) -> list[int]:
+    """Propiedades que 'posee' un contratante: la suya o todas las de su cadena."""
+    ids: set[int] = set()
+    if scope.company_id:
+        ids.add(scope.company_id)
+    if scope.group_id:
+        rows = (await db.execute(
+            select(Company.id).where(Company.group_id == scope.group_id))).all()
+        ids.update(cid for (cid,) in rows)
+    return sorted(ids)
+
+
+async def _scope_filter(db: DbSession, q, scope):
+    """Limita el tablero a lo que le toca ver a quien pregunta.
+
+    Artistas y MASTER ven todas las solicitudes; un hotel sólo las suyas.
+    """
+    if scope.is_admin or scope.is_artist or not scope.is_contratante:
+        return q
+    ids = await _own_company_ids(db, scope)
+    if not ids:
+        return q.where(ProductRequest.id < 0)  # sin propiedad asociada: nada que ver
+    return q.where(ProductRequest.company_id.in_(ids))
+
+
+async def _ensure_request_visible(db: DbSession, req: ProductRequest, scope) -> None:
+    """Un hotel no puede abrir la solicitud de otro hotel."""
+    if scope.is_admin or scope.is_artist or not scope.is_contratante:
+        return
+    if req.company_id in await _own_company_ids(db, scope):
+        return
+    raise HTTPException(status_code=403, detail="Esta solicitud no es de tu propiedad.")
+
+
 # --- Solicitudes ----------------------------------------------------------
 
 @router.post(
@@ -69,9 +108,16 @@ async def _decorate(db: DbSession, req: ProductRequest) -> ProductRequestOut:
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def create_request(payload: ProductRequestCreate, db: DbSession):
+async def create_request(payload: ProductRequestCreate, db: DbSession, scope: CurrentScope):
     if payload.company_id is not None and await db.get(Company, payload.company_id) is None:
         raise HTTPException(status_code=404, detail="Company not found")
+    # Un hotel sólo puede publicar a nombre de su propia propiedad (o su cadena).
+    if not scope.is_admin and scope.is_contratante:
+        own = await _own_company_ids(db, scope)
+        if payload.company_id is None and own:
+            payload.company_id = own[0]
+        elif payload.company_id not in own:
+            raise HTTPException(status_code=403, detail="No puedes publicar para otra propiedad.")
     req = ProductRequest(**payload.model_dump())
     db.add(req)
     await db.commit()
@@ -103,10 +149,10 @@ async def upload_request_image(file: UploadFile = File(...)):
 @router.get(
     "",
     response_model=list[ProductRequestOut],
-    dependencies=[Depends(get_current_user)],  # the board is browsable by any signed-in user (artists included)
 )
 async def list_requests(
     db: DbSession,
+    scope: CurrentScope,
     status_: RequestStatus | None = Query(default=None, alias="status"),
     category: str | None = None,
     subcategory: str | None = None,
@@ -114,12 +160,27 @@ async def list_requests(
     company_id: int | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
+    include_past: bool = False,
 ):
     """Browse requests - what artists see on the board. Defaults to every status;
-    pass status=open to see only the ones still taking proposals."""
+    pass status=open to see only the ones still taking proposals.
+
+    Visibilidad (David): el tablero es abierto para los artistas — ven todas las
+    solicitudes de la red —, pero un hotel sólo ve LAS SUYAS (las de su propiedad
+    o, si dirige una cadena, las de sus propiedades). El MASTER ve todo.
+
+    Además, por defecto se ocultan las solicitudes cuya fecha del evento ya pasó,
+    para que el tablero no se sature; ``include_past=true`` las vuelve a mostrar.
+    """
     q = select(ProductRequest)
     if status_ is not None:
         q = q.where(ProductRequest.status == status_)
+    q = await _scope_filter(db, q, scope)
+    if not include_past:
+        q = q.where(
+            (ProductRequest.event_date.is_(None))
+            | (ProductRequest.event_date >= _today_start())
+        )
     if category:
         q = q.where(ProductRequest.category == category)
     if subcategory:
@@ -169,10 +230,11 @@ async def list_requests(
 @router.get(
     "/{request_id}",
     response_model=ProductRequestOut,
-    dependencies=[Depends(get_current_user)],
 )
-async def get_request(request_id: int, db: DbSession):
-    return await _decorate(db, await _get_request_or_404(db, request_id))
+async def get_request(request_id: int, db: DbSession, scope: CurrentScope):
+    req = await _get_request_or_404(db, request_id)
+    await _ensure_request_visible(db, req, scope)
+    return await _decorate(db, req)
 
 
 @router.patch(
@@ -180,8 +242,11 @@ async def get_request(request_id: int, db: DbSession):
     response_model=ProductRequestOut,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def update_request(request_id: int, payload: ProductRequestUpdate, db: DbSession):
+async def update_request(
+    request_id: int, payload: ProductRequestUpdate, db: DbSession, scope: CurrentScope
+):
     req = await _get_request_or_404(db, request_id)
+    await _ensure_request_visible(db, req, scope)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(req, field, value)
     await db.commit()
@@ -194,8 +259,9 @@ async def update_request(request_id: int, payload: ProductRequestUpdate, db: DbS
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def delete_request(request_id: int, db: DbSession):
+async def delete_request(request_id: int, db: DbSession, scope: CurrentScope):
     req = await _get_request_or_404(db, request_id)
+    await _ensure_request_visible(db, req, scope)
     await db.delete(req)
     await db.commit()
 
@@ -264,7 +330,7 @@ async def submit_proposal(
 async def list_proposals(request_id: int, db: DbSession, scope: CurrentScope):
     """Hotels/admins see every proposal on the request; an artist only sees their
     own (so competitor bids stay private)."""
-    await _get_request_or_404(db, request_id)
+    await _ensure_request_visible(db, await _get_request_or_404(db, request_id), scope)
     q = (
         select(RequestProposal)
         .where(RequestProposal.request_id == request_id)
@@ -297,12 +363,13 @@ async def _get_proposal_or_404(db: DbSession, request_id: int, proposal_id: int)
     response_model=ProposalOut,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def accept_proposal(request_id: int, proposal_id: int, db: DbSession):
+async def accept_proposal(request_id: int, proposal_id: int, db: DbSession, scope: CurrentScope):
     """Hotel picks a winner: this proposal is accepted, the rest rejected, the
     request is marked fulfilled, and the actuacion is generated automatically so
     it goes straight to the agenda (David's call). The hotel then only picks the
     venue and confirms the fecha on the calendar."""
     req = await _get_request_or_404(db, request_id)
+    await _ensure_request_visible(db, req, scope)
     if req.status == RequestStatus.FULFILLED:
         raise HTTPException(status_code=409, detail="La solicitud ya fue adjudicada")
     winner = await _get_proposal_or_404(db, request_id, proposal_id)

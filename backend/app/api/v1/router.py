@@ -8,6 +8,7 @@ from app.api.v1 import (
     bookings,
     chat,
     companies,
+    documents,
     groups,
     intelligence,
     leads,
@@ -35,3 +36,4 @@ api_router.include_router(me.router)
 api_router.include_router(reports.router)
 api_router.include_router(support.router)
 api_router.include_router(admin.router)
+api_router.include_router(documents.router)

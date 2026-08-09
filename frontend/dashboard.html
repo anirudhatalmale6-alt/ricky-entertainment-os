@@ -2307,6 +2307,8 @@ async function openReqForm(){
   fillSub('rq_cat','rq_sub','— Selecciona —');
 }
 function reqClose(){ const ov=document.getElementById('reqMov'); if(ov) ov.style.display='none'; }
+// Mostrar / ocultar las solicitudes cuya fecha del evento ya pasó.
+function reqsTogglePast(on){ CACHE.reqsPast=!!on; show('reqs',true); }
 // Imágenes de la solicitud: logo de la propiedad (se guarda en el hotel) y foto del venue (por solicitud)
 let _reqImgKind=null;
 function pickReqImg(kind){
@@ -2844,10 +2846,8 @@ async function hotelBill(box){
         <div class="box" style="margin-bottom:16px"><div class="bhead"><h3 style="margin:0">Factura seleccionada</h3></div><div id="invDetail"></div></div>
         <div class="box"><div class="bhead"><h3 style="margin:0">Acciones</h3></div>
           <div class="qact">
-            <a onclick="dlHotelInvoice()">⬇ Descargar factura (PDF)</a>
-            <a onclick="show('chat')">✉ Enviar al hotel por chat</a>
+            <a onclick="dlHotelInvoice(this)">⬇ Descargar factura (PDF)</a>
             <a onclick="markInvoicePaid()">✓ Marcar como pagada</a>
-            <a onclick="hotelCreditNote()">📝 Crear nota de crédito</a>
           </div></div>
       </div>
     </div>
@@ -2989,10 +2989,44 @@ function _docHead(kind, no){
   return '<div class="head"><div><div class="brand">SHOWMA</div><div class="sub">Entertainment OS</div></div>'
     +'<div style="text-align:right"><h1>'+kind+'</h1><div class="sub">'+esc(no)+'</div></div></div>';
 }
+/* Descarga real en .PDF: el servidor genera el archivo y el navegador lo baja
+   (nada de abrir la ventana de impresión). Si algo fallara, se cae de vuelta a
+   la impresión del navegador para no dejar al usuario sin documento. */
+async function dlPdf(doc, filename, btn){
+  const old=btn?btn.textContent:null;
+  if(btn){ btn.textContent='⏳ Generando PDF…'; btn.style.pointerEvents='none'; }
+  try{
+    const r=await fetch(API+'/documents/pdf',{method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},
+      body:JSON.stringify(doc)});
+    if(!r.ok) throw new Error('http '+r.status);
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+    toast('PDF descargado ✓');
+    return true;
+  }catch(e){ return false; }
+  finally{ if(btn){ btn.textContent=old; btn.style.pointerEvents=''; } }
+}
 // Factura del hotel (panel de Facturación del hotel/cadena)
-function dlHotelInvoice(){
+async function dlHotelInvoice(btn){
   const inv=(CACHE.invoices||[])[CACHE.selInvIdx||0]; if(!inv){ toast('Selecciona una factura primero'); return; }
   const AMAP=CACHE.AMAP||{};
+  const rows=(inv.rows||[]).map(b=>[fmtDate(b.starts_at), b.show_name||'—',
+    b.artist_name||AMAP[b.artist_id]||'—', b.venue_name||'—', MXN2(b.agreed_price)]);
+  const ok=await dlPdf({
+    kind:'Factura', number:inv.no, title:'Factura '+inv.no,
+    filename:'Factura_'+inv.no+'.pdf',
+    meta:[['Hotel',inv.company],['Periodo',inv.period],['Emitida',inv.issue],['Vence',inv.due]],
+    table:{head:['Fecha','Show','Artista','Venue','Importe'],rows,align:['l','l','l','l','r']},
+    summary:[['Subtotal',MXN2(inv.subtotal),''],
+             ['Servicios de gestión SHOWMA ('+inv.feePct.toFixed(1)+'%)',MXN2(inv.fee),''],
+             ['IVA (16%)',MXN2(inv.iva),''],
+             ['Total',MXN2(inv.total)+' MXN','1']]
+  },'Factura_'+inv.no+'.pdf',btn);
+  if(ok) return;
   const lines=(inv.rows||[]).map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td><td>${esc(b.artist_name||AMAP[b.artist_id]||'—')}</td><td>${esc(b.venue_name||'—')}</td><td class="num">${MXN2(b.agreed_price)}</td></tr>`).join('');
   printDoc('Factura '+inv.no, _docHead('Factura', inv.no)
     +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Periodo:</b> <span style="text-transform:capitalize">${esc(inv.period)}</span></td></tr>`
@@ -3003,22 +3037,26 @@ function dlHotelInvoice(){
     +`<tr><td>IVA (16%)</td><td class="num">${MXN2(inv.iva)}</td></tr>`
     +`<tr class="tot"><td>Total</td><td class="num">${MXN2(inv.total)} MXN</td></tr></table>`);
 }
-function hotelCreditNote(){
-  const inv=(CACHE.invoices||[])[CACHE.selInvIdx||0]; if(!inv){ toast('Selecciona una factura primero'); return; }
-  const no='NC-'+String(inv.no).replace(/^INV-/,'');
-  printDoc('Nota de crédito '+no, _docHead('Nota de crédito', no)
-    +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Factura de origen:</b> ${esc(inv.no)}</td></tr>`
-    +`<tr><td><b>Periodo:</b> <span style="text-transform:capitalize">${esc(inv.period)}</span></td><td style="text-align:right"><b>Concepto:</b> Cancelación / ajuste</td></tr></table>`
-    +`<table class="sumt"><tr><td>Subtotal</td><td class="num">−${MXN2(inv.subtotal)}</td></tr>`
-    +`<tr><td>Servicios de gestión SHOWMA (${inv.feePct.toFixed(1)}%)</td><td class="num">−${MXN2(inv.fee)}</td></tr>`
-    +`<tr><td>IVA (16%)</td><td class="num">−${MXN2(inv.iva)}</td></tr>`
-    +`<tr class="tot"><td>Total nota de crédito</td><td class="num">−${MXN2(inv.total)} MXN</td></tr></table>`);
-}
 // Recibo del artista (panel de Facturación del artista)
-function dlPayout(){
+async function dlPayout(btn){
   const inv=(CACHE.payouts||[])[CACHE.selPayoutIdx||0]; if(!inv){ toast('Selecciona una factura primero'); return; }
-  const fig=CACHE.payoutFigura?' ('+esc(CACHE.payoutFigura)+')':'';
+  const fig=CACHE.payoutFigura?' ('+CACHE.payoutFigura+')':'';
   const p=x=>((+x||0))+'%';
+  const ok=await dlPdf({
+    kind:'Recibo de honorarios', number:inv.no, title:'Recibo '+inv.no,
+    filename:'Recibo_'+inv.no+'.pdf',
+    meta:[['Hotel',inv.company],['Periodo',inv.period],['Emitida',inv.issue],['Vence',inv.due]],
+    table:{head:['Concepto','Base','%','Importe'],align:['l','r','r','r'],rows:[
+      ['Honorarios contratados','','',MXN2(inv.honorarios)],
+      ['Platform Service',MXN2(inv.honorarios),p(inv.com_pct),'−'+MXN2(inv.comision)],
+      ['Base para emitir CFDI','','',MXN2(inv.base_cfdi)],
+      ['IVA trasladado',MXN2(inv.base_cfdi),p(inv.iva_pct),'+'+MXN2(inv.iva)],
+      ['Subtotal con IVA','','',MXN2(inv.subtotal_iva)],
+      ['Retención de IVA',MXN2(inv.base_cfdi),p(inv.riva_pct),'−'+MXN2(inv.ret_iva)],
+      ['Retención de ISR'+fig,MXN2(inv.base_cfdi),p(inv.risr_pct),'−'+MXN2(inv.ret_isr)]]},
+    summary:[['Total a recibir',MXN2(inv.total_recibir)+' MXN','1']]
+  },'Recibo_'+inv.no+'.pdf',btn);
+  if(ok) return;
   printDoc('Recibo '+inv.no, _docHead('Recibo de honorarios', inv.no)
     +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Periodo:</b> <span style="text-transform:capitalize">${esc(inv.period)}</span></td></tr>`
     +`<tr><td><b>Emitida:</b> ${esc(inv.issue)}</td><td style="text-align:right"><b>Vence:</b> ${esc(inv.due)}</td></tr></table>`
@@ -3029,7 +3067,7 @@ function dlPayout(){
     +`<tr><td>IVA trasladado</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${p(inv.iva_pct)}</td><td class="num">+${MXN2(inv.iva)}</td></tr>`
     +`<tr><td><b>Subtotal con IVA</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.subtotal_iva)}</b></td></tr>`
     +`<tr><td>Retención de IVA</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${p(inv.riva_pct)}</td><td class="num">−${MXN2(inv.ret_iva)}</td></tr>`
-    +`<tr><td>Retención de ISR${fig}</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${p(inv.risr_pct)}</td><td class="num">−${MXN2(inv.ret_isr)}</td></tr>`
+    +`<tr><td>Retención de ISR${esc(fig)}</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${p(inv.risr_pct)}</td><td class="num">−${MXN2(inv.ret_isr)}</td></tr>`
     +`<tr class="tot"><td>Total a recibir</td><td class="num"></td><td class="num"></td><td class="num">${MXN2(inv.total_recibir)} MXN</td></tr>`
     +`</tbody></table>`);
 }
@@ -4236,11 +4274,19 @@ const RENDER = {
   },
 
   async reqs(box){
-    const rs = await api(`/requests`);
+    // Por defecto se ocultan las solicitudes cuya fecha ya pasó, para no saturar
+    // el tablero; el interruptor las vuelve a mostrar.
+    const past = !!CACHE.reqsPast;
+    const rs = await api(`/requests${past?'?include_past=true':''}`);
     box.innerHTML=`
       <div class="rqhead">
-        <div><h3 style="margin:0">Solicitudes</h3><div class="hint" style="margin:0">Publica lo que necesitas y recibe propuestas de artistas.</div></div>
-        ${ME.artist_id?'':`<button class="btn" onclick="openReqForm()">＋ Crear solicitud</button>`}
+        <div><h3 style="margin:0">Solicitudes</h3><div class="hint" style="margin:0">${ME.artist_id?'Todas las solicitudes abiertas de la red.':'Publica lo que necesitas y recibe propuestas de artistas.'}</div></div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <label class="hint" style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" id="rq_past" ${past?'checked':''} onchange="reqsTogglePast(this.checked)"> Ver también las vencidas
+          </label>
+          ${ME.artist_id?'':`<button class="btn" onclick="openReqForm()">＋ Crear solicitud</button>`}
+        </div>
       </div>
       <div class="reqs">${rs.map(r=>`
       <div class="reqc" onclick="openReqDetail(${r.id})">${(r.venue_photo_url||r.company_logo)?`<div class="reqc-img"><img src="${esc(r.venue_photo_url||r.company_logo)}" alt="" loading="lazy"></div>`:''}<div class="t">${esc(r.title)}</div>
@@ -4249,7 +4295,7 @@ const RENDER = {
         <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
         ${(()=>{const m=parseMeta(r.description);let h='';if(m.horario)h+=`<div class="meta">🕐 ${esc(m.horario)}</div>`;if(m.loc.length)h+=`<div class="spc">🎪 ${m.loc.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`;if(m.size)h+=`<div class="spc">👥 <span>${esc(m.size)}</span></div>`;return h;})()}
         <div class="ft">${chip(r.status)}<span class="muted">${ME.artist_id?(r.status==='open'?'Ver y proponer →':'Ver detalle →'):(r.proposals_count+' propuesta'+(r.proposals_count===1?'':'s'))}</span></div>
-      </div>`).join("") || '<div class="muted">Aún no hay solicitudes. Pulsa "Crear solicitud" para publicar la primera.</div>'}</div>`;
+      </div>`).join("") || `<div class="muted">${past?'No hay solicitudes que mostrar.':(ME.artist_id?'No hay solicitudes vigentes por ahora. Activa "Ver también las vencidas" para revisar las anteriores.':'Aún no hay solicitudes vigentes. Pulsa "Crear solicitud" para publicar la primera.')}</div>`}</div>`;
   },
 
   async bill(box){
@@ -4287,7 +4333,7 @@ const RENDER = {
           <div class="box" style="margin-bottom:16px"><div class="bhead"><h3 style="margin:0">Factura seleccionada</h3></div><div id="poDetail"></div></div>
           <div class="box"><div class="bhead"><h3 style="margin:0">Acciones</h3></div>
             <div class="qact">
-              <a onclick="dlPayout()">⬇ Descargar recibo (PDF)</a>
+              <a onclick="dlPayout(this)">⬇ Descargar recibo (PDF)</a>
               <a onclick="show('chat')">✉ Enviar recibo al hotel por chat</a>
               <a onclick="markPayoutCobrada()">✓ Marcar como cobrada</a>
             </div></div>
