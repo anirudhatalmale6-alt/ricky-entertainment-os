@@ -17,6 +17,7 @@ from app.models.media import ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
 from app.schemas.show import PriceBenchmarkOut, ShowCreate, ShowOut, ShowUpdate
+from app.services import pricing
 
 router = APIRouter(tags=["shows"])
 
@@ -44,6 +45,8 @@ async def list_shows(
     subcategory: str | None = Query(None, description="Filter by subcategory"),
     region: str | None = Query(None, description="Filter by the profile's region"),
     active_only: bool = Query(True, description="Only active shows"),
+    on: datetime | None = Query(
+        None, description="Fecha de la actuación: aplica la tarifa de temporada del show"),
 ):
     """Marketplace catalogue of shows."""
     stmt = select(Show).options(*_SHOW_RELS).order_by(Show.show_name)
@@ -113,16 +116,14 @@ async def list_shows(
         s.image_url = show_img or avatars.get(s.artist_id)
         s.artist_city = cities.get(s.artist_id)
         s.artist_partner = partners.get(s.artist_id, False)
-        base = float(s.price_hotel) if s.price_hotel is not None else None
-        eff = base
-        r = rate_by_artist.get(s.artist_id)
-        if r is not None:
-            if r.special_price is not None:
-                eff = float(r.special_price)
-            elif r.discount_pct is not None and base is not None:
-                eff = round(base * (1 - float(r.discount_pct) / 100.0), 2)
-            s.has_special_rate = eff is not None and eff != base
-        s.effective_price = eff
+        # Precio efectivo = base → temporada del show (si la fecha cae dentro) →
+        # tarifa especial pactada con ese hotel/cadena.
+        info = pricing.effective_price(s, on, rate_by_artist.get(s.artist_id))
+        s.effective_price = info["price"]
+        s.has_special_rate = info["has_special_rate"]
+        s.season_label = info["season_label"]
+        s.season_pct = info["season_pct"]
+        s.has_season = info["has_season"]
     return shows
 
 
@@ -257,8 +258,14 @@ async def add_show(artist_id: int, payload: ShowCreate, db: DbSession):
 )
 async def update_show(show_id: int, payload: ShowUpdate, db: DbSession):
     show = await _get_show_or_404(db, show_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    rates = data.pop("seasonal_rates", None)
+    for field, value in data.items():
         setattr(show, field, value)
+    if rates is not None:
+        show.seasonal_rates.clear()
+        for rate in rates:
+            show.seasonal_rates.append(ShowSeasonalRate(**rate))
     await db.commit()
     return await _get_show_or_404(db, show_id)
 

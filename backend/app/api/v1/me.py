@@ -659,8 +659,15 @@ async def add_my_show(payload: ShowCreate, scope: CurrentScope, db: DbSession):
 async def update_my_show(show_id: int, payload: ShowUpdate, scope: CurrentScope, db: DbSession):
     artist_id = await _require_artist(scope)
     show = await _own_show_or_404(db, artist_id, show_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    rates = data.pop("seasonal_rates", None)
+    for field, value in data.items():
         setattr(show, field, value)
+    if rates is not None:
+        # El calendario de temporadas se reemplaza completo con lo que llega.
+        show.seasonal_rates.clear()
+        for rate in rates:
+            show.seasonal_rates.append(ShowSeasonalRate(**rate))
     await db.commit()
     return await _load_show(db, show_id)
 

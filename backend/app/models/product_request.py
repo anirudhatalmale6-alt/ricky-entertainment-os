@@ -58,7 +58,10 @@ class ProductRequest(Base, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(3), default="MXN")
 
     # Foto del área/venue para que el talento visualice el espacio al cotizar (rev.4)
+    # venue_photo_url es la principal (la que se ve en la cabecera de la tarjeta);
+    # `images` guarda hasta 3 fotos del espacio, incluida la principal.
     venue_photo_url: Mapped[str | None] = mapped_column(String(500))
+    images: Mapped[list] = mapped_column(JSON, default=list)
 
     status: Mapped[RequestStatus] = mapped_column(
         SQLEnum(RequestStatus, values_callable=lambda e: [m.value for m in e]),

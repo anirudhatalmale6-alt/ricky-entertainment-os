@@ -196,13 +196,37 @@
   .dot{width:10px;height:10px;border-radius:3px;flex:none}
 
   /* request cards */
-  .reqs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-  .reqc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px 16px;box-shadow:var(--shadow)}
-  .reqc .t{font-weight:650;font-size:14px;margin-bottom:8px}
-  .reqc .meta{font-size:12px;color:var(--mut);margin:3px 0}
+  .reqs{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+  .reqc{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+  /* Cabecera: logo del hotel a la izquierda + foto del venue a la derecha */
+  .reqc-hd{display:flex;height:132px;background:var(--inp);position:relative}
+  .reqc-logo{width:112px;flex:none;background:#131a33;display:flex;align-items:center;justify-content:center;padding:10px}
+  .reqc-logo img{max-width:100%;max-height:100%;object-fit:contain}
+  .reqc-logo .ini{color:#fff;font-weight:800;font-size:19px;letter-spacing:1px;opacity:.9;text-align:center;line-height:1.25}
+  .reqc-hero{flex:1;position:relative;background:linear-gradient(135deg,#382ca1,#8b5cf6);overflow:hidden}
+  .reqc-hero img{width:100%;height:100%;object-fit:cover;display:block}
+  .reqc-thumbs{position:absolute;right:8px;bottom:8px;display:flex;gap:5px}
+  .reqc-thumbs i{width:32px;height:32px;border-radius:7px;border:2px solid rgba(255,255,255,.9);background-size:cover;background-position:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);transition:.12s}
+  .reqc-thumbs i.on{outline:2px solid var(--acc2);transform:translateY(-2px)}
+  .reqc-body{padding:14px 16px 15px;display:flex;flex-direction:column;flex:1}
+  .reqc-cat{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:#b45309;background:#f59e0b1f;padding:3px 10px;border-radius:20px;margin-bottom:8px;align-self:flex-start}
+  .reqc .t{font-weight:750;font-size:16px;margin-bottom:9px;line-height:1.25}
+  .reqc-cols{display:flex;gap:12px;flex-wrap:wrap;flex:1}
+  .reqc-main{flex:1 1 175px;min-width:0}
+  .reqc-side{flex:0 1 145px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--ov);align-self:flex-start}
+  .reqc-side .sr{font-size:11.5px;color:var(--mut);line-height:1.35}
+  .reqc-side .sr+.sr{margin-top:7px;padding-top:7px;border-top:1px solid var(--line)}
+  .reqc-side .sr b{display:block;color:var(--txt);font-size:12px}
+  .reqc .meta{font-size:12.5px;color:var(--mut);margin:4px 0}
   .reqc .ft{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
   .reqc .spc{display:flex;flex-wrap:wrap;gap:5px;margin:7px 0 3px}
   .reqc .spc span{font-size:11px;padding:2px 9px;border-radius:20px;background:var(--ov);color:var(--acc);border:1px solid var(--line);font-weight:600}
+  /* Miniaturas en el formulario de crear solicitud */
+  .rqthumbs{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .rqth{position:relative;width:74px;height:56px;border-radius:9px;overflow:hidden;border:1px solid var(--line)}
+  .rqth img{width:100%;height:100%;object-fit:cover;display:block}
+  .rqth b{position:absolute;left:0;bottom:0;right:0;font-size:9px;text-align:center;background:rgba(12,16,30,.62);color:#fff;padding:1px 0;font-weight:700}
+  .rqth .x{position:absolute;top:2px;right:3px;width:17px;height:17px;border-radius:50%;background:rgba(12,16,30,.68);color:#fff;font-size:13px;line-height:16px;text-align:center;cursor:pointer}
   /* space chip picker (form) */
   .chipset{display:flex;flex-wrap:wrap;gap:7px}
   .spchip{padding:6px 12px;border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--txt);font-size:12.5px;cursor:pointer;transition:.12s}
@@ -303,6 +327,14 @@
   .saverow{display:flex;align-items:center;gap:12px;margin-top:4px}
   .saved{font-size:12px;color:var(--ok);opacity:0;transition:.2s}.saved.on{opacity:1}
   .showcard{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--ov)}
+  .seasbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
+  .seash b{display:block;font-size:13px;margin-bottom:3px}
+  .seast{width:100%;border-collapse:collapse;margin:8px 0 6px}
+  .seast th{text-align:left;font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;padding:0 6px 6px;font-weight:700}
+  .seast td{padding:3px 4px}
+  .seast input{width:100%;padding:7px 9px;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--txt)}
+  .seast .s-del{color:#dc2626;cursor:pointer;font-size:16px;text-align:center;width:26px}
+  .btn.mini{padding:6px 11px;font-size:12px}
   .showcard .hh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
   .showcard .tag2{font-size:10.5px;color:var(--mut);background:var(--ov2);padding:3px 9px;border-radius:20px}
   .invtot{display:flex;align-items:baseline;gap:10px;margin:2px 0 14px}
@@ -423,6 +455,7 @@
   .acard3 .atag.aud{background:#10b98118;color:#0c8a62}
   .acard3 .atag.vid{background:#ef444418;color:#dc2626;cursor:pointer}
   .acard3 .atag.rate{background:#f59e0b1f;color:#b45309}
+  .acard3 .atag.seas{background:#7c5cf01f;color:#5b3fd6}
   /* Tarifas especiales por cliente (Mi Perfil) */
   .crrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
   .crrow b{font-size:13px;font-weight:700;display:block}
@@ -444,8 +477,6 @@
   .imgtile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .imgtile.has span{position:relative;z-index:1;background:rgba(12,16,30,.55);padding:2px 8px;border-radius:20px;font-weight:600}
   /* Imagen en la tarjeta de solicitud */
-  .reqc-img{margin:-2px -2px 10px;height:104px;border-radius:11px;overflow:hidden;background:var(--inp)}
-  .reqc-img img{width:100%;height:100%;object-fit:cover;display:block}
   /* Form modals (crear solicitud / cargar presupuesto) + section headers */
   .amod.rqmod{max-width:540px}
   .amod .rqbody{padding:16px 18px 4px;overflow-y:auto}
@@ -2001,9 +2032,16 @@ async function delBooking(id,name){
 
 /* ---- "+" Agregar actuación: buscar artista desde el venue y agendarlo ---- */
 let ADDACT={venueId:null,venueName:'',date:'',showId:null,price:0};
-async function ensureShows(){
-  if(CACHE.shows) return CACHE.shows;
-  try{ CACHE.shows=(await api('/shows?active_only=true'))||[]; }catch(e){ CACHE.shows=[]; }
+// El catálogo se pide POR FECHA: así el precio ya viene con la tarifa de
+// temporada del artista aplicada (Navidad, temporada baja, etc.).
+async function ensureShows(on){
+  const key=on||'_';
+  CACHE.showsBy=CACHE.showsBy||{};
+  if(!CACHE.showsBy[key]){
+    try{ CACHE.showsBy[key]=(await api('/shows?active_only=true'+(on?'&on='+encodeURIComponent(on+'T00:00:00'):'')))||[]; }
+    catch(e){ CACHE.showsBy[key]=[]; }
+  }
+  CACHE.shows=CACHE.showsBy[key];
   return CACHE.shows;
 }
 async function openAddAct(venueId,dateStr){
@@ -2027,11 +2065,12 @@ async function openAddAct(venueId,dateStr){
     <div class="alist artgrid" id="actList"><div class="muted" style="padding:16px;text-align:center">Cargando artistas…</div></div>
     <div class="af">
       <div class="fld"><label>Hora</label><input id="actTime" type="time" value="20:00"></div>
-      <div class="fld"><label>Precio (MXN)</label><input id="actPrice" type="number" min="0" step="100" value="" oninput="ADDACT.price=+this.value||0"></div>
+      <div class="fld"><label>Precio (MXN)</label><input id="actPrice" type="number" min="0" step="100" value="" oninput="ADDACT.price=+this.value||0">
+        <small id="actPriceNote" style="display:none;font-size:10.5px;color:#5b3fd6;margin-top:3px"></small></div>
       <button class="ago" id="actGo" onclick="actConfirm()" disabled>Agregar</button>
     </div></div>`;
   ov.style.display='flex';
-  await ensureShows();
+  await ensureShows(dateStr);
   // Poblar el filtro de ubicación con las ciudades de los artistas disponibles.
   const locSel=document.getElementById('actLoc');
   if(locSel){
@@ -2058,11 +2097,12 @@ function actRender(){
     const langs=(s.show_languages||[]).slice(0,3).join(', ');
     const eff=(s.effective_price!=null?s.effective_price:s.price_hotel);
     const tags=[];
+    if(s.has_season) tags.push(`<span class="atag seas">${(s.season_pct||0)<0?'🔻':'🔺'} ${esc(s.season_label||'Temporada')} ${(s.season_pct>0?'+':'')+(s.season_pct||0)}%</span>`);
     if(s.has_special_rate) tags.push('<span class="atag rate">🏷️ Tarifa especial</span>');
     if(s.artist_partner) tags.push('<span class="atag part">✓ Partner</span>');
     if(s.offers_audition) tags.push('<span class="atag aud">🎤 Acepta audiciones</span>');
     if(s.video_url) tags.push(`<span class="atag vid" onclick="event.stopPropagation();window.open('${esc(s.video_url)}','_blank')">▶ Video</span>`);
-    const priceHtml=eff!=null?(s.has_special_rate&&s.price_hotel&&s.price_hotel!=eff?`<span class="ac3-price"><s style="color:var(--mut);font-weight:400">${MXN(s.price_hotel)}</s> ${MXN(eff)}</span>`:`<span class="ac3-price">${MXN(eff)}</span>`):'';
+    const priceHtml=eff!=null?(((s.has_special_rate||s.has_season)&&s.price_hotel&&s.price_hotel!=eff)?`<span class="ac3-price"><s style="color:var(--mut);font-weight:400">${MXN(s.price_hotel)}</s> ${MXN(eff)}</span>`:`<span class="ac3-price">${MXN(eff)}</span>`):'';
     return `<div class="acard3${ADDACT.showId===s.id?' sel':''}" onclick="actPick(${s.id})">
       <div class="ac3-ph" ${ph}>${s.image_url?'':'🎭'}<span class="ac3-disp">● Disponible</span></div>
       <div class="ac3-b">
@@ -2080,7 +2120,16 @@ function actRender(){
 function actPick(showId){
   const s=(CACHE.shows||[]).find(x=>x.id===showId); if(!s) return;
   ADDACT.showId=showId; ADDACT.price=+(s.effective_price!=null?s.effective_price:s.price_hotel)||0;
-  const pf=document.getElementById('actPrice'); if(pf&&!pf.value) pf.value=ADDACT.price||'';
+  const pf=document.getElementById('actPrice'); if(pf) pf.value=ADDACT.price||'';
+  // Explica de dónde sale el precio: temporada del artista y/o tarifa pactada.
+  const note=document.getElementById('actPriceNote');
+  if(note){
+    const bits=[];
+    if(s.has_season) bits.push(`${esc(s.season_label||'Temporada')} ${(s.season_pct>0?'+':'')+(s.season_pct||0)}% sobre ${MXN(s.price_hotel)}`);
+    if(s.has_special_rate) bits.push('tarifa pactada con tu hotel');
+    note.innerHTML=bits.length?`🏷️ ${bits.join(' · ')}`:'';
+    note.style.display=bits.length?'block':'none';
+  }
   const go=document.getElementById('actGo'); if(go) go.disabled=false;
   actRender();
 }
@@ -2292,11 +2341,12 @@ async function openReqForm(){
         <div class="chipset" id="rq_size">${TAMANOS.map(s=>`<button type="button" class="spchip" data-v="${esc(s)}" onclick="pickSize(this)">${esc(s)}</button>`).join('')}</div>
       </div>
       <div class="field"><label>Descripción *</label><textarea id="rq_desc" placeholder="Detalles del evento, horario, requisitos…"></textarea></div>
-      <div class="field"><label>Imágenes <span class="muted" style="font-weight:400">(opcional · ayudan al artista a cotizar)</span></label>
+      <div class="field"><label>Imágenes <span class="muted" style="font-weight:400">(opcional · ayudan al artista a cotizar · hasta 3 fotos del venue)</span></label>
         <div class="imgrow">
           <div class="imgtile" id="rq_logo_tile" onclick="pickReqImg('logo')"><span>🏨 Logo de la propiedad</span></div>
-          <div class="imgtile" id="rq_venue_tile" onclick="pickReqImg('venue')"><span>📸 Foto del venue / área</span></div>
+          <div class="imgtile" id="rq_venue_tile" onclick="pickReqImg('venue')"><span>📸 Fotos del venue / área</span></div>
         </div>
+        <div class="rqthumbs" id="rq_thumbs"></div>
         <input type="file" id="rq_imgfile" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="onReqImgPicked(this)">
         <input type="hidden" id="rq_venue_url">
       </div>
@@ -2304,18 +2354,81 @@ async function openReqForm(){
     <div class="af"><button class="ago" id="rq_go" onclick="submitReq(this)">Publicar solicitud</button></div>
   </div>`;
   ov.style.display='flex';
+  REQ_IMGS=[]; renderReqThumbs();
   fillSub('rq_cat','rq_sub','— Selecciona —');
 }
 function reqClose(){ const ov=document.getElementById('reqMov'); if(ov) ov.style.display='none'; }
 // Mostrar / ocultar las solicitudes cuya fecha del evento ya pasó.
 function reqsTogglePast(on){ CACHE.reqsPast=!!on; show('reqs',true); }
+
+/* ---- Tarjeta de solicitud (diseño de David: logo del hotel + foto del venue
+   en la cabecera, miniaturas de hasta 3 imágenes, y el bloque de locación /
+   aforo a la derecha) ---- */
+function reqInitials(name){
+  return ((name||'Hotel').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('')||'H').toUpperCase();
+}
+function reqCard(r){
+  const m=parseMeta(r.description);
+  const imgs=(r.images&&r.images.length?r.images:(r.venue_photo_url?[r.venue_photo_url]:[])).slice(0,3);
+  const hero=imgs[0]||'';
+  const logo=r.company_logo;
+  const cat=[pretty(r.category),r.subcategory?pretty(r.subcategory):''].filter(Boolean).join(' · ');
+  const side=[];
+  if(m.loc.length) side.push(`<div class="sr">🎪 <b>${esc(m.loc.join(' · '))}</b>Dónde se realiza</div>`);
+  if(m.size) side.push(`<div class="sr">👥 <b>${esc(m.size)}</b>Aforo del evento</div>`);
+  const acc=ME.artist_id?(r.status==='open'?'Ver y proponer →':'Ver detalle →')
+                        :(r.proposals_count+' propuesta'+(r.proposals_count===1?'':'s'));
+  return `<div class="reqc" onclick="openReqDetail(${r.id})">
+    <div class="reqc-hd">
+      <div class="reqc-logo">${logo?`<img src="${esc(logo)}" alt="" loading="lazy">`:`<span class="ini">${esc(reqInitials(r.company_name))}</span>`}</div>
+      <div class="reqc-hero">
+        ${hero?`<img id="rqhero_${r.id}" src="${esc(hero)}" alt="" loading="lazy">`:''}
+        ${imgs.length>1?`<div class="reqc-thumbs">${imgs.map((u,i)=>`<i class="${i===0?'on':''}" style="background-image:url('${esc(u)}')" onclick="reqHero(event,${r.id},'${esc(u)}',this)"></i>`).join('')}</div>`:''}
+      </div>
+    </div>
+    <div class="reqc-body">
+      ${cat?`<span class="reqc-cat">${esc(cat)}</span>`:''}
+      <div class="t">${esc(r.title)}</div>
+      <div class="reqc-cols">
+        <div class="reqc-main">
+          <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
+          <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''} MXN</div>
+          ${m.horario?`<div class="meta">🕐 ${esc(m.horario)}</div>`:''}
+          ${r.event_date?`<div class="meta">📅 ${fmtDate(r.event_date)}</div>`:''}
+        </div>
+        ${side.length?`<div class="reqc-side">${side.join('')}</div>`:''}
+      </div>
+      <div class="ft">${chip(r.status)}<span class="muted">${acc}</span></div>
+    </div>
+  </div>`;
+}
+// Cambiar la foto grande al tocar una miniatura, sin abrir el detalle.
+function reqHero(ev,id,url,el){
+  ev.stopPropagation();
+  const img=document.getElementById('rqhero_'+id); if(img) img.src=url;
+  if(el&&el.parentElement) el.parentElement.querySelectorAll('i').forEach(x=>x.classList.toggle('on',x===el));
+}
 // Imágenes de la solicitud: logo de la propiedad (se guarda en el hotel) y foto del venue (por solicitud)
 let _reqImgKind=null;
+let REQ_IMGS=[];          // hasta 3 fotos del venue; la primera es la de cabecera
+const REQ_IMG_MAX=3;
 function pickReqImg(kind){
   if(kind==='logo'){ const c=document.getElementById('rq_comp'); if(c && !c.value){ toast('Primero selecciona el hotel para guardar su logo.',true); return; } }
+  if(kind==='venue' && REQ_IMGS.length>=REQ_IMG_MAX){ toast('Máximo '+REQ_IMG_MAX+' fotos del venue.',true); return; }
   _reqImgKind=kind; const f=document.getElementById('rq_imgfile'); if(f){ f.value=''; f.click(); }
 }
 function _setImgTile(id,url,label){ const t=document.getElementById(id); if(t){ t.classList.add('has'); t.innerHTML=`<img src="${esc(url)}" alt=""><span>${esc(label)}</span>`; } }
+function renderReqThumbs(){
+  const box=document.getElementById('rq_thumbs'); if(!box) return;
+  box.innerHTML=REQ_IMGS.map((u,i)=>`<div class="rqth"><img src="${esc(u)}" alt="">${i===0?'<b>Portada</b>':''}<span class="x" onclick="delReqImg(${i})" title="Quitar">×</span></div>`).join('');
+  const t=document.getElementById('rq_venue_tile');
+  if(t){
+    if(REQ_IMGS.length) _setImgTile('rq_venue_tile',REQ_IMGS[0],REQ_IMGS.length+' de '+REQ_IMG_MAX+' ✓');
+    else { t.classList.remove('has'); t.innerHTML='<span>📸 Fotos del venue / área</span>'; }
+  }
+  const h=document.getElementById('rq_venue_url'); if(h) h.value=REQ_IMGS[0]||'';
+}
+function delReqImg(i){ REQ_IMGS.splice(i,1); renderReqThumbs(); }
 async function onReqImgPicked(inp){
   const file=inp.files&&inp.files[0]; if(!file) return;
   const kind=_reqImgKind;
@@ -2323,7 +2436,7 @@ async function onReqImgPicked(inp){
   try{
     const r=await fetch(API+'/requests/upload-image',{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
     if(!r.ok) throw new Error('No se pudo subir'); const d=await r.json();
-    if(kind==='venue'){ document.getElementById('rq_venue_url').value=d.url; _setImgTile('rq_venue_tile',d.url,'Foto lista ✓'); }
+    if(kind==='venue'){ REQ_IMGS.push(d.url); REQ_IMGS=REQ_IMGS.slice(0,REQ_IMG_MAX); renderReqThumbs(); }
     else { const c=document.getElementById('rq_comp'); await patch('/companies/'+c.value,{logo_url:d.url}); _setImgTile('rq_logo_tile',d.url,'Logo guardado ✓'); toast('Logo de la propiedad guardado ✓'); }
   }catch(e){ toast('No se pudo subir la imagen: '+(e.message||''),true); }
 }
@@ -2373,7 +2486,7 @@ async function submitReq(btn){
     event_date:dt+'T'+hini+':00',
     budget_min:+bmin, budget_max:+bmax };
   if(comp&&comp.value) body.company_id=+comp.value;
-  const vurl=(g('rq_venue_url')||{}).value; if(vurl) body.venue_photo_url=vurl;
+  if(REQ_IMGS.length){ body.venue_photo_url=REQ_IMGS[0]; body.images=REQ_IMGS.slice(0,REQ_IMG_MAX); }
   btn.disabled=true; btn.textContent='Publicando…';
   try{ await post('/requests',body); reqClose(); toast('Solicitud publicada ✓'); show('reqs',true); }
   catch(e){ btn.disabled=false; btn.textContent='Publicar solicitud'; toast('No se pudo publicar: '+(e.message||''),true); }
@@ -2571,7 +2684,9 @@ async function rdRender(){
   const open = r.status==='open';
   const myProp = isArtist ? props.find(p=>p.artist_id===ME.artist_id) : null;
   PROP_IMGS = ((myProp&&myProp.images)||[]).slice(0,3);   // arranca con las que ya tenía
-  const det=`<div class="rddet">
+  const rimgs=((r.images&&r.images.length)?r.images:(r.venue_photo_url?[r.venue_photo_url]:[])).slice(0,3);
+  const det=`${rimgs.length?`<div class="pgal" style="margin-bottom:12px">${rimgs.map(u=>`<div class="pthumb" style="background-image:url('${esc(u)}')" onclick="lightbox('${esc(u)}')"></div>`).join('')}</div>`:''}
+    <div class="rddet">
       <div class="rdmeta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
       <div class="rdmeta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
       <div class="rdmeta">📅 ${r.event_date?fmtDate(r.event_date):'Fecha por definir'}</div>
@@ -4288,14 +4403,7 @@ const RENDER = {
           ${ME.artist_id?'':`<button class="btn" onclick="openReqForm()">＋ Crear solicitud</button>`}
         </div>
       </div>
-      <div class="reqs">${rs.map(r=>`
-      <div class="reqc" onclick="openReqDetail(${r.id})">${(r.venue_photo_url||r.company_logo)?`<div class="reqc-img"><img src="${esc(r.venue_photo_url||r.company_logo)}" alt="" loading="lazy"></div>`:''}<div class="t">${esc(r.title)}</div>
-        <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
-        <div class="meta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
-        <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''}</div>
-        ${(()=>{const m=parseMeta(r.description);let h='';if(m.horario)h+=`<div class="meta">🕐 ${esc(m.horario)}</div>`;if(m.loc.length)h+=`<div class="spc">🎪 ${m.loc.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`;if(m.size)h+=`<div class="spc">👥 <span>${esc(m.size)}</span></div>`;return h;})()}
-        <div class="ft">${chip(r.status)}<span class="muted">${ME.artist_id?(r.status==='open'?'Ver y proponer →':'Ver detalle →'):(r.proposals_count+' propuesta'+(r.proposals_count===1?'':'s'))}</span></div>
-      </div>`).join("") || `<div class="muted">${past?'No hay solicitudes que mostrar.':(ME.artist_id?'No hay solicitudes vigentes por ahora. Activa "Ver también las vencidas" para revisar las anteriores.':'Aún no hay solicitudes vigentes. Pulsa "Crear solicitud" para publicar la primera.')}</div>`}</div>`;
+      <div class="reqs">${rs.map(reqCard).join("") || `<div class="muted">${past?'No hay solicitudes que mostrar.':(ME.artist_id?'No hay solicitudes vigentes por ahora. Activa "Ver también las vencidas" para revisar las anteriores.':'Aún no hay solicitudes vigentes. Pulsa "Crear solicitud" para publicar la primera.')}</div>`}</div>`;
   },
 
   async bill(box){
@@ -4803,10 +4911,39 @@ function showEditor(s){
       <div class="field"><label>Duración (min)</label><input id="sh_dur_${s.id}" type="number" value="${s.duration_minutes!=null?s.duration_minutes:''}"></div>
       <div class="field"><label>Tarifa boda (MXN)</label><input id="sh_pw_${s.id}" type="number" value="${s.price_wedding!=null?s.price_wedding:''}"></div>
     </div>
+    <div class="seasbox">
+      <div class="seash"><b>Tarifas por temporada</b><span class="hint" style="margin:0">Suplemento o descuento en % sobre tu tarifa hotel. Se aplica solo si la fecha de la actuación cae dentro del periodo.</span></div>
+      <table class="seast"><thead><tr><th>Periodo</th><th>Desde</th><th>Hasta</th><th>Ajuste %</th><th></th></tr></thead>
+        <tbody id="sh_seas_${s.id}">${(s.seasonal_rates||[]).map(seasRow).join('')||'<tr class="seas-empty"><td colspan="5" class="muted" style="font-size:12px;padding:6px 4px">Aún no tienes periodos. Añade uno para cobrar más en temporada alta o menos en temporada baja.</td></tr>'}</tbody></table>
+      <button class="btn ghost mini" onclick="seasAdd(${s.id})">＋ Añadir periodo</button>
+    </div>
     <div class="saverow"><button class="btn" onclick="saveShow(${s.id},this)">Guardar</button>
       <button class="btn danger" onclick="delShow(${s.id},this)">Eliminar</button>
       <span class="saved" id="sh_saved_${s.id}">Guardado ✓</span></div>
   </div>`;
+}
+// --- Tarifas por temporada del show (suplementos / descuentos) ---
+function seasRow(r){
+  const d=v=>v?String(v).slice(0,10):'';
+  return `<tr><td><input class="s-label" value="${esc((r&&r.label)||'')}" placeholder="Ej. Navidad"></td>
+    <td><input class="s-from" type="date" value="${d(r&&r.start_date)}"></td>
+    <td><input class="s-to" type="date" value="${d(r&&r.end_date)}"></td>
+    <td><input class="s-pct" type="number" step="1" value="${r&&r.adjustment_pct!=null?(+r.adjustment_pct):''}" placeholder="+150"></td>
+    <td class="s-del" onclick="this.closest('tr').remove()">×</td></tr>`;
+}
+function seasAdd(id){
+  const b=document.getElementById('sh_seas_'+id); if(!b) return;
+  const empty=b.querySelector('.seas-empty'); if(empty) empty.remove();
+  b.insertAdjacentHTML('beforeend',seasRow(null));
+}
+function seasCollect(id){
+  const b=document.getElementById('sh_seas_'+id); if(!b) return [];
+  return [...b.querySelectorAll('tr')].map(tr=>{
+    const g=c=>{const n=tr.querySelector(c); return n?n.value.trim():'';};
+    const label=g('.s-label'), from=g('.s-from'), to=g('.s-to');
+    if(!label||!from||!to) return null;
+    return {label,start_date:from,end_date:to,adjustment_pct:parseFloat((g('.s-pct')||'0').replace(/[^0-9.\-]/g,''))||0};
+  }).filter(Boolean);
 }
 function fillSub(catId,subId,ph){
   const tax=CACHE.tax||{}; const cat=document.getElementById(catId).value; const sel=document.getElementById(subId);
@@ -4947,7 +5084,8 @@ window.crToggle=crToggle;window.loadClientRates=loadClientRates;window.addClient
 async function saveShow(id,btn){
   btn.disabled=true;
   const body={show_name:gv('sh_name_'+id),description:gv('sh_desc_'+id)||null,
-    price_hotel:numOrNull('sh_price_'+id),duration_minutes:numOrNull('sh_dur_'+id),price_wedding:numOrNull('sh_pw_'+id)};
+    price_hotel:numOrNull('sh_price_'+id),duration_minutes:numOrNull('sh_dur_'+id),price_wedding:numOrNull('sh_pw_'+id),
+    seasonal_rates:seasCollect(id)};
   try{ await patch('/me/artist/shows/'+id,body); flash('sh_saved_'+id); }
   catch(e){ alert('No se pudo guardar: '+e.message); }
   btn.disabled=false;

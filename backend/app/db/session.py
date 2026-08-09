@@ -53,6 +53,8 @@ _SQLITE_ADDED_COLUMNS = [
     # REVISION 4: cancelación por el músico + foto del venue en solicitudes
     ("bookings", "cancelled_by", "VARCHAR(16)"),         # artist | hotel | admin
     ("product_requests", "venue_photo_url", "VARCHAR(500)"),
+    # Hasta 3 fotos del espacio en la solicitud (la primera es la de cabecera)
+    ("product_requests", "images", "JSON"),
 ]
 
 

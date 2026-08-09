@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentScope, DbSession, require_permission
 from app.core.config import settings
@@ -31,6 +32,7 @@ from app.models.enums import (
 )
 from app.models.show import Show
 from app.models.venue import Venue
+from app.services import pricing
 from app.schemas.booking import (
     AttendanceIn,
     BookingCreate,
@@ -116,7 +118,9 @@ async def _check_travel_buffer(db: DbSession, artist_id: int, starts_at: datetim
     dependencies=[Depends(require_permission("booking.manage"))],
 )
 async def create_booking(payload: BookingCreate, db: DbSession):
-    show = await db.get(Show, payload.show_id)
+    show = (await db.execute(
+        select(Show).options(selectinload(Show.seasonal_rates)).where(Show.id == payload.show_id)
+    )).scalar_one_or_none()
     if show is None:
         raise HTTPException(status_code=404, detail="Show not found")
     venue = await db.get(Venue, payload.venue_id)
@@ -129,6 +133,12 @@ async def create_booking(payload: BookingCreate, db: DbSession):
     )
 
     await _check_travel_buffer(db, show.artist_id, payload.starts_at, payload.ends_at)
+
+    # Si no vino un precio pactado, se toma el del show YA AJUSTADO por la
+    # temporada del artista para esa fecha (Navidad +300 %, baja −10 %…).
+    agreed_price = payload.agreed_price
+    if agreed_price is None:
+        agreed_price = pricing.effective_price(show, payload.starts_at)["price"]
 
     # A booking added on the Calendario Maestro starts as a DRAFT (borrador):
     # notified_at is NULL, so the artist doesn't see it yet. The hotel keeps
@@ -144,7 +154,7 @@ async def create_booking(payload: BookingCreate, db: DbSession):
         starts_at=payload.starts_at,
         ends_at=payload.ends_at,
         event_type=payload.event_type,
-        agreed_price=payload.agreed_price,
+        agreed_price=agreed_price,
         currency=payload.currency,
         commission_pct=commission_pct,
         notes=payload.notes,

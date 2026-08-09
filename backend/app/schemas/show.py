@@ -141,6 +141,9 @@ class ShowUpdate(BaseModel):
     special_event_surcharge_pct: float | None = None
     offers_audition: bool | None = None
     is_active: bool | None = None
+    # Si viene, REEMPLAZA el calendario de temporadas del show (suplementos y
+    # descuentos por periodo). Omitirlo lo deja tal cual.
+    seasonal_rates: list[SeasonalRateCreate] | None = None
 
     @model_validator(mode="after")
     def _check_category(self):
@@ -167,6 +170,11 @@ class ShowOut(ShowBase):
     # músico para ese cliente/cadena si existe); si no, es el precio público.
     effective_price: float | None = None
     has_special_rate: bool = False
+    # Tarifa de temporada del propio show aplicada a la fecha consultada
+    # (parámetro ?on=): "Navidad +300 %", "Temporada baja −10 %"…
+    season_label: str | None = None
+    season_pct: float | None = None
+    has_season: bool = False
 
 
 class PriceBenchmarkOut(BaseModel):

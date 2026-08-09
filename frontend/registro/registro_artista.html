@@ -107,6 +107,10 @@ textarea{resize:vertical;min-height:70px}
 .season td{padding:5px 6px}
 .season input{padding:7px 9px;font-size:12.5px}
 .season .del{color:var(--red);cursor:pointer;font-size:15px;text-align:center}
+.season tr.incomplete input{border-color:var(--red)}
+.csdst{display:none;margin:0 0 10px;padding:9px 12px;border-radius:10px;font-size:12.5px;font-weight:600;border:1px solid var(--border)}
+.csdst.ok{background:#10b98114;border-color:#10b98155;color:#0c8a62}
+.csdst.bad{background:#ef444414;border-color:#ef444455;color:#c02626}
 .addrow{margin-top:8px;font-size:12.5px;color:var(--violet-d);font-weight:600;cursor:pointer;background:none;border:none}
 
 /* Toggle rows */
@@ -294,6 +298,17 @@ textarea{resize:vertical;min-height:70px}
         <div class="doc" data-doc="comprobante_bancario" onclick="pickDoc(this)"><div class="di">🏦</div><b>Comprobante banco</b><span>opcional · PDF</span></div>
       </div>
       <input type="file" id="docInput" accept="image/*,application/pdf" style="display:none" onchange="onDocPicked(this)">
+
+      <div class="sec-t">Sello Digital (CSD) · para facturar automáticamente <span style="font-weight:400;text-transform:none;color:var(--text3)">(opcional · lo puedes cargar después desde tu perfil)</span></div>
+      <div class="sub" style="margin:-2px 0 10px">Con tu Certificado de Sello Digital, SHOWMA emite tus facturas (CFDI) solo: al marcarse una actuación como realizada, se timbra a tu nombre y aparece en tu Facturación. Es una carga única; tus archivos se validan ante el SAT en el momento.</div>
+      <div id="csd_state" class="csdst"></div>
+      <div class="grid">
+        <label class="f"><span>Certificado (.cer)</span><input type="file" id="csd_cer" accept=".cer,application/x-x509-ca-cert,application/pkix-cert"></label>
+        <label class="f"><span>Llave privada (.key)</span><input type="file" id="csd_key" accept=".key,application/octet-stream"></label>
+        <label class="f"><span>Contraseña de la llave</span><input type="password" id="csd_pass" placeholder="Contraseña de tu llave privada" autocomplete="off"></label>
+      </div>
+      <button class="addrow" id="csd_btn" onclick="uploadCSD(this)">🔐 Validar y activar facturación</button>
+
       <label class="consent"><input type="checkbox" id="c_terms"> He leído y acepto los <a>Términos y Condiciones</a> de SHOWMA.</label>
       <label class="consent"><input type="checkbox" id="c_privacy"> Acepto el <a>Aviso de Privacidad</a>.</label>
       <label class="consent"><input type="checkbox" id="c_data"> Autorizo el uso de mis datos para fines de operación y promoción.</label>
@@ -320,6 +335,50 @@ async function apiPatch(p,b){ const r=await fetch(API+p,{method:'PATCH',headers:
 async function apiPost(p,b){ const r=await fetch(API+p,{method:'POST',headers:authHeaders(true),body:JSON.stringify(b)}); if(!r.ok) throw await errOf(r,p); return r.json(); }
 
 function err(m){ const e=document.getElementById('err'); e.textContent=m||''; e.classList.toggle('on',!!m); if(m) window.scrollTo({top:0,behavior:'smooth'}); }
+
+/* ---- Sello Digital (CSD): carga única + validación ante el SAT ----
+   Es lo único que el músico hace para facturar: con su .cer, su .key y la
+   contraseña, la plataforma queda autorizada a timbrar a su nombre. A partir
+   de ahí el CFDI de cada actuación se emite solo. ---- */
+function csdState(txt, kind){
+  const b=document.getElementById('csd_state'); if(!b) return;
+  b.className='csdst'+(kind?' '+kind:''); b.textContent=txt||''; b.style.display=txt?'block':'none';
+}
+async function loadCsdState(){
+  try{
+    const f=await apiGet('/me/fiscal');
+    if(f && f.csd_status==='active'){
+      csdState('✅ Sello digital activo'+(f.csd_expires_at?' · vigente hasta '+String(f.csd_expires_at).slice(0,10):'')
+        +'. Tus facturas se emiten automáticamente.','ok');
+    } else if(f && f.csd_status==='error'){
+      csdState('⚠️ El último intento de validación no pasó. Vuelve a subir tu .cer y .key con la contraseña correcta.','bad');
+    } else { csdState(''); }
+    const rfc=document.getElementById('f_rfc');
+    if(rfc && !rfc.value && f && f.rfc) rfc.value=f.rfc;
+  }catch(e){ csdState(''); }
+}
+async function uploadCSD(btn){
+  const cer=document.getElementById('csd_cer').files[0];
+  const key=document.getElementById('csd_key').files[0];
+  const pass=(document.getElementById('csd_pass').value||'').trim();
+  const rfc=((document.getElementById('f_rfc')||{}).value||'').trim().toUpperCase();
+  if(!rfc){ go(2); err('Escribe tu RFC en Información fiscal antes de subir el sello.'); return; }
+  if(!cer||!key){ csdState('Selecciona tu archivo .cer y tu archivo .key.','bad'); return; }
+  if(!pass){ csdState('Escribe la contraseña de tu llave privada.','bad'); return; }
+  const t0=btn.textContent; btn.disabled=true; btn.textContent='Validando ante el SAT…';
+  csdState('');
+  try{
+    const fd=new FormData();
+    fd.append('cer',cer); fd.append('key',key); fd.append('password',pass); fd.append('rfc',rfc);
+    const r=await fetch(API+'/me/fiscal/csd',{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
+    if(!r.ok) throw await errOf(r,'sello digital');
+    const d=await r.json();
+    csdState('✅ Sello digital validado y activo'+(d&&d.csd_expires_at?' · vigente hasta '+String(d.csd_expires_at).slice(0,10):'')
+      +'. A partir de ahora tus facturas se emiten solas.','ok');
+    document.getElementById('csd_pass').value='';
+  }catch(e){ csdState('No se pudo validar el sello: '+e.message,'bad'); }
+  btn.disabled=false; btn.textContent=t0;
+}
 
 // ---- Category taxonomy (RAW keys = what the API expects; pretty = display) ----
 const TAX = {
@@ -407,6 +466,9 @@ function chipValues(id){ return [...document.querySelectorAll('#'+id+' .chip:not
 
 // ---- Shows ----
 let showN=0;
+// Año en curso para los periodos de ejemplo (así el periodo queda completo y
+// se guarda; el artista sólo ajusta o borra).
+const SEAS_Y=new Date().getFullYear();
 function showTpl(n){
   return `<div class="show open" data-n="${n}">
     <div class="show-h" onclick="if(!event.target.closest('input,select,button')) this.parentNode.classList.toggle('open')">
@@ -452,12 +514,12 @@ function showTpl(n){
         <label class="f"><span>Hospedaje / Alimentación / Viáticos</span><input class="p-lodging" placeholder="A acordar"></label>
       </div>
 
-      <div class="sec-t">Tarifas por temporada <span style="font-weight:400;text-transform:none;color:var(--text3)">(ajuste % sobre tu precio base — indica fechas para guardar)</span></div>
+      <div class="sec-t">Tarifas por temporada <span style="font-weight:400;text-transform:none;color:var(--text3)">(suplemento o descuento en % sobre tu precio base — el periodo necesita las dos fechas para poder aplicarse)</span></div>
       <table class="season">
         <thead><tr><th>Periodo</th><th>Desde</th><th>Hasta</th><th>Ajuste %</th><th></th></tr></thead>
         <tbody class="seasonBody">
-          <tr><td><input value="Navidad / Fin de año"></td><td><input type="date"></td><td><input type="date"></td><td><input value="+300"></td><td class="del" onclick="this.closest('tr').remove()">×</td></tr>
-          <tr><td><input value="Temporada baja"></td><td><input type="date"></td><td><input type="date"></td><td><input value="-10"></td><td class="del" onclick="this.closest('tr').remove()">×</td></tr>
+          <tr><td><input value="Navidad / Fin de año"></td><td><input type="date" value="${SEAS_Y}-12-15"></td><td><input type="date" value="${SEAS_Y}-12-31"></td><td><input value="+300"></td><td class="del" onclick="this.closest('tr').remove()">×</td></tr>
+          <tr><td><input value="Temporada baja"></td><td><input type="date" value="${SEAS_Y}-09-01"></td><td><input type="date" value="${SEAS_Y}-10-31"></td><td><input value="-10"></td><td class="del" onclick="this.closest('tr').remove()">×</td></tr>
         </tbody>
       </table>
       <button class="addrow" onclick="addRow(this)">＋ Añadir periodo</button>
@@ -564,7 +626,10 @@ function collectShow(el){
   const imgs=[...el.querySelectorAll('.ph[data-url]')].map((p,i)=>({url:p.dataset.url,is_profile:i===0}));
   const seasons=[...el.querySelectorAll('.seasonBody tr')].map(tr=>{
     const c=tr.querySelectorAll('input'); const label=c[0].value.trim();
-    const sd=c[1].value, ed=c[2].value; if(!label||!sd||!ed) return null;
+    const sd=c[1].value, ed=c[2].value;
+    // Un periodo sin las dos fechas no se puede aplicar: se marca y se descarta.
+    if(!label||!sd||!ed){ if(label||sd||ed) tr.classList.add('incomplete'); return null; }
+    tr.classList.remove('incomplete');
     const adj=parseFloat((c[3].value||'0').replace(/[^0-9.\-]/g,''))||0;
     return {label,start_date:sd,end_date:ed,adjustment_pct:adj};
   }).filter(Boolean);
@@ -650,6 +715,7 @@ async function finalizar(btn){
         fn.textContent='✓ '+(dc.filename||'Subido');
       });
     }catch(_){}
+    loadCsdState();
   }catch(e){
     if(String(e).indexOf('401')>-1){ try{ localStorage.removeItem('ricky_token'); }catch(_){} location.href=BASE+'/'; }
   }
