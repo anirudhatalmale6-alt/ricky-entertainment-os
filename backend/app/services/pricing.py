@@ -75,5 +75,8 @@ def effective_price(show, when=None, client_rate=None) -> dict:
             price = round(price * (1 - float(client_rate.discount_pct) / 100.0), 2)
         out["has_special_rate"] = price != base
 
+    # Un descuento mayor al 100 % dejaría el precio en negativo: se topa en 0.
+    if price is not None and price < 0:
+        price = 0.0
     out["price"] = price
     return out
