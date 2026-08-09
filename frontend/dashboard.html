@@ -337,6 +337,24 @@
   .btn.mini{padding:6px 11px;font-size:12px}
   .showcard .hh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
   .showcard .tag2{font-size:10.5px;color:var(--mut);background:var(--ov2);padding:3px 9px;border-radius:20px}
+  /* ficha completa del show (misma información que en el registro) */
+  .shsec{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--mut);
+    margin:16px 0 10px;padding-top:13px;border-top:1px dashed var(--line)}
+  .shsec span{font-weight:500;text-transform:none;letter-spacing:0;color:var(--mut2)}
+  .shph{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:6px}
+  .shph .t{position:relative;width:92px;height:68px;border-radius:10px;overflow:hidden;border:1px solid var(--line);
+    background:var(--ov2) center/cover no-repeat}
+  .shph .t b{position:absolute;left:0;right:0;bottom:0;font-size:9px;text-align:center;font-weight:700;
+    background:rgba(12,16,30,.62);color:#fff;padding:1px 0}
+  .shph .t .x{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(12,16,30,.7);
+    color:#fff;font-size:13px;line-height:17px;text-align:center;cursor:pointer}
+  .shph .t .star{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:rgba(12,16,30,.7);
+    color:#fff;font-size:10px;line-height:18px;text-align:center;cursor:pointer}
+  .shph .add{display:flex;align-items:center;justify-content:center;border:1px dashed var(--line);color:var(--mut2);
+    font-size:22px;cursor:pointer;background:var(--bg2)}
+  .shph .busy{display:flex;align-items:center;justify-content:center;color:var(--mut2);font-size:11px}
+  .shmore{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--acc);margin:6px 0 2px;user-select:none;display:inline-block}
+  .shmore-b{display:none}.shmore-b.on{display:block}
   .invtot{display:flex;align-items:baseline;gap:10px;margin:2px 0 14px}
   .invtot b{font-size:15px}.invtot span{font-size:12px;color:var(--mut)}
 
@@ -4554,20 +4572,15 @@ const RENDER = {
       <div class="box">
         <h3>🎭 Mis publicaciones</h3><div class="hint">Tus shows en el catálogo · edita tarifas y descripciones, o publica uno nuevo</div>
         <div id="shows">${p.shows.map(showEditor).join("")||'<div class="muted" style="margin-bottom:14px">Todavía no tienes shows publicados.</div>'}</div>
-        <div style="border-top:1px dashed var(--line);padding-top:16px;margin-top:4px">
-          <div style="font-weight:600;margin-bottom:12px">➕ Publicar un nuevo show</div>
-          <div class="fgrid">
-            <div class="field"><label>Nombre del show</label><input id="ns_name" placeholder="p. ej. Noche Mexicana"></div>
-            <div class="field"><label>Categoría</label><select id="ns_cat" onchange="fillSub('ns_cat','ns_sub')">${Object.keys(tax).map(c=>`<option value="${esc(c)}">${esc(pretty(c))}</option>`).join("")}</select></div>
-          </div>
-          <div class="fgrid">
-            <div class="field"><label>Subcategoría</label><select id="ns_sub"></select></div>
-            <div class="field"><label>Tarifa hotel (MXN)</label><input id="ns_price" type="number" placeholder="18000"></div>
-          </div>
-          <button class="btn ghost" onclick="addShow(this)">Publicar show</button>
+        <div class="showcard" style="border-style:dashed">
+          <div class="hh"><div style="font-weight:650">➕ Publicar un nuevo show</div>
+            <div class="tag2">Misma ficha que en el registro</div></div>
+          ${showFields(null)}
+          <div class="saverow"><button class="btn" onclick="addShow(this)">Publicar show</button>
+            <span class="muted" style="font-size:12px">Nombre, tarifa hotel y al menos una foto.</span></div>
         </div>
       </div>`;
-    fillSub('ns_cat','ns_sub');
+    initShowForms(p.shows);
     loadClientRates();
     loadFiscalStatus();
   },
@@ -4902,25 +4915,142 @@ async function artistHome(box){
 function showEditor(s){
   return `<div class="showcard" data-sid="${s.id}">
     <div class="hh"><div style="font-weight:650">${esc(s.show_name||'Show')}</div><div class="tag2">${esc(pretty(s.category))}${s.subcategory?' · '+esc(pretty(s.subcategory)):''}</div></div>
-    <div class="fgrid">
-      <div class="field"><label>Nombre del show</label><input id="sh_name_${s.id}" value="${esc(s.show_name||'')}"></div>
-      <div class="field"><label>Tarifa hotel (MXN)</label><input id="sh_price_${s.id}" type="number" value="${s.price_hotel!=null?s.price_hotel:''}"></div>
-    </div>
-    <div class="field"><label>Descripción</label><textarea id="sh_desc_${s.id}">${esc(s.description||'')}</textarea></div>
-    <div class="fgrid">
-      <div class="field"><label>Duración (min)</label><input id="sh_dur_${s.id}" type="number" value="${s.duration_minutes!=null?s.duration_minutes:''}"></div>
-      <div class="field"><label>Tarifa boda (MXN)</label><input id="sh_pw_${s.id}" type="number" value="${s.price_wedding!=null?s.price_wedding:''}"></div>
-    </div>
-    <div class="seasbox">
-      <div class="seash"><b>Tarifas por temporada</b><span class="hint" style="margin:0">Suplemento o descuento en % sobre tu tarifa hotel. Se aplica solo si la fecha de la actuación cae dentro del periodo.</span></div>
-      <table class="seast"><thead><tr><th>Periodo</th><th>Desde</th><th>Hasta</th><th>Ajuste %</th><th></th></tr></thead>
-        <tbody id="sh_seas_${s.id}">${(s.seasonal_rates||[]).map(seasRow).join('')||'<tr class="seas-empty"><td colspan="5" class="muted" style="font-size:12px;padding:6px 4px">Aún no tienes periodos. Añade uno para cobrar más en temporada alta o menos en temporada baja.</td></tr>'}</tbody></table>
-      <button class="btn ghost mini" onclick="seasAdd(${s.id})">＋ Añadir periodo</button>
-    </div>
+    ${showFields(s)}
     <div class="saverow"><button class="btn" onclick="saveShow(${s.id},this)">Guardar</button>
       <button class="btn danger" onclick="delShow(${s.id},this)">Eliminar</button>
       <span class="saved" id="sh_saved_${s.id}">Guardado ✓</span></div>
   </div>`;
+}
+
+// --- Ficha del show ------------------------------------------------------
+// La misma información que se captura en el registro, para que el artista
+// pueda publicar o corregir un show completo desde "Mi Perfil": descripción,
+// fotos, ficha técnica, todas las tarifas y las temporadas.
+// `s` = show existente, o null para el formulario de alta. La clave `k` es el
+// id del show ('new' en el alta) y prefija todos los campos.
+function showFields(s){
+  const k = s ? s.id : 'new';
+  const tax = CACHE.tax||{};
+  const cats = Object.keys(tax);
+  const cat = (s && s.category) || cats[0] || '';
+  const val = f => (s && s[f]!=null && s[f]!=='') ? s[f] : '';
+  const num = (id,label,field,ph) => `<div class="field"><label>${label}</label><input id="f_${k}_${id}" type="number" min="0" value="${val(field)}" placeholder="${esc(ph||'')}"></div>`;
+  const txt = (id,label,field,ph) => `<div class="field"><label>${label}</label><input id="f_${k}_${id}" value="${esc(val(field))}" placeholder="${esc(ph||'')}"></div>`;
+  return `
+    <div class="fgrid">
+      <div class="field"><label>Nombre del show</label><input id="f_${k}_name" value="${esc(val('show_name'))}" placeholder="p. ej. Noche Mexicana"></div>
+      <div class="field"><label>Categoría</label><select id="f_${k}_cat" onchange="fillSub('f_${k}_cat','f_${k}_sub')">${cats.map(c=>`<option value="${esc(c)}"${c===cat?' selected':''}>${esc(pretty(c))}</option>`).join('')}</select></div>
+    </div>
+    <div class="fgrid">
+      <div class="field"><label>Subcategoría</label><select id="f_${k}_sub"></select></div>
+      <div class="field"><label>Nº de integrantes</label><input id="f_${k}_members" type="number" min="1" value="${val('members')||1}"></div>
+    </div>
+    <div class="field"><label>Descripción</label><textarea id="f_${k}_desc" placeholder="De qué trata el show, el ambiente que crea…">${esc(val('description'))}</textarea></div>
+
+    <div class="shsec">Fotos del show <span>· la primera es la portada que ven los hoteles</span></div>
+    <div class="shph" id="f_${k}_ph"></div>
+    <input type="file" id="f_${k}_file" accept="image/*" multiple style="display:none" onchange="onShowPhotos('${k}',this)">
+    <div class="hint" style="margin:0">Hasta ${SHOW_IMG_MAX} fotos. Toca ★ para usar otra como portada. Sin foto el show no se muestra en el catálogo.</div>
+
+    <div class="shsec">Tarifas base por tipo de evento (MXN)</div>
+    <div class="fgrid fg3">
+      ${num('price','Hotel','price_hotel','18000')}
+      ${num('pc','Evento corporativo','price_corporate','')}
+      ${num('pw','Boda','price_wedding','')}
+      ${num('pp','Evento privado','price_private','')}
+      ${num('pr','Restaurante / lounge','price_restaurant','')}
+      ${num('pf','Festival / público','price_festival','')}
+      ${num('peh','Hora adicional','extra_hour_price','')}
+      ${num('ptr','Traslado (desde)','transport_from_price','')}
+      ${num('plo','Hospedaje / viáticos','lodging_price','A acordar')}
+    </div>
+
+    <div class="seasbox">
+      <div class="seash"><b>Tarifas por temporada</b><span class="hint" style="margin:0">Suplemento o descuento en % sobre tu tarifa hotel. Se aplica solo si la fecha de la actuación cae dentro del periodo.</span></div>
+      <table class="seast"><thead><tr><th>Periodo</th><th>Desde</th><th>Hasta</th><th>Ajuste %</th><th></th></tr></thead>
+        <tbody id="f_${k}_seas">${((s&&s.seasonal_rates)||[]).map(seasRow).join('')||'<tr class="seas-empty"><td colspan="5" class="muted" style="font-size:12px;padding:6px 4px">Aún no tienes periodos. Añade uno para cobrar más en temporada alta o menos en temporada baja.</td></tr>'}</tbody></table>
+      <button class="btn ghost mini" onclick="seasAdd('${k}')">＋ Añadir periodo</button>
+    </div>
+
+    <div class="shmore" onclick="this.nextElementSibling.classList.toggle('on');this.textContent=this.nextElementSibling.classList.contains('on')?'▾ Ficha técnica y multimedia':'▸ Ficha técnica y multimedia'">▸ Ficha técnica y multimedia</div>
+    <div class="shmore-b">
+      <div class="fgrid fg3">
+        ${num('dur','Duración (min)','duration_minutes','60')}
+        ${num('setup','Montaje (min)','setup_minutes','30')}
+        ${num('teardown','Desmontaje (min)','teardown_minutes','20')}
+        ${txt('space','Espacio requerido','space_required','3x3 m')}
+        ${txt('power','Consumo eléctrico','power_required','2 contactos 110v')}
+        ${txt('video','Video promocional','video_url','YouTube / Vimeo')}
+      </div>
+      <div class="field"><label>Requerimientos / rider</label><textarea id="f_${k}_req" placeholder="Escenario, sonido, camerino, etc.">${esc(val('requirements'))}</textarea></div>
+      <div class="fgrid">
+        ${txt('audio','Audio','audio_url','Spotify / SoundCloud')}
+        <div class="field"><label>Audiciones</label><label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:9px 0">
+          <input type="checkbox" id="f_${k}_aud" ${(s&&s.offers_audition)?'checked':''} style="width:auto"> Ofrezco audición de este show</label></div>
+      </div>
+    </div>`;
+}
+
+// --- Fotos del show ------------------------------------------------------
+const SHOW_IMGS={};        // clave del formulario -> [url, …] (la 1ª es portada)
+const SHOW_IMG_MAX=5;
+function renderShowPhotos(k){
+  const box=document.getElementById('f_'+k+'_ph'); if(!box) return;
+  const urls=SHOW_IMGS[k]||[];
+  const tiles=urls.map((u,i)=>`<div class="t" style="background-image:url('${esc(u)}')">
+    ${i===0?'<b>Portada</b>':`<span class="star" onclick="showImgCover('${k}',${i})" title="Usar como portada">★</span>`}
+    <span class="x" onclick="delShowImg('${k}',${i})" title="Quitar">×</span></div>`).join('');
+  const add=urls.length>=SHOW_IMG_MAX?'':`<div class="t add" onclick="document.getElementById('f_${k}_file').click()" title="Añadir fotos">＋</div>`;
+  box.innerHTML=tiles+add;
+}
+function delShowImg(k,i){ (SHOW_IMGS[k]||[]).splice(i,1); renderShowPhotos(k); }
+function showImgCover(k,i){
+  const a=SHOW_IMGS[k]||[]; if(i<=0||i>=a.length) return;
+  a.unshift(a.splice(i,1)[0]); renderShowPhotos(k);
+}
+async function onShowPhotos(k,input){
+  const files=[...input.files]; input.value='';
+  SHOW_IMGS[k]=SHOW_IMGS[k]||[];
+  for(const file of files){
+    if(SHOW_IMGS[k].length>=SHOW_IMG_MAX){ toast('Máximo '+SHOW_IMG_MAX+' fotos por show.',true); break; }
+    const box=document.getElementById('f_'+k+'_ph');
+    if(box) box.insertAdjacentHTML('beforeend','<div class="t busy">…</div>');
+    try{ const url=await uploadImage(file); SHOW_IMGS[k].push(url); }
+    catch(e){ toast('No se pudo subir una foto: '+(e.message||''),true); }
+    renderShowPhotos(k);
+  }
+}
+// Prepara los formularios ya pintados: subcategorías y galerías de fotos.
+function initShowForms(shows){
+  (shows||[]).forEach(s=>{
+    SHOW_IMGS[s.id]=(s.images||[]).slice().sort((a,b)=>(b.is_profile?1:0)-(a.is_profile?1:0)).map(i=>i.url);
+    fillSub('f_'+s.id+'_cat','f_'+s.id+'_sub');
+    const sel=document.getElementById('f_'+s.id+'_sub'); if(sel) sel.value=s.subcategory||'';
+    renderShowPhotos(s.id);
+  });
+  SHOW_IMGS['new']=[];
+  fillSub('f_new_cat','f_new_sub');
+  renderShowPhotos('new');
+}
+// Lee la ficha completa de un formulario (alta o edición).
+function collectShowForm(k){
+  const el=id=>document.getElementById('f_'+k+'_'+id);
+  const g=id=>{ const n=el(id); return n?String(n.value).trim():''; };
+  const n=id=>{ const x=g(id).replace(/[^0-9.]/g,''); return x?parseFloat(x):null; };
+  const i=id=>{ const x=g(id).replace(/[^0-9]/g,''); return x?parseInt(x,10):null; };
+  const hotel=n('price');
+  return {
+    show_name:g('name'), category:g('cat'), subcategory:g('sub')||null, description:g('desc')||null,
+    members:i('members')||1, duration_minutes:i('dur'), setup_minutes:i('setup'), teardown_minutes:i('teardown'),
+    space_required:g('space')||null, power_required:g('power')||null, requirements:g('req')||null,
+    video_url:g('video')||null, audio_url:g('audio')||null,
+    base_price:hotel, price_hotel:hotel, price_corporate:n('pc'), price_wedding:n('pw'), price_private:n('pp'),
+    price_restaurant:n('pr'), price_festival:n('pf'), extra_hour_price:n('peh'),
+    transport_from_price:n('ptr'), lodging_price:n('plo'),
+    offers_audition:!!(el('aud')&&el('aud').checked),
+    images:(SHOW_IMGS[k]||[]).map((u,idx)=>({url:u,is_profile:idx===0})),
+    seasonal_rates:seasCollect(k)
+  };
 }
 // --- Tarifas por temporada del show (suplementos / descuentos) ---
 function seasRow(r){
@@ -4932,12 +5062,12 @@ function seasRow(r){
     <td class="s-del" onclick="this.closest('tr').remove()">×</td></tr>`;
 }
 function seasAdd(id){
-  const b=document.getElementById('sh_seas_'+id); if(!b) return;
+  const b=document.getElementById('f_'+id+'_seas'); if(!b) return;
   const empty=b.querySelector('.seas-empty'); if(empty) empty.remove();
   b.insertAdjacentHTML('beforeend',seasRow(null));
 }
 function seasCollect(id){
-  const b=document.getElementById('sh_seas_'+id); if(!b) return [];
+  const b=document.getElementById('f_'+id+'_seas'); if(!b) return [];
   return [...b.querySelectorAll('tr')].map(tr=>{
     const g=c=>{const n=tr.querySelector(c); return n?n.value.trim():'';};
     const label=g('.s-label'), from=g('.s-from'), to=g('.s-to');
@@ -5082,11 +5212,10 @@ async function delClientRate(id){
 }
 window.crToggle=crToggle;window.loadClientRates=loadClientRates;window.addClientRate=addClientRate;window.delClientRate=delClientRate;
 async function saveShow(id,btn){
+  const body=collectShowForm(id);
+  if(!body.show_name){ toast('Ponle un nombre al show.',true); return; }
   btn.disabled=true;
-  const body={show_name:gv('sh_name_'+id),description:gv('sh_desc_'+id)||null,
-    price_hotel:numOrNull('sh_price_'+id),duration_minutes:numOrNull('sh_dur_'+id),price_wedding:numOrNull('sh_pw_'+id),
-    seasonal_rates:seasCollect(id)};
-  try{ await patch('/me/artist/shows/'+id,body); flash('sh_saved_'+id); }
+  try{ await patch('/me/artist/shows/'+id,body); flash('sh_saved_'+id); toast('Show actualizado ✓'); }
   catch(e){ alert('No se pudo guardar: '+e.message); }
   btn.disabled=false;
 }
@@ -5097,10 +5226,12 @@ async function delShow(id,btn){
   catch(e){ alert('No se pudo eliminar: '+e.message); btn.disabled=false; }
 }
 async function addShow(btn){
-  const name=gv('ns_name'), cat=document.getElementById('ns_cat').value, sub=document.getElementById('ns_sub').value||null, price=numOrNull('ns_price');
-  if(!name){ alert('Ponle un nombre al show'); return; }
+  const body=collectShowForm('new');
+  if(!body.show_name){ toast('Ponle un nombre al show.',true); return; }
+  if(body.price_hotel==null){ toast('Pon la tarifa para hotel; sin precio no se puede contratar.',true); return; }
+  if(!body.images.length){ toast('Sube al menos una foto para que el show se vea en el catálogo.',true); return; }
   btn.disabled=true;
-  try{ await post('/me/artist/shows',{show_name:name,category:cat,subcategory:sub,price_hotel:price}); show('profile',true); }
+  try{ await post('/me/artist/shows',body); SHOW_IMGS['new']=[]; toast('Show publicado ✓'); show('profile',true); }
   catch(e){ alert('No se pudo publicar: '+e.message); btn.disabled=false; }
 }
 async function becomePartner(){
@@ -5235,6 +5366,7 @@ async function toggleAutoConfirm(el){
   catch(e){ el.checked=!el.checked; toast('No se pudo guardar: '+(e.message||''),true); }
 }
 window.saveProfile=saveProfile;window.saveShow=saveShow;window.delShow=delShow;window.addShow=addShow;window.becomePartner=becomePartner;window.fillSub=fillSub;
+window.seasAdd=seasAdd;window.onShowPhotos=onShowPhotos;window.delShowImg=delShowImg;window.showImgCover=showImgCover;
 window.uploadProfileImg=uploadProfileImg;window.pickProfileImg=pickProfileImg;window.clearProfileImg=clearProfileImg;window.toggleAutoConfirm=toggleAutoConfirm;
 
 async function openConv(id,el){

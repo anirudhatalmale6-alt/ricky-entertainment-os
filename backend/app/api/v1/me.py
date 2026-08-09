@@ -661,6 +661,7 @@ async def update_my_show(show_id: int, payload: ShowUpdate, scope: CurrentScope,
     show = await _own_show_or_404(db, artist_id, show_id)
     data = payload.model_dump(exclude_unset=True)
     rates = data.pop("seasonal_rates", None)
+    images = data.pop("images", None)
     for field, value in data.items():
         setattr(show, field, value)
     if rates is not None:
@@ -668,6 +669,11 @@ async def update_my_show(show_id: int, payload: ShowUpdate, scope: CurrentScope,
         show.seasonal_rates.clear()
         for rate in rates:
             show.seasonal_rates.append(ShowSeasonalRate(**rate))
+    if images is not None:
+        # La galería también se reemplaza: el editor manda la lista final.
+        show.images.clear()
+        for img in images:
+            show.images.append(ShowImage(**img))
     await db.commit()
     return await _load_show(db, show_id)
 

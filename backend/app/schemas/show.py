@@ -144,6 +144,9 @@ class ShowUpdate(BaseModel):
     # Si viene, REEMPLAZA el calendario de temporadas del show (suplementos y
     # descuentos por periodo). Omitirlo lo deja tal cual.
     seasonal_rates: list[SeasonalRateCreate] | None = None
+    # Igual que arriba: si viene, REEMPLAZA la galería del show. La primera con
+    # is_profile=True es la portada del catálogo.
+    images: list[ShowImageCreate] | None = Field(default=None, max_length=MAX_ARTIST_IMAGES)
 
     @model_validator(mode="after")
     def _check_category(self):
