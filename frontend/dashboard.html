@@ -2128,22 +2128,24 @@ function actRender(){
   let items=CACHE.shows||[];
   if(q) items=items.filter(s=>((s.show_name||'')+' '+(s.artist_name||'')+' '+pretty(s.category||'')+' '+pretty(s.subcategory||'')).toLowerCase().includes(q));
   if(loc) items=items.filter(s=>(s.artist_city||'')===loc);
-  // Radio desde el hotel. Los que no tienen ciudad capturada no se esconden.
+  // Sólo se muestra quien cumple: dentro del radio y libre esa fecha (David
+  // 2026-08-09). Se lleva la cuenta de los ocultos para explicar el porqué.
   const lejos=ACT_KM?items.filter(s=>s.distance_km!=null&&s.distance_km>ACT_KM).length:0;
-  if(ACT_KM) items=items.filter(s=>s.distance_km==null||s.distance_km<=ACT_KM);
-  // Los no disponibles ese día se van al final, para que no estorben.
-  items=items.slice().sort((a,b)=>(a.is_available===false?1:0)-(b.is_available===false?1:0));
+  const sinUbi=ACT_KM?items.filter(s=>s.distance_km==null).length:0;
+  if(ACT_KM) items=items.filter(s=>s.distance_km!=null&&s.distance_km<=ACT_KM);
   const nd=items.filter(s=>s.is_available===false).length;
+  items=items.filter(s=>s.is_available!==false);
   items=items.slice(0,60);
+  const ocultos=[];
+  if(lejos) ocultos.push(`${lejos} fuera de los ${ACT_KM} km`);
+  if(sinUbi) ocultos.push(`${sinUbi} sin ciudad capturada`);
+  if(nd) ocultos.push(`${nd} sin disponibilidad ese día`);
   if(!items.length){
-    list.innerHTML='<div class="muted" style="padding:16px;text-align:center">Sin resultados.'
-      +(lejos?`<br>Hay ${lejos} proveedor${lejos>1?'es':''} fuera del radio de ${ACT_KM} km. Amplía la distancia arriba para verlos.`:'')+'</div>';
+    list.innerHTML='<div class="muted" style="padding:16px;text-align:center">Ningún proveedor cumple los filtros.'
+      +(ocultos.length?`<br><span style="font-size:12px">Ocultos: ${ocultos.join(' · ')}. Amplía la distancia arriba para ver más.</span>`:'')+'</div>';
     return;
   }
-  const avisos=[];
-  if(lejos) avisos.push(`${lejos} proveedor${lejos>1?'es':''} fuera de los ${ACT_KM} km`);
-  if(nd) avisos.push(`${nd} sin disponibilidad ese día`);
-  list.innerHTML=(avisos.length?`<div class="actnote">ℹ️ ${avisos.join(' · ')}</div>`:'')+items.map(s=>{
+  list.innerHTML=(ocultos.length?`<div class="actnote">ℹ️ No se muestran: ${ocultos.join(' · ')}</div>`:'')+items.map(s=>{
     const col=CATCOL[s.category]||'#382ca1';
     const ph=s.image_url?`style="background-image:url('${esc(s.image_url)}')"`:`style="background:linear-gradient(135deg,${col},#8b5cf6)"`;
     const cat=[pretty(s.category)].concat(s.subcategory?[pretty(s.subcategory)]:[]).filter(Boolean).join(' · ');
@@ -2647,8 +2649,8 @@ function applyArtistFilters(){
   let r=items.filter(i=>{
     if(AF.cat && i.cat!==AF.cat) return false;
     if(AF.loc && (i.city||'')!==AF.loc) return false;
-    // Radio desde el hotel; los que aún no capturan ciudad no se esconden.
-    if(AF.km && i.km!=null && i.km>AF.km) return false;
+    // Radio desde el hotel: sólo pasa quien está dentro y tiene ciudad.
+    if(AF.km && (i.km==null || i.km>AF.km)) return false;
     if(max<60000 && i.price && i.price>max) return false;
     if(q){ const hay=(i.name+' '+i.show+' '+i.cat+' '+(i.sub||'')+' '+(i.genres||[]).join(' ')).toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
@@ -2656,9 +2658,11 @@ function applyArtistFilters(){
   if(sort==='price') r.sort((a,b)=>(a.price||1e9)-(b.price||1e9));
   const grid=document.getElementById('af_grid'); if(grid) grid.innerHTML=r.map(artistCard).join('')||'<div class="muted" style="grid-column:1/-1;padding:34px;text-align:center">No hay proveedores que coincidan con tu búsqueda.</div>';
   const fuera=AF.km?items.filter(i=>i.km!=null&&i.km>AF.km).length:0;
+  const sinUbi=AF.km?items.filter(i=>i.km==null).length:0;
   const cnt=document.getElementById('af_count');
   if(cnt) cnt.textContent=r.length+(r.length===1?' proveedor encontrado':' proveedores encontrados')
-    +(fuera?` · ${fuera} fuera del radio de ${AF.km} km`:'');
+    +(fuera?` · ${fuera} fuera del radio de ${AF.km} km`:'')
+    +(sinUbi?` · ${sinUbi} sin ciudad capturada`:'');
   document.querySelectorAll('.catrow').forEach(el=>el.classList.toggle('on', (el.dataset.cat||'')===AF.cat));
 }
 function pickArtCat(c){ AF.cat=c; applyArtistFilters(); }

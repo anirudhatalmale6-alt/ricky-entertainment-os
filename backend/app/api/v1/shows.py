@@ -53,7 +53,7 @@ async def list_shows(
     near_venue_id: int | None = Query(
         None, description="Venue de referencia (gana sobre near_company_id): se usa el hotel al que pertenece"),
     max_km: float | None = Query(
-        None, ge=0, description="Sólo proveedores a esa distancia o menos (los de ubicación desconocida siempre pasan)"),
+        None, ge=0, description="Sólo proveedores a esa distancia o menos; quien no tenga ciudad capturada queda fuera"),
 ):
     """Marketplace catalogue of shows."""
     stmt = select(Show).options(*_SHOW_RELS).order_by(Show.show_name)
@@ -178,9 +178,10 @@ async def list_shows(
             s.distance_km = geo.distance_km(origin[0], origin[1], s.artist_city, s.artist_region)
 
     if max_km is not None:
-        # Los de ubicación desconocida se quedan: no los escondemos por un dato
-        # que todavía no han capturado.
-        shows = [s for s in shows if s.distance_km is None or s.distance_km <= max_km]
+        # Sólo pasa quien se puede demostrar que está dentro del radio: sin
+        # ciudad capturada no hay distancia que comprobar (David 2026-08-09,
+        # prefiere una lista limpia sólo con los que cumplen).
+        shows = [s for s in shows if s.distance_km is not None and s.distance_km <= max_km]
     return shows
 
 
