@@ -16,8 +16,9 @@ from app.models.company import Company
 from app.models.media import ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
+from app.models.venue import Venue
 from app.schemas.show import PriceBenchmarkOut, ShowCreate, ShowOut, ShowUpdate
-from app.services import pricing
+from app.services import availability, geo, pricing
 
 router = APIRouter(tags=["shows"])
 
@@ -47,6 +48,12 @@ async def list_shows(
     active_only: bool = Query(True, description="Only active shows"),
     on: datetime | None = Query(
         None, description="Fecha de la actuación: aplica la tarifa de temporada del show"),
+    near_company_id: int | None = Query(
+        None, description="Hotel de referencia para calcular la distancia; por defecto, el del usuario"),
+    near_venue_id: int | None = Query(
+        None, description="Venue de referencia (gana sobre near_company_id): se usa el hotel al que pertenece"),
+    max_km: float | None = Query(
+        None, ge=0, description="Sólo proveedores a esa distancia o menos (los de ubicación desconocida siempre pasan)"),
 ):
     """Marketplace catalogue of shows."""
     stmt = select(Show).options(*_SHOW_RELS).order_by(Show.show_name)
@@ -67,17 +74,19 @@ async def list_shows(
     names: dict[int, str] = {}
     avatars: dict[int, str | None] = {}
     cities: dict[int, str | None] = {}
+    regions: dict[int, str | None] = {}
     partners: dict[int, bool] = {}
     if artist_ids:
         rows = (await db.execute(
             select(Artist.id, Artist.stage_name, Artist.profile_image_url,
-                   Artist.base_city, Artist.is_partner)
+                   Artist.base_city, Artist.region, Artist.is_partner)
             .where(Artist.id.in_(artist_ids))
         )).all()
-        for aid, nm, av, city, partner in rows:
+        for aid, nm, av, city, region_, partner in rows:
             names[aid] = nm
             avatars[aid] = av
             cities[aid] = city
+            regions[aid] = region_
             partners[aid] = bool(partner)
     # Tarifas especiales: si el hotel/cadena que consulta tiene una tarifa pactada
     # con el artista, el precio efectivo la refleja (sin tocar el precio público).
@@ -106,6 +115,30 @@ async def list_shows(
             if r.artist_id not in rate_by_artist or r.company_id is not None:
                 rate_by_artist[r.artist_id] = r
 
+    # Disponibilidad del día consultado: días bloqueados por el propio artista
+    # (vacaciones/enfermedad) y actuaciones que ya tiene esa fecha.
+    day = availability.as_date(on)
+    blocked = await availability.blocked_on(db, day) if day else {}
+    busy = await availability.busy_on(db, day) if day else {}
+
+    # Distancia al hotel que consulta. El venue manda (es donde ocurre el show),
+    # luego el hotel indicado y, si no, el del propio usuario — un administrador
+    # no está ligado a ningún hotel, por eso hace falta el venue.
+    origin_company_id = near_company_id if near_company_id is not None else scope.company_id
+    if near_venue_id is not None:
+        v_company = (await db.execute(
+            select(Venue.company_id).where(Venue.id == near_venue_id)
+        )).scalar_one_or_none()
+        if v_company is not None:
+            origin_company_id = v_company
+    origin: tuple[str | None, str | None] | None = None
+    if origin_company_id is not None:
+        row = (await db.execute(
+            select(Company.city, Company.region).where(Company.id == origin_company_id)
+        )).first()
+        if row is not None:
+            origin = (row[0], row[1])
+
     for s in shows:
         imgs = list(s.images or [])
         show_img = None
@@ -115,6 +148,7 @@ async def list_shows(
         s.artist_name = names.get(s.artist_id)
         s.image_url = show_img or avatars.get(s.artist_id)
         s.artist_city = cities.get(s.artist_id)
+        s.artist_region = regions.get(s.artist_id)
         s.artist_partner = partners.get(s.artist_id, False)
         # Precio efectivo = base → temporada del show (si la fecha cae dentro) →
         # tarifa especial pactada con ese hotel/cadena.
@@ -124,6 +158,29 @@ async def list_shows(
         s.season_label = info["season_label"]
         s.season_pct = info["season_pct"]
         s.has_season = info["has_season"]
+        # Disponibilidad. Un día bloqueado por el artista es definitivo: no se
+        # puede contratar. Tener ya otra actuación ese día sólo se avisa — el
+        # choque real (con 1 h de margen) se revisa al guardar, con la hora.
+        if day:
+            if s.artist_id in blocked:
+                s.is_available = False
+                motivo = blocked[s.artist_id]
+                s.unavailable_reason = (
+                    f"El artista bloqueó ese día en su calendario ({motivo})" if motivo
+                    else "El artista bloqueó ese día en su calendario"
+                )
+            else:
+                s.is_available = True
+                if s.artist_id in busy:
+                    s.busy_note = f"Ya tiene otra actuación ese día a las {busy[s.artist_id]:%H:%M}"
+        # Distancia
+        if origin is not None:
+            s.distance_km = geo.distance_km(origin[0], origin[1], s.artist_city, s.artist_region)
+
+    if max_km is not None:
+        # Los de ubicación desconocida se quedan: no los escondemos por un dato
+        # que todavía no han capturado.
+        shows = [s for s in shows if s.distance_km is None or s.distance_km <= max_km]
     return shows
 
 

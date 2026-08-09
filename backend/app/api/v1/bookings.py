@@ -32,7 +32,7 @@ from app.models.enums import (
 )
 from app.models.show import Show
 from app.models.venue import Venue
-from app.services import pricing
+from app.services import availability, pricing
 from app.schemas.booking import (
     AttendanceIn,
     BookingCreate,
@@ -84,6 +84,23 @@ def _decorate(
     })
 
 
+async def _check_blocked_day(db: DbSession, artist_id: int | None, starts_at: datetime):
+    """Reject if the artist marked that day as unavailable (vacaciones, etc.)."""
+    if not artist_id:
+        return
+    blocked, reason = await availability.is_blocked(db, artist_id, starts_at)
+    if blocked:
+        day = availability.as_date(starts_at)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"El artista tiene bloqueado el {day:%d/%m/%Y} en su calendario"
+                + (f" ({reason})" if reason else "")
+                + ". Elige otra fecha u otro proveedor."
+            ),
+        )
+
+
 async def _check_travel_buffer(db: DbSession, artist_id: int, starts_at: datetime,
                                ends_at: datetime | None, exclude_id: int | None = None):
     """Reject if this artist already has an active actuacion within the 1h buffer."""
@@ -132,6 +149,7 @@ async def create_booking(payload: BookingCreate, db: DbSession):
         round(RISK_COMMISSION[company.risk_tier] * 100, 2) if company else None
     )
 
+    await _check_blocked_day(db, show.artist_id, payload.starts_at)
     await _check_travel_buffer(db, show.artist_id, payload.starts_at, payload.ends_at)
 
     # Si no vino un precio pactado, se toma el del show YA AJUSTADO por la
@@ -345,6 +363,7 @@ async def update_booking(booking_id: int, payload: BookingUpdate, db: DbSession)
         if new_end is not None and new_end <= new_start:
             raise HTTPException(status_code=422, detail="ends_at must be after starts_at")
         if booking.artist_id:
+            await _check_blocked_day(db, booking.artist_id, new_start)
             await _check_travel_buffer(db, booking.artist_id, new_start, new_end, exclude_id=booking.id)
     # moving to another venue (drag on the Calendario Maestro): re-derive the property scope
     if data.get("venue_id") is not None and data["venue_id"] != booking.venue_id:

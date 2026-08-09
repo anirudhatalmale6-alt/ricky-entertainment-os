@@ -474,6 +474,15 @@
   .acard3 .atag.vid{background:#ef444418;color:#dc2626;cursor:pointer}
   .acard3 .atag.rate{background:#f59e0b1f;color:#b45309}
   .acard3 .atag.seas{background:#7c5cf01f;color:#5b3fd6}
+  /* Proveedor que no puede esa fecha: se ve, se entiende por qué, y no se elige */
+  .acard3.nodisp{opacity:.62;background:var(--ov);border-style:dashed;cursor:not-allowed}
+  .acard3.nodisp:hover{border-color:var(--bad);box-shadow:none}
+  .acard3.nodisp .ac3-ph{filter:grayscale(1)}
+  .acard3 .ac3-disp.no{background:rgba(239,68,68,.92)}
+  .acard3 .atag.busy{background:#f59e0b1f;color:#b45309}
+  .acard3 .ac3-why{font-size:10.5px;font-weight:600;color:#dc2626;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .actnote{grid-column:1/-1;font-size:11.5px;color:var(--mut);background:var(--ov);border:1px dashed var(--line);
+    border-radius:9px;padding:7px 10px;margin-bottom:2px}
   /* Tarifas especiales por cliente (Mi Perfil) */
   .crrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
   .crrow b{font-size:13px;font-weight:700;display:block}
@@ -2052,16 +2061,24 @@ async function delBooking(id,name){
 let ADDACT={venueId:null,venueName:'',date:'',showId:null,price:0};
 // El catálogo se pide POR FECHA: así el precio ya viene con la tarifa de
 // temporada del artista aplicada (Navidad, temporada baja, etc.).
-async function ensureShows(on){
-  const key=on||'_';
+// `venueId` sirve de referencia para la distancia: el catálogo se pide desde el
+// hotel donde va a ocurrir el show (un administrador no tiene hotel propio).
+async function ensureShows(on,venueId){
+  const key=(on||'_')+'|'+(venueId||'');
   CACHE.showsBy=CACHE.showsBy||{};
   if(!CACHE.showsBy[key]){
-    try{ CACHE.showsBy[key]=(await api('/shows?active_only=true'+(on?'&on='+encodeURIComponent(on+'T00:00:00'):'')))||[]; }
+    const qs='/shows?active_only=true'
+      +(on?'&on='+encodeURIComponent(on+'T00:00:00'):'')
+      +(venueId?'&near_venue_id='+venueId:'');
+    try{ CACHE.showsBy[key]=(await api(qs))||[]; }
     catch(e){ CACHE.showsBy[key]=[]; }
   }
   CACHE.shows=CACHE.showsBy[key];
   return CACHE.shows;
 }
+// Radio de búsqueda del selector de artistas (km desde el hotel). 0 = sin límite.
+let ACT_KM=100;
+function actKmSet(v){ ACT_KM=+v||0; actRender(); }
 async function openAddAct(venueId,dateStr){
   if(!venueId){ toast('Este bloque no tiene venue asignado.',true); return; }
   if(dateStr<ymd(new Date())){ toast('No se pueden agendar actuaciones en fechas pasadas.',true); return; }
@@ -2079,6 +2096,12 @@ async function openAddAct(venueId,dateStr){
     <div class="afilters">
       <div class="asrch"><span class="ai">🔎</span><input id="actQ" placeholder="Buscar artista, show o categoría…" oninput="actRender()" autocomplete="off"></div>
       <select id="actLoc" class="afsel" onchange="actRender()"><option value="">📍 Todas las ubicaciones</option></select>
+      <select id="actKm" class="afsel" onchange="actKmSet(this.value)" title="Distancia máxima desde el hotel">
+        <option value="50"${ACT_KM===50?' selected':''}>📏 Hasta 50 km</option>
+        <option value="100"${ACT_KM===100?' selected':''}>📏 Hasta 100 km</option>
+        <option value="300"${ACT_KM===300?' selected':''}>📏 Hasta 300 km</option>
+        <option value="0"${ACT_KM===0?' selected':''}>📏 Sin límite de distancia</option>
+      </select>
     </div>
     <div class="alist artgrid" id="actList"><div class="muted" style="padding:16px;text-align:center">Cargando artistas…</div></div>
     <div class="af">
@@ -2088,7 +2111,7 @@ async function openAddAct(venueId,dateStr){
       <button class="ago" id="actGo" onclick="actConfirm()" disabled>Agregar</button>
     </div></div>`;
   ov.style.display='flex';
-  await ensureShows(dateStr);
+  await ensureShows(dateStr,venueId);
   // Poblar el filtro de ubicación con las ciudades de los artistas disponibles.
   const locSel=document.getElementById('actLoc');
   if(locSel){
@@ -2105,9 +2128,22 @@ function actRender(){
   let items=CACHE.shows||[];
   if(q) items=items.filter(s=>((s.show_name||'')+' '+(s.artist_name||'')+' '+pretty(s.category||'')+' '+pretty(s.subcategory||'')).toLowerCase().includes(q));
   if(loc) items=items.filter(s=>(s.artist_city||'')===loc);
+  // Radio desde el hotel. Los que no tienen ciudad capturada no se esconden.
+  const lejos=ACT_KM?items.filter(s=>s.distance_km!=null&&s.distance_km>ACT_KM).length:0;
+  if(ACT_KM) items=items.filter(s=>s.distance_km==null||s.distance_km<=ACT_KM);
+  // Los no disponibles ese día se van al final, para que no estorben.
+  items=items.slice().sort((a,b)=>(a.is_available===false?1:0)-(b.is_available===false?1:0));
+  const nd=items.filter(s=>s.is_available===false).length;
   items=items.slice(0,60);
-  if(!items.length){ list.innerHTML='<div class="muted" style="padding:16px;text-align:center">Sin resultados.</div>'; return; }
-  list.innerHTML=items.map(s=>{
+  if(!items.length){
+    list.innerHTML='<div class="muted" style="padding:16px;text-align:center">Sin resultados.'
+      +(lejos?`<br>Hay ${lejos} proveedor${lejos>1?'es':''} fuera del radio de ${ACT_KM} km. Amplía la distancia arriba para verlos.`:'')+'</div>';
+    return;
+  }
+  const avisos=[];
+  if(lejos) avisos.push(`${lejos} proveedor${lejos>1?'es':''} fuera de los ${ACT_KM} km`);
+  if(nd) avisos.push(`${nd} sin disponibilidad ese día`);
+  list.innerHTML=(avisos.length?`<div class="actnote">ℹ️ ${avisos.join(' · ')}</div>`:'')+items.map(s=>{
     const col=CATCOL[s.category]||'#382ca1';
     const ph=s.image_url?`style="background-image:url('${esc(s.image_url)}')"`:`style="background:linear-gradient(135deg,${col},#8b5cf6)"`;
     const cat=[pretty(s.category)].concat(s.subcategory?[pretty(s.subcategory)]:[]).filter(Boolean).join(' · ');
@@ -2115,28 +2151,42 @@ function actRender(){
     const langs=(s.show_languages||[]).slice(0,3).join(', ');
     const eff=(s.effective_price!=null?s.effective_price:s.price_hotel);
     const tags=[];
+    if(s.busy_note) tags.push(`<span class="atag busy">🕒 ${esc(s.busy_note)}</span>`);
     if(s.has_season) tags.push(`<span class="atag seas">${(s.season_pct||0)<0?'🔻':'🔺'} ${esc(s.season_label||'Temporada')} ${(s.season_pct>0?'+':'')+(s.season_pct||0)}%</span>`);
     if(s.has_special_rate) tags.push('<span class="atag rate">🏷️ Tarifa especial</span>');
     if(s.artist_partner) tags.push('<span class="atag part">✓ Partner</span>');
     if(s.offers_audition) tags.push('<span class="atag aud">🎤 Acepta audiciones</span>');
     if(s.video_url) tags.push(`<span class="atag vid" onclick="event.stopPropagation();window.open('${esc(s.video_url)}','_blank')">▶ Video</span>`);
     const priceHtml=eff!=null?(((s.has_special_rate||s.has_season)&&s.price_hotel&&s.price_hotel!=eff)?`<span class="ac3-price"><s style="color:var(--mut);font-weight:400">${MXN(s.price_hotel)}</s> ${MXN(eff)}</span>`:`<span class="ac3-price">${MXN(eff)}</span>`):'';
-    return `<div class="acard3${ADDACT.showId===s.id?' sel':''}" onclick="actPick(${s.id})">
-      <div class="ac3-ph" ${ph}>${s.image_url?'':'🎭'}<span class="ac3-disp">● Disponible</span></div>
+    // Disponibilidad del día: el artista pudo bloquearlo o ya tener actuación.
+    const nd=s.is_available===false;
+    const disp=nd?`<span class="ac3-disp no">✕ No disponible</span>`
+      :(s.is_available===true?'<span class="ac3-disp">● Disponible</span>':'<span class="ac3-disp">● Disponible</span>');
+    const km=s.distance_km!=null?`📏 ${s.distance_km<1?'<1':Math.round(s.distance_km)} km`:'';
+    const meta=[s.artist_city?`📍 ${esc(s.artist_city)}`:'',km,langs?`🗣️ ${esc(langs)}`:''].filter(Boolean).join(' · ');
+    return `<div class="acard3${ADDACT.showId===s.id?' sel':''}${nd?' nodisp':''}" onclick="${nd?`actBlocked(${s.id})`:`actPick(${s.id})`}">
+      <div class="ac3-ph" ${ph}>${s.image_url?'':'🎭'}${disp}</div>
       <div class="ac3-b">
         <div class="ac3-h"><b>${who}</b>${priceHtml}</div>
         <div class="ac3-sub">${esc(s.show_name||'Show')} · ${esc(cat)||'—'}</div>
-        <div class="ac3-meta">${s.artist_city?`📍 ${esc(s.artist_city)}`:''}${(s.artist_city&&langs)?' · ':''}${langs?`🗣️ ${esc(langs)}`:''}</div>
+        <div class="ac3-meta">${meta}</div>
+        ${nd?`<div class="ac3-why">🚫 ${esc(s.unavailable_reason||'No disponible ese día')}</div>`:''}
         ${tags.length?`<div class="ac3-tags">${tags.join('')}</div>`:''}
         <div class="ac3-act">
-          <span class="ac3-pick">${ADDACT.showId===s.id?'✓ Seleccionado':'Seleccionar'}</span>
+          <span class="ac3-pick">${nd?'No disponible':(ADDACT.showId===s.id?'✓ Seleccionado':'Seleccionar')}</span>
           ${s.artist_id?`<button class="mini" onclick="event.stopPropagation();pickerMessage(${s.artist_id})">💬 Mensaje</button>`:''}
         </div>
       </div></div>`;
   }).join('');
 }
+// Clic sobre un proveedor que no puede ese día: se explica y no se selecciona.
+function actBlocked(showId){
+  const s=(CACHE.shows||[]).find(x=>x.id===showId);
+  toast((s&&s.unavailable_reason)||'Ese artista no está disponible en esa fecha.',true);
+}
 function actPick(showId){
   const s=(CACHE.shows||[]).find(x=>x.id===showId); if(!s) return;
+  if(s.is_available===false){ actBlocked(showId); return; }
   ADDACT.showId=showId; ADDACT.price=+(s.effective_price!=null?s.effective_price:s.price_hotel)||0;
   const pf=document.getElementById('actPrice'); if(pf) pf.value=ADDACT.price||'';
   // Explica de dónde sale el precio: temporada del artista y/o tarifa pactada.
@@ -2573,7 +2623,7 @@ async function delBudget(id){
   catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
 }
 /* ---- Buscar Artistas (screen 4) ---- */
-let AF={cat:''};
+let AF={cat:'',loc:'',km:100};
 function artGrad(cat){ const c=CATCOL[cat]||'#382ca1'; return `linear-gradient(135deg,${c},#8b5cf6)`; }
 function artistCard(i){
   const badge=`<span class="av-badge">● Disponible</span>`;
@@ -2586,7 +2636,7 @@ function artistCard(i){
       <div class="ty">${esc(i.show)} · ${esc(pretty(i.cat))}</div>
       ${i.price?`<div class="from">${i.specialRate&&i.publicPrice&&i.publicPrice!=i.price?`Desde <s style="color:var(--mut);font-weight:400">${MXN(i.publicPrice)}</s> ${MXN(i.price)} <span class="spbadge">🏷️ Tarifa especial</span>`:`Desde ${MXN(i.price)}`}</div>`:''}
       <div class="tgs">${tags.map(g=>`<span>${esc(g)}</span>`).join('')}</div>
-      <div class="loc"><span>📍 ${esc(i.city||'México')}</span>${i.langs&&i.langs.length?`<span>🗣 ${esc(i.langs.slice(0,2).join(', '))}</span>`:''}</div>
+      <div class="loc"><span>📍 ${esc(i.city||'México')}${i.km!=null?` · ${i.km<1?'<1':Math.round(i.km)} km`:''}</span>${i.langs&&i.langs.length?`<span>🗣 ${esc(i.langs.slice(0,2).join(', '))}</span>`:''}</div>
     </div></div>`;
 }
 function applyArtistFilters(){
@@ -2597,13 +2647,18 @@ function applyArtistFilters(){
   let r=items.filter(i=>{
     if(AF.cat && i.cat!==AF.cat) return false;
     if(AF.loc && (i.city||'')!==AF.loc) return false;
+    // Radio desde el hotel; los que aún no capturan ciudad no se esconden.
+    if(AF.km && i.km!=null && i.km>AF.km) return false;
     if(max<60000 && i.price && i.price>max) return false;
     if(q){ const hay=(i.name+' '+i.show+' '+i.cat+' '+(i.sub||'')+' '+(i.genres||[]).join(' ')).toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
   });
   if(sort==='price') r.sort((a,b)=>(a.price||1e9)-(b.price||1e9));
   const grid=document.getElementById('af_grid'); if(grid) grid.innerHTML=r.map(artistCard).join('')||'<div class="muted" style="grid-column:1/-1;padding:34px;text-align:center">No hay proveedores que coincidan con tu búsqueda.</div>';
-  const cnt=document.getElementById('af_count'); if(cnt) cnt.textContent=r.length+(r.length===1?' proveedor encontrado':' proveedores encontrados');
+  const fuera=AF.km?items.filter(i=>i.km!=null&&i.km>AF.km).length:0;
+  const cnt=document.getElementById('af_count');
+  if(cnt) cnt.textContent=r.length+(r.length===1?' proveedor encontrado':' proveedores encontrados')
+    +(fuera?` · ${fuera} fuera del radio de ${AF.km} km`:'');
   document.querySelectorAll('.catrow').forEach(el=>el.classList.toggle('on', (el.dataset.cat||'')===AF.cat));
 }
 function pickArtCat(c){ AF.cat=c; applyArtistFilters(); }
@@ -4222,7 +4277,10 @@ const RENDER = {
   },
 
   async artists(box){
-    const shows = await api('/shows');
+    // Referencia para la distancia: el hotel del usuario o, si es administrador
+    // (que no tiene hotel propio), el primero de la cadena.
+    let refCo=null; try{ refCo=await anyCompanyId(); }catch(e){}
+    const shows = await api('/shows'+(refCo?'?near_company_id='+refCo:''));
     let amap={}; try{ (await api('/artists')||[]).forEach(a=>{amap[a.id]={name:a.stage_name,city:a.base_city||a.city,partner:a.is_partner,langs:a.languages_spoken||[],profileImg:a.profile_image_url||null};}); }catch(e){}
     const now=Date.now(); const seen=new Set(); const items=[];
     (shows||[]).filter(s=>s.is_active!==false).forEach(s=>{
@@ -4232,10 +4290,11 @@ const RENDER = {
       const eff=(s.effective_price!=null?s.effective_price:pub);
       items.push({id:s.id,artistId:s.artist_id,name:a.name||s.show_name,show:s.show_name,cat:s.category,sub:s.subcategory,
         price:(eff!=null?eff:null),publicPrice:(pub!=null?pub:null),specialRate:!!s.has_special_rate,
-        rating:s.rating,img,city:(a.city||s.artist_city||null),partner:a.partner,langs:a.langs,
+        rating:s.rating,img,city:(a.city||s.artist_city||null),km:(s.distance_km!=null?s.distance_km:null),
+        partner:a.partner,langs:a.langs,
         isNew:s.created_at?(now-new Date(s.created_at).getTime())<7*864e5:false,genres:s.genres||[]});
     });
-    CACHE.artistItems=items; AF={cat:'',loc:''};
+    CACHE.artistItems=items; AF={cat:'',loc:'',km:100};
     const locs=[...new Set(items.map(i=>i.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     const catCount={}; items.forEach(i=>{catCount[i.cat]=(catCount[i.cat]||0)+1;});
     const cats=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
@@ -4244,6 +4303,9 @@ const RENDER = {
         <div class="filtrow">
           <div class="field" style="margin:0"><label>Buscar</label><input id="af_q" oninput="applyArtistFilters()" placeholder="Nombre, tipo de show, instrumento…"></div>
           <div class="field" style="margin:0"><label>Locación</label><select id="af_loc" onchange="AF.loc=this.value;applyArtistFilters()"><option value="">Todas las locaciones</option>${locs.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div>
+          <div class="field" style="margin:0"><label>Distancia desde el hotel</label><select id="af_km" onchange="AF.km=+this.value;applyArtistFilters()">
+            <option value="50">Hasta 50 km</option><option value="100" selected>Hasta 100 km</option>
+            <option value="300">Hasta 300 km</option><option value="0">Sin límite</option></select></div>
           <div class="field" style="margin:0"><label>Presupuesto máx.</label><input id="af_max" type="range" min="5000" max="60000" step="1000" value="60000" oninput="document.getElementById('af_maxv').textContent=(+this.value>=60000?'Sin límite':MXN(+this.value));applyArtistFilters()"><span id="af_maxv" class="hint" style="margin-top:4px">Sin límite</span></div>
           <div class="field" style="margin:0"><label>Ordenar por</label><select id="af_sort" onchange="applyArtistFilters()"><option value="best">Mejor coincidencia</option><option value="price">Menor precio</option></select></div>
         </div>

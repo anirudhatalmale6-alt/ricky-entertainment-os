@@ -178,6 +178,17 @@ class ShowOut(ShowBase):
     season_label: str | None = None
     season_pct: float | None = None
     has_season: bool = False
+    # Disponibilidad en la fecha consultada (?on=): el artista bloqueó el día o
+    # ya tiene una actuación. Sin `on` no se puede saber y queda en None.
+    is_available: bool | None = None
+    unavailable_reason: str | None = None
+    # Aviso blando: ya tiene otra actuación ese día, pero puede caber otra si la
+    # hora no choca (el margen de traslado se valida al guardar).
+    busy_note: str | None = None
+    # Distancia aproximada al hotel que consulta, en km (None si falta la
+    # ciudad de alguno de los dos).
+    artist_region: str | None = None
+    distance_km: float | None = None
 
 
 class PriceBenchmarkOut(BaseModel):

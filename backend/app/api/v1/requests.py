@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentScope, DbSession, require_permission
-from app.api.v1.bookings import _check_travel_buffer, _now
+from app.api.v1.bookings import _check_blocked_day, _check_travel_buffer, _now
 from app.core.config import settings
 from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
@@ -411,6 +411,7 @@ async def _booking_from_proposal(
     # have a real date to check against.
     starts_at = req.event_date or _now()
     if req.event_date is not None:
+        await _check_blocked_day(db, winner.artist_id, starts_at)
         await _check_travel_buffer(db, winner.artist_id, starts_at, None)
 
     note = f"Generada desde solicitud #{req.id}: {req.title}"
