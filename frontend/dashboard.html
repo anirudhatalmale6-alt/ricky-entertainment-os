@@ -494,7 +494,10 @@
   .amod .af .fld{display:flex;flex-direction:column;gap:4px}
   .amod .af .fld label{font-size:10.5px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
   .amod .af .fld input{border:1px solid var(--line);background:var(--inp);border-radius:9px;padding:8px 10px;font-size:13px;color:var(--txt);width:100px}
-  .amod .af .ago{margin-left:auto;background:var(--grad);border:0;color:#fff;font-weight:650;font-size:13px;padding:10px 18px;border-radius:10px;cursor:pointer}
+  .amod .ago{background:var(--grad);border:0;color:#fff;font-weight:650;font-size:13px;padding:10px 18px;border-radius:10px;cursor:pointer}
+  .amod .af .ago{margin-left:auto}
+  .amod .ago.alt{background:var(--ov);color:var(--txt);border:1px solid var(--line)}
+  .amod .abody{padding:14px 18px 18px}
   .amod .af .ago:disabled{opacity:.45;cursor:not-allowed}
   /* Subida de imágenes en la solicitud (logo propiedad + foto venue) */
   .imgrow{display:flex;gap:10px}
@@ -781,6 +784,8 @@
   .lg-in input:focus,.lg-in textarea:focus{border-color:#7c5cfc;box-shadow:0 0 0 3px rgba(124,92,252,.18)}
   .lg-in input::placeholder,.lg-in textarea::placeholder{color:#61637a}
   .lg-note{font-size:11.5px;color:#8688a0;text-align:center;margin-top:12px;line-height:1.5}
+  .lg-note.ok{color:#34d399}
+  .lg-note.bad{color:#f87171}
   .lg-done{text-align:center;padding:8px 0}
   .lg-done-ic{width:56px;height:56px;border-radius:50%;margin:0 auto 16px;display:grid;place-items:center;
       font-size:26px;color:#fff;background:linear-gradient(135deg,#34d399,#10b981);box-shadow:0 8px 24px rgba(16,185,129,.34)}
@@ -973,6 +978,7 @@
     <div class="lg-cols">
       <!-- LOGIN -->
       <div class="lg-pane">
+        <div id="lg-signin">
         <h2>Iniciar sesión</h2>
         <div class="lead">Bienvenido de nuevo</div>
         <div class="lg-lab">Correo electrónico</div>
@@ -982,9 +988,42 @@
         <input id="otp" placeholder="Código 2FA" class="lg-hide">
         <div class="lg-row">
           <label class="lg-chk"><input type="checkbox" checked> Recuérdame</label>
-          <span class="lg-link">¿Olvidaste tu contraseña?</span>
+          <span class="lg-link" onclick="showForgot()">¿Olvidaste tu contraseña?</span>
         </div>
         <button class="lg-btn" onclick="login()">Iniciar sesión</button>
+        </div>
+
+        <!-- Olvidé mi contraseña: pide el correo y manda el enlace -->
+        <div id="lg-forgot" class="lg-hide">
+          <h2>Recuperar contraseña</h2>
+          <div class="lead">Te enviamos un enlace para crear una nueva.</div>
+          <div class="lg-lab">Correo electrónico de tu cuenta</div>
+          <div class="lg-in"><input id="fp_email" type="email" placeholder="tu@correo.com" onkeydown="if(event.key==='Enter')sendForgot()"></div>
+          <div id="fp_msg" class="lg-note lg-hide"></div>
+          <button class="lg-btn" id="fp_btn" onclick="sendForgot()">Enviar enlace</button>
+          <div style="text-align:center;margin-top:12px"><span class="lg-link" onclick="showSignin()">← Volver a iniciar sesión</span></div>
+        </div>
+
+        <!-- Enlace del correo abierto: elegir la contraseña nueva -->
+        <div id="lg-reset" class="lg-hide">
+          <h2>Crea tu contraseña nueva</h2>
+          <div class="lead" id="rs_lead">Verificando el enlace…</div>
+          <div id="rs_form" class="lg-hide">
+            <div class="lg-lab">Contraseña nueva</div>
+            <div class="lg-in"><input id="rs_pass" type="password" placeholder="Crea una contraseña segura" oninput="pwRules('rs_pass','rs_rules')"><span class="eye" onclick="pwEye('rs_pass',this)">👁</span></div>
+            <ul class="lg-rules" id="rs_rules">
+              <li data-r="len">Al menos 8 caracteres</li>
+              <li data-r="upper">Una letra mayúscula</li>
+              <li data-r="num">Un número</li>
+              <li data-r="spec">Un carácter especial</li>
+            </ul>
+            <div class="lg-lab">Repite la contraseña</div>
+            <div class="lg-in"><input id="rs_pass2" type="password" placeholder="Escríbela otra vez" onkeydown="if(event.key==='Enter')doReset()"></div>
+            <button class="lg-btn" id="rs_btn" onclick="doReset()">Guardar y entrar</button>
+          </div>
+          <div id="rs_msg" class="lg-note lg-hide"></div>
+          <div style="text-align:center;margin-top:12px"><span class="lg-link" onclick="showSignin()">← Volver a iniciar sesión</span></div>
+        </div>
       </div>
 
       <!-- REGISTER -->
@@ -1085,6 +1124,7 @@
     <div class="side-user">
       <div class="su-av" id="suAv">RA</div>
       <div class="su-meta"><b id="suName">Mi cuenta</b><span id="suRole">SHOWMA</span></div>
+      <button class="su-out" onclick="openChangePw()" title="Cambiar mi contraseña" aria-label="Cambiar mi contraseña">🔑</button>
       <button class="su-out" onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión">↪ Salir</button>
     </div>
     <div class="foot">SHOWMA · v0.1</div>
@@ -1326,6 +1366,91 @@ async function regHotel(){
   }catch(e){el.textContent="No se pudo conectar al servidor";}
 }
 
+/* ---- Recuperación de contraseña ---- */
+// Tres vistas dentro del mismo panel de acceso: iniciar sesión, pedir el enlace
+// y (al abrir el enlace del correo, que llega como /?reset=TOKEN) elegir la
+// contraseña nueva.
+function lgPane(id){
+  ['lg-signin','lg-forgot','lg-reset'].forEach(k=>{
+    const el=document.getElementById(k); if(el) el.classList.toggle('lg-hide',k!==id);
+  });
+  // Mientras se recupera la contraseña, fuera la columna de "Crear cuenta":
+  // el usuario ya tiene cuenta, ofrecerle crear otra sólo distrae.
+  const reg=document.querySelectorAll('.lg-pane')[1];
+  if(reg && !INTRANET) reg.style.display = (id==='lg-signin') ? '' : 'none';
+  const err=document.getElementById('lerr'); if(err) err.textContent='';
+}
+function showSignin(){ lgPane('lg-signin'); if(RESET_TOKEN){ RESET_TOKEN=null; history.replaceState(null,'',location.pathname); } }
+function showForgot(){
+  lgPane('lg-forgot');
+  const e=document.getElementById('fp_email'), l=document.getElementById('email');
+  if(e){ e.value=(l&&l.value&&l.value.includes('@'))?l.value:''; e.focus(); }
+  lgMsg('fp_msg','');
+}
+function lgMsg(id,txt,kind){
+  const el=document.getElementById(id); if(!el) return;
+  el.textContent=txt||'';
+  el.className='lg-note'+(kind?' '+kind:'')+(txt?'':' lg-hide');
+}
+async function sendForgot(){
+  const email=(val('fp_email')||'').trim();
+  if(email.length<5||!email.includes('@')){ lgMsg('fp_msg','Escribe un correo válido.','bad'); return; }
+  const b=document.getElementById('fp_btn'); if(b){ b.disabled=true; b.textContent='Enviando…'; }
+  try{
+    const r=await fetch(API+'/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email})});
+    const d=await r.json().catch(()=>({}));
+    lgMsg('fp_msg', d.message || 'Listo. Revisa tu correo.', d.email_sent?'ok':'');
+  }catch(e){ lgMsg('fp_msg','No se pudo conectar al servidor. Intenta de nuevo.','bad'); }
+  if(b){ b.disabled=false; b.textContent='Enviar enlace'; }
+}
+let RESET_TOKEN=null;
+async function openResetFromLink(){
+  const t=new URLSearchParams(location.search).get('reset');
+  if(!t) return false;
+  RESET_TOKEN=t;
+  lgPane('lg-reset');
+  try{
+    const r=await fetch(API+'/auth/reset-password/check?token='+encodeURIComponent(t));
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.valid){
+      document.getElementById('rs_lead').textContent='';
+      lgMsg('rs_msg',(d.reason||'El enlace no es válido.')+' Puedes pedir uno nuevo desde "¿Olvidaste tu contraseña?".','bad');
+      return true;
+    }
+    document.getElementById('rs_lead').textContent='Cuenta: '+(d.full_name||'')+' ('+(d.email||'')+')';
+    document.getElementById('rs_form').classList.remove('lg-hide');
+    const p=document.getElementById('rs_pass'); if(p) p.focus();
+  }catch(e){
+    document.getElementById('rs_lead').textContent='';
+    lgMsg('rs_msg','No se pudo conectar al servidor. Vuelve a abrir el enlace.','bad');
+  }
+  return true;
+}
+async function doReset(){
+  const p1=val('rs_pass'), p2=val('rs_pass2');
+  if(p1!==p2){ lgMsg('rs_msg','Las dos contraseñas no coinciden.','bad'); return; }
+  const b=document.getElementById('rs_btn'); if(b){ b.disabled=true; b.textContent='Guardando…'; }
+  try{
+    const r=await fetch(API+'/auth/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:RESET_TOKEN,password:p1})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ lgMsg('rs_msg', regErr(d), 'bad'); if(b){ b.disabled=false; b.textContent='Guardar y entrar'; } return; }
+    history.replaceState(null,'',location.pathname);
+    if(d.requires_2fa){
+      lgPane('lg-signin');
+      const em=document.getElementById('email'); if(em) em.value='';
+      document.getElementById('otp').style.display='block';
+      document.getElementById('lerr').textContent='Contraseña actualizada. Inicia sesión con tu código 2FA.';
+      return;
+    }
+    await afterAuth(d.access_token);
+  }catch(e){
+    lgMsg('rs_msg','No se pudo conectar al servidor.','bad');
+    if(b){ b.disabled=false; b.textContent='Guardar y entrar'; }
+  }
+}
+
 /* ---- Login Master helpers ---- */
 function pwEye(id,el){const i=document.getElementById(id);const hidden=i.type==='password';i.type=hidden?'text':'password';el.textContent=hidden?'🙈':'👁';}
 function pwRules(id,listId){
@@ -1376,6 +1501,9 @@ function logout(){ TOKEN=null; ME=null; try{localStorage.removeItem('ricky_token
 // Restore a saved session on load so a page refresh (or returning from the
 // registration hoja) keeps the user logged in.
 async function restoreSession(){
+  // Si vienen del enlace del correo (/?reset=…) mandan ellos: aunque haya una
+  // sesión guardada en este navegador, primero se elige la contraseña nueva.
+  if(await openResetFromLink()) return;
   let t=null; try{ t=localStorage.getItem('ricky_token'); }catch(e){}
   if(!t) return;
   try{ await afterAuth(t); }
@@ -1401,8 +1529,8 @@ function openConvertLead(id,name,email){
   ov.innerHTML=`<div class="amod" style="position:relative;max-width:460px">
     <button class="ax" onclick="cvClose()" aria-label="Cerrar">✕</button>
     <div class="ah"><b>Crear cuenta de hotel</b><span class="as">${esc(name)} · ${esc(email)}</span></div>
-    <div id="cvBody">
-      <div class="fld" style="margin-top:8px"><label>Contraseña (opcional)</label><input id="cvPw" placeholder="Vacío = se genera una automática" autocomplete="off"></div>
+    <div id="cvBody" class="abody">
+      <div class="field" style="margin-top:8px"><label>Contraseña (opcional)</label><input id="cvPw" placeholder="Vacío = se genera una automática" autocomplete="off"></div>
       <div class="hint" style="padding:4px 2px">Se creará el acceso del hotel con este correo. Después podrás compartirle usuario y contraseña.</div>
       <button class="ago" style="width:100%;margin-top:8px" id="cvGo" onclick="doConvertLead(${id})">Crear cuenta</button>
     </div>
@@ -1432,6 +1560,47 @@ async function doConvertLead(id){
   }catch(e){
     if(go){ go.disabled=false; go.textContent='Crear cuenta'; }
     toast('No se pudo crear la cuenta: '+(e.message||''),true);
+  }
+}
+
+// ---- Cambiar mi contraseña (dentro de la plataforma, cualquier rol) ----
+function openChangePw(){
+  let ov=document.getElementById('cpMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='cpMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) cpClose(); }); }
+  ov.innerHTML=`<div class="amod" style="position:relative;max-width:440px">
+    <button class="ax" onclick="cpClose()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Cambiar mi contraseña</b><span class="as">${esc((ME&&ME.email)||'')}</span></div>
+    <div id="cpBody" class="abody">
+      <div class="field" style="margin-top:8px"><label>Contraseña actual</label><input id="cp_old" type="password" autocomplete="off"></div>
+      <div class="field"><label>Contraseña nueva</label><input id="cp_new" type="password" autocomplete="off" oninput="pwRules('cp_new','cp_rules')"></div>
+      <ul class="lg-rules" id="cp_rules" style="margin:8px 0 12px">
+        <li data-r="len">Al menos 8 caracteres</li><li data-r="upper">Una letra mayúscula</li>
+        <li data-r="num">Un número</li><li data-r="spec">Un carácter especial</li>
+      </ul>
+      <div class="field"><label>Repite la contraseña nueva</label><input id="cp_new2" type="password" autocomplete="off" onkeydown="if(event.key==='Enter')doChangePw()"></div>
+      <button class="ago" style="width:100%;margin-top:10px" id="cpGo" onclick="doChangePw()">Guardar contraseña</button>
+    </div>
+  </div>`;
+  ov.style.display='flex';
+  const f=document.getElementById('cp_old'); if(f) f.focus();
+}
+function cpClose(){ const ov=document.getElementById('cpMov'); if(ov) ov.style.display='none'; }
+async function doChangePw(){
+  const a=val('cp_old'), b=val('cp_new'), c=val('cp_new2');
+  if(!a){ toast('Escribe tu contraseña actual.',true); return; }
+  if(b!==c){ toast('Las dos contraseñas nuevas no coinciden.',true); return; }
+  const go=document.getElementById('cpGo'); if(go){ go.disabled=true; go.textContent='Guardando…'; }
+  try{
+    await post('/auth/change-password',{current_password:a,new_password:b});
+    const body=document.getElementById('cpBody');
+    if(body) body.innerHTML=`<div style="margin-top:10px;background:var(--ov);border-radius:10px;padding:16px">
+      <div style="font-weight:700;color:#10b981;margin-bottom:6px">✓ Contraseña actualizada</div>
+      <div class="hint" style="margin:0">Úsala la próxima vez que inicies sesión.</div>
+      <button class="ago" style="width:100%;margin-top:12px" onclick="cpClose()">Listo</button></div>`;
+  }catch(e){
+    if(go){ go.disabled=false; go.textContent='Guardar contraseña'; }
+    toast(e.message||'No se pudo cambiar la contraseña.',true);
   }
 }
 
@@ -3359,7 +3528,7 @@ function mShell(){
     : `<div class="mi${it.v===MASTER.view?' on':''}" data-v="${it.v}" onclick="mNav('${it.v}')"><span class="ic">${it.ic}</span> ${esc(it.label)}</div>`
   ).join('');
   const top = INTRANET
-    ? `<div class="mtop"><div class="mtbrand"><span class="m">S</span><div>SHOWMA<small>PANEL MASTER</small></div></div><div class="sp"></div><span class="mtuser">${esc((ME&&ME.full_name)||'Administración')}</span><button class="mtout" onclick="logout()" title="Cerrar sesión">↪ Salir</button></div>`
+    ? `<div class="mtop"><div class="mtbrand"><span class="m">S</span><div>SHOWMA<small>PANEL MASTER</small></div></div><div class="sp"></div><span class="mtuser">${esc((ME&&ME.full_name)||'Administración')}</span><button class="mtout" onclick="openChangePw()" title="Cambiar mi contraseña">🔑 Contraseña</button><button class="mtout" onclick="logout()" title="Cerrar sesión">↪ Salir</button></div>`
     : '';
   return `${top}<div class="mcon"><aside class="msb">${items}</aside><div class="mmain" id="mbody"><div class="load">Cargando…</div></div></div>`;
 }
@@ -3383,6 +3552,7 @@ async function mNav(v){
     else if(v==='reportes')  mReportes(body);
     else if(v==='cfg_taxes') await mTaxes(body);
     else if(v==='cfg_plantillas') await mPlantillas(body);
+    else if(v==='cfg_usuarios') await mUsuarios(body);
     else                     mConfig(body, v);
   }catch(e){ body.innerHTML = `<div class="mempty"><div class="big">⚠️</div>No se pudo cargar: ${esc(e.message)}</div>`; }
 }
@@ -4063,6 +4233,101 @@ function mExportAcceptances(){
   const items=MASTER.cache.acceptances||[];
   mCSV('constancias_contrato.csv',['Artista','Version','Fecha y hora','IP'],
     items.map(i=>[i.signer_name,'v'+i.version, i.accepted_at? new Date(i.accepted_at).toLocaleString('es-MX'):'', i.ip||'']));
+}
+
+/* ---- Configuración · Usuarios y roles ---- */
+// Lista de accesos de la plataforma y, sobre todo, el rescate: si alguien pierde
+// su contraseña MASTER puede darle una temporal (funciona sin correo saliente) o
+// generarle el enlace para que la elija él mismo.
+const mRolKey = u => (u && u.role && u.role.name) || '';
+const M_ROL = {admin:'Administración', finance:'Contaduría', artist:'Músico / Talento', booker:'Hotel / Contratante'};
+async function mUsuarios(box){
+  const f = MASTER.f.usuarios = MASTER.f.usuarios || {};
+  box.innerHTML = mHead('Usuarios y roles','Accesos a la plataforma · restablece contraseñas cuando alguien no puede entrar')
+    + `<div class="mbar">
+        <input id="fU_q" placeholder="Buscar nombre o correo…" value="${esc(f.q||'')}" oninput="mDebounce(mLoadUsuarios)">
+        <select id="fU_rol" onchange="mLoadUsuarios()">
+          <option value="">Rol (todos)</option>
+          ${Object.entries(M_ROL).map(([k,v])=>`<option value="${k}"${f.rol===k?' selected':''}>${esc(v)}</option>`).join('')}
+        </select>
+        ${mExportBtn('mExpUsuarios()')}
+       </div>
+       <div id="mres"><div class="load">Cargando…</div></div>`;
+  await mLoadUsuarios();
+}
+async function mLoadUsuarios(){
+  const f = MASTER.f.usuarios = {q:mVal('fU_q').toLowerCase(), rol:mVal('fU_rol')};
+  const res = document.getElementById('mres'); if(!res) return;
+  let items = await api('/users');
+  if(f.q)  items = items.filter(u=>((u.full_name||'')+' '+(u.email||'')).toLowerCase().includes(f.q));
+  if(f.rol) items = items.filter(u=>mRolKey(u)===f.rol);
+  MASTER.cache.usuarios = items;
+  if(!items.length){ res.innerHTML = mEmpty('No hay usuarios que coincidan con el filtro.'); return; }
+  res.innerHTML = `<div class="mtw"><table class="mt"><thead><tr>
+      <th>Usuario</th><th>Correo</th><th>Rol</th><th>Estatus</th><th>2FA</th><th>Contraseña</th>
+      </tr></thead><tbody>
+    ${items.map(u=>{ const rol=mRolKey(u); return `<tr>
+      <td><b>${esc(u.full_name||'—')}</b><div class="sub" style="color:var(--mut);font-size:11px">Alta ${mDay(u.created_at)}</div></td>
+      <td>${esc(u.email||'')}</td>
+      <td>${esc(M_ROL[rol]||rol||'—')}${u.is_superuser?' <span class="pbadge">MASTER</span>':''}</td>
+      <td>${u.is_active?mEstChip('confirmed','Activo'):mEstChip('','Inactivo')}</td>
+      <td>${u.totp_enabled?'🔐':'—'}</td>
+      <td>${u.is_active?`<span class="mlink" onclick="mResetPw(${u.id})">🔑 Restablecer</span>`:'—'}</td>
+    </tr>`;}).join('')}</tbody></table></div>`;
+}
+function mExpUsuarios(){
+  const items = MASTER.cache.usuarios||[];
+  mCSV('showma_usuarios.csv',['Nombre','Correo','Rol','Alta','Activo','2FA'],
+    items.map(u=>[u.full_name,u.email,M_ROL[mRolKey(u)]||mRolKey(u),u.created_at,u.is_active?'Sí':'No',u.totp_enabled?'Sí':'No']));
+}
+function mResetPw(id){
+  const u = (MASTER.cache.usuarios||[]).find(x=>x.id===id); if(!u) return;
+  let ov=document.getElementById('rpMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='rpMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) rpClose(); }); }
+  ov.innerHTML=`<div class="amod" style="position:relative;max-width:470px">
+    <button class="ax" onclick="rpClose()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Restablecer contraseña</b><span class="as">${esc(u.full_name||'')} · ${esc(u.email||'')}</span></div>
+    <div id="rpBody" class="abody">
+      <div class="hint" style="padding:6px 2px 12px">Elige cómo quieres devolverle el acceso. La contraseña anterior deja de funcionar en cuanto uses la primera opción.</div>
+      <button class="ago" style="width:100%" id="rpTemp" onclick="doResetPw(${id},'temp')">Generar contraseña temporal</button>
+      <div class="hint" style="padding:6px 2px 12px">Se muestra una sola vez, para dictársela o pasársela por chat. No necesita correo.</div>
+      <button class="ago alt" style="width:100%" id="rpLink" onclick="doResetPw(${id},'link')">Enviarle un enlace por correo</button>
+      <div class="hint" style="padding:6px 2px 0">El usuario elige su propia contraseña. Caduca en 1 hora.</div>
+    </div>
+  </div>`;
+  ov.style.display='flex';
+}
+function rpClose(){ const ov=document.getElementById('rpMov'); if(ov) ov.style.display='none'; }
+async function doResetPw(id,mode){
+  const btn=document.getElementById(mode==='temp'?'rpTemp':'rpLink');
+  if(btn){ btn.disabled=true; btn.textContent='Procesando…'; }
+  try{
+    const r = await post('/users/'+id+'/reset-password?mode='+mode, {});
+    const body=document.getElementById('rpBody'); if(!body) return;
+    if(mode==='temp'){
+      body.innerHTML=`<div style="margin-top:10px;background:var(--ov);border-radius:10px;padding:15px">
+        <div style="font-weight:700;color:#10b981;margin-bottom:9px">✓ Contraseña temporal generada</div>
+        <div style="font-size:13.5px;line-height:2">
+          <div>Usuario (correo): <b>${esc(r.email)}</b></div>
+          <div>Contraseña: <b style="font-family:ui-monospace,monospace;font-size:15px">${esc(r.temp_password)}</b></div>
+        </div>
+        <div class="hint" style="margin-top:9px">Pásasela y pídele que la cambie desde el botón 🔑 de su panel. No se vuelve a mostrar.</div>
+        <button class="ago" style="width:100%;margin-top:11px" onclick="rpClose()">Listo</button></div>`;
+    } else {
+      body.innerHTML=`<div style="margin-top:10px;background:var(--ov);border-radius:10px;padding:15px">
+        <div style="font-weight:700;color:${r.email_sent?'#10b981':'#f59e0b'};margin-bottom:9px">
+          ${r.email_sent?'✓ Enlace enviado por correo':'⚠️ El correo saliente no está configurado'}</div>
+        <div class="hint" style="margin:0 0 8px">${r.email_sent
+          ? 'Le llegó a '+esc(r.email)+'. Caduca en '+r.expires_minutes+' minutos.'
+          : 'Pásale tú este enlace (caduca en '+r.expires_minutes+' minutos):'}</div>
+        <div style="word-break:break-all;font-size:12px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:9px">${esc(r.reset_link)}</div>
+        <button class="ago" style="width:100%;margin-top:11px" onclick="rpClose()">Listo</button></div>`;
+    }
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent=mode==='temp'?'Generar contraseña temporal':'Enviarle un enlace por correo'; }
+    toast('No se pudo restablecer: '+(e.message||''),true);
+  }
 }
 
 function mConfig(box, key){

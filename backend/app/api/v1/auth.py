@@ -6,21 +6,28 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentScope, CurrentUser, DbSession
 from app.core import security
+from app.core.config import settings
 from app.models.artist import Artist
 from app.models.booker import Booker
 from app.models.company import Company
 from app.models.user import Role, User
 from app.schemas.auth import (
     ArtistRegisterRequest,
+    ChangePasswordRequest,
     ContratanteRegisterRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResult,
     LoginRequest,
     LoginResult,
     MeOut,
     RegisterRequest,
+    ResetPasswordRequest,
+    ResetTokenCheck,
     TotpSetupResponse,
     TotpVerifyRequest,
 )
 from app.schemas.user import UserOut
+from app.services import mailer, passwords
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -176,6 +183,87 @@ async def login(payload: LoginRequest, db: DbSession):
 
     token = security.create_access_token(user.id)
     return LoginResult(access_token=token)
+
+
+# --- Recuperación de contraseña -------------------------------------------
+# La respuesta de /forgot-password es siempre la misma exista o no la cuenta:
+# si dijera "ese correo no está registrado" cualquiera podría ir probando
+# correos para averiguar quién trabaja con la plataforma.
+
+@router.post("/forgot-password", response_model=ForgotPasswordResult)
+async def forgot_password(payload: ForgotPasswordRequest, db: DbSession):
+    generic = (
+        "Si ese correo tiene una cuenta en SHOWMA, te enviamos un enlace para "
+        "crear una contraseña nueva. Revisa también la carpeta de spam."
+    )
+    user = (
+        await db.execute(select(User).where(User.email == payload.email))
+    ).scalar_one_or_none()
+    if user is None or not user.is_active:
+        return ForgotPasswordResult(email_sent=mailer.is_configured(), message=generic)
+
+    raw, _ = await passwords.issue_token(db, user)
+    subject, text, html = mailer.reset_email(
+        user.full_name, passwords.reset_link(raw), settings.RESET_TOKEN_MINUTES
+    )
+    sent = await mailer.send(user.email, subject, text, html)
+    if not sent:
+        return ForgotPasswordResult(
+            email_sent=False,
+            message=(
+                "Tu solicitud quedó registrada. El envío de correos todavía no "
+                "está activo en la plataforma: pídele al administrador de SHOWMA "
+                "que te genere una contraseña nueva desde el panel."
+            ),
+        )
+    return ForgotPasswordResult(email_sent=True, message=generic)
+
+
+@router.get("/reset-password/check", response_model=ResetTokenCheck)
+async def check_reset_token(token: str, db: DbSession):
+    _, user, reason = await passwords.resolve_token(db, token)
+    if user is None:
+        return ResetTokenCheck(valid=False, reason=reason)
+    return ResetTokenCheck(
+        valid=True, email=passwords.mask_email(user.email), full_name=user.full_name
+    )
+
+
+@router.post("/reset-password", response_model=LoginResult)
+async def reset_password(payload: ResetPasswordRequest, db: DbSession):
+    """Fija la contraseña nueva y deja al usuario dentro (si no tiene 2FA)."""
+    row, user, reason = await passwords.resolve_token(db, payload.token)
+    if user is None or row is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, reason or "Enlace no válido.")
+    error = passwords.check_strength(payload.password)
+    if error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, error)
+
+    await passwords.apply_new_password(db, row, user, payload.password)
+    if user.totp_enabled:
+        return LoginResult(requires_2fa=True)
+    return LoginResult(access_token=security.create_access_token(user.id))
+
+
+@router.post("/change-password", response_model=UserOut)
+async def change_password(
+    payload: ChangePasswordRequest, current_user: CurrentUser, db: DbSession
+):
+    """Cambio de contraseña estando dentro (Mi Perfil)."""
+    if not security.verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "La contraseña actual no es correcta.")
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "La contraseña nueva debe ser distinta a la actual."
+        )
+    error = passwords.check_strength(payload.new_password)
+    if error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, error)
+
+    current_user.hashed_password = security.hash_password(payload.new_password)
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
 
 
 @router.post("/2fa/setup", response_model=TotpSetupResponse)

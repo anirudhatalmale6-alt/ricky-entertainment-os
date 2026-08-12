@@ -59,6 +59,26 @@ class Settings(BaseSettings):
     FACTURAMA_PASSWORD: str = ""
     FACTURAMA_SANDBOX: bool = True
 
+    # --- Correo saliente (SMTP) ----------------------------------------
+    # Sólo se usa para la recuperación de contraseña. Si SMTP_HOST va vacío la
+    # plataforma funciona igual: el enlace de recuperación queda disponible en
+    # el panel de MASTER para pasárselo al usuario a mano.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_SECURITY: str = "starttls"      # starttls | ssl | none
+    SMTP_FROM: str = ""                  # si va vacío se usa SMTP_USER
+    SMTP_FROM_NAME: str = "SHOWMA"
+    # Dirección pública desde la que se arma el enlace del correo.
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
+    # Vigencia del enlace de recuperación.
+    RESET_TOKEN_MINUTES: int = 60
+
+    @property
+    def mail_from(self) -> str:
+        return self.SMTP_FROM or self.SMTP_USER
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

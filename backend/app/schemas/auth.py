@@ -68,6 +68,47 @@ class LoginResult(BaseModel):
     token_type: str = "bearer"
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResult(BaseModel):
+    """Respuesta deliberadamente genérica: no dice si el correo existe o no, para
+    que nadie pueda averiguar quién tiene cuenta. `email_sent` sólo indica si la
+    plataforma tiene el correo saliente configurado."""
+    ok: bool = True
+    email_sent: bool = False
+    message: str
+
+
+class ResetTokenCheck(BaseModel):
+    valid: bool
+    email: str | None = None       # enmascarado (a***@dominio.com)
+    full_name: str | None = None
+    reason: str | None = None
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str = Field(min_length=8, max_length=128)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class AdminResetResult(BaseModel):
+    """Lo que ve MASTER al restablecer la contraseña de alguien."""
+    user_id: int
+    email: EmailStr
+    full_name: str
+    temp_password: str | None = None   # sólo en modo "contraseña temporal"
+    reset_link: str | None = None      # sólo en modo "enlace"
+    expires_minutes: int | None = None
+    email_sent: bool = False
+
+
 class TotpSetupResponse(BaseModel):
     secret: str
     provisioning_uri: str

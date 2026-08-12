@@ -15,6 +15,7 @@ from app.models.conversation import Conversation, Message
 from app.models.hotel_lead import HotelLead
 from app.models.notification import ArtistNotification
 from app.models.blocked_date import ArtistBlockedDate
+from app.models.password_reset import PasswordResetToken
 from app.models.tax_figure import TaxFigure
 from app.models.cfdi import Cfdi
 from app.models.contract import ContractTemplate, ContractAcceptance
@@ -62,6 +63,7 @@ __all__ = [
     "ArtistClientRate",
     "ArtistNotification",
     "ArtistBlockedDate",
+    "PasswordResetToken",
     "TaxFigure",
     "Cfdi",
     "ContractTemplate",
