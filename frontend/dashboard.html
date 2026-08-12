@@ -500,6 +500,15 @@
   .acard3 .ac3-disp.no{background:rgba(239,68,68,.92)}
   .acard3 .atag.busy{background:#f59e0b1f;color:#b45309}
   .acard3 .ac3-why{font-size:10.5px;font-weight:600;color:#dc2626;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Aviso de fechas de corte en Facturación (artista y hotel) */
+  .cutbar{display:flex;gap:12px;align-items:flex-start;background:#382ca10e;border:1px solid #382ca126;
+    border-radius:12px;padding:14px 16px;margin-bottom:16px;position:relative}
+  .cutbar .ci{font-size:15px;line-height:1.2;color:var(--acc);flex:none;margin-top:1px}
+  .cutbar .cx{font-size:13px;line-height:1.6;color:var(--acc);font-weight:600;padding-right:22px}
+  .cutbar .cx .sub{display:block;font-weight:500;opacity:.82}
+  .cutbar .cc{position:absolute;top:9px;right:11px;background:transparent;border:0;color:var(--acc);
+    opacity:.55;font-size:15px;cursor:pointer;line-height:1}
+  .cutbar .cc:hover{opacity:1}
   .actnote{grid-column:1/-1;font-size:11.5px;color:var(--mut);background:var(--ov);border:1px dashed var(--line);
     border-radius:9px;padding:7px 10px;margin-bottom:2px}
   /* Tarifas especiales por cliente (Mi Perfil) */
@@ -3209,8 +3218,8 @@ async function hotelBill(box){
   const total=sum(()=>true), pagado=sum(x=>x.status==='paid'), pend=sum(x=>x.status==='sent'), venc=sum(x=>x.status==='overdue');
   const vencN=invoices.filter(x=>x.status==='overdue').length;
   const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
-  if(!invoices.length){ box.innerHTML=`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no hay facturas</h3><p style="max-width:440px;margin:10px auto 0">En cuanto confirmes o realices actuaciones en tu cadena, aquí verás la facturación agrupada por hotel y mes, con los servicios de gestión SHOWMA y el IVA.</p></div></div>`; return; }
-  box.innerHTML=`
+  if(!invoices.length){ box.innerHTML=cutoffNotice('company')+`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no hay facturas</h3><p style="max-width:440px;margin:10px auto 0">En cuanto confirmes o realices actuaciones en tu cadena, aquí verás la facturación agrupada por hotel y mes, con los servicios de gestión SHOWMA y el IVA.</p></div></div>`; return; }
+  box.innerHTML=cutoffNotice('company')+`
     <div class="kpis">
       <div class="kpi"><div class="kh"><div><div class="k">Total facturado</div><div class="v">${MXN(total)}</div><div class="d">${invoices.length} factura${invoices.length===1?'':'s'}</div></div><div class="kc violet">🧾</div></div></div>
       <div class="kpi"><div class="kh"><div><div class="k">Pagado</div><div class="v">${MXN(pagado)}</div><div class="d">${total>0?Math.round(pagado/total*100):0}% del total</div></div><div class="kc green">✅</div></div></div>
@@ -4792,9 +4801,9 @@ const RENDER = {
           mes=sum(x=>{const[y,m]=x.ym.split('-');return (+y)===now.getFullYear()&&(+m)===now.getMonth()+1;});
     const vencN=invoices.filter(x=>x.status==='overdue').length;
     const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
-    if(!invoices.length){ box.innerHTML=`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no tienes facturas</h3>
+    if(!invoices.length){ box.innerHTML=cutoffNotice('artist')+`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no tienes facturas</h3>
       <p style="max-width:460px;margin:10px auto 0">En cuanto confirmes o realices actuaciones, aquí verás tu facturación agrupada por hotel y mes, con el desglose completo: Platform Service, IVA trasladado, retenciones y tu total a recibir.</p></div></div>`; return; }
-    box.innerHTML=`
+    box.innerHTML=cutoffNotice('artist')+`
       <div class="kpis">
         <div class="kpi"><div class="kh"><div><div class="k">Total a recibir</div><div class="v">${MXN(total)}</div><div class="d">${invoices.length} factura${invoices.length===1?'':'s'}</div></div><div class="kc violet">🧾</div></div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Cobrado</div><div class="v">${MXN(cobrado)}</div><div class="d">${total>0?Math.round(cobrado/total*100):0}% del total</div></div><div class="kc green">✅</div></div></div>
@@ -5106,6 +5115,22 @@ const RENDER = {
         <div class="newslist">${cards}</div></div>`;
   }
 };
+
+// Aviso de periodización de facturas. Los cortes son los días 15 y 30 de cada
+// mes y el pago sale 10 días después del corte; la redacción cambia según quien
+// mire, porque el hotel PAGA y el músico COBRA.
+function cutoffNotice(role){
+  const linea = role==='artist'
+    ? 'Fechas de corte: días 15 y 30 de cada mes. Tu pago se procesa 10 días posteriores a la fecha de corte del periodo correspondiente.'
+    : 'Fechas de corte: días 15 y 30 de cada mes. Tu factura se emite en cada corte y el pago se procesa 10 días posteriores a la fecha de corte.';
+  return `<div class="cutbar" id="cutbar">
+    <span class="ci">ℹ️</span>
+    <div class="cx">${linea}
+      <span class="sub">Las fechas podrán ajustarse en caso de fines de semana o días festivos. En caso de cualquier cambio, recibirás una notificación oportuna.</span>
+    </div>
+    <button class="cc" onclick="this.closest('.cutbar').remove()" title="Ocultar" aria-label="Ocultar aviso">✕</button>
+  </div>`;
+}
 
 /* ---- Artist dashboard + self-service ---- */
 const sameMonth=(iso,d)=>{const x=new Date(iso);return x.getFullYear()===d.getFullYear()&&x.getMonth()===d.getMonth();};
