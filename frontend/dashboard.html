@@ -751,6 +751,7 @@
   /* Facturación (screen 6) */
   .inv-status{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
   .is-paid{background:#10b9811f;color:#10b981}.is-sent{background:#3b82f61f;color:#3b82f6}.is-overdue{background:#ef44441f;color:#ef4444}
+  .is-open{background:#6b72801f;color:#6b7280}
   .invdetail .idr{display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0}
   .invdetail .idr.tot{border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-weight:800;font-size:14px;color:var(--acc)}
   .qact{display:flex;flex-direction:column;gap:2px}
@@ -3202,27 +3203,33 @@ async function hotelBill(box){
   const num=x=>+x||0; const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null; const today=new Date();
   const invb=bk.filter(b=>['confirmed','completed'].includes(b.status));
   const g={};
-  invb.forEach(b=>{const d=new Date(b.starts_at);const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');const k=(b.company_id||0)+'|'+ym;(g[k]=g[k]||{company:b.company_name||'—',ym,rows:[]}).rows.push(b);});
+  // Agrupado por hotel + QUINCENA, igual que el recibo del músico, para que las
+  // dos partes vean exactamente el mismo corte.
+  invb.forEach(b=>{const per=qKey(b.starts_at); if(!per) return;
+    const k=(b.company_id||0)+'|'+per;
+    (g[k]=g[k]||{company:b.company_name||'—',per,ym:per.slice(0,7),rows:[]}).rows.push(b);});
   const invoices=Object.entries(g).map(([k,v])=>{
     const subtotal=v.rows.reduce((a,b)=>a+num(b.agreed_price),0);
     const feePct=avg(v.rows.map(b=>b.commission_pct).filter(x=>x!=null))||5.2;
     const fee=subtotal*feePct/100, iva=subtotal*0.16, total=subtotal+iva;
-    const allDone=v.rows.every(b=>b.status==='completed');
+    const corte=qCutoff(v.per), deposito=qPayment(v.per);
+    const cerrado=corte && corte<=today;
     const allPaid=v.rows.length && v.rows.every(b=>b.invoice_paid);
-    const d=new Date(v.ym+'-01T00:00:00'); const due=new Date(d); due.setMonth(due.getMonth()+1); due.setDate(14);
-    // Vencida solo si ya pasó la fecha de vencimiento y no está pagada; si no, está por cobrar.
-    const status=(allDone||allPaid)?'paid':(due<today?'overdue':'sent');
-    return {company:v.company,ym:v.ym,period:d.toLocaleDateString('es-MX',{month:'long',year:'numeric'}),rows:v.rows,
-      subtotal,feePct,fee,iva,total,status,
-      issue:d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}),
-      due:due.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})};
-  }).sort((a,b)=>b.ym.localeCompare(a.ym));
-  invoices.forEach((inv,i)=>{inv.no='INV-'+inv.ym.replace('-','')+'-'+String(i+1).padStart(3,'0');});
+    // "Pagada" sólo si está marcada como pagada. Antes bastaba con que las
+    // actuaciones estuvieran realizadas, y eso daba por pagado dinero que
+    // todavía no había salido — justo lo que no puede pasar aquí.
+    const status=allPaid?'paid':(!cerrado?'open':(deposito<today?'overdue':'sent'));
+    return {company:v.company,ym:v.ym,per:v.per,period:qShort(v.per),rows:v.rows,
+      subtotal,feePct,fee,iva,total,status,cerrado,
+      issue:qFecha(corte), due:qFecha(deposito)};
+  }).sort((a,b)=>b.per.localeCompare(a.per));
+  invoices.forEach((inv,i)=>{inv.no='INV-'+inv.per.replace(/-/g,'')+'-'+String(i+1).padStart(3,'0');});
   CACHE.invoices=invoices; CACHE.AMAP=AMAP;
   const sum=f=>invoices.filter(f).reduce((a,b)=>a+b.total,0);
   const total=sum(()=>true), pagado=sum(x=>x.status==='paid'), pend=sum(x=>x.status==='sent'), venc=sum(x=>x.status==='overdue');
   const vencN=invoices.filter(x=>x.status==='overdue').length;
-  const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
+  const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue'],open:['En curso','is-open']};
+  const stl=s=>STL[s]||['—','is-open'];
   if(!invoices.length){ box.innerHTML=cutoffNotice('company')+`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no hay facturas</h3><p style="max-width:440px;margin:10px auto 0">En cuanto confirmes o realices actuaciones en tu cadena, aquí verás la facturación agrupada por hotel y mes, con los servicios de gestión SHOWMA y el IVA.</p></div></div>`; return; }
   box.innerHTML=cutoffNotice('company')+`
     <div class="kpis">
@@ -3235,9 +3242,9 @@ async function hotelBill(box){
       <div class="box"><div class="bhead"><h3 style="margin:0">Facturas</h3><span class="hint" style="margin:0">${invoices.length} · más recientes primero</span></div>
         <table id="invTable"><thead><tr><th>Factura</th><th>Periodo</th><th>Hotel</th><th>Total</th><th>Estado</th></tr></thead><tbody>
         ${invoices.map((inv,i)=>`<tr data-i="${i}" onclick="selectInvoice(${i})" style="cursor:pointer">
-          <td style="font-variant-numeric:tabular-nums">${inv.no}</td><td class="muted" style="text-transform:capitalize">${inv.period}</td>
+          <td style="font-variant-numeric:tabular-nums">${inv.no}</td><td class="muted">${inv.period}</td>
           <td>${esc(inv.company)}</td><td style="font-weight:650">${MXN(inv.total)}</td>
-          <td><span class="inv-status ${STL[inv.status][1]}">${STL[inv.status][0]}</span></td></tr>`).join('')}
+          <td><span class="inv-status ${stl(inv.status)[1]}">${stl(inv.status)[0]}</span></td></tr>`).join('')}
         </tbody></table>
         <div style="margin-top:12px"><button class="btn ghost" onclick="exportInvoices&&exportInvoices(this)">⬇ Exportar CSV</button></div>
       </div>
@@ -3256,15 +3263,17 @@ async function hotelBill(box){
 function selectInvoice(i){
   const inv=(CACHE.invoices||[])[i]; if(!inv) return;
   CACHE.selInvIdx=i;
-  const AMAP=CACHE.AMAP||{}; const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
+  const AMAP=CACHE.AMAP||{}; const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue'],open:['En curso','is-open']};
+  const stl=s=>STL[s]||['—','is-open'];
   document.querySelectorAll('#invTable tr[data-i]').forEach(r=>{r.style.background=(+r.dataset.i===i)?'var(--ov)':'';});
   document.getElementById('invDetail').innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><b style="font-variant-numeric:tabular-nums">${inv.no}</b><span class="inv-status ${STL[inv.status][1]}">${STL[inv.status][0]}</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><b style="font-variant-numeric:tabular-nums">${inv.no}</b><span class="inv-status ${stl(inv.status)[1]}">${stl(inv.status)[0]}</span></div>
     <div class="invdetail">
       <div class="idr"><span class="muted">Hotel</span><b>${esc(inv.company)}</b></div>
-      <div class="idr"><span class="muted">Periodo</span><span style="text-transform:capitalize">${inv.period}</span></div>
-      <div class="idr"><span class="muted">Emitida</span><span>${inv.issue}</span></div>
-      <div class="idr"><span class="muted">Vence</span><span>${inv.due}</span></div>
+      <div class="idr"><span class="muted">Periodo</span><span>${inv.period}</span></div>
+      <div class="idr"><span class="muted">Fecha de corte</span><span>${inv.issue}</span></div>
+      <div class="idr"><span class="muted">Pago</span><b>${inv.due}</b></div>
+      ${inv.cerrado===false?'<div class="idr"><span class="muted">Estado del periodo</span><span>Abierto · aún puede sumar actuaciones</span></div>':''}
       <div class="idr"><span class="muted">Subtotal</span><span>${MXN(inv.subtotal)}</span></div>
       <div class="idr"><span class="muted">Servicios de gestión SHOWMA (${inv.feePct.toFixed(1)}%)</span><span>${MXN(inv.fee)}</span></div>
       <div class="idr"><span class="muted">IVA (16%)</span><span>${MXN(inv.iva)}</span></div>
@@ -3283,18 +3292,20 @@ function selectInvoice(i){
 function selectPayout(i){
   const inv=(CACHE.payouts||[])[i]; if(!inv) return;
   CACHE.selPayoutIdx=i;
-  const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
+  const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue'],open:['En curso','is-open']};
+  const stl=s=>STL[s]||['—','is-open'];
   document.querySelectorAll('#poTable tr[data-i]').forEach(r=>{r.style.background=(+r.dataset.i===i)?'var(--ov)':'';});
   const pct=x=>{const n=+x||0; return (Math.round(n*10000)/10000).toString()+'%';};
   const fig=CACHE.payoutFigura?` <span class="muted" style="font-size:11px">(${esc(CACHE.payoutFigura)})</span>`:'';
   const d=document.getElementById('poDetail'); if(!d) return;
   d.innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><b style="font-variant-numeric:tabular-nums">${inv.no}</b><span class="inv-status ${STL[inv.status][1]}">${STL[inv.status][0]}</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><b style="font-variant-numeric:tabular-nums">${inv.no}</b><span class="inv-status ${stl(inv.status)[1]}">${stl(inv.status)[0]}</span></div>
     <div class="invdetail">
       <div class="idr"><span class="muted">Hotel</span><b>${esc(inv.company)}</b></div>
-      <div class="idr"><span class="muted">Periodo</span><span style="text-transform:capitalize">${inv.period}</span></div>
-      <div class="idr"><span class="muted">Emitida</span><span>${inv.issue}</span></div>
-      <div class="idr"><span class="muted">Vence</span><span>${inv.due}</span></div>
+      <div class="idr"><span class="muted">Periodo</span><span>${inv.period}</span></div>
+      <div class="idr"><span class="muted">Fecha de corte</span><span>${inv.cutoff||inv.issue}</span></div>
+      <div class="idr"><span class="muted">Depósito</span><b>${inv.payment_date||inv.due}</b></div>
+      ${inv.closed===false?'<div class="idr"><span class="muted">Estado del periodo</span><span>Abierto · aún puede sumar actuaciones</span></div>':''}
     </div>
     <table class="podesg"><thead><tr><th>Concepto</th><th class="num">Base</th><th class="num">%</th><th class="num">Importe</th></tr></thead><tbody>
       <tr><td><b>Honorarios contratados</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.honorarios)}</b></td></tr>
@@ -3418,7 +3429,7 @@ async function dlHotelInvoice(btn){
   const ok=await dlPdf({
     kind:'Factura', number:inv.no, title:'Factura '+inv.no,
     filename:'Factura_'+inv.no+'.pdf',
-    meta:[['Hotel',inv.company],['Periodo',inv.period],['Emitida',inv.issue],['Vence',inv.due]],
+    meta:[['Hotel',inv.company],['Periodo',inv.period],['Fecha de corte',inv.issue],['Pago',inv.due]],
     table:{head:['Fecha','Show','Artista','Venue','Importe'],rows,align:['l','l','l','l','r']},
     summary:[['Subtotal',MXN2(inv.subtotal),''],
              ['Servicios de gestión SHOWMA ('+inv.feePct.toFixed(1)+'%)',MXN2(inv.fee),''],
@@ -3428,8 +3439,8 @@ async function dlHotelInvoice(btn){
   if(ok) return;
   const lines=(inv.rows||[]).map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td><td>${esc(b.artist_name||AMAP[b.artist_id]||'—')}</td><td>${esc(b.venue_name||'—')}</td><td class="num">${MXN2(b.agreed_price)}</td></tr>`).join('');
   printDoc('Factura '+inv.no, _docHead('Factura', inv.no)
-    +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Periodo:</b> <span style="text-transform:capitalize">${esc(inv.period)}</span></td></tr>`
-    +`<tr><td><b>Emitida:</b> ${esc(inv.issue)}</td><td style="text-align:right"><b>Vence:</b> ${esc(inv.due)}</td></tr></table>`
+    +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Periodo:</b> ${esc(inv.period)}</td></tr>`
+    +`<tr><td><b>Fecha de corte:</b> ${esc(inv.issue)}</td><td style="text-align:right"><b>Pago:</b> ${esc(inv.due)}</td></tr></table>`
     +`<table><thead><tr><th>Fecha</th><th>Show</th><th>Artista</th><th>Venue</th><th class="num">Importe</th></tr></thead><tbody>${lines}</tbody></table>`
     +`<table class="sumt"><tr><td>Subtotal</td><td class="num">${MXN2(inv.subtotal)}</td></tr>`
     +`<tr><td>Servicios de gestión SHOWMA (${inv.feePct.toFixed(1)}%)</td><td class="num">${MXN2(inv.fee)}</td></tr>`
@@ -3444,7 +3455,7 @@ async function dlPayout(btn){
   const ok=await dlPdf({
     kind:'Recibo de honorarios', number:inv.no, title:'Recibo '+inv.no,
     filename:'Recibo_'+inv.no+'.pdf',
-    meta:[['Hotel',inv.company],['Periodo',inv.period],['Emitida',inv.issue],['Vence',inv.due]],
+    meta:[['Hotel',inv.company],['Periodo',inv.period],['Fecha de corte',inv.issue],['Pago',inv.due]],
     table:{head:['Concepto','Base','%','Importe'],align:['l','r','r','r'],rows:[
       ['Honorarios contratados','','',MXN2(inv.honorarios)],
       ['Platform Service',MXN2(inv.honorarios),p(inv.com_pct),'−'+MXN2(inv.comision)],
@@ -3457,8 +3468,8 @@ async function dlPayout(btn){
   },'Recibo_'+inv.no+'.pdf',btn);
   if(ok) return;
   printDoc('Recibo '+inv.no, _docHead('Recibo de honorarios', inv.no)
-    +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Periodo:</b> <span style="text-transform:capitalize">${esc(inv.period)}</span></td></tr>`
-    +`<tr><td><b>Emitida:</b> ${esc(inv.issue)}</td><td style="text-align:right"><b>Vence:</b> ${esc(inv.due)}</td></tr></table>`
+    +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Periodo:</b> ${esc(inv.period)}</td></tr>`
+    +`<tr><td><b>Fecha de corte:</b> ${esc(inv.issue)}</td><td style="text-align:right"><b>Pago:</b> ${esc(inv.due)}</td></tr></table>`
     +`<table><thead><tr><th>Concepto</th><th class="num">Base</th><th class="num">%</th><th class="num">Importe</th></tr></thead><tbody>`
     +`<tr><td><b>Honorarios contratados</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.honorarios)}</b></td></tr>`
     +`<tr><td>Platform Service</td><td class="num">${MXN2(inv.honorarios)}</td><td class="num">${p(inv.com_pct)}</td><td class="num">−${MXN2(inv.comision)}</td></tr>`
@@ -3492,7 +3503,9 @@ async function markPayoutCobrada(){
   if(!inv){ toast('Selecciona una factura primero'); return; }
   if(inv.status==='paid'){ toast('Este recibo ya está cobrado'); return; }
   try{
-    await post('/me/payouts/mark', {company_id:inv.company_id, ym:inv.ym, paid:true});
+    // Se marca la QUINCENA concreta, no el mes: si no, marcar la primera
+    // quincena daría por cobrada también la segunda.
+    await post('/me/payouts/mark', {company_id:inv.company_id, period:inv.period_key, paid:true});
     inv.status='paid';
     const cell=document.querySelector(`#poTable tr[data-i="${i}"] .inv-status`);
     if(cell){ cell.className='inv-status is-paid'; cell.textContent='Pagada'; }
@@ -3550,6 +3563,7 @@ const M_MENU = [
   {v:'ingresos', ic:'🧾', label:'Facturación Ingresos'},
   {v:'egresos',  ic:'🔻', label:'Facturación Egresos'},
   {v:'pagos',    ic:'🏦', label:'Pagos y depósitos'},
+  {v:'periodos', ic:'📆', label:'Cortes y quincenas'},
   {sec:'Reportes'},
   {v:'reportes', ic:'📈', label:'Reportes'},
   {sec:'Configuración'},
@@ -3591,6 +3605,7 @@ async function mNav(v){
     else if(v==='cfg_taxes') await mTaxes(body);
     else if(v==='cfg_plantillas') await mPlantillas(body);
     else if(v==='cfg_usuarios') await mUsuarios(body);
+    else if(v==='periodos')  await mPeriodos(body);
     else                     mConfig(body, v);
   }catch(e){ body.innerHTML = `<div class="mempty"><div class="big">⚠️</div>No se pudo cargar: ${esc(e.message)}</div>`; }
 }
@@ -4273,6 +4288,96 @@ function mExportAcceptances(){
     items.map(i=>[i.signer_name,'v'+i.version, i.accepted_at? new Date(i.accepted_at).toLocaleString('es-MX'):'', i.ip||'']));
 }
 
+/* ---- Contaduría · Cortes y quincenas ---- */
+// El tablero de cortes. David: "necesitamos mucha claridad y orden en cortes y
+// fechas de depósito, esto es lo más riesgoso del sistema". Por eso antes de
+// emitir nada se puede ver exactamente qué se va a facturar y a quién.
+async function mPeriodos(box){
+  box.innerHTML = mHead('Cortes y quincenas','Cierres los días 15 y último de cada mes · el depósito sale 10 días después del corte')
+    + `<div id="mres"><div class="load">Cargando…</div></div>`;
+  const res=document.getElementById('mres');
+  let d; try{ d=await api('/admin/facturacion/periodos'); }
+  catch(e){ res.innerHTML=mEmpty('No se pudo cargar: '+(e.message||'')); return; }
+  MASTER.cache.periodos=d.periodos;
+  const hoy=new Date().toISOString().slice(0,10);
+  res.innerHTML=`<div class="mtw"><table class="mt"><thead><tr>
+      <th>Quincena</th><th>Del … al</th><th>Corte</th><th>Depósito</th>
+      <th class="num">Pendiente</th><th class="num">Facturado</th><th>Estado</th><th></th>
+    </tr></thead><tbody>
+    ${d.periodos.map(p=>{
+      const abierto=!p.closed;
+      const pend=p.actuaciones_pendientes;
+      const estado = abierto ? mEstChip('','En curso')
+        : (p.facturas_con_error ? mEstChip('cancelled', p.facturas_con_error+' con error')
+          : (pend ? mEstChip('pending', pend+' sin facturar') : mEstChip('confirmed','Al día')));
+      return `<tr${(!abierto&&pend)?' style="background:#f59e0b0d"':''}>
+        <td><b>${esc(p.short)}</b></td>
+        <td class="sub">${qDM(p.start)} → ${qDM(p.end)}</td>
+        <td>${qDMY(p.cutoff)}</td>
+        <td><b>${qDMY(p.payment_date)}</b>${p.payment_date===hoy?' <span class="pbadge">HOY</span>':''}</td>
+        <td class="num">${pend?MXN(p.importe_pendiente):'—'}</td>
+        <td class="num">${p.facturas_emitidas?MXN(p.importe_facturado)+' <span class="sub">('+p.facturas_emitidas+')</span>':'—'}</td>
+        <td>${estado}</td>
+        <td><span class="mlink" onclick="mPeriodoPreview('${p.period}')">👁 Ver detalle</span></td>
+      </tr>`;}).join('')}
+    </tbody></table></div>`;
+}
+async function mPeriodoPreview(period){
+  let ov=document.getElementById('mpMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='mpMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) mpClose(); }); }
+  ov.innerHTML=`<div class="amod" style="position:relative;max-width:740px">
+    <button class="ax" onclick="mpClose()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Detalle de la quincena</b><span class="as">${esc(period)}</span></div>
+    <div id="mpBody" class="abody"><div class="load">Cargando…</div></div></div>`;
+  ov.style.display='flex';
+  let d; try{ d=await api('/admin/facturacion/periodos/'+period+'/preview'); }
+  catch(e){ document.getElementById('mpBody').innerHTML=mEmpty('No se pudo cargar: '+(e.message||'')); return; }
+  const sinCsd=d.detalle.filter(x=>x.csd!=='active');
+  document.getElementById('mpBody').innerHTML=`
+    <div class="hint" style="margin:0 0 10px">${esc(d.label)} · corte ${qDMY(d.cutoff)} · depósito ${qDMY(d.payment_date)}</div>
+    ${d.facturas_a_emitir?`
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+        <div><div class="hint" style="margin:0">Facturas a emitir</div><b style="font-size:19px">${d.facturas_a_emitir}</b></div>
+        <div><div class="hint" style="margin:0">Actuaciones</div><b style="font-size:19px">${d.actuaciones}</b></div>
+        <div><div class="hint" style="margin:0">Importe</div><b style="font-size:19px">${MXN(d.importe_total)}</b></div>
+      </div>
+      ${sinCsd.length?`<div class="hint" style="color:#b45309;background:#f59e0b14;border-radius:8px;padding:8px 10px;margin:0 0 10px">
+        ⚠️ ${sinCsd.length} músico(s) sin CSD activo: su factura no se podrá timbrar hasta que lo suban.</div>`:''}
+      <div class="mtw" style="max-height:260px;overflow:auto"><table class="mt" style="min-width:0"><thead><tr>
+        <th>Músico</th><th>Hotel</th><th class="num">Actuaciones</th><th class="num">Importe</th></tr></thead><tbody>
+        ${d.detalle.map(x=>`<tr>
+          <td>${esc(x.artista)}${x.csd!=='active'?' <span class="pbadge" style="background:#f59e0b1f;color:#b45309">sin CSD</span>':''}</td>
+          <td>${esc(x.hotel)}</td>
+          <td class="num">${x.actuaciones.length}</td>
+          <td class="num">${MXN(x.importe)}</td></tr>`).join('')}
+      </tbody></table></div>
+      ${d.closed?`<button class="ago" style="width:100%;margin-top:12px" id="mpGo" onclick="mCerrarPeriodo('${period}')">Emitir las facturas de esta quincena</button>
+        <div class="hint" style="margin:6px 0 0">Se puede repetir sin miedo: sólo entra lo que todavía no está facturado.</div>`
+        :`<div class="hint" style="margin:12px 0 0">La quincena aún no cierra (corta el ${qDMY(d.cutoff)}). Todavía puede sumar actuaciones.</div>`}
+    `:`<div class="mempty" style="padding:22px"><div class="big">✅</div>No hay nada pendiente de facturar en esta quincena.</div>`}`;
+}
+function mpClose(){ const ov=document.getElementById('mpMov'); if(ov) ov.style.display='none'; }
+async function mCerrarPeriodo(period){
+  const b=document.getElementById('mpGo'); if(b){ b.disabled=true; b.textContent='Emitiendo…'; }
+  try{
+    const r=await post('/admin/facturacion/periodos/'+period+'/cerrar',{});
+    document.getElementById('mpBody').innerHTML=`<div style="background:var(--ov);border-radius:10px;padding:15px">
+      <div style="font-weight:700;color:${r.facturas_con_error?'#f59e0b':'#10b981'};margin-bottom:8px">
+        ${r.facturas_con_error?'⚠️ Emitido con incidencias':'✓ Quincena facturada'}</div>
+      <div style="font-size:13.5px;line-height:1.9">
+        <div>Facturas emitidas: <b>${r.facturas_emitidas}</b></div>
+        ${r.facturas_con_error?`<div>Con error: <b>${r.facturas_con_error}</b></div>`:''}
+        <div>Depósito programado: <b>${qDMY(r.payment_date)}</b></div>
+      </div>
+      ${r.errores&&r.errores.length?`<div class="hint" style="margin-top:9px">${r.errores.map(e=>'· '+esc(e.error||'')).join('<br>')}</div>`:''}
+      <button class="ago" style="width:100%;margin-top:12px" onclick="mpClose();mNav('periodos')">Listo</button></div>`;
+  }catch(e){
+    if(b){ b.disabled=false; b.textContent='Emitir las facturas de esta quincena'; }
+    toast('No se pudo cerrar: '+(e.message||''),true);
+  }
+}
+
 /* ---- Configuración · Usuarios y roles ---- */
 // Lista de accesos de la plataforma y, sobre todo, el rescate: si alguien pierde
 // su contraseña MASTER puede darle una temporal (funciona sin correo saliente) o
@@ -4805,7 +4910,8 @@ const RENDER = {
           porcobrar=sum(x=>x.status!=='paid'),
           mes=sum(x=>{const[y,m]=x.ym.split('-');return (+y)===now.getFullYear()&&(+m)===now.getMonth()+1;});
     const vencN=invoices.filter(x=>x.status==='overdue').length;
-    const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue']};
+    const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue'],open:['En curso','is-open']};
+  const stl=s=>STL[s]||['—','is-open'];
     if(!invoices.length){ box.innerHTML=cutoffNotice('artist')+`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no tienes facturas</h3>
       <p style="max-width:460px;margin:10px auto 0">En cuanto confirmes o realices actuaciones, aquí verás tu facturación agrupada por hotel y mes, con el desglose completo: Platform Service, IVA trasladado, retenciones y tu total a recibir.</p></div></div>`; return; }
     box.innerHTML=cutoffNotice('artist')+`
@@ -4819,9 +4925,9 @@ const RENDER = {
         <div class="box"><div class="bhead"><h3 style="margin:0">Facturas</h3><span class="hint" style="margin:0">${invoices.length} · más recientes primero</span></div>
           <table id="poTable"><thead><tr><th>Factura</th><th>Periodo</th><th>Hotel</th><th>Total a recibir</th><th>Estado</th></tr></thead><tbody>
           ${invoices.map((inv,i)=>`<tr data-i="${i}" onclick="selectPayout(${i})" style="cursor:pointer">
-            <td style="font-variant-numeric:tabular-nums">${inv.no}</td><td class="muted" style="text-transform:capitalize">${inv.period}</td>
+            <td style="font-variant-numeric:tabular-nums">${inv.no}</td><td class="muted">${inv.period}</td>
             <td>${esc(inv.company)}</td><td style="font-weight:650">${MXN2(inv.total_recibir)}</td>
-            <td><span class="inv-status ${STL[inv.status][1]}">${STL[inv.status][0]}</span></td></tr>`).join('')}
+            <td><span class="inv-status ${stl(inv.status)[1]}">${stl(inv.status)[0]}</span></td></tr>`).join('')}
           </tbody></table>
           <div style="margin-top:12px"><button class="btn ghost" onclick="exportPayouts(this)">⬇ Exportar CSV</button></div>
         </div>
@@ -5120,6 +5226,24 @@ const RENDER = {
         <div class="newslist">${cards}</div></div>`;
   }
 };
+
+// --- Quincenas en el frontend (mismo cálculo que backend/services/periodos.py) ---
+const QMES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const qLastDay=(y,m)=>new Date(y,m,0).getDate();          // m es 1-based
+function qKey(iso){
+  const d=new Date(iso); if(isNaN(d)) return null;
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-Q'+(d.getDate()<=15?1:2);
+}
+function qParse(k){ const m=/^(\d{4})-(\d{2})-Q([12])$/.exec(k||''); return m?[+m[1],+m[2],+m[3]]:null; }
+function qRange(k){ const p=qParse(k); if(!p) return null; const [y,m,q]=p;
+  return q===1?[new Date(y,m-1,1),new Date(y,m-1,15)]:[new Date(y,m-1,16),new Date(y,m-1,qLastDay(y,m))]; }
+function qCutoff(k){ const r=qRange(k); return r?r[1]:null; }
+function qPayment(k){ const c=qCutoff(k); if(!c) return null; const d=new Date(c); d.setDate(d.getDate()+10); return d; }
+function qShort(k){ const p=qParse(k); if(!p) return k; const [y,m,q]=p;
+  return QMES[m-1].slice(0,3).replace(/^./,c=>c.toUpperCase())+' '+y+' · '+q+'ª quincena'; }
+const qFecha=d=>d?d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'—';
+const qDM =iso=>iso?iso.slice(8,10)+'/'+iso.slice(5,7):'—';           // 2026-08-15 -> 15/08
+const qDMY=iso=>iso?qDM(iso)+'/'+iso.slice(0,4):'—';                   // 2026-08-15 -> 15/08/2026
 
 // Aviso de periodización de facturas. Los cortes son los días 15 y 30 de cada
 // mes y el pago sale 10 días después del corte; la redacción cambia según quien

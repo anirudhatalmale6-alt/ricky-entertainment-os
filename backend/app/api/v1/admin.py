@@ -871,3 +871,118 @@ async def contract_acceptances(scope: CurrentScope, db: DbSession):
         "ip": r.ip,
         "accepted_at": r.created_at.isoformat() if r.created_at else None,
     } for r in rows]}
+
+
+# --- Facturación por quincena ---------------------------------------------
+# "Necesitamos mucha claridad y orden en cortes y fechas de depósito, esto es lo
+# más riesgoso del sistema" (David, 2026-08-12). Por eso el cierre se puede ver
+# ANTES de emitir nada (`/preview`) y el que emite es idempotente.
+
+def _require_admin(scope: CurrentScope) -> None:
+    if not scope.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo administración puede facturar periodos.")
+
+
+@router.get("/facturacion/periodos")
+async def listar_periodos(scope: CurrentScope, db: DbSession, ultimos: int = Query(8, ge=1, le=24)):
+    """Las últimas quincenas con su estado: qué se facturó, qué falta y cuándo
+    toca depositar. Es el tablero para no perder de vista ningún corte."""
+    _require_admin(scope)
+    from app.models.cfdi import Cfdi
+    from app.services import facturacion, periodos
+
+    key = periodos.key_for(datetime.utcnow().date())
+    claves = []
+    for _ in range(ultimos):
+        claves.append(key)
+        key = periodos.previous(key)
+
+    filas = []
+    for k in claves:
+        info = periodos.info(k)
+        pend = await facturacion.pending_bookings_for_period(db, k)
+        cfdis = list((await db.execute(
+            select(Cfdi).where(Cfdi.period == k)
+        )).scalars().all())
+        filas.append({
+            **info,
+            "actuaciones_pendientes": len(pend),
+            "importe_pendiente": round(sum(float(b.agreed_price or 0) for b in pend), 2),
+            "facturas_emitidas": sum(1 for c in cfdis if c.status == "stamped"),
+            "facturas_con_error": sum(1 for c in cfdis if c.status == "error"),
+            "importe_facturado": round(sum(float(c.total or 0) for c in cfdis if c.status == "stamped"), 2),
+        })
+    return {"periodos": filas}
+
+
+@router.get("/facturacion/periodos/{period}/preview")
+async def preview_periodo(period: str, scope: CurrentScope, db: DbSession):
+    """Qué se facturaría si se cerrara este periodo AHORA, sin emitir nada:
+    una línea por músico+hotel con sus actuaciones y su importe."""
+    _require_admin(scope)
+    from app.services import facturacion, periodos
+
+    try:
+        info = periodos.info(period)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+    pend = await facturacion.pending_bookings_for_period(db, period)
+    artistas = {a.id: a for a in (await db.execute(select(Artist))).scalars().all()}
+    empresas = {c.id: c for c in (await db.execute(select(Company))).scalars().all()}
+    shows = {s.id: s for s in (await db.execute(select(Show))).scalars().all()}
+
+    grupos: dict[tuple, dict] = {}
+    for b in pend:
+        k = (b.artist_id, b.company_id)
+        art, emp = artistas.get(b.artist_id), empresas.get(b.company_id)
+        g = grupos.setdefault(k, {
+            "artist_id": b.artist_id,
+            "artista": art.stage_name if art else "— sin músico —",
+            "csd": (art.csd_status or "none") if art else "none",
+            "company_id": b.company_id,
+            "hotel": emp.name if emp else "— sin hotel —",
+            "actuaciones": [], "importe": 0.0,
+        })
+        g["actuaciones"].append({
+            "booking_id": b.id,
+            "fecha": b.starts_at.isoformat() if b.starts_at else None,
+            "show": (shows.get(b.show_id).show_name if shows.get(b.show_id) else None),
+            "importe": float(b.agreed_price or 0),
+        })
+        g["importe"] = round(g["importe"] + float(b.agreed_price or 0), 2)
+
+    filas = sorted(grupos.values(), key=lambda g: (-g["importe"], g["artista"]))
+    return {
+        **info,
+        "facturas_a_emitir": len(filas),
+        "actuaciones": len(pend),
+        "importe_total": round(sum(f["importe"] for f in filas), 2),
+        "detalle": filas,
+    }
+
+
+@router.post("/facturacion/periodos/{period}/cerrar")
+async def cerrar_periodo(period: str, scope: CurrentScope, db: DbSession):
+    """Emite las facturas de la quincena. Se puede repetir sin miedo: sólo entra
+    lo que todavía no está en ninguna factura."""
+    _require_admin(scope)
+    from app.services import facturacion, periodos
+
+    try:
+        periodos.parse(period)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if not periodos.is_closed(period):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"El periodo {periodos.label(period)} todavía no cierra "
+            f"(corta el {periodos.cutoff(period):%d/%m/%Y}). Espera a la fecha de corte.",
+        )
+    if not settings.FACTURAMA_ENABLED:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "La facturación electrónica no está activada todavía "
+            "(faltan las credenciales de Facturama).",
+        )
+    return await facturacion.close_period(db, period)

@@ -60,6 +60,9 @@ _SQLITE_ADDED_COLUMNS = [
     ("shows", "travel_fee_km", "INTEGER DEFAULT 30"),
     # Fotos adjuntas en el chat
     ("messages", "images", "JSON"),
+    # Facturación por quincena
+    ("cfdis", "period", "VARCHAR(16)"),
+    ("bookings", "cfdi_id", "INTEGER"),
 ]
 
 

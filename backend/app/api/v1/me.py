@@ -30,7 +30,7 @@ from app.models.tax_figure import TaxFigure
 from app.models.cfdi import Cfdi
 from app.models.venue import Venue
 from app.services.facturama import FacturamaError, get_facturama
-from app.services import facturacion
+from app.services import facturacion, periodos
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
     ContractAcceptance,
@@ -180,17 +180,22 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
         (await db.execute(select(Show).where(Show.id.in_(sids)))).scalars().all() if sids else []
     )}
 
-    # Agrupa por hotel + mes.
+    # Agrupa por hotel + QUINCENA (David, 2026-08-12): un recibo por periodo, no
+    # por mes, para que cuadre con las fechas de corte y de depósito.
     groups: dict[str, dict] = {}
     for b in bookings:
         dt = b.starts_at
-        ym = f"{dt.year}-{dt.month:02d}"
-        key = f"{b.company_id or 0}|{ym}"
+        per = periodos.key_for(dt)
+        if per is None:
+            continue
+        key = f"{b.company_id or 0}|{per}"
         comp = companies.get(b.company_id)
         g = groups.setdefault(key, {
             "company_id": b.company_id,
             "company": comp.name if comp else "—",
-            "ym": ym, "rows": [],
+            "period": per,
+            "ym": per[:7],
+            "rows": [],
         })
         g["rows"].append(b)
 
@@ -207,16 +212,33 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
         ret_isr = round(base_cfdi * risr_pct / 100.0, 2)
         total_recibir = round(subtotal_iva - ret_iva - ret_isr, 2)
 
-        y, m = int(g["ym"][:4]), int(g["ym"][5:7])
-        issue = datetime(y, m, 1)
-        due = datetime(y + 1, 1, 14) if m == 12 else datetime(y, m + 1, 14)
-        all_done = all(b.status == BookingStatus.COMPLETED for b in rows)
+        per = g["period"]
+        corte = periodos.cutoff(per)
+        deposito = periodos.payment_date(per)
+        issue = datetime.combine(corte, datetime.min.time())
+        due = datetime.combine(deposito, datetime.min.time())
+        cerrado = periodos.is_closed(per, today.date())
         all_paid = bool(rows) and all(getattr(b, "payout_paid", False) for b in rows)
-        status_s = "paid" if (all_done or all_paid) else ("overdue" if due < today else "sent")
+        # "Pagada" sólo si el músico la marcó como cobrada. Antes bastaba con que
+        # las actuaciones estuvieran realizadas, lo que daba por cobrado dinero
+        # que todavía no se había depositado.
+        if all_paid:
+            status_s = "paid"
+        elif not cerrado:
+            status_s = "open"          # la quincena sigue abierta, aún suma
+        elif due < today:
+            status_s = "overdue"
+        else:
+            status_s = "sent"
 
         invoices.append({
             "company_id": g["company_id"], "company": g["company"], "ym": g["ym"],
-            "period": f"{_MES_ES[m - 1]} de {y}",
+            "period_key": per,
+            "period": periodos.short_label(per),
+            "period_label": periodos.label(per),
+            "cutoff": corte.strftime("%d/%m/%Y"),
+            "payment_date": deposito.strftime("%d/%m/%Y"),
+            "closed": cerrado,
             "issue": issue.strftime("%d/%m/%Y"),
             "due": due.strftime("%d/%m/%Y"),
             "status": status_s,
@@ -236,9 +258,9 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
             } for b in rows],
         })
 
-    invoices.sort(key=lambda x: x["ym"], reverse=True)
+    invoices.sort(key=lambda x: x["period_key"], reverse=True)
     for i, inv in enumerate(invoices):
-        inv["no"] = f"INV-{inv['ym'].replace('-', '')}-{i + 1:03d}"
+        inv["no"] = f"INV-{inv['period_key'].replace('-', '')}-{i + 1:03d}"
 
     return {
         "figura": figura.name if figura else None,
@@ -249,7 +271,10 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
 
 class PayoutMarkIn(BaseModel):
     company_id: int
-    ym: str            # "YYYY-MM"
+    # Quincena ("2026-08-Q1"). Se sigue aceptando "YYYY-MM" de la versión por
+    # meses: en ese caso se marcan las dos quincenas de ese mes.
+    period: str | None = None
+    ym: str | None = None
     paid: bool = True
 
 
@@ -267,10 +292,17 @@ async def mark_payout(payload: PayoutMarkIn, scope: CurrentScope, db: DbSession)
             )
         )
     ).scalars().all()
+    objetivo = (payload.period or payload.ym or "").strip()
+    if not objetivo:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Indica la quincena a marcar.")
+    por_mes = len(objetivo) == 7          # "YYYY-MM" -> el mes completo
     n = 0
     for b in rows:
         dt = b.starts_at
-        if dt is not None and f"{dt.year}-{dt.month:02d}" == payload.ym:
+        if dt is None:
+            continue
+        per = periodos.key_for(dt)
+        if (per[:7] if por_mes else per) == objetivo:
             b.payout_paid = payload.paid
             n += 1
     await db.commit()

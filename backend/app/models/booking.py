@@ -38,6 +38,9 @@ class Booking(Base, TimestampMixin):
     __tablename__ = "bookings"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # CFDI que ya cubre esta actuación. Es el candado contra facturar (y pagar)
+    # dos veces lo mismo: el cierre de quincena sólo toma las que lo tienen NULL.
+    cfdi_id: Mapped[int | None] = mapped_column(Integer, index=True)
 
     # What is playing, where, and for whom.
     show_id: Mapped[int | None] = mapped_column(
