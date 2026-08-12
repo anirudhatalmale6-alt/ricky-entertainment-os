@@ -64,15 +64,20 @@ async def run(period: str | None, dry_run: bool) -> int:
             return 0
         if not settings.FACTURAMA_ENABLED:
             log.warning("FACTURAMA_ENABLED está en false: no se puede timbrar todavía.")
-            return 1
+            return 0
 
         resumen = await facturacion.close_period(db, key)
         log.info("Emitidas: %d · con error: %d · sin músico u hotel: %d",
                  resumen["facturas_emitidas"], resumen["facturas_con_error"],
                  len(resumen["sin_musico_u_hotel"]))
         for e in resumen["errores"]:
-            log.error("  artista %s / hotel %s: %s", e["artist_id"], e["company_id"], e["error"])
-        return 1 if resumen["facturas_con_error"] else 0
+            log.warning("  artista %s / hotel %s: %s", e["artist_id"], e["company_id"], e["error"])
+        # Sale 0 aunque haya facturas con error. Que a un músico le falte el CSD
+        # es una situación NORMAL, no un fallo del cierre: esas actuaciones
+        # quedan pendientes y el cierre de mañana las reintenta. Si devolviera
+        # error, el timer aparecería como "failed" a diario y taparía un fallo
+        # de verdad. Los motivos quedan en el log y en el panel de MASTER.
+        return 0
 
 
 def main() -> int:
