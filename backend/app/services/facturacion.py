@@ -17,6 +17,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.artist import Artist
 from app.models.booking import Booking
 from app.models.cfdi import Cfdi
@@ -340,6 +341,15 @@ async def pending_bookings_for_period(
     from app.services import periodos
 
     ini, fin = periodos.range_of(period)
+    # Todo lo anterior a FACTURACION_DESDE se queda fuera. En la base conviven
+    # actuaciones de demostración y pruebas de meses pasados; sin esta raya,
+    # el primer cierre en producción intentaría timbrarlas como si fueran
+    # reales — CFDI de verdad, ante el SAT, por funciones que nunca ocurrieron.
+    desde = settings.facturacion_desde_date
+    if desde is not None and desde > ini:
+        ini = desde
+        if ini > fin:
+            return []
     stmt = select(Booking).where(
         Booking.status == BookingStatus.COMPLETED,
         Booking.cfdi_id.is_(None),

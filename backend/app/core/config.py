@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     FACTURAMA_USER: str = ""
     FACTURAMA_PASSWORD: str = ""
     FACTURAMA_SANDBOX: bool = True
+    # Raya de arranque: NO se factura ninguna actuación anterior a esta fecha
+    # (formato AAAA-MM-DD). En la base conviven actuaciones de demostración y de
+    # pruebas; sin esta raya el primer cierre en producción intentaría timbrarlas
+    # como reales. Vacío = sin límite (sólo para desarrollo).
+    FACTURACION_DESDE: str = ""
 
     # --- Correo saliente (SMTP) ----------------------------------------
     # Sólo se usa para la recuperación de contraseña. Si SMTP_HOST va vacío la
@@ -82,6 +87,15 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def facturacion_desde_date(self):
+        """FACTURACION_DESDE como date, o None si no se configuró."""
+        from datetime import date as _date
+        try:
+            return _date.fromisoformat(self.FACTURACION_DESDE.strip())
+        except (AttributeError, ValueError):
+            return None
 
     @property
     def facturama_base_url(self) -> str:
