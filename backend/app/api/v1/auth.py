@@ -196,26 +196,29 @@ async def forgot_password(payload: ForgotPasswordRequest, db: DbSession):
         "Si ese correo tiene una cuenta en SHOWMA, te enviamos un enlace para "
         "crear una contraseña nueva. Revisa también la carpeta de spam."
     )
+    sin_correo = (
+        "El envío de correos todavía no está activo en la plataforma. Pídele al "
+        "administrador de SHOWMA que te genere una contraseña nueva desde el panel."
+    )
+    # El aviso de "no hay correo saliente" va ANTES de mirar la base: si sólo se
+    # mostrara cuando la cuenta existe, comparar las dos respuestas revelaría
+    # quién está registrado.
+    if not mailer.is_configured():
+        return ForgotPasswordResult(email_sent=False, message=sin_correo)
+
     user = (
         await db.execute(select(User).where(User.email == payload.email))
     ).scalar_one_or_none()
     if user is None or not user.is_active:
-        return ForgotPasswordResult(email_sent=mailer.is_configured(), message=generic)
+        return ForgotPasswordResult(email_sent=True, message=generic)
 
     raw, _ = await passwords.issue_token(db, user)
     subject, text, html = mailer.reset_email(
         user.full_name, passwords.reset_link(raw), settings.RESET_TOKEN_MINUTES
     )
-    sent = await mailer.send(user.email, subject, text, html)
-    if not sent:
-        return ForgotPasswordResult(
-            email_sent=False,
-            message=(
-                "Tu solicitud quedó registrada. El envío de correos todavía no "
-                "está activo en la plataforma: pídele al administrador de SHOWMA "
-                "que te genere una contraseña nueva desde el panel."
-            ),
-        )
+    await mailer.send(user.email, subject, text, html)
+    # Aunque el envío falle (SMTP caído) se responde igual: el motivo se queda en
+    # el log del servidor, no en una pista para quien esté probando correos.
     return ForgotPasswordResult(email_sent=True, message=generic)
 
 
