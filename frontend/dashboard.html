@@ -3192,7 +3192,12 @@ async function bookReplacement(showId, name){
 window.openReplacements=openReplacements; window.bookReplacement=bookReplacement;
 /* ---- Facturación hoteles (screen 6): agrupa actuaciones facturables por hotel+mes ---- */
 async function hotelBill(box){
-  const bk=await api(`/bookings?group_id=${GID}`);
+  // Facturación sólo la ven artistas, MASTER y directores de cadena, así que
+  // aquí normalmente hay GID. Si no lo hubiera, `group_id=null` haría que el
+  // API respondiera 422 y la pantalla mostraría el error en crudo: se acota
+  // por empresa, que es el alcance correcto para un hotel suelto.
+  const scope = GID ? `?group_id=${GID}` : (ME && ME.company_id ? `?company_id=${ME.company_id}` : '');
+  const bk=await api(`/bookings${scope}`);
   let AMAP={}; try{ (await api('/artists')||[]).forEach(a=>{AMAP[a.id]=a.stage_name;}); }catch(e){}
   const num=x=>+x||0; const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null; const today=new Date();
   const invb=bk.filter(b=>['confirmed','completed'].includes(b.status));
