@@ -6,6 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, computed_field
 
 from app.models.enums import RISK_COMMISSION, RiskTier
+from app.schemas.fiscal import Rfc
 
 
 class PropertyGroupBase(BaseModel):
@@ -17,14 +18,17 @@ class PropertyGroupBase(BaseModel):
 
 
 class PropertyGroupCreate(PropertyGroupBase):
-    pass
+    # `Rfc` sólo en la ENTRADA: los Out heredan de esta clase y en la base ya
+    # hay RFC viejos mal capturados. Validarlos al LEER tiraría la pantalla
+    # entera en vez de dejar corregir el dato.
+    tax_id: Rfc = None
 
 
 class PropertyGroupUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str | None = None
     legal_name: str | None = None
-    tax_id: str | None = None
+    tax_id: Rfc = None
     contact_email: str | None = None
     contact_phone: str | None = None
 

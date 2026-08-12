@@ -114,6 +114,10 @@ async def convert_hotel_lead(
     if await _email_taken(db, lead.email):
         raise HTTPException(status.HTTP_409_CONFLICT, "Ya existe una cuenta con ese correo.")
 
+    # `tax_id` ya viene validado y normalizado por el tipo Rfc del esquema: el RFC
+    # del hotel es el RECEPTOR de cada factura y, mal escrito, el CFDI no timbra.
+    tax_id = payload.tax_id
+
     name = payload.company_name or lead.company_name
     # Cada hotel/empresa que se da de alta es su propio "grupo" (aunque sea de una
     # sola propiedad): así el usuario entra como DIRECTOR y ve el menú completo
@@ -123,7 +127,7 @@ async def convert_hotel_lead(
     group = PropertyGroup(
         name=name,
         legal_name=payload.legal_name,
-        tax_id=payload.tax_id,
+        tax_id=tax_id,
         contact_email=(payload.contact_email or lead.email),
         contact_phone=(payload.contact_phone or lead.phone),
     )
@@ -135,7 +139,7 @@ async def convert_hotel_lead(
         name=name,
         group_id=group.id,
         legal_name=payload.legal_name,
-        tax_id=payload.tax_id,
+        tax_id=tax_id,
         fiscal_constancia_url=payload.fiscal_constancia_url,
         address=payload.address,
         city=payload.city,

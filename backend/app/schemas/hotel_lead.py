@@ -5,6 +5,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.fiscal import Rfc
+
 
 class HotelLeadCreate(BaseModel):
     full_name: str = Field(min_length=2, max_length=255)
@@ -41,7 +43,7 @@ class HotelLeadConvertIn(BaseModel):
     # Datos generales
     company_name: str | None = Field(default=None, max_length=255)   # nombre comercial
     legal_name: str | None = Field(default=None, max_length=255)     # razón social
-    tax_id: str | None = Field(default=None, max_length=20)          # RFC
+    tax_id: Rfc = Field(default=None, max_length=20)          # RFC
     fiscal_constancia_url: str | None = Field(default=None, max_length=500)
     address: str | None = Field(default=None, max_length=255)        # dirección fiscal
     city: str | None = Field(default=None, max_length=120)

@@ -1212,6 +1212,49 @@ const PRETTY={"Musica":"Música","Produccion":"Producción","Fotografia y Video"
   "Musica en vivo":"Música en vivo","Fotografia":"Fotografía","Iluminacion":"Iluminación"};
 const pretty = s => PRETTY[s]||s||"";
 
+// ---- RFC: misma validación que el backend (app/services/rfc.py) ----------
+// El RFC mal capturado no se ve hasta que la factura no timbra, diez días
+// después. Se revisa aquí para atrapar el dedazo en el momento. Dos niveles:
+// la forma mal armada se rechaza; el dígito verificador sólo advierte, porque
+// el SAT tiene emitidos unos cuantos RFC que no cumplen el cálculo.
+const RFC_DIC="0123456789ABCDEFGHIJKLMN&OPQRSTUVWXYZ Ñ";
+const RFC_GENERICOS=['XAXX010101000','XEXX010101000'];
+const rfcNorm = s => (s||'').replace(/[\s\-\.]/g,'').toUpperCase();
+function rfcDigito(r){
+  let base=r.slice(0,-1); while(base.length<12) base=' '+base;
+  let suma=0; for(let i=0;i<base.length;i++) suma+=RFC_DIC.indexOf(base[i])*(13-i);
+  const d=11-(suma%11);
+  return d===11?'0':(d===10?'A':String(d));
+}
+function rfcCheck(v){
+  const r=rfcNorm(v);
+  if(!r) return {rfc:'',ok:true,digito:true,msg:null};
+  const forma=/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(r) && (r.length===12||r.length===13);
+  // Los 6 dígitos de en medio tienen que ser una fecha que exista.
+  let fecha=false;
+  if(forma){
+    const s=r.slice(0,-3).slice(-6), mm=+s.slice(2,4), dd=+s.slice(4,6), aa=+s.slice(0,2);
+    const dias=[31,(aa%4===0?29:28),31,30,31,30,31,31,30,31,30,31];
+    fecha = mm>=1 && mm<=12 && dd>=1 && dd<=dias[mm-1];
+  }
+  if(!forma||!fecha) return {rfc:r,ok:false,digito:false,
+    msg:'El RFC no tiene la forma correcta. Deben ser 12 caracteres para una empresa o 13 para una persona física, con la fecha en medio (por ejemplo ABC180429TM6).'};
+  if(RFC_GENERICOS.indexOf(r)>=0) return {rfc:r,ok:true,digito:true,msg:null};
+  const digito=rfcDigito(r)===r.slice(-1);
+  return {rfc:r,ok:true,digito:digito,
+    msg:digito?null:'El último carácter del RFC no corresponde con el resto. Casi siempre es un error de captura: revísalo contra la constancia de situación fiscal antes de facturar.'};
+}
+// Devuelve el RFC normalizado, o false si hay que detener el guardado.
+function rfcGate(id){
+  const el=document.getElementById(id); if(!el) return '';
+  const c=rfcCheck(el.value);
+  if(!c.ok){ alert(c.msg); el.focus(); return false; }
+  if(!c.digito && !confirm(c.msg+'\n\n¿Guardar de todos modos?')){ el.focus(); return false; }
+  el.value=c.rfc;
+  return c.rfc;
+}
+window.rfcCheck=rfcCheck; window.rfcGate=rfcGate;
+
 // Saca el motivo real que manda el backend (detail) para que el usuario vea
 // "Ya existe una cuenta con ese correo" en vez de un "…/convert 409" críptico.
 async function _errMsg(r,path){
@@ -3777,9 +3820,11 @@ async function mConvertProspecto(id){
   const numv=i=>{ const v=gv(i).replace(/[^0-9.]/g,''); return v?parseFloat(v):null; };
   const clabe=gv('pr_clabe').replace(/\s+/g,'');
   if(clabe && clabe.replace(/[^0-9]/g,'').length!==18){ toast('La CLABE debe tener 18 dígitos.',true); return; }
+  // El RFC del hotel es el receptor de sus facturas: si va mal, el CFDI no timbra.
+  const rfcHotel=rfcGate('pr_rfc'); if(rfcHotel===false) return;
   const body={
     password:gv('pr_pass')||null,
-    company_name:gv('pr_name')||null, legal_name:gv('pr_legal')||null, tax_id:gv('pr_rfc')||null,
+    company_name:gv('pr_name')||null, legal_name:gv('pr_legal')||null, tax_id:rfcHotel||null,
     fiscal_constancia_url:_PROS_CONSTANCIA, address:gv('pr_addr')||null, city:gv('pr_city')||null,
     region:gv('pr_region')||null, country:gv('pr_country')||null, website:gv('pr_web')||null,
     contact_person:gv('pr_person')||null, position:gv('pr_pos')||null, contact_phone:gv('pr_phone')||null,
@@ -5632,7 +5677,8 @@ async function saveFiscal(btn){
   btn.disabled=true;
   const clabe=(gv('pf_clabe')||'').replace(/\s+/g,'');
   if(clabe && clabe.replace(/[^0-9]/g,'').length!==18){ alert('La CLABE interbancaria debe tener 18 dígitos.'); btn.disabled=false; return; }
-  const body={rfc:gv('pf_rfc')||null,tax_regime:gv('pf_regime')||null,legal_name:gv('pf_legal')||null,
+  const rfcMio=rfcGate('pf_rfc'); if(rfcMio===false){ btn.disabled=false; return; }
+  const body={rfc:rfcMio||null,tax_regime:gv('pf_regime')||null,legal_name:gv('pf_legal')||null,
     fiscal_postal_code:gv('pf_cp')||null,cfdi_use:gv('pf_use')||null,
     bank_name:gv('pf_bank')||null,bank_account_holder:gv('pf_holder')||null,
     bank_account:gv('pf_account')||null,bank_clabe:clabe||null};

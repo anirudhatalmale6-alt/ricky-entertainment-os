@@ -6,6 +6,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, computed_field
 
 from app.models.enums import PAYOUT_COMMISSION, PayoutSpeed
+from app.schemas.fiscal import Rfc
 from app.schemas.show import ShowCreate, ShowOut
 
 
@@ -83,6 +84,10 @@ class ArtistBase(BaseModel):
 
 
 class ArtistCreate(ArtistBase):
+    # `Rfc` sólo en la ENTRADA: los Out heredan de esta clase y en la base ya
+    # hay RFC viejos mal capturados. Validarlos al LEER tiraría la pantalla
+    # entera en vez de dejar corregir el dato.
+    rfc: Rfc = None
     shows: list[ShowCreate] = []
     documents: list[ArtistDocumentCreate] = []
 
@@ -120,7 +125,7 @@ class ArtistUpdate(BaseModel):
     accepted_terms: bool | None = None
     accepted_privacy: bool | None = None
     authorized_data_use: bool | None = None
-    rfc: str | None = None
+    rfc: Rfc = None
     cfdi_use: str | None = None
     tax_regime: str | None = None
     legal_name: str | None = None

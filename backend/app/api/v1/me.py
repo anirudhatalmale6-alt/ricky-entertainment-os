@@ -30,7 +30,7 @@ from app.models.tax_figure import TaxFigure
 from app.models.cfdi import Cfdi
 from app.models.venue import Venue
 from app.services.facturama import FacturamaError, get_facturama
-from app.services import facturacion, periodos
+from app.services import facturacion, periodos, rfc as rfc_svc
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
     ContractAcceptance,
@@ -502,6 +502,9 @@ def _fiscal_out(a: Artist) -> dict:
         "csd_status": a.csd_status or "none",
         "csd_uploaded_at": a.csd_uploaded_at.isoformat() if a.csd_uploaded_at else None,
         "csd_expires_at": a.csd_expires_at.isoformat() if a.csd_expires_at else None,
+        # Aviso (no bloqueo) cuando el dígito verificador no cuadra: el timbrado
+        # fallaría más adelante y es mejor verlo aquí.
+        "rfc_aviso": rfc_svc.check(a.rfc)["mensaje"],
         "ready": ready,
         "regimes": _SAT_REGIMES,
         "cfdi_uses": _SAT_CFDI_USES,
@@ -530,7 +533,13 @@ async def save_my_fiscal(payload: FiscalDataIn, scope: CurrentScope, db: DbSessi
     artist_id = await _require_artist(scope)
     artist = await _load_artist(db, artist_id)
     if payload.rfc is not None:
-        artist.rfc = payload.rfc.strip().upper() or None
+        chk = rfc_svc.check(payload.rfc)
+        # Sólo se rechaza lo que con seguridad está mal escrito. Si lo que falla
+        # es el dígito verificador se guarda igual y el aviso viaja de vuelta,
+        # porque el SAT tiene emitidos unos cuantos RFC que no cumplen el cálculo.
+        if not chk["ok"]:
+            raise HTTPException(status_code=422, detail=chk["mensaje"])
+        artist.rfc = chk["rfc"] or None
     if payload.legal_name is not None:
         artist.legal_name = payload.legal_name.strip() or None
     if payload.tax_regime is not None:

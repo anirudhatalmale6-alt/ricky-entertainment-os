@@ -7,6 +7,7 @@ from urllib.parse import quote_plus
 from pydantic import BaseModel, ConfigDict, computed_field
 
 from app.models.enums import RISK_COMMISSION, RiskTier
+from app.schemas.fiscal import Rfc
 
 
 # --- Venues ---------------------------------------------------------------
@@ -99,6 +100,10 @@ class CompanyBase(BaseModel):
 
 
 class CompanyCreate(CompanyBase):
+    # `Rfc` sólo en la ENTRADA: los Out heredan de esta clase y en la base ya
+    # hay RFC viejos mal capturados. Validarlos al LEER tiraría la pantalla
+    # entera en vez de dejar corregir el dato.
+    tax_id: Rfc = None
     venues: list[VenueCreate] = []
 
 
@@ -110,7 +115,7 @@ class CompanyUpdate(BaseModel):
     company_type: str | None = None
     logo_url: str | None = None
     group_id: int | None = None
-    tax_id: str | None = None
+    tax_id: Rfc = None
     legal_name: str | None = None
     cfdi_use: str | None = None
     tax_regime: str | None = None

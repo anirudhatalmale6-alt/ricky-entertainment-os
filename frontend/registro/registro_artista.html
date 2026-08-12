@@ -363,13 +363,17 @@ async function uploadCSD(btn){
   const pass=(document.getElementById('csd_pass').value||'').trim();
   const rfc=((document.getElementById('f_rfc')||{}).value||'').trim().toUpperCase();
   if(!rfc){ go(2); err('Escribe tu RFC en Información fiscal antes de subir el sello.'); return; }
+  // El sello se registra ante Facturama con este RFC: si está mal, no sirve.
+  const cRfc=rfcCheck(rfc);
+  if(!cRfc.ok){ go(2); err(cRfc.msg); focusId('f_rfc'); return; }
+  if(!cRfc.digito && !confirm(cRfc.msg+'\n\n¿Subir el sello de todos modos?')){ go(2); focusId('f_rfc'); return; }
   if(!cer||!key){ csdState('Selecciona tu archivo .cer y tu archivo .key.','bad'); return; }
   if(!pass){ csdState('Escribe la contraseña de tu llave privada.','bad'); return; }
   const t0=btn.textContent; btn.disabled=true; btn.textContent='Validando ante el SAT…';
   csdState('');
   try{
     const fd=new FormData();
-    fd.append('cer',cer); fd.append('key',key); fd.append('password',pass); fd.append('rfc',rfc);
+    fd.append('cer',cer); fd.append('key',key); fd.append('password',pass); fd.append('rfc',cRfc.rfc);
     const r=await fetch(API+'/me/fiscal/csd',{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
     if(!r.ok) throw await errOf(r,'sello digital');
     const d=await r.json();
@@ -654,6 +658,33 @@ function collectShow(el){
 }
 // ---- Validation: only complete, hireable & payable profiles can finish ----
 const digitsOf=s=>(s||'').replace(/[^0-9]/g,'');
+// ---- RFC: mismas reglas que el backend (app/services/rfc.py) -------------
+// Un RFC mal escrito no se nota hasta que la factura no timbra. La forma mal
+// armada se rechaza; el dígito verificador sólo advierte, porque el SAT tiene
+// emitidos unos cuantos RFC que no cumplen el cálculo.
+const RFC_DIC="0123456789ABCDEFGHIJKLMN&OPQRSTUVWXYZ Ñ";
+const RFC_GENERICOS=['XAXX010101000','XEXX010101000'];
+const rfcNorm=s=>(s||'').replace(/[\s\-\.]/g,'').toUpperCase();
+function rfcCheck(v){
+  const r=rfcNorm(v);
+  if(!r) return {rfc:'',ok:true,digito:true,msg:null};
+  const forma=/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(r) && (r.length===12||r.length===13);
+  let fecha=false;
+  if(forma){
+    const s=r.slice(0,-3).slice(-6), mm=+s.slice(2,4), dd=+s.slice(4,6), aa=+s.slice(0,2);
+    const dias=[31,(aa%4===0?29:28),31,30,31,30,31,31,30,31,30,31];
+    fecha = mm>=1 && mm<=12 && dd>=1 && dd<=dias[mm-1];
+  }
+  if(!forma||!fecha) return {rfc:r,ok:false,digito:false,
+    msg:'El RFC no tiene la forma correcta. Deben ser 12 caracteres para una empresa o 13 para una persona física, con la fecha en medio (por ejemplo GOMC850416H23).'};
+  if(RFC_GENERICOS.indexOf(r)>=0) return {rfc:r,ok:true,digito:true,msg:null};
+  let base=r.slice(0,-1); while(base.length<12) base=' '+base;
+  let suma=0; for(let i=0;i<base.length;i++) suma+=RFC_DIC.indexOf(base[i])*(13-i);
+  const d=11-(suma%11), esp=d===11?'0':(d===10?'A':String(d));
+  const digito=esp===r.slice(-1);
+  return {rfc:r,ok:true,digito:digito,
+    msg:digito?null:'El último carácter de tu RFC no corresponde con el resto. Revísalo contra tu constancia de situación fiscal.'};
+}
 function focusId(id){ const n=document.getElementById(id); if(n) setTimeout(()=>{ try{ n.focus(); }catch(e){} },320); }
 function openShow(el){ el.classList.add('open'); el.scrollIntoView({behavior:'smooth',block:'center'}); }
 function validate(prof){
@@ -676,6 +707,12 @@ function validate(prof){
   if(!anyShow){ go(1); err('Registra al menos un show con nombre, precio y foto.'); return false; }
   // --- Datos fiscales y bancarios (para poder pagarte) ---
   if(!prof.rfc){ go(2); err('El RFC es obligatorio para poder facturar y pagarte.'); focusId('f_rfc'); return false; }
+  const cRfc=rfcCheck(prof.rfc);
+  if(!cRfc.ok){ go(2); err(cRfc.msg); focusId('f_rfc'); return false; }
+  // El dígito verificador sólo advierte: se puede continuar, pero avisados.
+  if(!cRfc.digito && !confirm(cRfc.msg+'\n\n¿Continuar de todos modos?')){ go(2); focusId('f_rfc'); return false; }
+  prof.rfc=cRfc.rfc;
+  const elRfc=document.getElementById('f_rfc'); if(elRfc) elRfc.value=cRfc.rfc;
   if(!prof.bank_name){ go(2); err('Indica tu banco para recibir pagos.'); focusId('f_bank'); return false; }
   if(!prof.bank_account_holder){ go(2); err('Indica el titular de la cuenta bancaria.'); focusId('f_holder'); return false; }
   if(digitsOf(prof.bank_clabe).length!==18){ go(2); err('La CLABE interbancaria debe tener 18 dígitos; es la que usamos para pagarte.'); focusId('f_clabe'); return false; }
