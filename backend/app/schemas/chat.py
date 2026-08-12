@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SenderRole = Literal["artist", "company"]
 
@@ -18,11 +18,23 @@ class ConversationCreate(BaseModel):
     subject: str | None = None
 
 
+MAX_CHAT_IMAGES = 5
+
+
 class MessageCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     sender_role: SenderRole
-    body: str = Field(min_length=1)
+    # Puede ir vacío si el mensaje son sólo fotos (lo valida el model_validator).
+    body: str = ""
+    images: list[str] = Field(default=[], max_length=MAX_CHAT_IMAGES)
     sender_user_id: int | None = None
+
+    @model_validator(mode="after")
+    def _needs_content(self):
+        self.body = (self.body or "").strip()
+        if not self.body and not self.images:
+            raise ValueError("El mensaje no puede ir vacío: escribe algo o adjunta una foto.")
+        return self
 
 
 class MessageOut(BaseModel):
@@ -32,7 +44,14 @@ class MessageOut(BaseModel):
     sender_role: str
     sender_user_id: int | None = None
     body: str
+    images: list[str] = []
     read_at: datetime | None = None
+
+    @field_validator("images", mode="before")
+    @classmethod
+    def _none_is_empty(cls, v):
+        # Los mensajes anteriores a esta función tienen la columna en NULL.
+        return v or []
     created_at: datetime
 
 

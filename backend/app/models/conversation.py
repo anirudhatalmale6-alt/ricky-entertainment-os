@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -56,6 +56,9 @@ class Message(Base, TimestampMixin):
         ForeignKey("users.id", ondelete="SET NULL")
     )
     body: Mapped[str] = mapped_column(Text)
+    # Imágenes adjuntas (URLs de /uploads). Un mensaje puede ser sólo fotos, con
+    # el cuerpo vacío: por eso `body` no es obligatorio a nivel de schema.
+    images: Mapped[list] = mapped_column(JSON, default=list)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     conversation: Mapped["Conversation"] = relationship(back_populates="messages")

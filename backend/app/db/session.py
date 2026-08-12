@@ -58,6 +58,8 @@ _SQLITE_ADDED_COLUMNS = [
     # Extra por larga distancia en cada show (gasolina)
     ("shows", "travel_fee", "NUMERIC(12,2)"),
     ("shows", "travel_fee_km", "INTEGER DEFAULT 30"),
+    # Fotos adjuntas en el chat
+    ("messages", "images", "JSON"),
 ]
 
 

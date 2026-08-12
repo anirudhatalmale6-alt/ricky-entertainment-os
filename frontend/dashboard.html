@@ -250,21 +250,36 @@
   .pmine{font-size:12.5px;color:var(--mut);margin-bottom:10px}
 
   /* chat */
-  .chat{display:grid;grid-template-columns:280px 1fr;gap:0;height:560px;background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden;box-shadow:var(--shadow)}
+  /* minmax(0,1fr): sin esto la fila del grid crece con el contenido y tanto la
+     lista de conversaciones como la barra de escribir se salían del panel. */
+  .chat{display:grid;grid-template-columns:280px 1fr;grid-template-rows:minmax(0,1fr);gap:0;height:560px;background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden;box-shadow:var(--shadow)}
   .clist{border-right:1px solid var(--line);overflow-y:auto}
   .citem{padding:13px 15px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:11px;align-items:center}
   .citem:hover,.citem.on{background:var(--ov)}
   .citem .av{width:38px;height:38px;border-radius:10px;background:var(--grad);display:grid;place-items:center;font-weight:700;flex:none}
   .citem .nm{font-size:13px;font-weight:600}.citem .lm{font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
   .badge{margin-left:auto;background:var(--acc2);color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;padding:0 5px}
-  .thread{display:flex;flex-direction:column}
+  .thread{display:flex;flex-direction:column;min-height:0}
   .thead{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:600}
-  .msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
+  /* min-height:0 para que el hilo ceda alto cuando la barra crece con las
+     miniaturas de las fotos adjuntas; si no, empuja la barra fuera del panel. */
+  .msgs{flex:1;min-height:0;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
   .msg{max-width:70%;padding:9px 13px;border-radius:13px;font-size:13px}
   .msg.them{background:var(--card);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
   .msg.me{background:var(--grad);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
   .msg .tm{font-size:9.5px;opacity:.6;margin-top:4px}
-  .cbar{padding:13px 16px;border-top:1px solid var(--line);display:flex;gap:10px}
+  .msg .mimgs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px}
+  .msg .mimgs img{width:132px;height:132px;object-fit:cover;border-radius:9px;cursor:zoom-in;background:var(--ov);display:block}
+  .msg .mimgs.one img{width:auto;max-width:230px;height:auto;max-height:250px}
+  .cbar{flex:none;padding:13px 16px;border-top:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .cbar .clip{background:var(--inp);border:1px solid var(--line);color:var(--mut);font-size:17px;width:40px;border-radius:9px;cursor:pointer;flex:none}
+  .cbar .clip:hover{border-color:var(--acc);color:var(--acc)}
+  .cprev{flex-basis:100%;display:flex;flex-wrap:wrap;gap:7px;order:-1}
+  .cprev .t{position:relative;width:62px;height:62px;border-radius:8px;background-size:cover;background-position:center;border:1px solid var(--line)}
+  .cprev .t .x{position:absolute;top:-6px;right:-6px;width:19px;height:19px;border-radius:50%;background:#ef4444;color:#fff;font-size:11px;line-height:19px;text-align:center;cursor:pointer}
+  .cprev .t.up{display:grid;place-items:center;font-size:10px;color:var(--mut)}
+  .imgov{position:fixed;inset:0;background:rgba(10,12,24,.88);z-index:90;display:flex;align-items:center;justify-content:center;padding:26px;cursor:zoom-out}
+  .imgov img{max-width:94vw;max-height:92vh;border-radius:11px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
   .cbar input{flex:1;background:var(--inp);border:1px solid var(--line);border-radius:9px;padding:10px 13px;color:var(--txt);outline:none}
   .cbar button,.pillbtn{background:var(--grad);border:0;color:#fff;font-weight:600;padding:0 16px;border-radius:9px;cursor:pointer}
 
@@ -5042,7 +5057,13 @@ const RENDER = {
     const unread = c => SENDER==='artist' ? c.unread_for_artist : c.unread_for_company;
     box.innerHTML=`<div class="chat"><div class="clist" id="clist"></div>
       <div class="thread"><div class="thead" id="thead">—</div><div class="msgs" id="msgs"></div>
-      <div class="cbar"><input id="cin" placeholder="Escribe un mensaje…"><button onclick="sendMsg()">Enviar</button></div></div></div>`;
+      <div class="cbar">
+        <div class="cprev" id="cprev"></div>
+        <button class="clip" onclick="document.getElementById('cfile').click()" title="Adjuntar fotos">📎</button>
+        <input type="file" id="cfile" accept="image/*" multiple style="display:none" onchange="onChatPhotos(this)">
+        <input id="cin" placeholder="Escribe un mensaje…" onkeydown="if(event.key==='Enter')sendMsg()">
+        <button onclick="sendMsg()">Enviar</button>
+      </div></div></div>`;
     const cl=document.getElementById('clist');
     cl.innerHTML=convs.map((c,i)=>`<div class="citem ${i===0?'on':''}" data-id="${c.id}" onclick="openConv(${c.id},this)">
       <div class="av">${esc(other(c)[0])}</div>
@@ -5721,11 +5742,16 @@ window.uploadProfileImg=uploadProfileImg;window.pickProfileImg=pickProfileImg;wi
 
 async function openConv(id,el){
   if(el){document.querySelectorAll('.citem').forEach(x=>x.classList.remove('on'));el.classList.add('on');}
+  if(CACHE.cur!==id){ CHAT_IMGS=[]; renderChatPrev(); }
   const c=(CACHE.convs||[]).find(x=>x.id===id)||{};
   document.getElementById('thead').textContent=(c.artist_name||'Artista')+' · '+(c.company_name||'Hotel');
   const msgs=await api(`/conversations/${id}/messages`);
   CACHE.cur=id;
-  document.getElementById('msgs').innerHTML=msgs.map(m=>`<div class="msg ${m.sender_role===SENDER?'me':'them'}">${esc(m.body)}<div class="tm">${fmtDate(m.created_at)}</div></div>`).join("");
+  document.getElementById('msgs').innerHTML=msgs.map(m=>{
+    const im=(m.images||[]);
+    const gal=im.length?`<div class="mimgs${im.length===1?' one':''}">${im.map(u=>`<img src="${esc(u)}" loading="lazy" onclick="zoomImg('${esc(u)}')" alt="Foto adjunta">`).join('')}</div>`:'';
+    return `<div class="msg ${m.sender_role===SENDER?'me':'them'}">${gal}${esc(m.body)}<div class="tm">${fmtDate(m.created_at)}</div></div>`;
+  }).join("");
   const mm=document.getElementById('msgs'); mm.scrollTop=mm.scrollHeight;
   // Marca como leídos los mensajes de la otra parte y baja el contador.
   if(SELF){ try{
@@ -5735,10 +5761,52 @@ async function openConv(id,el){
     syncChatBadge();
   }catch(e){} }
 }
+// --- Fotos en el chat ---
+const CHAT_IMG_MAX=5;
+let CHAT_IMGS=[];        // URLs ya subidas, listas para adjuntar
+let CHAT_UP=0;           // subidas en curso
+function renderChatPrev(){
+  const box=document.getElementById('cprev'); if(!box) return;
+  box.innerHTML=CHAT_IMGS.map((u,i)=>`<div class="t" style="background-image:url('${esc(u)}')"><span class="x" onclick="delChatImg(${i})" title="Quitar">×</span></div>`).join('')
+    + (CHAT_UP?`<div class="t up">Subiendo…</div>`:'');
+}
+function delChatImg(i){ CHAT_IMGS.splice(i,1); renderChatPrev(); }
+async function onChatPhotos(input){
+  const files=Array.from(input.files||[]); input.value='';
+  if(!CACHE.cur){ toast('Abre una conversación primero.',true); return; }
+  for(const f of files){
+    if(CHAT_IMGS.length+CHAT_UP>=CHAT_IMG_MAX){ toast(`Máximo ${CHAT_IMG_MAX} fotos por mensaje.`,true); break; }
+    CHAT_UP++; renderChatPrev();
+    try{
+      const blob=await _resizeImage(f);
+      const fd=new FormData(); fd.append('file',blob,'foto.jpg');
+      const r=await fetch(API+`/conversations/${CACHE.cur}/images`,{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
+      if(!r.ok) throw new Error(await _errMsg(r,'subir foto'));
+      CHAT_IMGS.push((await r.json()).url);
+    }catch(e){ toast('No se pudo subir la foto: '+(e.message||''),true); }
+    CHAT_UP--; renderChatPrev();
+  }
+}
+function zoomImg(url){
+  let ov=document.getElementById('imgOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='imgOv'; ov.className='imgov';
+    ov.addEventListener('click',()=>{ov.style.display='none';}); document.body.appendChild(ov); }
+  ov.innerHTML=`<img src="${esc(url)}" alt="Foto">`;
+  ov.style.display='flex';
+}
 async function sendMsg(){
-  const inp=document.getElementById('cin'); const b=inp.value.trim(); if(!b||!CACHE.cur)return;
-  inp.value="";
-  await post(`/conversations/${CACHE.cur}/messages`,{sender_role:SENDER,body:b});
+  const inp=document.getElementById('cin'); const b=inp.value.trim();
+  if(!CACHE.cur) return;
+  if(CHAT_UP){ toast('Espera a que terminen de subir las fotos.',true); return; }
+  if(!b && !CHAT_IMGS.length) return;
+  const imgs=CHAT_IMGS.slice();
+  inp.value=""; CHAT_IMGS=[]; renderChatPrev();
+  try{
+    await post(`/conversations/${CACHE.cur}/messages`,{sender_role:SENDER,body:b,images:imgs});
+  }catch(e){
+    inp.value=b; CHAT_IMGS=imgs; renderChatPrev();
+    toast('No se pudo enviar: '+(e.message||''),true); return;
+  }
   openConv(CACHE.cur);
 }
 

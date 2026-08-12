@@ -8,19 +8,28 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import uuid
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentScope, DbSession, require_permission
+from app.core.config import settings
+from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
 from app.models.company import Company
 from app.models.conversation import Conversation, Message
 from app.schemas.chat import (
+    MAX_CHAT_IMAGES,
     ConversationCreate,
     ConversationOut,
     MessageCreate,
     MessageOut,
 )
+
+# Mismos límites que las fotos de show: el navegador ya las reescala antes.
+_ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+_MAX_IMAGE_BYTES = 6 * 1024 * 1024
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
 
@@ -49,11 +58,19 @@ async def _decorate(db: DbSession, conv: Conversation) -> ConversationOut:
         )).scalars().all()
     )
     last = msgs[-1] if msgs else None
+
+    def _preview(m) -> str | None:
+        if m is None:
+            return None
+        if m.body:
+            return m.body
+        n = len(m.images or [])
+        return "📷 Foto" if n == 1 else f"📷 {n} fotos"
     return out.model_copy(update={
         "artist_name": artist_name,
         "company_name": company_name,
         "message_count": len(msgs),
-        "last_message": last.body if last else None,
+        "last_message": _preview(last),
         "last_message_at": last.created_at if last else None,
         "unread_for_artist": sum(1 for m in msgs if m.sender_role == "company" and m.read_at is None),
         "unread_for_company": sum(1 for m in msgs if m.sender_role == "artist" and m.read_at is None),
@@ -183,11 +200,54 @@ async def list_messages(conversation_id: int, scope: CurrentScope, db: DbSession
 async def send_message(conversation_id: int, payload: MessageCreate, scope: CurrentScope, db: DbSession):
     conv = await _get_conversation_or_404(db, conversation_id)
     await _assert_participant(db, scope, conv)
-    msg = Message(conversation_id=conversation_id, **payload.model_dump())
+    data = payload.model_dump()
+    # Sólo se aceptan fotos subidas a la propia plataforma: si se guardara
+    # cualquier URL, un mensaje podría cargar imágenes de fuera (o rastrear a
+    # quien lo abre) desde el propio panel.
+    prefix = f"{settings.ROOT_PATH}/uploads/"
+    data["images"] = [u for u in (data.get("images") or []) if u.startswith(prefix)][:MAX_CHAT_IMAGES]
+    if not data["body"] and not data["images"]:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "El mensaje no puede ir vacío.")
+    msg = Message(conversation_id=conversation_id, **data)
     db.add(msg)
     await db.commit()
     await db.refresh(msg)
     return msg
+
+
+@router.post("/{conversation_id}/images", status_code=status.HTTP_201_CREATED)
+async def upload_chat_image(
+    conversation_id: int,
+    scope: CurrentScope,
+    db: DbSession,
+    file: UploadFile = File(...),
+):
+    """Sube una foto para adjuntarla a un mensaje y devuelve su URL.
+
+    Sólo las dos partes de la conversación (y administración) pueden subir aquí,
+    así que sirve igual para el hotel y para el artista — el endpoint de fotos de
+    show es sólo de artistas y no valía para el chat.
+    """
+    conv = await _get_conversation_or_404(db, conversation_id)
+    await _assert_participant(db, scope, conv)
+
+    ext = _ALLOWED_IMAGE_TYPES.get((file.content_type or "").lower())
+    if ext is None:
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            "Formato no admitido. Usa JPG, PNG o WEBP.",
+        )
+    data = await file.read()
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Archivo vacío.")
+    if len(data) > _MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            "La imagen es muy grande (máximo 6 MB).",
+        )
+    name = f"chat{conversation_id}_{uuid.uuid4().hex}.{ext}"
+    (ensure_upload_dir() / name).write_bytes(data)
+    return {"url": f"{settings.ROOT_PATH}/uploads/{name}"}
 
 
 @router.post("/{conversation_id}/read", response_model=ConversationOut)
