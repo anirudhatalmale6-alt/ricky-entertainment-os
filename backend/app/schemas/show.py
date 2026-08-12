@@ -90,6 +90,10 @@ class ShowBase(BaseModel):
     meals_price: float | None = None
     per_diem_price: float | None = None
     special_event_surcharge_pct: float = 0
+    # Extra por larga distancia: monto fijo (gasolina/casetas) que se suma solo
+    # cuando el hotel está a más de `travel_fee_km` km. None/0 = no cobra extra.
+    travel_fee: float | None = None
+    travel_fee_km: int = 30
 
     offers_audition: bool = False
 
@@ -139,6 +143,8 @@ class ShowUpdate(BaseModel):
     meals_price: float | None = None
     per_diem_price: float | None = None
     special_event_surcharge_pct: float | None = None
+    travel_fee: float | None = None
+    travel_fee_km: int | None = None
     offers_audition: bool | None = None
     is_active: bool | None = None
     # Si viene, REEMPLAZA el calendario de temporadas del show (suplementos y
@@ -189,6 +195,10 @@ class ShowOut(ShowBase):
     # ciudad de alguno de los dos).
     artist_region: str | None = None
     distance_km: float | None = None
+    # Extra por distancia que YA está incluido en effective_price (None si no
+    # aplica: sin distancia conocida, sin extra configurado o dentro del umbral).
+    travel_fee_applied: float | None = None
+    travel_fee_km_applied: int | None = None
 
 
 class PriceBenchmarkOut(BaseModel):

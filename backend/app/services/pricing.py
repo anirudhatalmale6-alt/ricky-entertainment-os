@@ -44,17 +44,38 @@ def season_for(show, when) -> object | None:
     return None
 
 
-def effective_price(show, when=None, client_rate=None) -> dict:
+def travel_fee_for(show, distance_km) -> tuple[float, int] | None:
+    """(monto, umbral) del extra por larga distancia si aplica a esa distancia.
+
+    Es un monto FIJO para gasolina/casetas que el artista fija en su show: "si
+    el destino está a más de 30 km, +$500". Se suma al final, después de
+    temporadas y descuentos — el combustible cuesta lo mismo en temporada baja
+    y no es negociable con un % de descuento pactado.
+    """
+    if distance_km is None or show is None:
+        return None
+    fee = getattr(show, "travel_fee", None)
+    if fee is None or float(fee) <= 0:
+        return None
+    limit = int(getattr(show, "travel_fee_km", None) or 0)
+    if limit <= 0 or float(distance_km) <= limit:
+        return None
+    return float(fee), limit
+
+
+def effective_price(show, when=None, client_rate=None, distance_km=None) -> dict:
     """Precio efectivo + de dónde sale, para poder explicarlo en pantalla.
 
     Devuelve ``{price, base, season_label, season_pct, has_season,
-    has_special_rate}``. ``price`` es None si el show no tiene precio público.
+    has_special_rate, travel_fee, travel_fee_km}``. ``price`` es None si el show
+    no tiene precio público.
     """
     base = float(show.price_hotel) if getattr(show, "price_hotel", None) is not None else None
     out = {
         "price": base, "base": base,
         "season_label": None, "season_pct": None,
         "has_season": False, "has_special_rate": False,
+        "travel_fee": None, "travel_fee_km": None,
     }
     price = base
 
@@ -78,5 +99,14 @@ def effective_price(show, when=None, client_rate=None) -> dict:
     # Un descuento mayor al 100 % dejaría el precio en negativo: se topa en 0.
     if price is not None and price < 0:
         price = 0.0
+
+    # El extra por distancia va al final y por fuera de los descuentos.
+    travel = travel_fee_for(show, distance_km)
+    if travel is not None and price is not None:
+        fee, limit = travel
+        price = round(price + fee, 2)
+        out["travel_fee"] = fee
+        out["travel_fee_km"] = limit
+
     out["price"] = price
     return out

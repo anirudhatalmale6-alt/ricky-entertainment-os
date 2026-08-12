@@ -68,6 +68,10 @@ class Show(Base, TimestampMixin):
     meals_price: Mapped[float | None] = mapped_column(Numeric(12, 2))
     per_diem_price: Mapped[float | None] = mapped_column(Numeric(12, 2))
     special_event_surcharge_pct: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    # Extra por larga distancia (gasolina/casetas): monto FIJO que se suma sola
+    # cuando el hotel está más lejos del umbral. NULL o 0 = no cobra extra.
+    travel_fee: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    travel_fee_km: Mapped[int] = mapped_column(Integer, default=30)
 
     offers_audition: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

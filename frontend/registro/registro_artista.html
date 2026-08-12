@@ -514,6 +514,12 @@ function showTpl(n){
         <label class="f"><span>Hospedaje / Alimentación / Viáticos</span><input class="p-lodging" placeholder="A acordar"></label>
       </div>
 
+      <div class="sec-t">Extra por larga distancia <span style="font-weight:400;text-transform:none;color:var(--text3)">(monto fijo para gasolina y casetas — se suma solo cuando el hotel está más lejos del límite; déjalo vacío si no cobras extra)</span></div>
+      <div class="grid">
+        <label class="f"><span>Extra por distancia (MXN)</span><input class="p-travelfee" placeholder="$ 500"></label>
+        <label class="f"><span>A partir de (km)</span><input class="p-travelkm" placeholder="30"></label>
+      </div>
+
       <div class="sec-t">Tarifas por temporada <span style="font-weight:400;text-transform:none;color:var(--text3)">(suplemento o descuento en % sobre tu precio base — el periodo necesita las dos fechas para poder aplicarse)</span></div>
       <table class="season">
         <thead><tr><th>Periodo</th><th>Desde</th><th>Hasta</th><th>Ajuste %</th><th></th></tr></thead>
@@ -642,6 +648,7 @@ function collectShow(el){
     base_price:hotel, price_hotel:hotel, price_corporate:numOf(v('.p-corp')), price_wedding:numOf(v('.p-wedding')),
     price_private:numOf(v('.p-private')), price_restaurant:numOf(v('.p-restaurant')), price_festival:numOf(v('.p-festival')),
     extra_hour_price:numOf(v('.p-extrahour')), transport_from_price:numOf(v('.p-transport')), lodging_price:numOf(v('.p-lodging')),
+    travel_fee:numOf(v('.p-travelfee')), travel_fee_km:intOf(v('.p-travelkm'))||30,
     offers_audition:q('.chk-audition').checked, images:imgs, seasonal_rates:seasons
   };
 }

@@ -55,6 +55,9 @@ _SQLITE_ADDED_COLUMNS = [
     ("product_requests", "venue_photo_url", "VARCHAR(500)"),
     # Hasta 3 fotos del espacio en la solicitud (la primera es la de cabecera)
     ("product_requests", "images", "JSON"),
+    # Extra por larga distancia en cada show (gasolina)
+    ("shows", "travel_fee", "NUMERIC(12,2)"),
+    ("shows", "travel_fee_km", "INTEGER DEFAULT 30"),
 ]
 
 

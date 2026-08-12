@@ -328,6 +328,9 @@
   .saved{font-size:12px;color:var(--ok);opacity:0;transition:.2s}.saved.on{opacity:1}
   .showcard{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--ov)}
   .seasbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
+  .tfbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
+  .tfbox .tfh{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+  .tfbox .tfh b{font-size:13px}
   .seash b{display:block;font-size:13px;margin-bottom:3px}
   .seast{width:100%;border-collapse:collapse;margin:8px 0 6px}
   .seast th{text-align:left;font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;padding:0 6px 6px;font-weight:700}
@@ -474,6 +477,7 @@
   .acard3 .atag.vid{background:#ef444418;color:#dc2626;cursor:pointer}
   .acard3 .atag.rate{background:#f59e0b1f;color:#b45309}
   .acard3 .atag.seas{background:#7c5cf01f;color:#5b3fd6}
+  .acard3 .atag.km{background:#0ea5e91f;color:#0369a1}
   /* Proveedor que no puede esa fecha: se ve, se entiende por qué, y no se elige */
   .acard3.nodisp{opacity:.62;background:var(--ov);border-style:dashed;cursor:not-allowed}
   .acard3.nodisp:hover{border-color:var(--bad);box-shadow:none}
@@ -698,6 +702,7 @@
   .acard .ab .ty{font-size:11.5px;color:var(--mut);margin-top:2px}
   .acard .ab .from{font-size:12.5px;font-weight:700;color:var(--acc);margin-top:6px}
   .acard .ab .from .spbadge{display:inline-block;font-size:9.5px;font-weight:700;color:#b45309;background:#f59e0b1f;padding:1px 6px;border-radius:20px;vertical-align:middle;margin-left:2px}
+  .acard .tfnote{font-size:10.5px;font-weight:600;color:#0369a1;background:#0ea5e914;border-radius:7px;padding:4px 7px;margin-top:6px}
   .acard .tgs{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
   .acard .tgs span{font-size:10.5px;background:var(--inp);color:var(--mut);padding:3px 8px;border-radius:6px}
   .acard .loc{font-size:11px;color:var(--mut);margin-top:9px;display:flex;gap:12px;flex-wrap:wrap}
@@ -2318,17 +2323,20 @@ function actRender(){
     const col=CATCOL[s.category]||'#382ca1';
     const ph=s.image_url?`style="background-image:url('${esc(s.image_url)}')"`:`style="background:linear-gradient(135deg,${col},#8b5cf6)"`;
     const cat=[pretty(s.category)].concat(s.subcategory?[pretty(s.subcategory)]:[]).filter(Boolean).join(' · ');
-    const who=s.artist_name&&s.artist_name!=='—'?esc(s.artist_name):esc(s.show_name||'Artista');
+    // El nombre del SHOW manda (es lo que se contrata); el proveedor va debajo.
+    const titulo=esc(s.show_name||s.artist_name||'Show');
+    const who=s.artist_name&&s.artist_name!=='—'?esc(s.artist_name):'';
     const langs=(s.show_languages||[]).slice(0,3).join(', ');
     const eff=(s.effective_price!=null?s.effective_price:s.price_hotel);
     const tags=[];
     if(s.busy_note) tags.push(`<span class="atag busy">🕒 ${esc(s.busy_note)}</span>`);
     if(s.has_season) tags.push(`<span class="atag seas">${(s.season_pct||0)<0?'🔻':'🔺'} ${esc(s.season_label||'Temporada')} ${(s.season_pct>0?'+':'')+(s.season_pct||0)}%</span>`);
     if(s.has_special_rate) tags.push('<span class="atag rate">🏷️ Tarifa especial</span>');
+    if(s.travel_fee_applied) tags.push(`<span class="atag km">🚗 Incluye ${MXN(s.travel_fee_applied)} de traslado (a más de ${s.travel_fee_km_applied} km)</span>`);
     if(s.artist_partner) tags.push('<span class="atag part">✓ Partner</span>');
     if(s.offers_audition) tags.push('<span class="atag aud">🎤 Acepta audiciones</span>');
     if(s.video_url) tags.push(`<span class="atag vid" onclick="event.stopPropagation();window.open('${esc(s.video_url)}','_blank')">▶ Video</span>`);
-    const priceHtml=eff!=null?(((s.has_special_rate||s.has_season)&&s.price_hotel&&s.price_hotel!=eff)?`<span class="ac3-price"><s style="color:var(--mut);font-weight:400">${MXN(s.price_hotel)}</s> ${MXN(eff)}</span>`:`<span class="ac3-price">${MXN(eff)}</span>`):'';
+    const priceHtml=eff!=null?(((s.has_special_rate||s.has_season||s.travel_fee_applied)&&s.price_hotel&&s.price_hotel!=eff)?`<span class="ac3-price"><s style="color:var(--mut);font-weight:400">${MXN(s.price_hotel)}</s> ${MXN(eff)}</span>`:`<span class="ac3-price">${MXN(eff)}</span>`):'';
     // Disponibilidad del día: el artista pudo bloquearlo o ya tener actuación.
     const nd=s.is_available===false;
     const disp=nd?`<span class="ac3-disp no">✕ No disponible</span>`
@@ -2338,8 +2346,8 @@ function actRender(){
     return `<div class="acard3${ADDACT.showId===s.id?' sel':''}${nd?' nodisp':''}" onclick="${nd?`actBlocked(${s.id})`:`actPick(${s.id})`}">
       <div class="ac3-ph" ${ph}>${s.image_url?'':'🎭'}${disp}</div>
       <div class="ac3-b">
-        <div class="ac3-h"><b>${who}</b>${priceHtml}</div>
-        <div class="ac3-sub">${esc(s.show_name||'Show')} · ${esc(cat)||'—'}</div>
+        <div class="ac3-h"><b>${titulo}</b>${priceHtml}</div>
+        <div class="ac3-sub">${[who,esc(cat)].filter(Boolean).join(' · ')||'—'}</div>
         <div class="ac3-meta">${meta}</div>
         ${nd?`<div class="ac3-why">🚫 ${esc(s.unavailable_reason||'No disponible ese día')}</div>`:''}
         ${tags.length?`<div class="ac3-tags">${tags.join('')}</div>`:''}
@@ -2803,9 +2811,10 @@ function artistCard(i){
   return `<div class="acard" onclick="openArtistProfile(${i.artistId||'null'})">
     <div class="ph" ${ph}>${badge}<div class="play">▶</div></div>
     <div class="ab">
-      <div class="arow"><h4>${esc(i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
-      <div class="ty">${esc(i.show)} · ${esc(pretty(i.cat))}</div>
+      <div class="arow"><h4>${esc(i.show||i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
+      <div class="ty">${esc(i.name)} · ${esc(pretty(i.cat))}</div>
       ${i.price?`<div class="from">${i.specialRate&&i.publicPrice&&i.publicPrice!=i.price?`Desde <s style="color:var(--mut);font-weight:400">${MXN(i.publicPrice)}</s> ${MXN(i.price)} <span class="spbadge">🏷️ Tarifa especial</span>`:`Desde ${MXN(i.price)}`}</div>`:''}
+      ${i.travelFee?`<div class="tfnote">🚗 Incluye ${MXN(i.travelFee)} de traslado · el hotel está a más de ${i.travelFeeKm} km</div>`:''}
       <div class="tgs">${tags.map(g=>`<span>${esc(g)}</span>`).join('')}</div>
       <div class="loc"><span>📍 ${esc(i.city||'México')}${i.km!=null?` · ${i.km<1?'<1':Math.round(i.km)} km`:''}</span>${i.langs&&i.langs.length?`<span>🗣 ${esc(i.langs.slice(0,2).join(', '))}</span>`:''}</div>
     </div></div>`;
@@ -4559,6 +4568,7 @@ const RENDER = {
       const eff=(s.effective_price!=null?s.effective_price:pub);
       items.push({id:s.id,artistId:s.artist_id,name:a.name||s.show_name,show:s.show_name,cat:s.category,sub:s.subcategory,
         price:(eff!=null?eff:null),publicPrice:(pub!=null?pub:null),specialRate:!!s.has_special_rate,
+        travelFee:(s.travel_fee_applied!=null?s.travel_fee_applied:null),travelFeeKm:s.travel_fee_km_applied,
         rating:s.rating,img,city:(a.city||s.artist_city||null),km:(s.distance_km!=null?s.distance_km:null),
         partner:a.partner,langs:a.langs,
         isNew:s.created_at?(now-new Date(s.created_at).getTime())<7*864e5:false,genres:s.genres||[]});
@@ -5296,6 +5306,14 @@ function showFields(s){
       ${num('plo','Hospedaje / viáticos','lodging_price','A acordar')}
     </div>
 
+    <div class="tfbox">
+      <div class="tfh"><b>🚗 Extra por larga distancia</b><span class="hint" style="margin:0">Monto fijo para gasolina y casetas. Si el hotel está más lejos del límite, se suma solo a tu tarifa y el hotel lo ve desglosado. Déjalo vacío si no cobras extra.</span></div>
+      <div class="fgrid">
+        <div class="field"><label>Extra (MXN)</label><input id="f_${k}_tfee" type="number" min="0" step="50" value="${val('travel_fee')}" placeholder="p. ej. 500"></div>
+        <div class="field"><label>A partir de (km)</label><input id="f_${k}_tkm" type="number" min="1" step="5" value="${(s&&s.travel_fee_km)||30}"></div>
+      </div>
+    </div>
+
     <div class="seasbox">
       <div class="seash"><b>Tarifas por temporada</b><span class="hint" style="margin:0">Suplemento o descuento en % sobre tu tarifa hotel. Se aplica solo si la fecha de la actuación cae dentro del periodo.</span></div>
       <table class="seast"><thead><tr><th>Periodo</th><th>Desde</th><th>Hasta</th><th>Ajuste %</th><th></th></tr></thead>
@@ -5378,6 +5396,7 @@ function collectShowForm(k){
     base_price:hotel, price_hotel:hotel, price_corporate:n('pc'), price_wedding:n('pw'), price_private:n('pp'),
     price_restaurant:n('pr'), price_festival:n('pf'), extra_hour_price:n('peh'),
     transport_from_price:n('ptr'), lodging_price:n('plo'),
+    travel_fee:n('tfee'), travel_fee_km:i('tkm')||30,
     offers_audition:!!(el('aud')&&el('aud').checked),
     images:(SHOW_IMGS[k]||[]).map((u,idx)=>({url:u,is_profile:idx===0})),
     seasonal_rates:seasCollect(k)

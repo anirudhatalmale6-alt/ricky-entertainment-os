@@ -150,14 +150,22 @@ async def list_shows(
         s.artist_city = cities.get(s.artist_id)
         s.artist_region = regions.get(s.artist_id)
         s.artist_partner = partners.get(s.artist_id, False)
+        # La distancia va ANTES del precio: el extra por larga distancia
+        # (gasolina) depende de a cuántos km está el hotel.
+        if origin is not None:
+            s.distance_km = geo.distance_km(origin[0], origin[1], s.artist_city, s.artist_region)
         # Precio efectivo = base → temporada del show (si la fecha cae dentro) →
-        # tarifa especial pactada con ese hotel/cadena.
-        info = pricing.effective_price(s, on, rate_by_artist.get(s.artist_id))
+        # tarifa especial pactada con ese hotel/cadena → extra por distancia.
+        info = pricing.effective_price(
+            s, on, rate_by_artist.get(s.artist_id), distance_km=s.distance_km
+        )
         s.effective_price = info["price"]
         s.has_special_rate = info["has_special_rate"]
         s.season_label = info["season_label"]
         s.season_pct = info["season_pct"]
         s.has_season = info["has_season"]
+        s.travel_fee_applied = info["travel_fee"]
+        s.travel_fee_km_applied = info["travel_fee_km"]
         # Disponibilidad. Un día bloqueado por el artista es definitivo: no se
         # puede contratar. Tener ya otra actuación ese día sólo se avisa — el
         # choque real (con 1 h de margen) se revisa al guardar, con la hora.
@@ -173,9 +181,6 @@ async def list_shows(
                 s.is_available = True
                 if s.artist_id in busy:
                     s.busy_note = f"Ya tiene otra actuación ese día a las {busy[s.artist_id]:%H:%M}"
-        # Distancia
-        if origin is not None:
-            s.distance_km = geo.distance_km(origin[0], origin[1], s.artist_city, s.artist_region)
 
     if max_km is not None:
         # Sólo pasa quien se puede demostrar que está dentro del radio: sin
