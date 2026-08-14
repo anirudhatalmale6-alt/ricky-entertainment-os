@@ -55,6 +55,19 @@ async def get_artist(artist_id: int, db: DbSession, _: CurrentUser):
     return await _get_artist_or_404(db, artist_id)
 
 
+@router.get("/{artist_id}/trayectoria")
+async def artist_trayectoria(artist_id: int, db: DbSession, _: CurrentUser):
+    """Lo que la plataforma puede demostrar de este músico.
+
+    Ni un dato lo escribe él: todo sale de sus actuaciones. Es lo que le permite
+    a un hotel contratar a alguien que no conoce sin fiarse de un video.
+    """
+    from app.services import trayectoria
+
+    artist = await _get_artist_or_404(db, artist_id)
+    return await trayectoria.de_artista(db, artist)
+
+
 @router.post(
     "",
     response_model=ArtistOut,

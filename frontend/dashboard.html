@@ -566,6 +566,26 @@
   .socpill.vid{color:#fff;background:var(--grad);border:0}
   .apgal{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
   .apthumb{padding-top:70%;background-size:cover;background-position:center;border-radius:10px;background-color:var(--ov)}
+  /* Trayectoria verificada: lo que la plataforma demuestra del músico. Cada
+     número lleva debajo sobre cuántas actuaciones está calculado — sin eso un
+     porcentaje no significa nada y el bloque entero pierde el sentido. */
+  .trbox{border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:18px}
+  .trhd{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--ov2);border-bottom:1px solid var(--line)}
+  .trhd b{font-size:12.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--acc)}
+  .trhd .trsub{font-size:11.5px;color:var(--mut);margin-left:auto;text-align:right}
+  /* Rejilla con bordes en vez de gap+fondo: si la última fila queda a medias,
+     el hueco se ve limpio y no como una celda vacía pintada. */
+  .trgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr))}
+  .trcell{padding:12px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .trcell .trv{font-size:20px;font-weight:800;line-height:1.1;color:var(--txt)}
+  .trcell .trl{font-size:11.5px;font-weight:650;color:var(--txt);margin-top:3px}
+  .trcell .trm{font-size:10.5px;color:var(--mut);margin-top:2px}
+  .trcell.hi .trv{color:var(--acc)}
+  .trnew{padding:13px 14px;font-size:12.5px;color:var(--mut);background:var(--card,#fff)}
+  .trnew b{color:var(--txt)}
+  .trchecks{display:flex;gap:7px;flex-wrap:wrap;padding:11px 14px}
+  .trck{font-size:11.5px;font-weight:650;padding:4px 10px;border-radius:20px;border:1px solid var(--line);color:var(--mut)}
+  .trck.on{color:#166534;background:#dcfce7;border-color:#bbf7d0}
   .apshow{border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:9px}
   .apsh-t{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
   .apsh-t b{font-size:14px;font-weight:700}
@@ -2926,6 +2946,59 @@ function socialUrl(k,v){
   if(k==='twitter'||k==='x') return 'https://x.com/'+h;
   return 'https://'+v;
 }
+/* ---- Trayectoria verificada ----
+   Todo lo que se pinta aquí lo calcula la plataforma con las actuaciones que ya
+   pasaron: ni un dato lo escribe el músico. Por eso cada cifra va acompañada de
+   la muestra sobre la que está calculada, y si todavía no hay historia se dice
+   "Nuevo en SHOWMA" en vez de inventar un porcentaje bonito. */
+function trFecha(iso){
+  if(!iso) return '';
+  const d=new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+}
+function trCell(valor, etiqueta, muestra, hi){
+  return `<div class="trcell${hi?' hi':''}"><div class="trv">${esc(String(valor))}</div>
+    <div class="trl">${esc(etiqueta)}</div>${muestra?`<div class="trm">${esc(muestra)}</div>`:''}</div>`;
+}
+function trayectoriaHTML(t){
+  if(!t) return '';
+  const cells=[];
+  if(t.actuaciones) cells.push(trCell(t.actuaciones, t.actuaciones===1?'actuación en SHOWMA':'actuaciones en SHOWMA',
+    t.hoteles?`en ${t.hoteles} ${t.hoteles===1?'hotel':'hoteles'} distintos`:''));
+  if(t.recontratacion) cells.push(trCell(t.recontratacion.pct+'%','de los hoteles lo repitieron',
+    `${t.recontratacion.hoteles_que_repitieron} de ${t.recontratacion.hoteles_totales} volvieron a contratarlo`, true));
+  if(t.cumplimiento) cells.push(trCell(t.cumplimiento.pct+'%','de cumplimiento',
+    t.cumplimiento.canceladas_por_el
+      ? `canceló ${t.cumplimiento.canceladas_por_el} de ${t.cumplimiento.agendadas} actuaciones`
+      : `nunca ha cancelado · ${t.cumplimiento.agendadas} actuaciones`, t.cumplimiento.pct>=95));
+  if(t.publico && t.publico.ocupacion_pct!=null) cells.push(trCell(t.publico.ocupacion_pct+'%','de aforo que llenó',
+    `medido en ${t.publico.muestra} actuaciones`));
+  if(t.publico && t.publico.retencion_pct!=null) cells.push(trCell(t.publico.retencion_pct+'%','del público se quedó',
+    `medido en ${t.publico.muestra} actuaciones`, t.publico.retencion_pct>=80));
+  if(t.respuesta) cells.push(trCell(t.respuesta.horas<1?'<1 h':(Math.round(t.respuesta.horas)+' h'),'suele tardar en contestar',
+    `mediana de ${t.respuesta.muestra} actuaciones`));
+
+  const v=t.verificaciones||{};
+  const checks=[
+    ['identidad','Identidad verificada'],
+    ['constancia_sat','Constancia del SAT'],
+    ['puede_facturar','Puede facturar (sello activo)'],
+    ['contrato_firmado','Contrato marco firmado'],
+    ['partner','Partner SHOWMA'],
+  ].filter(([k])=>v[k]).map(([,l])=>`<span class="trck on">✓ ${esc(l)}</span>`);
+
+  if(!cells.length && !checks.length) return '';
+  const desde=t.desde?`Desde ${trFecha(t.desde)}`:'';
+  const cuerpo = cells.length
+    ? `<div class="trgrid">${cells.join('')}</div>`
+    : `<div class="trnew"><b>Nuevo en SHOWMA.</b> Todavía no tiene actuaciones suficientes para mostrar historial. Los datos de abajo sí están comprobados.</div>`;
+  return `<div class="trbox">
+    <div class="trhd"><b>✓ Verificado por SHOWMA</b><span class="trsub">Datos del sistema, no los escribe el artista${desde?' · '+esc(desde):''}</span></div>
+    ${cuerpo}
+    ${checks.length?`<div class="trchecks">${checks.join('')}</div>`:''}
+  </div>`;
+}
+
 async function openArtistProfile(artistId){
   if(!artistId){ toast('Perfil no disponible para este artista.',true); return; }
   let ov=document.getElementById('apMov');
@@ -2933,9 +3006,10 @@ async function openArtistProfile(artistId){
     ov.addEventListener('click',e=>{ if(e.target===ov) apClose(); }); }
   ov.innerHTML=`<div class="amod apmod" style="position:relative"><button class="ax" onclick="apClose()">✕</button><div class="rqbody"><div class="muted" style="padding:40px;text-align:center">Cargando perfil…</div></div></div>`;
   ov.style.display='flex';
-  let a={}, shows=[];
+  let a={}, shows=[], tray=null;
   try{ a=await api('/artists/'+artistId); }catch(e){}
   try{ shows=(await api('/artists/'+artistId+'/shows'))||[]; }catch(e){}
+  try{ tray=await api('/artists/'+artistId+'/trayectoria'); }catch(e){}
   const photos=[]; shows.forEach(s=>(s.images||[]).forEach(im=>{ if(im.url) photos.push(im.url); }));
   const videos=shows.filter(s=>s.video_url).map(s=>({name:s.show_name,url:s.video_url}));
   const cover=a.profile_image_url||photos[0]||null;
@@ -2952,12 +3026,13 @@ async function openArtistProfile(artistId){
         <div class="apchips">${chips.map(c=>`<span>${c}</span>`).join('')}</div></div>
     </div>
     <div class="rqbody apbody">
+      ${trayectoriaHTML(tray)}
       ${a.bio?`<div class="apsec"><h4>Sobre el artista</h4><p>${esc(a.bio)}</p></div>`:''}
       ${socLinks.length?`<div class="apsec"><h4>Redes y enlaces</h4><div class="socrow">${socLinks.join('')}</div></div>`:''}
       ${videos.length?`<div class="apsec"><h4>Videos</h4><div class="socrow">${videos.map(v=>`<a class="socpill vid" href="${esc(v.url)}" target="_blank" rel="noopener">▶ ${esc(v.name)}</a>`).join('')}</div></div>`:''}
       ${photos.length>1?`<div class="apsec"><h4>Fotos</h4><div class="apgal">${photos.slice(0,12).map(u=>`<div class="apthumb" style="background-image:url('${esc(u)}')"></div>`).join('')}</div></div>`:''}
       ${shows.length?`<div class="apsec"><h4>Shows publicados</h4>${shows.map(s=>`<div class="apshow"><div class="apsh-t"><b>${esc(s.show_name)}</b>${s.price_hotel?`<span class="apsh-p">${MXN(s.price_hotel)}</span>`:''}</div><div class="muted" style="font-size:12px">${esc(pretty(s.category))}${s.subcategory?' · '+esc(pretty(s.subcategory)):''}${s.duration_minutes?' · '+s.duration_minutes+' min':''}</div>${s.description?`<div style="font-size:12.5px;margin-top:4px">${esc(s.description)}</div>`:''}</div>`).join('')}</div>`:''}
-      ${(!a.bio&&!socLinks.length&&!videos.length&&photos.length<=1&&!shows.length)?'<div class="muted" style="padding:20px;text-align:center">Este artista aún no ha completado su perfil.</div>':''}
+      ${(!a.bio&&!socLinks.length&&!videos.length&&photos.length<=1&&!shows.length&&!trayectoriaHTML(tray))?'<div class="muted" style="padding:20px;text-align:center">Este artista aún no ha completado su perfil.</div>':''}
     </div>
     <div class="af"><button class="btn ghost" onclick="apClose()">Cerrar</button><button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button></div>
   </div>`;
