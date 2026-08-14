@@ -93,6 +93,7 @@ class CompanyBase(BaseModel):
     rooms: int | None = None                # numero de habitaciones
     avg_daily_rate: float | None = None     # tarifa promedio (ADR)
     star_rating: int | None = None          # categoria 1-5 estrellas
+    is_all_inclusive: bool = False          # plan todo incluido (segmenta los rankings)
     is_partner: bool = False                # accede al benchmarking premium
     # commercial
     risk_tier: RiskTier = RiskTier.A
@@ -133,6 +134,7 @@ class CompanyUpdate(BaseModel):
     rooms: int | None = None
     avg_daily_rate: float | None = None
     star_rating: int | None = None
+    is_all_inclusive: bool | None = None
     is_partner: bool | None = None
     risk_tier: RiskTier | None = None
     agreed_payment_days: int | None = None

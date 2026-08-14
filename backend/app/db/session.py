@@ -66,6 +66,8 @@ _SQLITE_ADDED_COLUMNS = [
     # Avisos por correo: a quién se le mandó y si salió
     ("artist_notifications", "email_to", "VARCHAR(255)"),
     ("artist_notifications", "email_sent_at", "DATETIME"),
+    # Plan de la propiedad: separa All Inclusive de hotel urbano en los rankings
+    ("companies", "is_all_inclusive", "BOOLEAN DEFAULT 0"),
     # Afluencia y retención de público: las dos preguntas del "Calificar"
     ("reviews", "afluencia", "VARCHAR(10)"),
     ("reviews", "retencion", "VARCHAR(10)"),

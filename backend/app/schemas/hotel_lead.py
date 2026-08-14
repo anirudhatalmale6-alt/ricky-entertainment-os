@@ -49,6 +49,9 @@ class HotelLeadConvertIn(BaseModel):
     # propiedad se quede sin imagen: los logos son los que dan credibilidad en
     # "Experiencia en hoteles" del perfil del proveedor (David 2026-08-14).
     logo_url: str | None = Field(default=None, max_length=500)
+    # Todo incluido: sin esto las distinciones comparan un show de un All
+    # Inclusive con uno de hotel urbano, que son mercados distintos.
+    is_all_inclusive: bool = False
     address: str | None = Field(default=None, max_length=255)        # dirección fiscal
     city: str | None = Field(default=None, max_length=120)
     region: str | None = Field(default=None, max_length=120)

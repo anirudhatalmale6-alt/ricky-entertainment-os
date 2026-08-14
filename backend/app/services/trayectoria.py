@@ -68,6 +68,24 @@ def _pct(parte: float, total: float) -> float | None:
     return round(parte * 100.0 / total, 1)
 
 
+# Estas dos definiciones las comparte `distinciones`. Tienen que salir de un
+# solo lugar: el día que "cumplida" signifique una cosa en el perfil y otra en
+# el ranking, el perfil dice "130 actuaciones" y la medalla se calcula sobre
+# otro número. Nadie lo notaría hasta que un hotel preguntara.
+def es_agendada(b) -> bool:
+    """Llegó a existir para el músico. Lo que cancela el hotel no cuenta en su
+    contra: no fue él quien falló."""
+    return b.cancelled_by != "hotel"
+
+
+def es_cumplida(b, ahora: datetime) -> bool:
+    ini = _naive(b.starts_at)
+    return es_agendada(b) and (
+        b.status == BookingStatus.COMPLETED
+        or (b.status == BookingStatus.CONFIRMED and ini is not None and ini < ahora)
+    )
+
+
 async def de_artista(db, artist: Artist) -> dict:
     """Todo lo demostrable de un músico, listo para pintar."""
     bookings = list((await db.execute(
@@ -77,13 +95,9 @@ async def de_artista(db, artist: Artist) -> dict:
     ahora = _ahora()
     # "Agendadas" = las que llegaron a existir para el músico. Las que canceló el
     # hotel no cuentan en su contra: no fue él quien falló.
-    agendadas = [b for b in bookings if b.cancelled_by != "hotel"]
+    agendadas = [b for b in bookings if es_agendada(b)]
     canceladas_por_el = [b for b in agendadas if b.cancelled_by == "artist"]
-    cumplidas = [
-        b for b in agendadas
-        if b.status == BookingStatus.COMPLETED
-        or (b.status == BookingStatus.CONFIRMED and _naive(b.starts_at) and _naive(b.starts_at) < ahora)
-    ]
+    cumplidas = [b for b in bookings if es_cumplida(b, ahora)]
 
     hoteles = {b.company_id for b in cumplidas if b.company_id}
     venues = {b.venue_id for b in cumplidas if b.venue_id}

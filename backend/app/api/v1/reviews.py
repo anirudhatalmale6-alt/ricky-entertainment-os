@@ -150,6 +150,10 @@ async def calificar(booking_id: int, payload: ReviewIn, scope: CurrentScope, db:
         db.add(review)
     await db.commit()
     await db.refresh(review)
+    # Esta reseña puede mover un ranking: que el siguiente perfil que se abra no
+    # sirva el barrido viejo.
+    from app.services import distinciones
+    distinciones.invalidar()
     company = await db.get(Company, review.company_id) if review.company_id else None
     show = await db.get(Show, review.show_id) if review.show_id else None
     return _out(review, company, show, _naive(booking.starts_at))

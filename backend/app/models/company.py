@@ -53,6 +53,11 @@ class Company(Base, TimestampMixin):
     rooms: Mapped[int | None] = mapped_column(Integer)                 # numero de habitaciones
     avg_daily_rate: Mapped[float | None] = mapped_column(Numeric(12, 2))  # tarifa promedio (ADR)
     star_rating: Mapped[int | None] = mapped_column(Integer)           # categoria 1-5 estrellas
+    # Plan de la propiedad. Es LA segmentación del Caribe mexicano: un show que
+    # funciona en un All Inclusive (público cautivo, todas las noches) no se
+    # parece a uno de hotel urbano. Sin este dato no se puede comparar peras
+    # con peras en las distinciones.
+    is_all_inclusive: Mapped[bool] = mapped_column(Boolean, default=False)
     # Whether this property pays for the premium Market Intelligence add-on.
     # The market comparative (benchmarking) is the "Partners" paid feature.
     is_partner: Mapped[bool] = mapped_column(Boolean, default=False)

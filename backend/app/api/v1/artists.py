@@ -62,10 +62,25 @@ async def artist_trayectoria(artist_id: int, db: DbSession, _: CurrentUser):
     Ni un dato lo escribe él: todo sale de sus actuaciones. Es lo que le permite
     a un hotel contratar a alguien que no conoce sin fiarse de un video.
     """
-    from app.services import trayectoria
+    from app.services import distinciones, trayectoria
 
     artist = await _get_artist_or_404(db, artist_id)
-    return await trayectoria.de_artista(db, artist)
+    datos = await trayectoria.de_artista(db, artist)
+    datos["distinciones"] = await distinciones.de_artista(db, artist_id)
+    return datos
+
+
+@router.get("/distinciones/todas")
+async def distinciones_del_mercado(db: DbSession, _: CurrentUser):
+    """La distinción más fuerte de cada proveedor, para pintarla en las tarjetas
+    de búsqueda sin pedir el perfil completo de cada uno."""
+    from app.services import distinciones
+
+    ids = list((await db.execute(
+        select(Artist.id).where(Artist.is_active.is_(True))
+    )).scalars().all())
+    fuera = await distinciones.de_varios(db, ids)
+    return {str(k): v for k, v in fuera.items() if v}
 
 
 @router.post(

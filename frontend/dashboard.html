@@ -590,6 +590,20 @@
   .trnew b{color:var(--txt)}
   .trchecks{display:flex;gap:7px;flex-wrap:wrap;padding:11px 14px}
   .trchecks + .trline{border-top:1px solid var(--line)}
+  /* Distinciones. Un solo tono de marca y sin relleno de color: si cada medalla
+     trae su propio color, el perfil vuelve a parecer una feria. */
+  .apdist{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 14px}
+  .apdchip{display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:8px;
+    border:1px solid var(--line);background:var(--card);line-height:1.25}
+  .apdchip b{font-size:11.5px;font-weight:750}
+  .apdchip span{font-size:10.5px;color:var(--mut)}
+  .apdchip.top,.apdchip.lider{border-color:rgba(56,44,161,.28);background:rgba(56,44,161,.045)}
+  /* En la tarjeta: una línea, sin envolver, con puntos suspensivos si no cabe. */
+  .acdist{display:flex;align-items:center;gap:5px;margin:6px 0 0;font-size:10.5px;
+    color:var(--acc);overflow:hidden;white-space:nowrap}
+  .acdist b{font-weight:750;overflow:hidden;text-overflow:ellipsis}
+  .acdist i{font-style:normal;color:var(--mut);font-weight:600;overflow:hidden;text-overflow:ellipsis}
+  .acdist .ic1{width:13px;height:13px}
   /* Las cuatro opciones de afluencia / retención al calificar. */
   .rtops{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
   .rtop{padding:8px 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);
@@ -2998,6 +3012,37 @@ async function delBudget(id){
   try{ await del('/companies/budgets/'+id); toast('Presupuesto eliminado ✓'); show('budget',true); }
   catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
 }
+/* ---- Distinciones: lo que la plataforma le reconoce a un proveedor ----
+   Un hotel no sabe si "82% de aforo" es bueno. Sí sabe qué significa "Top 10%".
+   Por eso la medalla vale más que el número — y por eso el servidor sólo la
+   manda cuando hay grupo suficiente con quién comparar. Aquí no se decide nada:
+   si llegó, se pinta. */
+const DIST_ICO={top:'medal', lider:'star', constancia:'cal', cumplimiento:'check', recontratacion:'hotel'};
+function apDistHTML(lista){
+  if(!lista||!lista.length) return '';
+  return `<div class="apdist">${lista.map(d=>{
+    // "El más contratado en X" ya lleva el grupo dentro: repetirlo al lado se
+    // lee como un error de la pantalla.
+    const grupo=(d.grupo && !(d.texto||'').includes(d.grupo)) ? d.grupo : '';
+    return `<div class="apdchip ${esc(d.tipo||'')}"${d.detalle?` title="${esc(d.detalle)}"`:''}>
+      ${ico(DIST_ICO[d.tipo]||'medal')}<b>${esc(d.texto||'')}</b>${grupo?`<span>${esc(grupo)}</span>`:''}
+    </div>`;}).join('')}</div>`;
+}
+/* En la tarjeta de búsqueda sólo cabe la más fuerte, y sin el grupo: la tarjeta
+   es para decidir a quién abrir, no para leerse entera. */
+function apDistCard(artistId){
+  const d=(CACHE.distinciones||{})[String(artistId)];
+  if(!d) return '';
+  // Sin el grupo: en 200px acaban cortándose las dos cosas y no se lee ninguna.
+  // El grupo entero va en el tooltip y en el perfil.
+  return `<div class="acdist" title="${esc(d.detalle||'')}">${ico(DIST_ICO[d.tipo]||'medal')}
+    <b>${esc(d.texto||'')}</b></div>`;
+}
+async function cargarDistinciones(){
+  // Falla en silencio: una medalla que no llegó no puede romper la búsqueda.
+  try{ CACHE.distinciones=await api('/artists/distinciones/todas'); }
+  catch(e){ CACHE.distinciones={}; }
+}
 /* ---- Buscar Artistas (screen 4) ---- */
 let AF={cat:'',loc:'',km:100};
 function artGrad(cat){ const c=CATCOL[cat]||'#382ca1'; return `linear-gradient(135deg,${c},#8b5cf6)`; }
@@ -3012,6 +3057,7 @@ function artistCard(i){
       <div class="ty">${esc(i.name)} · ${esc(pretty(i.cat))}</div>
       ${i.price?`<div class="from">${i.specialRate&&i.publicPrice&&i.publicPrice!=i.price?`Desde <s style="color:var(--mut);font-weight:400">${MXN(i.publicPrice)}</s> ${MXN(i.price)} <span class="spbadge">🏷️ Tarifa especial</span>`:`Desde ${MXN(i.price)}`}</div>`:''}
       ${i.travelFee?`<div class="tfnote">🚗 Incluye ${MXN(i.travelFee)} de traslado · el hotel está a más de ${i.travelFeeKm} km</div>`:''}
+      ${apDistCard(i.artistId)}
       <div class="tgs">${tags.map(g=>`<span>${esc(g)}</span>`).join('')}</div>
       <div class="loc"><span>📍 ${esc(i.city||'México')}${i.km!=null?` · ${i.km<1?'<1':Math.round(i.km)} km`:''}</span>${i.langs&&i.langs.length?`<span>🗣 ${esc(i.langs.slice(0,2).join(', '))}</span>`:''}</div>
     </div></div>`;
@@ -3346,6 +3392,7 @@ async function openArtistProfile(artistId, showId){
     </div>
     <div class="rqbody apbody">
       ${apStatsHTML(tray,a)}
+      ${apDistHTML(tray&&tray.distinciones)}
       ${(tray&&tray.nuevo)
         ? `<div class="trbox"><div class="trnew"><b>Nuevo en SHOWMA.</b> Todavía no tiene actuaciones suficientes para mostrar historial. Lo que se muestra abajo sí está comprobado por la plataforma.</div>${checks.length?`<div class="trchecks">${checks.join('')}</div>`:''}</div>`
         : trayectoriaHTML(tray, checks)}
@@ -4272,6 +4319,10 @@ function mProspectoFicha(id){
         ${fld('pr_rfc','RFC','','XAXX010101000')}
         <div>${lb('Constancia de situación fiscal (PDF)')}<input type="file" id="pr_const_file" accept="application/pdf,image/*" onchange="mProsUploadConstancia(this)" style="${inS};height:auto;padding:6px 9px"><div id="pr_const_st" class="sub" style="font-size:11px;color:var(--mut);margin-top:3px"></div></div>
         <div>${lb('Logo de la propiedad')}<input type="file" id="pr_logo_file" accept="image/*" onchange="mProsUploadLogo(this)" style="${inS};height:auto;padding:6px 9px"><div id="pr_logo_st" class="sub" style="font-size:11px;color:var(--mut);margin-top:3px">Se ve en el perfil de cada proveedor que haya trabajado aquí.</div></div>
+        <div>${lb('Plan de la propiedad')}
+          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:7px 0">
+            <input type="checkbox" id="pr_ai" style="width:16px;height:16px"> Todo incluido (All Inclusive)</label>
+          <div class="sub" style="font-size:11px;color:var(--mut);margin-top:-2px">Separa los rankings: un show de All Inclusive no compite contra uno de hotel urbano.</div></div>
         ${fld('pr_addr','Dirección fiscal','','Calle, número, colonia')}
         ${fld('pr_city','Ciudad','','Cancún')}
         <div>${lb('Estado')}<select id="pr_region" style="${inS}">${mxEstadoOpts('')}</select></div>
@@ -4333,7 +4384,9 @@ async function mConvertProspecto(id){
   const body={
     password:gv('pr_pass')||null,
     company_name:gv('pr_name')||null, legal_name:gv('pr_legal')||null, tax_id:rfcHotel||null,
-    fiscal_constancia_url:_PROS_CONSTANCIA, logo_url:_PROS_LOGO, address:gv('pr_addr')||null, city:gv('pr_city')||null,
+    fiscal_constancia_url:_PROS_CONSTANCIA, logo_url:_PROS_LOGO,
+    is_all_inclusive:!!(document.getElementById('pr_ai')||{}).checked,
+    address:gv('pr_addr')||null, city:gv('pr_city')||null,
     region:gv('pr_region')||null, country:gv('pr_country')||null, website:gv('pr_web')||null,
     contact_person:gv('pr_person')||null, position:gv('pr_pos')||null, contact_phone:gv('pr_phone')||null,
     whatsapp:gv('pr_wa')||null, contact_email:gv('pr_email')||null,
@@ -5338,6 +5391,7 @@ const RENDER = {
         isNew:s.created_at?(now-new Date(s.created_at).getTime())<7*864e5:false,genres:s.genres||[]});
     });
     CACHE.artistItems=items; AF={cat:'',loc:'',km:100};
+    await cargarDistinciones();
     const locs=[...new Set(items.map(i=>i.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     const catCount={}; items.forEach(i=>{catCount[i.cat]=(catCount[i.cat]||0)+1;});
     const cats=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
