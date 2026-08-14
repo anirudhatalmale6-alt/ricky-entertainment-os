@@ -28,9 +28,11 @@ from sqlalchemy import func, select
 
 from app.models.artist import Artist
 from app.models.booking import Booking
+from app.models.company import Company
 from app.models.contract import ContractAcceptance
 from app.models.enums import BookingStatus
 from app.models.media import ArtistDocument
+from app.models.review import Review
 from app.models.venue import Venue
 
 # Mínimos por debajo de los cuales no se publica un porcentaje.
@@ -158,6 +160,51 @@ async def de_artista(db, artist: Artist) -> dict:
             "retencion_pct": round(sum(reten) / len(reten), 1) if reten else None,
             "muestra": len(medidas),
         }
+
+    # --- Experiencia por hotel: con quién ha trabajado y cuánto ---
+    # Es lo que convierte "186 actuaciones" en algo comprobable: se ve en casa
+    # de quién. Un hotel reconoce los logos de sus vecinos y eso cierra ventas.
+    empresas: dict[int, Company] = {}
+    if por_hotel:
+        for c in (await db.execute(
+            select(Company).where(Company.id.in_(list(por_hotel)))
+        )).scalars().all():
+            empresas[c.id] = c
+    out["hoteles_detalle"] = sorted(
+        [
+            {
+                "company_id": cid,
+                "nombre": empresas[cid].name if cid in empresas else "Hotel",
+                "logo_url": empresas[cid].logo_url if cid in empresas else None,
+                "actuaciones": n,
+            }
+            for cid, n in por_hotel.items()
+        ],
+        key=lambda d: -d["actuaciones"],
+    )
+
+    # --- Por show: cuántas lleva cada uno y en cuántos hoteles ---
+    por_show: dict[int, dict] = {}
+    for b in cumplidas:
+        if not b.show_id:
+            continue
+        d = por_show.setdefault(b.show_id, {"actuaciones": 0, "hoteles": set()})
+        d["actuaciones"] += 1
+        if b.company_id:
+            d["hoteles"].add(b.company_id)
+    out["shows"] = {
+        str(sid): {"actuaciones": d["actuaciones"], "hoteles": len(d["hoteles"])}
+        for sid, d in por_show.items()
+    }
+
+    # --- Calificación de los contratantes ---
+    prom, total = (await db.execute(
+        select(func.avg(Review.rating), func.count(Review.id))
+        .where(Review.artist_id == artist.id)
+    )).one()
+    out["calificacion"] = (
+        {"promedio": round(float(prom), 1), "total": total} if total else None
+    )
 
     # --- Verificaciones: ciertas desde el primer día, sin historial ---
     docs = {

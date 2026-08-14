@@ -21,6 +21,7 @@ from app.models.cfdi import Cfdi
 from app.models.contract import ContractTemplate, ContractAcceptance
 from app.models.support import SupportMessage
 from app.models.artist_client_rate import ArtistClientRate
+from app.models.review import Review
 from app.models.enums import (
     PayoutSpeed,
     RiskTier,
@@ -62,6 +63,7 @@ __all__ = [
     "SupportMessage",
     "ArtistClientRate",
     "ArtistNotification",
+    "Review",
     "ArtistBlockedDate",
     "PasswordResetToken",
     "TaxFigure",

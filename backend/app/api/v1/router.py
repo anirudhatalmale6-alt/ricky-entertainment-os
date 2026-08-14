@@ -15,6 +15,7 @@ from app.api.v1 import (
     me,
     reports,
     requests,
+    reviews,
     shows,
     support,
     users,
@@ -37,3 +38,4 @@ api_router.include_router(reports.router)
 api_router.include_router(support.router)
 api_router.include_router(admin.router)
 api_router.include_router(documents.router)
+api_router.include_router(reviews.router)
