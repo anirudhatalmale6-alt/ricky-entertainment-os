@@ -45,6 +45,10 @@ class HotelLeadConvertIn(BaseModel):
     legal_name: str | None = Field(default=None, max_length=255)     # razón social
     tax_id: Rfc = Field(default=None, max_length=20)          # RFC
     fiscal_constancia_url: str | None = Field(default=None, max_length=500)
+    # Logo de la propiedad. Se pide ya en el alta manual para que NINGUNA
+    # propiedad se quede sin imagen: los logos son los que dan credibilidad en
+    # "Experiencia en hoteles" del perfil del proveedor (David 2026-08-14).
+    logo_url: str | None = Field(default=None, max_length=500)
     address: str | None = Field(default=None, max_length=255)        # dirección fiscal
     city: str | None = Field(default=None, max_length=120)
     region: str | None = Field(default=None, max_length=120)

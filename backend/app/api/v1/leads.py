@@ -141,6 +141,7 @@ async def convert_hotel_lead(
         legal_name=payload.legal_name,
         tax_id=tax_id,
         fiscal_constancia_url=payload.fiscal_constancia_url,
+        logo_url=payload.logo_url,
         address=payload.address,
         city=payload.city,
         region=payload.region,

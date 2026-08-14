@@ -555,7 +555,9 @@
   .aphttl h2{margin:0;font-size:23px;font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,.4);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .aphttl .ppart{font-size:11px;font-weight:700;background:rgba(255,255,255,.22);padding:3px 9px;border-radius:20px;backdrop-filter:blur(4px)}
   .apchips{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
-  .apchips span{font-size:11.5px;background:rgba(255,255,255,.18);color:#fff;padding:3px 10px;border-radius:20px;backdrop-filter:blur(4px)}
+  .apchips span{font-size:11px;background:rgba(255,255,255,.16);color:#fff;padding:3px 10px;border-radius:20px;
+    backdrop-filter:blur(4px);display:inline-flex;align-items:center;gap:5px}
+  .apchips span .ic1{opacity:.85}
   .apbody{padding:18px 20px 6px}
   .apsec{margin-bottom:18px}
   .apsec h4{margin:0 0 8px;font-size:12.5px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.4px}
@@ -569,71 +571,102 @@
   /* Trayectoria verificada: lo que la plataforma demuestra del músico. Cada
      número lleva debajo sobre cuántas actuaciones está calculado — sin eso un
      porcentaje no significa nada y el bloque entero pierde el sentido. */
-  .trbox{border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:18px}
-  .trhd{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--ov2);border-bottom:1px solid var(--line)}
-  .trhd b{font-size:12.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--acc)}
-  .trhd .trsub{font-size:11.5px;color:var(--mut);margin-left:auto;text-align:right}
-  /* Rejilla con bordes en vez de gap+fondo: si la última fila queda a medias,
-     el hueco se ve limpio y no como una celda vacía pintada. */
-  .trgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr))}
-  .trcell{padding:12px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
-  .trcell .trv{font-size:20px;font-weight:800;line-height:1.1;color:var(--txt)}
-  .trcell .trl{font-size:11.5px;font-weight:650;color:var(--txt);margin-top:3px}
-  .trcell .trm{font-size:10.5px;color:var(--mut);margin-top:2px}
-  .trcell.hi .trv{color:var(--acc)}
+  .trbox{border:1px solid var(--line);border-radius:11px;overflow:hidden;margin-bottom:16px}
+  .trhd{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--ov2);border-bottom:1px solid var(--line)}
+  .trhd b{font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--acc)}
+  .trhd .trsub{font-size:10.5px;color:var(--mut);margin-left:auto;text-align:right}
+  /* Una sola línea, fina: valor en negrita, etiqueta al lado y la muestra entre
+     paréntesis. Da los mismos datos que la rejilla en un quinto del espacio. */
+  .trline{display:flex;flex-wrap:wrap;align-items:baseline;padding:10px 12px;gap:6px 0}
+  .trit{display:flex;align-items:baseline;gap:5px;padding:0 12px;border-right:1px solid var(--line);white-space:nowrap}
+  .trit:first-child{padding-left:0}
+  .trit:last-child{border-right:0}
+  .trit b{font-size:13px;font-weight:800;letter-spacing:-.2px}
+  .trit span{font-size:11px;color:var(--mut)}
+  .trit i{font-style:normal;font-size:10px;color:var(--mut);opacity:.75}
   .trnew{padding:13px 14px;font-size:12.5px;color:var(--mut);background:var(--card,#fff)}
   .trnew b{color:var(--txt)}
   .trchecks{display:flex;gap:7px;flex-wrap:wrap;padding:11px 14px}
   .trck{font-size:11.5px;font-weight:650;padding:4px 10px;border-radius:20px;border:1px solid var(--line);color:var(--mut)}
   .trck.on{color:#166534;background:#dcfce7;border-color:#bbf7d0}
   /* ---- Perfil del proveedor (rediseño sobre el mockup de David) ---- */
-  .apvchk{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;
-    border-radius:50%;background:#1d9bf0;color:#fff;font-size:12px;font-weight:900;vertical-align:middle;margin-left:7px}
+  .apvchk{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;
+    border-radius:50%;background:#1d9bf0;color:#fff;font-size:11px;font-weight:900;vertical-align:middle;margin-left:6px}
+  /* Iconos de una sola tinta. Los emoji meten cinco colores en cada fila y
+     ensucian el perfil; con un solo trazo gris la vista va al dato (David). */
+  .ic1{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;
+    stroke-linecap:round;stroke-linejoin:round;opacity:.62;vertical-align:-2px}
   .apvbadge{position:absolute;top:14px;right:16px;display:flex;align-items:center;gap:7px;
     background:rgba(15,14,23,.62);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.16);
     color:#fff;padding:7px 12px;border-radius:11px;font-size:11px;line-height:1.25}
   .apvbadge b{display:block;font-size:12.5px;font-weight:800;letter-spacing:.3px}
-  .apstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-    border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:-30px 0 18px;
-    position:relative;z-index:2;background:var(--card,#fff);box-shadow:0 6px 22px rgba(15,14,35,.10)}
-  .apstat{display:flex;align-items:center;gap:11px;padding:14px 16px;border-right:1px solid var(--line)}
+  .apstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:-26px 0 16px;
+    position:relative;z-index:2;background:var(--card,#fff);box-shadow:0 4px 16px rgba(15,14,35,.07)}
+  .apstat{display:flex;align-items:center;gap:9px;padding:11px 13px;border-right:1px solid var(--line)}
   .apstat:last-child{border-right:0}
-  .apstat .ic{font-size:21px;line-height:1;opacity:.85}
-  .apstat .apsv{font-size:17px;font-weight:800;line-height:1.15}
-  .apstat .apsl{font-size:11.5px;color:var(--mut);margin-top:2px}
-  .apcols{display:grid;grid-template-columns:1.55fr 1fr;gap:22px;align-items:start;margin-bottom:18px}
-  .aphgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px}
-  .aphcard{border:1px solid var(--line);border-radius:11px;padding:12px 8px;text-align:center}
-  .aphlogo{height:34px;display:flex;align-items:center;justify-content:center;margin-bottom:7px;
-    font-size:12px;font-weight:750;color:var(--txt);overflow:hidden}
-  .aphlogo img{max-height:34px;max-width:100%;object-fit:contain}
-  .aphcard .n{font-size:11.5px;font-weight:700;color:var(--acc)}
-  .apinfo{border-left:1px solid var(--line);padding-left:18px}
-  .apirow{display:flex;gap:10px;margin-bottom:14px}
-  .apirow .ic{font-size:16px;opacity:.75;line-height:1.3}
-  .apirow .t{font-size:12.5px;font-weight:700}
-  .apirow .v{font-size:12.5px;color:var(--mut);margin-top:1px}
-  .apshow2{display:flex;gap:13px;border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:10px}
-  .apsimg{width:118px;min-width:118px;height:96px;border-radius:10px;background-size:cover;
+  .apstat .apsv{font-size:14px;font-weight:750;line-height:1.2;letter-spacing:-.1px}
+  .apstat .apsl{font-size:10.5px;color:var(--mut);margin-top:1px;line-height:1.3}
+  .apcols{display:grid;grid-template-columns:1.55fr 1fr;gap:20px;align-items:start;margin-bottom:16px}
+  .aphgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+  .aphcard{border:1px solid var(--line);border-radius:10px;padding:10px 7px;text-align:center}
+  .aphlogo{height:30px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;
+    font-size:10.5px;font-weight:700;color:var(--txt);line-height:1.2;overflow:hidden}
+  .aphlogo img{max-height:30px;max-width:100%;object-fit:contain}
+  .aphcard .n{font-size:10.5px;font-weight:650;color:var(--mut)}
+  .apinfo{border-left:1px solid var(--line);padding-left:16px}
+  .apirow{display:flex;gap:9px;margin-bottom:11px}
+  .apirow .t{font-size:11.5px;font-weight:700}
+  .apirow .v{font-size:11.5px;color:var(--mut);margin-top:1px;line-height:1.35}
+  /* Datos del proveedor: dos columnas finas, etiqueta arriba y dato debajo. */
+  .apdatos{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px 16px;margin-top:9px}
+  .apdato .k{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px;font-weight:700}
+  .apdato .v{font-size:12px;margin-top:1px}
+  .apshow2{display:flex;gap:12px;border:1px solid var(--line);border-radius:12px;padding:11px;margin-bottom:9px}
+  .apsimg{width:104px;min-width:104px;height:84px;border-radius:9px;background-size:cover;
     background-position:center;background-color:var(--ov)}
   .apsbody{flex:1;min-width:0}
   .apstitle{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
-  .apstitle b{font-size:14.5px;font-weight:750}
-  .apsprice{font-size:15px;font-weight:800;color:var(--acc);white-space:nowrap;text-align:right}
-  .apsmeta{font-size:11.5px;color:var(--mut);margin-top:2px}
-  .apsdesc{font-size:12.5px;margin-top:5px;line-height:1.45}
-  .apstats2{display:flex;gap:12px;flex-wrap:wrap;margin-top:7px;font-size:11.5px;color:var(--mut)}
+  .apstitle b{font-size:13px;font-weight:750}
+  .apsprice{font-size:13.5px;font-weight:800;color:var(--acc);white-space:nowrap;text-align:right}
+  .apsmeta{font-size:10.5px;color:var(--mut);margin-top:2px}
+  .apsdesc{font-size:11.5px;margin-top:4px;line-height:1.45}
+  .apstats2{display:flex;gap:11px;flex-wrap:wrap;margin-top:6px;font-size:10.5px;color:var(--mut);align-items:center}
   .apstats2 b{color:var(--txt);font-weight:700}
-  .aprevs{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
-  .aprev{border:1px solid var(--line);border-radius:12px;padding:12px 13px}
-  .aprevh{display:flex;align-items:center;gap:8px;margin-bottom:5px}
-  .aprevh .lg{width:26px;height:26px;border-radius:7px;background:var(--ov);background-size:cover;
-    background-position:center;flex:none}
-  .aprevh b{font-size:12.5px;font-weight:750;line-height:1.2}
-  .apstars{color:#f0a020;font-size:12.5px;letter-spacing:1px}
-  .aprev p{margin:5px 0 0;font-size:12.5px;line-height:1.5;color:var(--txt)}
-  .aprev .sig{font-size:11.5px;color:var(--mut);margin-top:6px}
+  .aprevs{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:9px}
+  .aprev{border:1px solid var(--line);border-radius:11px;padding:11px 12px}
+  .aprevh{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  /* El logo del hotel va CONTENIDO, no recortado: muchos son apaisados y con
+     "cover" se corta justo el nombre. Y con borde, para que un logo blanco no
+     desaparezca sobre la tarjeta blanca. */
+  .aprevh .lg{width:26px;height:26px;border-radius:6px;background-color:var(--ov);
+    background-size:contain;background-repeat:no-repeat;background-position:center;
+    border:1px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;
+    font-size:9.5px;font-weight:800;color:var(--mut)}
+  .aprevh b{font-size:11.5px;font-weight:750;line-height:1.2}
+  .apstars{color:#f0a020;font-size:11px;letter-spacing:.8px}
+  .aprev p{margin:4px 0 0;font-size:11.5px;line-height:1.5;color:var(--txt)}
+  .aprev .sig{font-size:10.5px;color:var(--mut);margin-top:5px}
   .apmore{font-size:12px;font-weight:700;color:var(--acc);cursor:pointer;background:none;border:0;padding:0}
+  /* Redes · videos · fotos en una sola fila de tres, como el diseño. */
+  .apmedia{display:grid;grid-template-columns:auto auto 1fr;gap:18px;align-items:start;margin-bottom:16px}
+  .apmedia h5{margin:0 0 7px;font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .apsoc{display:flex;gap:7px}
+  .apsoc a{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);display:flex;
+    align-items:center;justify-content:center;color:var(--mut);text-decoration:none}
+  .apsoc a:hover{color:var(--acc);border-color:var(--acc)}
+  .apvids{display:flex;gap:8px}
+  .apvid{position:relative;width:132px;height:74px;border-radius:8px;overflow:hidden;background:var(--ov);
+    background-size:cover;background-position:center;display:block;text-decoration:none}
+  .apvid .pl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;
+    background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.55))}
+  .apvid .pl .ic1{width:22px;height:22px;opacity:1;stroke-width:1.4}
+  .apvid b{position:absolute;left:7px;bottom:5px;color:#fff;font-size:10px;font-weight:650;
+    text-shadow:0 1px 3px rgba(0,0,0,.6);max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .apfotos{display:flex;gap:7px;flex-wrap:wrap}
+  .apfoto{width:74px;height:74px;border-radius:8px;background-size:cover;background-position:center;
+    background-color:var(--ov)}
+  @media(max-width:720px){ .apmedia{grid-template-columns:1fr} }
   @media(max-width:720px){ .apcols{grid-template-columns:1fr} .apinfo{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:14px} }
   .apshow{border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:9px}
   .apsh-t{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
@@ -3005,36 +3038,59 @@ function trFecha(iso){
   const d=new Date(iso+'T00:00:00');
   return d.toLocaleDateString('es-MX',{month:'long',year:'numeric'});
 }
-function trCell(valor, etiqueta, muestra, hi){
-  return `<div class="trcell${hi?' hi':''}"><div class="trv">${esc(String(valor))}</div>
-    <div class="trl">${esc(etiqueta)}</div>${muestra?`<div class="trm">${esc(muestra)}</div>`:''}</div>`;
-}
+/* Iconos de un solo trazo, del mismo gris. Se dibujan con currentColor para que
+   hereden el color del texto y no metan una paleta extra en el perfil. */
+const ICO={
+  hotel:'<path d="M3 21h18M5 21V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v17M15 9h3a1 1 0 0 1 1 1v11M8 7h3M8 11h3M8 15h3"/>',
+  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/>',
+  star:'<path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8z"/>',
+  medal:'<circle cx="12" cy="15" r="5"/><path d="M8.5 10.5L6 3h12l-2.5 7.5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  pin:'<path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>',
+  plane:'<path d="M10.5 19l1.5-5.5 8-4.5a1.6 1.6 0 0 0-1.6-2.8l-4.9 2.2-6.4-3.6-1.6.9 4.4 4.6-3.2 1.4-2.4-1.2-1.2.7 3 3.4 5.9-1.6z"/>',
+  doc:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  users:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M17 11.5a3 3 0 0 0 0-6M20.5 20a5 5 0 0 0-3.5-4.8"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  play:'<circle cx="12" cy="12" r="9"/><path d="M10 8.5l6 3.5-6 3.5z"/>',
+  photo:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M4 17l5-4 4 3 3-2 4 3"/>',
+  link:'<path d="M10 13a4.5 4.5 0 0 0 6.4 0l2.3-2.3a4.5 4.5 0 0 0-6.4-6.4L11 5.6"/><path d="M14 11a4.5 4.5 0 0 0-6.4 0l-2.3 2.3a4.5 4.5 0 0 0 6.4 6.4L13 18.4"/>',
+};
+function ico(k){ return `<svg class="ic1" viewBox="0 0 24 24" aria-hidden="true">${ICO[k]||''}</svg>`; }
 function trayectoriaHTML(t){
   if(!t) return '';
   const cells=[];
-  if(t.actuaciones) cells.push(trCell(t.actuaciones, t.actuaciones===1?'actuación en SHOWMA':'actuaciones en SHOWMA',
-    t.hoteles?`en ${t.hoteles} ${t.hoteles===1?'hotel':'hoteles'} distintos`:''));
-  if(t.recontratacion) cells.push(trCell(t.recontratacion.pct+'%','de los hoteles lo repitieron',
-    `${t.recontratacion.hoteles_que_repitieron} de ${t.recontratacion.hoteles_totales} volvieron a contratarlo`, true));
-  if(t.cumplimiento) cells.push(trCell(t.cumplimiento.pct+'%','de cumplimiento',
+  if(t.actuaciones) cells.push(trIt(t.actuaciones, t.actuaciones===1?'actuación':'actuaciones',
+    t.hoteles?`${t.hoteles} ${t.hoteles===1?'hotel':'hoteles'}`:'',
+    `${t.actuaciones} actuaciones realizadas en ${t.hoteles} hoteles distintos`));
+  if(t.recontratacion) cells.push(trIt(t.recontratacion.pct+'%','repiten',
+    `${t.recontratacion.hoteles_que_repitieron}/${t.recontratacion.hoteles_totales}`,
+    `${t.recontratacion.hoteles_que_repitieron} de ${t.recontratacion.hoteles_totales} hoteles volvieron a contratarlo`));
+  if(t.cumplimiento) cells.push(trIt(t.cumplimiento.pct+'%','cumplimiento', t.cumplimiento.agendadas,
     t.cumplimiento.canceladas_por_el
-      ? `canceló ${t.cumplimiento.canceladas_por_el} de ${t.cumplimiento.agendadas} actuaciones`
-      : `nunca ha cancelado · ${t.cumplimiento.agendadas} actuaciones`, t.cumplimiento.pct>=95));
-  if(t.publico && t.publico.ocupacion_pct!=null) cells.push(trCell(t.publico.ocupacion_pct+'%','de aforo que llenó',
-    `medido en ${t.publico.muestra} actuaciones`));
-  if(t.publico && t.publico.retencion_pct!=null) cells.push(trCell(t.publico.retencion_pct+'%','del público se quedó',
-    `medido en ${t.publico.muestra} actuaciones`, t.publico.retencion_pct>=80));
-  if(t.respuesta) cells.push(trCell(t.respuesta.horas<1?'<1 h':(Math.round(t.respuesta.horas)+' h'),'suele tardar en contestar',
-    `mediana de ${t.respuesta.muestra} actuaciones`));
+      ? `Canceló ${t.cumplimiento.canceladas_por_el} de ${t.cumplimiento.agendadas} actuaciones aceptadas`
+      : `Nunca ha cancelado, sobre ${t.cumplimiento.agendadas} actuaciones aceptadas`));
+  if(t.publico && t.publico.ocupacion_pct!=null) cells.push(trIt(t.publico.ocupacion_pct+'%','de aforo',
+    t.publico.muestra, `Llenó en promedio el ${t.publico.ocupacion_pct}% del venue, medido en ${t.publico.muestra} actuaciones`));
+  if(t.publico && t.publico.retencion_pct!=null) cells.push(trIt(t.publico.retencion_pct+'%','se queda',
+    t.publico.muestra, `El ${t.publico.retencion_pct}% del público seguía ahí al terminar, medido en ${t.publico.muestra} actuaciones`));
+  if(t.respuesta) cells.push(trIt(t.respuesta.horas<1?'<1 h':(Math.round(t.respuesta.horas)+' h'),'responde',
+    t.respuesta.muestra, `Mediana de respuesta sobre ${t.respuesta.muestra} actuaciones`));
 
   // El aviso de "nuevo" y las verificaciones los pinta el perfil por su cuenta,
   // arriba: aquí sólo van las métricas, para no decir dos veces lo mismo.
   if(!cells.length) return '';
   const desde=t.desde?`Desde ${trFecha(t.desde)}`:'';
   return `<div class="trbox">
-    <div class="trhd"><b>✓ Verificado por SHOWMA</b><span class="trsub">Datos del sistema, no los escribe el artista${desde?' · '+esc(desde):''}</span></div>
-    <div class="trgrid">${cells.join('')}</div>
+    <div class="trhd">${ico('check')}<b>Verificado por SHOWMA</b><span class="trsub">Datos del sistema, no los escribe el artista${desde?' · '+esc(desde):''}</span></div>
+    <div class="trline">${cells.join('')}</div>
   </div>`;
+}
+/* Un dato de la línea verificada: valor, etiqueta y, entre paréntesis, sobre
+   cuántas actuaciones está calculado. La muestra va SIEMPRE — sin ella un
+   porcentaje no significa nada, y era la regla del bloque desde el primer día. */
+function trIt(valor, etiqueta, muestra, detalle){
+  return `<div class="trit"${detalle?` title="${esc(detalle)}"`:''}><b>${esc(String(valor))}</b>
+    <span>${esc(etiqueta)}</span>${muestra?`<i>(${esc(String(muestra))})</i>`:''}</div>`;
 }
 
 /* Barra de cuatro números del encabezado. Sólo entra el que tiene dato: más vale
@@ -3042,14 +3098,14 @@ function trayectoriaHTML(t){
 function apStatsHTML(t, a){
   if(!t) return '';
   const st=[];
-  if(t.hoteles) st.push(['🏨', String(t.hoteles)+(t.hoteles===1?' Hotel':' Hoteles'),'han contratado']);
-  if(t.actuaciones) st.push(['📅', String(t.actuaciones)+(t.actuaciones===1?' Actuación':' Actuaciones'),'registradas en SHOWMA']);
-  if(t.calificacion) st.push(['⭐', t.calificacion.promedio.toFixed(1)+' / 5',
+  if(t.hoteles) st.push(['hotel', String(t.hoteles)+(t.hoteles===1?' Hotel':' Hoteles'),'han contratado']);
+  if(t.actuaciones) st.push(['cal', String(t.actuaciones)+(t.actuaciones===1?' Actuación':' Actuaciones'),'registradas en SHOWMA']);
+  if(t.calificacion) st.push(['star', t.calificacion.promedio.toFixed(1)+' / 5',
     `Calificación de ${t.calificacion.total} ${t.calificacion.total===1?'hotel':'hoteles'}`]);
-  if(t.desde) st.push(['🎖️', trAntiguedad(t.desde),'en SHOWMA']);
+  if(t.desde) st.push(['medal', trAntiguedad(t.desde),'en SHOWMA']);
   if(!st.length) return '';
-  return `<div class="apstats">${st.map(([ic,v,l])=>
-    `<div class="apstat"><span class="ic">${ic}</span><div><div class="apsv">${esc(v)}</div>
+  return `<div class="apstats">${st.map(([k,v,l])=>
+    `<div class="apstat">${ico(k)}<div><div class="apsv">${esc(v)}</div>
       <div class="apsl">${esc(l)}</div></div></div>`).join('')}</div>`;
 }
 function trAntiguedad(iso){
@@ -3076,17 +3132,41 @@ function apHotelesHTML(t){
 }
 function apInfoHTML(t, a){
   const rows=[];
-  if(t&&t.respuesta) rows.push(['🕐','Tiempo de respuesta',
+  if(t&&t.respuesta) rows.push(['clock','Tiempo de respuesta',
     (t.respuesta.horas<1?'Menos de 1 hora':'Alrededor de '+Math.round(t.respuesta.horas)+' horas')]);
   const cob=[a.base_city||a.city, a.work_radius_km?`radio de ${a.work_radius_km} km`:''].filter(Boolean).join(' · ');
-  if(cob) rows.push(['📍','Cobertura',cob]);
-  if(a.available_to_travel) rows.push(['✈️','Disponible para viajar','Sí, fuera de su ciudad']);
+  if(cob) rows.push(['pin','Cobertura',cob]);
+  if(a.available_to_travel) rows.push(['plane','Disponible para viajar','Sí, fuera de su ciudad']);
   const v=(t&&t.verificaciones)||{};
-  if(v.puede_facturar) rows.push(['🧾','Facturación','Factura con sello propio (CFDI)']);
+  if(v.puede_facturar) rows.push(['doc','Facturación','Factura con sello propio (CFDI)']);
   if(!rows.length) return '';
-  return `<div class="apinfo">${rows.map(([ic,tt,vv])=>
-    `<div class="apirow"><span class="ic">${ic}</span><div><div class="t">${esc(tt)}</div>
+  return `<div class="apinfo">${rows.map(([k,tt,vv])=>
+    `<div class="apirow">${ico(k)}<div><div class="t">${esc(tt)}</div>
       <div class="v">${esc(vv)}</div></div></div>`).join('')}</div>`;
+}
+/* Información del proveedor. Estaba en la versión anterior y el rediseño la
+   dejó fuera: sin bio capturada, el perfil no decía absolutamente nada de quién
+   es (David 2026-08-14). Ahora se arma con lo que haya en su ficha, así que
+   siempre hay algo que leer. */
+function apProveedorHTML(a){
+  const datos=[];
+  const add=(k,v)=>{ if(v) datos.push([k,v]); };
+  add('Tipo', a.artist_type?pretty(a.artist_type):'');
+  add('Experiencia', a.years_experience);
+  add('Ciudad base', a.base_city||a.city);
+  add('Idiomas', (a.languages_spoken||[]).join(', '));
+  add('Idiomas del show', (a.show_languages||[]).join(', '));
+  add('Integrantes', a.members?String(a.members):'');
+  add('Vehículo propio', a.own_vehicle?'Sí':'');
+  add('Pasaporte vigente', a.valid_passport?'Sí':'');
+  add('Visa a EE. UU.', a.usa_visa?'Sí':'');
+  add('Ofrece audición', a.offers_audition?'Sí':'');
+  if(!a.bio && !datos.length) return '';
+  return `<div class="apsec"><h4>Sobre ${esc(a.stage_name||'el proveedor')}</h4>
+    ${a.bio?`<p>${esc(a.bio)}</p>`:''}
+    ${datos.length?`<div class="apdatos">${datos.map(([k,v])=>
+      `<div class="apdato"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('')}</div>`:''}
+  </div>`;
 }
 function apShowsHTML(shows, t, titulo){
   if(!shows.length) return '';
@@ -3098,8 +3178,8 @@ function apShowsHTML(shows, t, titulo){
       .filter(Boolean).join(' · ');
     const marcas=[];
     if(e&&e.actuaciones) marcas.push(`<span><b>${e.actuaciones}</b> ${e.actuaciones===1?'actuación realizada':'actuaciones realizadas'}</span>`);
-    if(e&&e.hoteles) marcas.push(`<span>🏨 Contratado por <b>${e.hoteles}</b> ${e.hoteles===1?'hotel':'hoteles'}</span>`);
-    if(s.members) marcas.push(`<span>👤 ${esc(String(s.members))} ${s.members===1?'integrante':'integrantes'}</span>`);
+    if(e&&e.hoteles) marcas.push(`<span>${ico('hotel')} Contratado por <b>${e.hoteles}</b> ${e.hoteles===1?'hotel':'hoteles'}</span>`);
+    if(s.members) marcas.push(`<span>${ico('users')} ${esc(String(s.members))} ${s.members===1?'integrante':'integrantes'}</span>`);
     return `<div class="apshow2">
       <div class="apsimg" ${img?`style="background-image:url('${esc(img)}')"`:''}></div>
       <div class="apsbody">
@@ -3114,10 +3194,29 @@ function apShowsHTML(shows, t, titulo){
 // "Cuanta más información, más transparencia" (David): junto a cada reseña va
 // de qué show fue y cuándo, y firma con nombre y puesto. Así el hotel que la
 // lee puede juzgarla, no sólo creerla.
+// Si el hotel todavía no subió logo, sus iniciales — nunca un hueco gris.
+function revIniciales(nombre){
+  return (nombre||'?').split(/\s+/).filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase();
+}
 function revFecha(iso){
   const d=new Date(iso);
   if(isNaN(d)) return '';
   return d.toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+}
+/* Redes, videos y fotos en una sola fila, como el diseño. Los videos llevan la
+   foto del show de miniatura: un enlace de texto no invita a hacer clic y el
+   video es justo lo que el hotel quiere ver antes de contratar. */
+function apMediaHTML(socLinks, videos, photos){
+  if(!socLinks.length && !videos.length && photos.length<2) return '';
+  const col=(titulo,html)=>html?`<div><h5>${esc(titulo)}</h5>${html}</div>`:'';
+  const soc=socLinks.length?`<div class="apsoc">${socLinks.join('')}</div>`:'';
+  const vid=videos.length?`<div class="apvids">${videos.slice(0,2).map(v=>
+    `<a class="apvid" href="${esc(v.url)}" target="_blank" rel="noopener"
+        ${v.img?`style="background-image:url('${esc(v.img)}')"`:''}>
+      <span class="pl">${ico('play')}</span><b>${esc(v.name||'Ver video')}</b></a>`).join('')}</div>`:'';
+  const fot=photos.length>1?`<div class="apfotos">${photos.slice(0,6).map(u=>
+    `<div class="apfoto" style="background-image:url('${esc(u)}')"></div>`).join('')}</div>`:'';
+  return `<div class="apmedia">${col('Redes y enlaces',soc)}${col('Videos destacados',vid)}${col('Galería de fotos',fot)}</div>`;
 }
 function apReviewsHTML(rev){
   if(!rev||!rev.items||!rev.items.length) return '';
@@ -3126,7 +3225,7 @@ function apReviewsHTML(rev){
   return `<div class="apsec"><h4>Lo que dicen los contratantes</h4>${cab}
     <div class="aprevs">${rev.items.slice(0,6).map(r=>`<div class="aprev">
       <div class="aprevh">
-        <div class="lg" ${r.company_logo?`style="background-image:url('${esc(r.company_logo)}')"`:''}></div>
+        <div class="lg" ${r.company_logo?`style="background-image:url('${esc(r.company_logo)}')"`:''}>${r.company_logo?'':esc(revIniciales(r.company_name))}</div>
         <div><b>${esc(r.company_name||'Hotel')}</b><div>${apStars(r.rating)} <span class="muted" style="font-size:11.5px">${r.rating}.0</span></div></div>
       </div>
       ${(r.show_name||r.actuacion_fecha)?`<div class="muted" style="font-size:11px;margin:-1px 0 4px">${esc([r.show_name, r.actuacion_fecha?revFecha(r.actuacion_fecha):''].filter(Boolean).join(' · '))}</div>`:''}
@@ -3153,18 +3252,23 @@ async function openArtistProfile(artistId, showId){
   try{ tray=await api('/artists/'+artistId+'/trayectoria'); }catch(e){}
   try{ rev=await api('/reviews/artists/'+artistId); }catch(e){}
   const photos=[]; shows.forEach(s=>(s.images||[]).forEach(im=>{ if(im.url) photos.push(im.url); }));
-  const videos=shows.filter(s=>s.video_url).map(s=>({name:s.show_name,url:s.video_url}));
+  const videos=shows.filter(s=>s.video_url).map(s=>({
+    name:s.show_name, url:s.video_url, img:(s.images&&s.images[0]&&s.images[0].url)||null}));
   const cover=a.profile_image_url||photos[0]||null;
   const langs=a.languages_spoken||[];
   const sl=a.social_links||{};
   // Solo dejamos YouTube (y las fotos/videos); se quitaron el resto de redes y las páginas web propias.
-  const socLinks=Object.entries(sl).filter(([k,v])=>v && k==='youtube').map(([k,v])=>`<a class="socpill" href="${esc(socialUrl(k,v))}" target="_blank" rel="noopener">${esc(SOCNAME[k]||_cap(k))}</a>`);
+  const socLinks=Object.entries(sl).filter(([k,v])=>v && k==='youtube').map(([k,v])=>
+    `<a href="${esc(socialUrl(k,v))}" target="_blank" rel="noopener" title="${esc(SOCNAME[k]||_cap(k))}">${ico('play')}</a>`);
+  if(a.website) socLinks.push(`<a href="${esc(a.website)}" target="_blank" rel="noopener" title="Sitio web">${ico('link')}</a>`);
   const sel = showId ? shows.find(s=>s.id===showId) : null;
-  const chips=[]; if(a.base_city||a.city) chips.push('📍 '+esc(a.base_city||a.city)); if(langs.length) chips.push('🗣 '+esc(langs.join(', ')));
+  const chips=[];
+  if(a.base_city||a.city) chips.push(ico('pin')+' '+esc(a.base_city||a.city));
+  if(langs.length) chips.push(ico('users')+' '+esc(langs.join(', ')));
   if(sel){
     const m=[pretty(sel.category), sel.subcategory?pretty(sel.subcategory):'', sel.duration_minutes?sel.duration_minutes+' min':'']
       .filter(Boolean).join(' · ');
-    if(m) chips.unshift('🎭 '+esc(m));
+    if(m) chips.unshift(ico('star')+' '+esc(m));
   }
   const v=(tray&&tray.verificaciones)||{};
   // La palomita azul se gana: identidad comprobada. No la da el propio artista.
@@ -3194,16 +3298,14 @@ async function openArtistProfile(artistId, showId){
       ${apStatsHTML(tray,a)}
       ${(tray&&tray.nuevo)?`<div class="trbox"><div class="trnew"><b>Nuevo en SHOWMA.</b> Todavía no tiene actuaciones suficientes para mostrar historial. Lo que se muestra abajo sí está comprobado por la plataforma.</div>${checks.length?`<div class="trchecks">${checks.join('')}</div>`:''}</div>`:''}
       ${sel?apShowsHTML([sel],tray,'El show'):''}
-      ${a.bio?`<div class="apsec"><h4>Sobre ${esc(a.stage_name||'el artista')}</h4><p>${esc(a.bio)}</p></div>`:''}
+      ${apProveedorHTML(a)}
       <div class="apcols">
         <div>${apHotelesHTML(tray)||`<div class="apsec"><h4>Experiencia en hoteles</h4><div class="muted" style="font-size:12.5px">Todavía no tiene actuaciones registradas en la plataforma.</div></div>`}</div>
         ${apInfoHTML(tray,a)}
       </div>
       ${(!(tray&&tray.nuevo)&&checks.length)?`<div class="apsec"><h4>Verificaciones</h4><div class="socrow">${checks.join('')}</div></div>`:''}
       ${trayectoriaHTML(tray)}
-      ${socLinks.length?`<div class="apsec"><h4>Redes y enlaces</h4><div class="socrow">${socLinks.join('')}</div></div>`:''}
-      ${videos.length?`<div class="apsec"><h4>Videos destacados</h4><div class="socrow">${videos.map(v=>`<a class="socpill vid" href="${esc(v.url)}" target="_blank" rel="noopener">▶ ${esc(v.name)}</a>`).join('')}</div></div>`:''}
-      ${photos.length>1?`<div class="apsec"><h4>Galería de fotos</h4><div class="apgal">${photos.slice(0,12).map(u=>`<div class="apthumb" style="background-image:url('${esc(u)}')"></div>`).join('')}</div></div>`:''}
+      ${apMediaHTML(socLinks,videos,photos)}
       ${sel
         ? apShowsHTML(shows.filter(s=>s.id!==sel.id),tray,'Otros shows del proveedor')
         : apShowsHTML(shows,tray)}
@@ -4072,10 +4174,10 @@ async function mProspectoStatus(id,st){
   try{ await patch('/leads/hotel/'+id,{status:st}); toast('Prospecto actualizado ✓'); await mLoadProspectos(); }
   catch(e){ toast('No se pudo actualizar: '+e.message,true); }
 }
-let _PROS_CONSTANCIA=null;
+let _PROS_CONSTANCIA=null, _PROS_LOGO=null;
 function mProspectoFicha(id){
   const l=(MASTER.cache.prospectos||[]).find(x=>x.id===id); if(!l) return;
-  _PROS_CONSTANCIA=null;
+  _PROS_CONSTANCIA=null; _PROS_LOGO=null;
   const inS="width:100%;border:1px solid var(--line);background:var(--card);border-radius:7px;height:34px;padding:0 9px;font-size:12.5px;color:var(--txt);font-family:inherit";
   const lb=t=>`<div style="font-size:11px;font-weight:700;color:var(--mut);margin:0 0 4px">${t}</div>`;
   const fld=(id2,label,val,ph,type)=>`<div>${lb(label)}<input id="${id2}" style="${inS}" value="${esc(val||'')}" placeholder="${esc(ph||'')}"${type?` type="${type}"`:''}></div>`;
@@ -4088,6 +4190,7 @@ function mProspectoFicha(id){
         ${fld('pr_legal','Razón social','','Razón social S.A. de C.V.')}
         ${fld('pr_rfc','RFC','','XAXX010101000')}
         <div>${lb('Constancia de situación fiscal (PDF)')}<input type="file" id="pr_const_file" accept="application/pdf,image/*" onchange="mProsUploadConstancia(this)" style="${inS};height:auto;padding:6px 9px"><div id="pr_const_st" class="sub" style="font-size:11px;color:var(--mut);margin-top:3px"></div></div>
+        <div>${lb('Logo de la propiedad')}<input type="file" id="pr_logo_file" accept="image/*" onchange="mProsUploadLogo(this)" style="${inS};height:auto;padding:6px 9px"><div id="pr_logo_st" class="sub" style="font-size:11px;color:var(--mut);margin-top:3px">Se ve en el perfil de cada proveedor que haya trabajado aquí.</div></div>
         ${fld('pr_addr','Dirección fiscal','','Calle, número, colonia')}
         ${fld('pr_city','Ciudad','','Cancún')}
         <div>${lb('Estado')}<select id="pr_region" style="${inS}">${mxEstadoOpts('')}</select></div>
@@ -4129,6 +4232,16 @@ async function mProsUploadConstancia(input){
     _PROS_CONSTANCIA=d.url; if(st){ st.style.color='var(--ok)'; st.textContent='✓ '+(d.filename||'Subido'); }
   }catch(e){ if(st){ st.style.color='var(--bad)'; st.textContent='No se pudo subir: '+e.message; } }
 }
+async function mProsUploadLogo(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const st=document.getElementById('pr_logo_st'); if(st){ st.style.color='var(--mut)'; st.textContent='Subiendo…'; }
+  try{
+    const fd=new FormData(); fd.append('file',f);
+    const r=await fetch(API+'/admin/upload',{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
+    if(!r.ok) throw new Error('Error '+r.status); const d=await r.json();
+    _PROS_LOGO=d.url; if(st){ st.style.color='var(--ok)'; st.textContent='✓ Logo cargado'; }
+  }catch(e){ if(st){ st.style.color='var(--bad)'; st.textContent='No se pudo subir: '+e.message; } }
+}
 async function mConvertProspecto(id){
   const gv=i=>{ const el=document.getElementById(i); return el?(el.value||'').trim():''; };
   const numv=i=>{ const v=gv(i).replace(/[^0-9.]/g,''); return v?parseFloat(v):null; };
@@ -4139,7 +4252,7 @@ async function mConvertProspecto(id){
   const body={
     password:gv('pr_pass')||null,
     company_name:gv('pr_name')||null, legal_name:gv('pr_legal')||null, tax_id:rfcHotel||null,
-    fiscal_constancia_url:_PROS_CONSTANCIA, address:gv('pr_addr')||null, city:gv('pr_city')||null,
+    fiscal_constancia_url:_PROS_CONSTANCIA, logo_url:_PROS_LOGO, address:gv('pr_addr')||null, city:gv('pr_city')||null,
     region:gv('pr_region')||null, country:gv('pr_country')||null, website:gv('pr_web')||null,
     contact_person:gv('pr_person')||null, position:gv('pr_pos')||null, contact_phone:gv('pr_phone')||null,
     whatsapp:gv('pr_wa')||null, contact_email:gv('pr_email')||null,
