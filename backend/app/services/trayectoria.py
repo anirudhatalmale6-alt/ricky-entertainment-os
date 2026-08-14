@@ -40,6 +40,17 @@ MIN_CUMPLIMIENTO = 3      # actuaciones agendadas
 MIN_AFORO = 2             # actuaciones con conteo de público
 MIN_RESPUESTA = 3         # actuaciones respondidas
 
+# Los cuatro rangos que el hotel elige al calificar (David, 2026-08-14). Se
+# guarda la palabra, no el número: un gerente no cuenta cabezas, pero sí sabe
+# si el salón estaba lleno. Para promediar se usa el punto medio del rango.
+#
+# OJO: el promedio que sale de aquí es una ESTIMACIÓN, no un conteo. Por eso se
+# redondea a entero (un "78.4%" fingiría una precisión que no existe) y la
+# pantalla dice de dónde viene. Si algún día se captura el aforo real, ése manda.
+BANDAS_AFLUENCIA = {"baja": 20.0, "media": 52.0, "alta": 75.0, "muy_alta": 92.0}
+BANDAS_RETENCION = {"baja": 25.0, "media": 60.0, "alta": 80.0, "muy_alta": 95.0}
+BANDAS = ("baja", "media", "alta", "muy_alta")
+
 
 def _naive(dt: datetime | None) -> datetime | None:
     if dt is None:
@@ -136,29 +147,60 @@ async def de_artista(db, artist: Artist) -> dict:
         out["respuesta"] = None
 
     # --- Público: cuánto llenó y cuánta gente se quedó ---
-    # Necesita el aforo del venue, así que se piden sólo los que hagan falta.
-    medidas = [b for b in cumplidas if b.headcount_start]
+    # Dos fuentes, en este orden:
+    #   1. El conteo real (headcount + aforo del venue) cuando alguien lo capturó.
+    #   2. El rango que eligió el hotel al calificar.
+    # La segunda es la que va a alimentar esto en la práctica: nadie cuenta
+    # cabezas, pero calificar son dos clics dentro de un flujo que el hotel ya
+    # hace. Si la mezcla incluye rangos, el número sale marcado como estimado y
+    # se redondea a entero — un "78.4%" fingiría una precisión que no existe.
+    resenas = list((await db.execute(
+        select(Review).where(Review.artist_id == artist.id)
+    )).scalars().all())
+    por_booking = {r.booking_id: r for r in resenas}
+
     aforos: dict[int, int] = {}
-    ids = {b.venue_id for b in medidas if b.venue_id}
+    ids = {b.venue_id for b in cumplidas if b.venue_id and b.headcount_start}
     if ids:
         for vid, cap in (await db.execute(
             select(Venue.id, Venue.capacity).where(Venue.id.in_(ids))
         )).all():
             if cap:
                 aforos[vid] = cap
+
     ocup, reten = [], []
-    for b in medidas:
+    estimado = False
+    for b in cumplidas:
+        r = por_booking.get(b.id)
         cap = aforos.get(b.venue_id or 0)
-        if cap:
+        if b.headcount_start and cap:
             ocup.append(min(b.headcount_start * 100.0 / cap, 100.0))
+        elif r is not None and r.afluencia in BANDAS_AFLUENCIA:
+            ocup.append(BANDAS_AFLUENCIA[r.afluencia])
+            estimado = True
         if b.headcount_end is not None and b.headcount_start:
             reten.append(min(b.headcount_end * 100.0 / b.headcount_start, 100.0))
+        elif r is not None and r.retencion in BANDAS_RETENCION:
+            reten.append(BANDAS_RETENCION[r.retencion])
+            estimado = True
+
+    def _prom(vals: list[float]) -> float | int | None:
+        if not vals:
+            return None
+        v = sum(vals) / len(vals)
+        # Con rangos de por medio el decimal es ruido: entero y ya.
+        return int(round(v)) if estimado else round(v, 1)
+
+    muestra = max(len(ocup), len(reten))
     out["publico"] = None
-    if len(medidas) >= MIN_AFORO and (ocup or reten):
+    if muestra >= MIN_AFORO:
         out["publico"] = {
-            "ocupacion_pct": round(sum(ocup) / len(ocup), 1) if ocup else None,
-            "retencion_pct": round(sum(reten) / len(reten), 1) if reten else None,
-            "muestra": len(medidas),
+            "ocupacion_pct": _prom(ocup),
+            "retencion_pct": _prom(reten),
+            "muestra_aforo": len(ocup),
+            "muestra_retencion": len(reten),
+            "muestra": muestra,
+            "estimado": estimado,
         }
 
     # --- Experiencia por hotel: con quién ha trabajado y cuánto ---
@@ -197,13 +239,11 @@ async def de_artista(db, artist: Artist) -> dict:
         for sid, d in por_show.items()
     }
 
-    # --- Calificación de los contratantes ---
-    prom, total = (await db.execute(
-        select(func.avg(Review.rating), func.count(Review.id))
-        .where(Review.artist_id == artist.id)
-    )).one()
+    # --- Calificación de los contratantes --- (las reseñas ya están cargadas)
     out["calificacion"] = (
-        {"promedio": round(float(prom), 1), "total": total} if total else None
+        {"promedio": round(sum(r.rating for r in resenas) / len(resenas), 1),
+         "total": len(resenas)}
+        if resenas else None
     )
 
     # --- Verificaciones: ciertas desde el primer día, sin historial ---

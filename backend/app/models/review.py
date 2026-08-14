@@ -41,6 +41,13 @@ class Review(Base, TimestampMixin):
 
     rating: Mapped[int] = mapped_column(Integer)          # 1 a 5
     comment: Mapped[str | None] = mapped_column(Text)
+    # Las dos preguntas de público (David, 2026-08-14). Se guarda el RANGO que
+    # eligió el hotel, no un porcentaje: nadie cuenta cabezas una por una, pero
+    # cualquier gerente sabe decir si el salón estaba lleno o a medias. El
+    # porcentaje sale después, en `trayectoria`, y es una estimación declarada
+    # como tal — nunca se debe presentar como un conteo exacto.
+    afluencia: Mapped[str | None] = mapped_column(String(10))   # baja|media|alta|muy_alta
+    retencion: Mapped[str | None] = mapped_column(String(10))   # baja|media|alta|muy_alta
     # Quién firma, del lado del hotel: "Gerente de Entretenimiento", etc.
     author_name: Mapped[str | None] = mapped_column(String(160))
     author_position: Mapped[str | None] = mapped_column(String(120))

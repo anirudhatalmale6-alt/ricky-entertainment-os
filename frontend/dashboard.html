@@ -589,6 +589,13 @@
   .trnew{padding:13px 14px;font-size:12.5px;color:var(--mut);background:var(--card,#fff)}
   .trnew b{color:var(--txt)}
   .trchecks{display:flex;gap:7px;flex-wrap:wrap;padding:11px 14px}
+  .trchecks + .trline{border-top:1px solid var(--line)}
+  /* Las cuatro opciones de afluencia / retención al calificar. */
+  .rtops{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .rtop{padding:8px 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);
+    color:var(--mut);font-size:12px;font-weight:650;cursor:pointer;transition:.12s}
+  .rtop:hover{border-color:var(--acc2);color:var(--txt)}
+  .rtop.on{background:var(--acc);border-color:var(--acc);color:#fff}
   .trck{font-size:11.5px;font-weight:650;padding:4px 10px;border-radius:20px;border:1px solid var(--line);color:var(--mut)}
   .trck.on{color:#166534;background:#dcfce7;border-color:#bbf7d0}
   /* ---- Perfil del proveedor (rediseño sobre el mockup de David) ---- */
@@ -611,12 +618,28 @@
   .apstat .apsv{font-size:14px;font-weight:750;line-height:1.2;letter-spacing:-.1px}
   .apstat .apsl{font-size:10.5px;color:var(--mut);margin-top:1px;line-height:1.3}
   .apcols{display:grid;grid-template-columns:1.55fr 1fr;gap:20px;align-items:start;margin-bottom:16px}
-  .aphgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
-  .aphcard{border:1px solid var(--line);border-radius:10px;padding:10px 7px;text-align:center}
-  .aphlogo{height:30px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;
-    font-size:10.5px;font-weight:700;color:var(--txt);line-height:1.2;overflow:hidden}
-  .aphlogo img{max-height:30px;max-width:100%;object-fit:contain}
+  /* Sin esto la tira de hoteles (que se desborda a propósito) ensancha su
+     columna y aplasta la de la derecha hasta partir "Tiempo de respuesta". */
+  .apcols>*{min-width:0}
+  /* Carrusel de hoteles: tres a la vista, el resto se desliza. */
+  .aphwrap{position:relative}
+  .aphstrip{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;
+    scrollbar-width:none;padding-bottom:2px}
+  .aphstrip::-webkit-scrollbar{display:none}
+  .aphcard{flex:0 0 calc((100% - 20px)/3);scroll-snap-align:start;
+    border:1px solid var(--line);border-radius:10px;padding:12px 8px;text-align:center}
+  .aphlogo{height:46px;display:flex;align-items:center;justify-content:center;margin-bottom:7px;
+    font-size:11px;font-weight:700;color:var(--txt);line-height:1.2;overflow:hidden}
+  .aphlogo img{max-height:46px;max-width:100%;object-fit:contain}
+  .aphcard .nom{font-size:10.5px;font-weight:650;line-height:1.25;margin-bottom:2px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .aphcard .n{font-size:10.5px;font-weight:650;color:var(--mut)}
+  .aphnav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:26px;height:26px;
+    border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--txt);
+    cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 8px rgba(15,14,35,.12);padding:0}
+  .aphnav:hover{border-color:var(--acc);color:var(--acc)}
+  .aphnav.pre{left:-11px} .aphnav.sig{right:-11px}
   .apinfo{border-left:1px solid var(--line);padding-left:16px}
   .apirow{display:flex;gap:9px;margin-bottom:11px}
   .apirow .t{font-size:11.5px;font-weight:700}
@@ -3060,12 +3083,13 @@ const ICO={
   link:'<path d="M10 13a4.5 4.5 0 0 0 6.4 0l2.3-2.3a4.5 4.5 0 0 0-6.4-6.4L11 5.6"/><path d="M14 11a4.5 4.5 0 0 0-6.4 0l-2.3 2.3a4.5 4.5 0 0 0 6.4 6.4L13 18.4"/>',
 };
 function ico(k){ return `<svg class="ic1" viewBox="0 0 24 24" aria-hidden="true">${ICO[k]||''}</svg>`; }
-function trayectoriaHTML(t){
+/* La línea verificada. Cuatro datos, ni uno más (David 2026-08-14):
+   - las actuaciones por hotel ya están en la barra de arriba, y
+   - el tiempo de respuesta está en la columna de la derecha.
+   Repetirlos aquí no añadía nada y alargaba la línea. */
+function trayectoriaHTML(t, checks){
   if(!t) return '';
   const cells=[];
-  if(t.actuaciones) cells.push(trIt(t.actuaciones, t.actuaciones===1?'actuación':'actuaciones',
-    t.hoteles?`${t.hoteles} ${t.hoteles===1?'hotel':'hoteles'}`:'',
-    `${t.actuaciones} actuaciones realizadas en ${t.hoteles} hoteles distintos`));
   if(t.recontratacion) cells.push(trIt(t.recontratacion.pct+'%','repiten',
     `${t.recontratacion.hoteles_que_repitieron}/${t.recontratacion.hoteles_totales}`,
     `${t.recontratacion.hoteles_que_repitieron} de ${t.recontratacion.hoteles_totales} hoteles volvieron a contratarlo`));
@@ -3073,20 +3097,25 @@ function trayectoriaHTML(t){
     t.cumplimiento.canceladas_por_el
       ? `Canceló ${t.cumplimiento.canceladas_por_el} de ${t.cumplimiento.agendadas} actuaciones aceptadas`
       : `Nunca ha cancelado, sobre ${t.cumplimiento.agendadas} actuaciones aceptadas`));
-  if(t.publico && t.publico.ocupacion_pct!=null) cells.push(trIt(t.publico.ocupacion_pct+'%','de aforo',
-    t.publico.muestra, `Llenó en promedio el ${t.publico.ocupacion_pct}% del venue, medido en ${t.publico.muestra} actuaciones`));
-  if(t.publico && t.publico.retencion_pct!=null) cells.push(trIt(t.publico.retencion_pct+'%','se queda',
-    t.publico.muestra, `El ${t.publico.retencion_pct}% del público seguía ahí al terminar, medido en ${t.publico.muestra} actuaciones`));
-  if(t.respuesta) cells.push(trIt(t.respuesta.horas<1?'<1 h':(Math.round(t.respuesta.horas)+' h'),'responde',
-    t.respuesta.muestra, `Mediana de respuesta sobre ${t.respuesta.muestra} actuaciones`));
+  const p=t.publico;
+  // "estimado" = el número sale del rango que eligieron los hoteles al calificar,
+  // no de un conteo cabeza por cabeza. Se dice en el detalle: si algún día lo
+  // presentamos como conteo exacto, estamos mintiendo con dos decimales.
+  const fuente=(p&&p.estimado)
+    ? 'según lo que reportaron los hoteles al calificar'
+    : 'medido con el conteo de público';
+  if(p && p.ocupacion_pct!=null) cells.push(trIt(p.ocupacion_pct+'%','de aforo',
+    p.muestra_aforo||p.muestra, `Llenó en promedio el ${p.ocupacion_pct}% del salón, ${fuente} en ${p.muestra_aforo||p.muestra} actuaciones`));
+  if(p && p.retencion_pct!=null) cells.push(trIt(p.retencion_pct+'%','se queda',
+    p.muestra_retencion||p.muestra, `El ${p.retencion_pct}% del público seguía ahí al terminar, ${fuente} en ${p.muestra_retencion||p.muestra} actuaciones`));
 
-  // El aviso de "nuevo" y las verificaciones los pinta el perfil por su cuenta,
-  // arriba: aquí sólo van las métricas, para no decir dos veces lo mismo.
-  if(!cells.length) return '';
+  const lista=(checks&&checks.length)?`<div class="trchecks">${checks.join('')}</div>`:'';
+  if(!cells.length && !lista) return '';
   const desde=t.desde?`Desde ${trFecha(t.desde)}`:'';
   return `<div class="trbox">
-    <div class="trhd">${ico('check')}<b>Verificado por SHOWMA</b><span class="trsub">Datos del sistema, no los escribe el artista${desde?' · '+esc(desde):''}</span></div>
-    <div class="trline">${cells.join('')}</div>
+    <div class="trhd">${ico('check')}<b>Verificaciones</b><span class="trsub">Datos del sistema, no los escribe el artista${desde?' · '+esc(desde):''}</span></div>
+    ${lista}
+    ${cells.length?`<div class="trline">${cells.join('')}</div>`:''}
   </div>`;
 }
 /* Un dato de la línea verificada: valor, etiqueta y, entre paréntesis, sobre
@@ -3124,16 +3153,33 @@ function apStars(r){
   const llenas=Math.round(r||0);
   return `<span class="apstars">${'★'.repeat(llenas)}${'☆'.repeat(Math.max(0,5-llenas))}</span>`;
 }
+/* Deslizable en vez de rejilla (David 2026-08-14): con 12 hoteles la rejilla
+   crecía hacia abajo y empujaba todo el perfil. Así se ven tres a la vez, los
+   logos caben más grandes y la columna de la derecha no se mueve. */
 function apHotelesHTML(t){
   const h=(t&&t.hoteles_detalle)||[];
   if(!h.length) return '';
+  const flechas = h.length>3
+    ? `<button class="aphnav pre" onclick="apHotelScroll(-1)" aria-label="Anteriores">‹</button>
+       <button class="aphnav sig" onclick="apHotelScroll(1)" aria-label="Siguientes">›</button>` : '';
   return `<div class="apsec"><h4>Experiencia en hoteles</h4>
     <div class="muted" style="font-size:12px;margin:-4px 0 9px">${h.length} ${h.length===1?'hotel':'hoteles'} · ${t.actuaciones} ${t.actuaciones===1?'actuación verificada':'actuaciones verificadas'}</div>
-    <div class="aphgrid">${h.slice(0,8).map(x=>`<div class="aphcard">
-      <div class="aphlogo">${x.logo_url?`<img src="${esc(x.logo_url)}" alt="${esc(x.nombre)}">`:esc(x.nombre)}</div>
-      <div class="n">${x.actuaciones} ${x.actuaciones===1?'actuación':'actuaciones'}</div>
-    </div>`).join('')}</div></div>`;
+    <div class="aphwrap">${flechas}
+      <div class="aphstrip" id="apHStrip">${h.map(x=>`<div class="aphcard">
+        <div class="aphlogo">${x.logo_url?`<img src="${esc(x.logo_url)}" alt="${esc(x.nombre)}">`:esc(x.nombre)}</div>
+        <div class="nom" title="${esc(x.nombre)}">${esc(x.nombre)}</div>
+        <div class="n">${x.actuaciones} ${x.actuaciones===1?'actuación':'actuaciones'}</div>
+      </div>`).join('')}</div>
+    </div></div>`;
 }
+function apHotelScroll(dir){
+  const s=document.getElementById('apHStrip'); if(!s) return;
+  const card=s.querySelector('.aphcard');
+  // Una tarjeta + su hueco: así siempre queda una alineada al borde.
+  const paso=card?(card.getBoundingClientRect().width+10):160;
+  s.scrollBy({left:dir*paso, behavior:'smooth'});
+}
+window.apHotelScroll=apHotelScroll;
 function apInfoHTML(t, a){
   const rows=[];
   if(t&&t.respuesta) rows.push(['clock','Tiempo de respuesta',
@@ -3157,7 +3203,7 @@ function apProveedorHTML(a){
   const add=(k,v)=>{ if(v) datos.push([k,v]); };
   add('Tipo', a.artist_type?pretty(a.artist_type):'');
   add('Experiencia', a.years_experience);
-  add('Ciudad base', a.base_city||a.city);
+  // La ciudad base NO va aquí: ya sale en la cabecera, junto al nombre (David).
   add('Idiomas', (a.languages_spoken||[]).join(', '));
   add('Idiomas del show', (a.show_languages||[]).join(', '));
   add('Integrantes', a.members?String(a.members):'');
@@ -3300,15 +3346,15 @@ async function openArtistProfile(artistId, showId){
     </div>
     <div class="rqbody apbody">
       ${apStatsHTML(tray,a)}
-      ${(tray&&tray.nuevo)?`<div class="trbox"><div class="trnew"><b>Nuevo en SHOWMA.</b> Todavía no tiene actuaciones suficientes para mostrar historial. Lo que se muestra abajo sí está comprobado por la plataforma.</div>${checks.length?`<div class="trchecks">${checks.join('')}</div>`:''}</div>`:''}
+      ${(tray&&tray.nuevo)
+        ? `<div class="trbox"><div class="trnew"><b>Nuevo en SHOWMA.</b> Todavía no tiene actuaciones suficientes para mostrar historial. Lo que se muestra abajo sí está comprobado por la plataforma.</div>${checks.length?`<div class="trchecks">${checks.join('')}</div>`:''}</div>`
+        : trayectoriaHTML(tray, checks)}
       ${sel?apShowsHTML([sel],tray,'El show'):''}
       ${apProveedorHTML(a)}
       <div class="apcols">
         <div>${apHotelesHTML(tray)||`<div class="apsec"><h4>Experiencia en hoteles</h4><div class="muted" style="font-size:12.5px">Todavía no tiene actuaciones registradas en la plataforma.</div></div>`}</div>
         ${apInfoHTML(tray,a)}
       </div>
-      ${(!(tray&&tray.nuevo)&&checks.length)?`<div class="apsec"><h4>Verificaciones</h4><div class="socrow">${checks.join('')}</div></div>`:''}
-      ${trayectoriaHTML(tray)}
       ${apMediaHTML(socLinks,videos,photos)}
       ${sel
         ? apShowsHTML(shows.filter(s=>s.id!==sel.id),tray,'Otros shows del proveedor')
@@ -3532,9 +3578,37 @@ function renderAgenda(fromRange){
 }
 /* ---- Calificar una actuación (sólo el hotel que la contrató, ya realizada) ---- */
 let RATE={id:null,stars:0};
+/* Las dos preguntas de público (David 2026-08-14). El hotel elige un RANGO, no
+   escribe un número: nadie cuenta cabezas al terminar un show, pero cualquier
+   gerente sabe si el salón estaba lleno o a medias. El porcentaje se calcula
+   solo y nunca se le enseña al que califica — si ve "65%<85%" se pone a pensar
+   en la cifra exacta y deja de contestar. */
+const RT_PUBLICO=[
+  {campo:'afluencia', titulo:'Afluencia de público',
+   ayuda:'¿Qué tan lleno estuvo el espacio?',
+   ops:[['baja','Baja'],['media','Media'],['alta','Alta'],['muy_alta','Muy alta']]},
+  {campo:'retencion', titulo:'Retención de público',
+   ayuda:'¿Cuánta gente seguía ahí al terminar?',
+   ops:[['baja','Baja'],['media','Media'],['alta','Alta'],['muy_alta','Muy alta']]},
+];
+function rtPublicoHTML(){
+  return RT_PUBLICO.map(q=>`<div class="field"><label>${esc(q.titulo)}</label>
+    <div class="hint" style="margin:-2px 0 6px">${esc(q.ayuda)}</div>
+    <div class="rtops" id="rt_${q.campo}">${q.ops.map(([v,l])=>
+      `<button type="button" class="rtop" data-v="${v}" onclick="ratePick('${q.campo}','${v}')">${esc(l)}</button>`).join('')}</div>
+  </div>`).join('');
+}
+function ratePick(campo, valor){
+  // Volver a tocar la opción elegida la quita: son datos opcionales y el hotel
+  // debe poder desdecirse sin cerrar la ventana.
+  RATE[campo] = (RATE[campo]===valor) ? null : valor;
+  document.querySelectorAll(`#rt_${campo} .rtop`).forEach(el=>{
+    el.classList.toggle('on', el.dataset.v===RATE[campo]);
+  });
+}
 function openRate(bookingId){
   const b=(CACHE.agenda||[]).find(x=>x.id===bookingId)||{};
-  RATE={id:bookingId,stars:0};
+  RATE={id:bookingId,stars:0,afluencia:null,retencion:null};
   let ov=document.getElementById('rtMov');
   if(!ov){ ov=document.createElement('div'); ov.id='rtMov'; ov.className='mov'; document.body.appendChild(ov);
     ov.addEventListener('click',e=>{ if(e.target===ov) rateClose(); }); }
@@ -3549,6 +3623,7 @@ function openRate(bookingId){
         </div>
         <div class="hint" id="rt_hint" style="margin-top:2px">Toca las estrellas</div>
       </div>
+      ${rtPublicoHTML()}
       <div class="field"><label>Comentario (opcional)</label>
         <textarea id="rt_txt" rows="4" maxlength="1200" placeholder="Lo que otro hotel necesitaría saber antes de contratarlo: puntualidad, trato, si el público respondió…"></textarea></div>
       <div class="hint">Tu reseña se publica en el perfil del proveedor junto al nombre de tu hotel. Sólo puede escribirla quien contrató esta actuación, por eso vale.</div>
@@ -3572,7 +3647,8 @@ async function rateSend(){
   const btn=document.getElementById('rt_btn'); btn.disabled=true; btn.textContent='Publicando…';
   try{
     const txt=(document.getElementById('rt_txt').value||'').trim();
-    await post(`/reviews/bookings/${RATE.id}`,{rating:RATE.stars, comment:txt||null});
+    await post(`/reviews/bookings/${RATE.id}`,{rating:RATE.stars, comment:txt||null,
+      afluencia:RATE.afluencia||null, retencion:RATE.retencion||null});
     if(CACHE.porCalificar) CACHE.porCalificar.delete(RATE.id);
     rateClose(); toast('Reseña publicada ✓ Gracias, esto le sirve a los demás hoteles');
     renderAgenda();
@@ -3582,6 +3658,7 @@ async function rateSend(){
   }
 }
 window.openRate=openRate; window.rateSet=rateSet; window.rateClose=rateClose; window.rateSend=rateSend;
+window.ratePick=ratePick;
 
 function mapsUrl(b){
   if(b.venue_map_url) return b.venue_map_url;

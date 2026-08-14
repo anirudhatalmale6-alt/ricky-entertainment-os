@@ -66,6 +66,9 @@ _SQLITE_ADDED_COLUMNS = [
     # Avisos por correo: a quién se le mandó y si salió
     ("artist_notifications", "email_to", "VARCHAR(255)"),
     ("artist_notifications", "email_sent_at", "DATETIME"),
+    # Afluencia y retención de público: las dos preguntas del "Calificar"
+    ("reviews", "afluencia", "VARCHAR(10)"),
+    ("reviews", "retencion", "VARCHAR(10)"),
 ]
 
 

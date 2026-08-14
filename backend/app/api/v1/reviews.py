@@ -7,6 +7,7 @@ opine sin haber contratado, la calificación deja de valer y con ella el perfil.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -25,9 +26,16 @@ from app.models.venue import Venue
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
 
+Banda = Literal["baja", "media", "alta", "muy_alta"]
+
+
 class ReviewIn(BaseModel):
     rating: int = Field(..., ge=1, le=5)
     comment: str | None = Field(None, max_length=1200)
+    # Las dos preguntas de público. Opcionales: quien sólo quiera poner estrellas
+    # y comentario debe poder hacerlo — si son obligatorias, nadie califica.
+    afluencia: Banda | None = None
+    retencion: Banda | None = None
 
 
 def _now() -> datetime:
@@ -85,6 +93,8 @@ def _out(r: Review, company: Company | None, show: Show | None, cuando: datetime
         "booking_id": r.booking_id,
         "rating": r.rating,
         "comment": r.comment,
+        "afluencia": r.afluencia,
+        "retencion": r.retencion,
         "author_name": r.author_name,
         "author_position": r.author_position,
         "company_id": r.company_id,
@@ -119,6 +129,8 @@ async def calificar(booking_id: int, payload: ReviewIn, scope: CurrentScope, db:
     if existente:
         existente.rating = payload.rating
         existente.comment = payload.comment
+        existente.afluencia = payload.afluencia
+        existente.retencion = payload.retencion
         existente.author_name = firmante or existente.author_name
         existente.author_position = puesto or existente.author_position
         review = existente
@@ -130,6 +142,8 @@ async def calificar(booking_id: int, payload: ReviewIn, scope: CurrentScope, db:
             company_id=booking.company_id,
             rating=payload.rating,
             comment=payload.comment,
+            afluencia=payload.afluencia,
+            retencion=payload.retencion,
             author_name=firmante,
             author_position=puesto,
         )
