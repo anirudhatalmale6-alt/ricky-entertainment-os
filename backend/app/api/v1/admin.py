@@ -986,3 +986,50 @@ async def cerrar_periodo(period: str, scope: CurrentScope, db: DbSession):
             "(faltan las credenciales de Facturama).",
         )
     return await facturacion.close_period(db, period)
+
+
+# --- Correo saliente -------------------------------------------------------
+# Los avisos de actuaciones y de chat salen también por correo, para que músicos
+# y hoteles se enteren sin entrar a la plataforma (David 2026-08-14). Esto es
+# para comprobar desde Master que el buzón está bien configurado ANTES de que
+# dependa de él una actuación de verdad.
+
+@router.get("/correo/estado")
+async def estado_correo(scope: CurrentScope):
+    """Cómo está configurado el envío, sin exponer la contraseña."""
+    _require_admin(scope)
+    from app.services import avisos, mailer
+
+    return {
+        "smtp_configurado": mailer.is_configured(),
+        "avisos_activos": avisos.activo(),
+        "servidor": settings.SMTP_HOST or None,
+        "puerto": settings.SMTP_PORT,
+        "seguridad": settings.SMTP_SECURITY,
+        "remitente": settings.mail_from or None,
+        "nombre_remitente": settings.SMTP_FROM_NAME,
+        "usuario": settings.SMTP_USER or None,
+    }
+
+
+@router.post("/correo/prueba")
+async def probar_correo(scope: CurrentScope, para: str = Query(..., min_length=5)):
+    """Manda un correo de prueba. A diferencia del resto, este SÍ espera la
+    respuesta del servidor: la gracia es enterarse aquí mismo de si salió."""
+    _require_admin(scope)
+    from app.services import avisos, mailer
+
+    if not mailer.is_configured():
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Todavía no hay un buzón de salida configurado (SMTP_HOST y remitente).",
+        )
+    asunto, texto, html = avisos.prueba()
+    enviado = await mailer.send(para.strip(), asunto, texto, html)
+    if not enviado:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "El servidor de correo rechazó el envío. Revisa usuario, contraseña, "
+            "puerto y tipo de seguridad.",
+        )
+    return {"enviado": True, "para": para.strip(), "desde": settings.mail_from}

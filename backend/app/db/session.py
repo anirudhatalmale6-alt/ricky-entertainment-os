@@ -63,6 +63,9 @@ _SQLITE_ADDED_COLUMNS = [
     # Facturación por quincena
     ("cfdis", "period", "VARCHAR(16)"),
     ("bookings", "cfdi_id", "INTEGER"),
+    # Avisos por correo: a quién se le mandó y si salió
+    ("artist_notifications", "email_to", "VARCHAR(255)"),
+    ("artist_notifications", "email_sent_at", "DATETIME"),
 ]
 
 

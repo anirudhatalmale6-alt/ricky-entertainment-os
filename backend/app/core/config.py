@@ -65,9 +65,9 @@ class Settings(BaseSettings):
     FACTURACION_DESDE: str = ""
 
     # --- Correo saliente (SMTP) ----------------------------------------
-    # Sólo se usa para la recuperación de contraseña. Si SMTP_HOST va vacío la
-    # plataforma funciona igual: el enlace de recuperación queda disponible en
-    # el panel de MASTER para pasárselo al usuario a mano.
+    # Recuperación de contraseña y avisos de actuaciones. Si SMTP_HOST va vacío
+    # la plataforma funciona igual: los avisos siguen dentro (campanita) y el
+    # enlace de recuperación queda disponible en MASTER para pasarlo a mano.
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     PUBLIC_BASE_URL: str = "http://localhost:8000"
     # Vigencia del enlace de recuperación.
     RESET_TOKEN_MINUTES: int = 60
+    # Interruptor general de los avisos por correo (actuaciones y chat). Se puede
+    # apagar sin tocar el SMTP, que la recuperación de contraseña sí lo necesita.
+    NOTIFY_EMAIL: bool = True
 
     @property
     def mail_from(self) -> str:

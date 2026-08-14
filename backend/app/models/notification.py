@@ -32,3 +32,8 @@ class ArtistNotification(Base, TimestampMixin):
     body: Mapped[str | None] = mapped_column(Text)
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    # A dónde se mandó el mismo aviso por correo y cuándo salió de verdad.
+    # email_to con email_sent_at vacío = se intentó y no salió (SMTP caído o
+    # sin configurar); así en Master se ve a quién avisamos y a quién no.
+    email_to: Mapped[str | None] = mapped_column(String(255))
+    email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

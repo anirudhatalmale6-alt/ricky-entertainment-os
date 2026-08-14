@@ -13,7 +13,7 @@ rewrites past money.
 """
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -31,7 +31,7 @@ from app.models.enums import (
 )
 from app.models.show import Show
 from app.models.venue import Venue
-from app.services import availability, pricing
+from app.services import availability, avisos, pricing
 from app.schemas.booking import (
     AttendanceIn,
     BookingCreate,
@@ -398,9 +398,12 @@ async def confirm_booking(booking_id: int, db: DbSession):
 
 
 async def _notify_artist_cancel(db: DbSession, booking: Booking, reason: str | None):
-    """Aviso al músico de que el hotel canceló su actuación."""
+    """Aviso al músico de que el hotel canceló su actuación.
+
+    Devuelve los correos a mandar (todavía no se mandan: falta el commit).
+    """
     if not booking.artist_id:
-        return
+        return []
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
     show = await db.get(Show, booking.show_id) if booking.show_id else None
     st = _naive(booking.starts_at) if booking.starts_at else None
@@ -410,11 +413,24 @@ async def _notify_artist_cancel(db: DbSession, booking: Booking, reason: str | N
     body = f"El hotel canceló {sname} en {vname} del {when}."
     if reason:
         body += f" Motivo: {reason}"
-    db.add(ArtistNotification(
+    artist = await db.get(Artist, booking.artist_id)
+    destino = await avisos.correo_artista(db, artist)
+    aviso = ArtistNotification(
         artist_id=booking.artist_id, booking_id=booking.id,
         kind="cancelled", title="Actuación cancelada por el hotel",
-        body=body, starts_at=booking.starts_at,
-    ))
+        body=body, starts_at=booking.starts_at, email_to=destino,
+    )
+    db.add(aviso)
+    if not destino:
+        return []
+    company = await db.get(Company, booking.company_id) if booking.company_id else None
+    asunto, texto, html = avisos.actuacion(
+        "cancelled", show=sname, venue=vname,
+        hotel=company.name if company else "", cuando=st, motivo=reason or "",
+    )
+    await db.flush()
+    return [avisos.Aviso(to=destino, subject=asunto, text=texto, html=html,
+                         notification_id=aviso.id)]
 
 
 @router.post(
@@ -422,7 +438,7 @@ async def _notify_artist_cancel(db: DbSession, booking: Booking, reason: str | N
     response_model=BookingOut,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def cancel_booking(booking_id: int, scope: CurrentScope, db: DbSession, reason: str | None = None):
+async def cancel_booking(booking_id: int, scope: CurrentScope, db: DbSession, bg: BackgroundTasks, reason: str | None = None):
     booking = await _get_or_404(db, booking_id)
     if booking.status in (BookingStatus.CANCELLED, BookingStatus.COMPLETED):
         raise HTTPException(status_code=409, detail="La actuacion ya esta finalizada o cancelada")
@@ -439,8 +455,9 @@ async def cancel_booking(booking_id: int, scope: CurrentScope, db: DbSession, re
     booking.cancelled_at = _now()
     booking.cancellation_reason = reason
     booking.cancelled_by = "admin" if scope.is_admin else "hotel"
-    await _notify_artist_cancel(db, booking, reason)   # avisar al músico
+    correos = await _notify_artist_cancel(db, booking, reason)   # avisar al músico
     await db.commit()
+    avisos.despachar(bg, correos)
     await db.refresh(booking)
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
     show = await db.get(Show, booking.show_id) if booking.show_id else None
@@ -449,7 +466,8 @@ async def cancel_booking(booking_id: int, scope: CurrentScope, db: DbSession, re
 
 @router.post("/{booking_id}/artist-cancel", response_model=BookingOut)
 async def artist_cancel_booking(
-    booking_id: int, scope: CurrentScope, db: DbSession, reason: str | None = None
+    booking_id: int, scope: CurrentScope, db: DbSession, bg: BackgroundTasks,
+    reason: str | None = None,
 ):
     """El músico cancela su propia actuación (enfermedad, imprevisto, etc.).
 
@@ -467,7 +485,26 @@ async def artist_cancel_booking(
     booking.cancelled_at = _now()
     booking.cancellation_reason = reason
     booking.cancelled_by = "artist"
+
+    # Este es el aviso más urgente del sistema: el hotel se queda sin show y
+    # tiene que salir a buscar reemplazo. No puede depender de que alguien
+    # esté mirando el panel.
+    venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
+    show = await db.get(Show, booking.show_id) if booking.show_id else None
+    artist = await db.get(Artist, booking.artist_id) if booking.artist_id else None
+    asunto, texto, html = avisos.cancelacion_musico(
+        show=(show.show_name if show else None) or "la actuación",
+        artista=(artist.stage_name if artist else None) or "El artista",
+        venue=(venue.name if venue else "") or "",
+        cuando=_naive(booking.starts_at) if booking.starts_at else None,
+        motivo=reason or "",
+    )
+    correos = [
+        avisos.Aviso(to=d, subject=asunto, text=texto, html=html)
+        for d in await avisos.correos_hotel(db, booking.company_id)
+    ]
     await db.commit()
+    avisos.despachar(bg, correos)
     await db.refresh(booking)
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
     show = await db.get(Show, booking.show_id) if booking.show_id else None
@@ -518,6 +555,7 @@ async def artist_respond(
     booking_id: int,
     scope: CurrentScope,
     db: DbSession,
+    bg: BackgroundTasks,
     action: str = Query(..., pattern="^(accept|reject)$"),
 ):
     """The artist accepts or rejects one of THEIR OWN pending actuaciones.
@@ -540,10 +578,32 @@ async def artist_respond(
         booking.status = BookingStatus.CANCELLED
         booking.cancelled_at = _now()
         booking.cancellation_reason = "Rechazada por el artista"
-    await db.commit()
-    await db.refresh(booking)
+        booking.cancelled_by = "artist"
+
+    # Avisar al hotel por correo: aceptó (queda cerrado) o rechazó (hay que
+    # buscar a otro). Sin esto el hotel se entera cuando entra al panel.
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
     show = await db.get(Show, booking.show_id) if booking.show_id else None
+    artist = await db.get(Artist, booking.artist_id) if booking.artist_id else None
+    datos = dict(
+        show=(show.show_name if show else None) or "la actuación",
+        artista=(artist.stage_name if artist else None) or "El artista",
+        venue=(venue.name if venue else "") or "",
+        cuando=_naive(booking.starts_at) if booking.starts_at else None,
+    )
+    if action == "accept":
+        asunto, texto, html = avisos.confirmacion_musico(**datos)
+    else:
+        asunto, texto, html = avisos.cancelacion_musico(
+            **datos, motivo="El artista rechazó la actuación"
+        )
+    correos = [
+        avisos.Aviso(to=d, subject=asunto, text=texto, html=html)
+        for d in await avisos.correos_hotel(db, booking.company_id)
+    ]
+    await db.commit()
+    avisos.despachar(bg, correos)
+    await db.refresh(booking)
     return _decorate(booking, venue, show)
 
 
@@ -598,15 +658,20 @@ class NotifyIn(BaseModel):
     "/notify",
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def notify_artists(payload: NotifyIn, db: DbSession):
+async def notify_artists(payload: NotifyIn, db: DbSession, bg: BackgroundTasks):
     """"Guardar y notificar": create an in-app aviso for each affected artist.
 
     Called from the Calendario Maestro when the hotel finishes arranging the
     week. One notification per booking; the artist sees them in their bell
-    inbox. WhatsApp/email is a later channel (David 2026-07-18).
+    inbox, y el mismo aviso le sale por correo (David 2026-08-14: mientras no
+    haya app, nadie entra a mirar la campanita).
     """
     notified = 0
+    emails = 0
     artists: set[int] = set()
+    # (ArtistNotification, correo, asunto, texto, html) — el correo se manda al
+    # final, cuando el commit ya guardó las actuaciones.
+    pendientes: list[tuple] = []
     for item in payload.items:
         booking = await db.get(Booking, item.booking_id)
         if booking is None or not booking.artist_id:
@@ -644,7 +709,7 @@ async def notify_artists(payload: NotifyIn, db: DbSession):
                 f"Fuiste agendado en {venue_name} para el {when}. "
                 "Queda pendiente de tu confirmación."
             )
-        db.add(ArtistNotification(
+        aviso = ArtistNotification(
             artist_id=booking.artist_id,
             booking_id=booking.id,
             kind=kind,
@@ -652,8 +717,33 @@ async def notify_artists(payload: NotifyIn, db: DbSession):
             body=body,
             starts_at=st,
             is_read=False,
-        ))
+        )
+        destino = await avisos.correo_artista(db, artist)
+        aviso.email_to = destino
+        db.add(aviso)
         notified += 1
         artists.add(booking.artist_id)
+
+        if destino:
+            company = await db.get(Company, venue.company_id) if venue and venue.company_id else None
+            asunto, texto, html = avisos.actuacion(
+                kind,
+                show=show_name,
+                venue=venue_name,
+                hotel=company.name if company else "",
+                cuando=st,
+                importe=(f"${booking.agreed_price:,.2f} {booking.currency or 'MXN'}"
+                         if booking.agreed_price else ""),
+            )
+            pendientes.append((aviso, destino, asunto, texto, html))
+            emails += 1
+    # flush antes del commit para que cada aviso tenga id y el correo pueda
+    # sellarse contra él.
+    await db.flush()
+    correos = [
+        avisos.Aviso(to=d, subject=s, text=t, html=h, notification_id=a.id)
+        for a, d, s, t, h in pendientes
+    ]
     await db.commit()
-    return {"notified": notified, "artists": len(artists)}
+    avisos.despachar(bg, correos)
+    return {"notified": notified, "artists": len(artists), "emails": emails}

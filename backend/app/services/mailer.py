@@ -76,9 +76,16 @@ _WRAP = """<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-seri
    font-weight:700;letter-spacing:.5px">SHOWMA</div>
   <div style="padding:24px;color:#1f2937;font-size:15px;line-height:1.55">{body}</div>
   <div style="padding:16px 24px;background:#fafafa;color:#8b93a1;font-size:12px;
-   border-top:1px solid #eef0f3">Si no solicitaste esto puedes ignorar este
-   correo, tu contraseña no cambiará.</div>
+   border-top:1px solid #eef0f3">{footer}</div>
  </div></div>"""
+
+_PIE_RESET = ("Si no solicitaste esto puedes ignorar este correo, tu contraseña "
+              "no cambiará.")
+
+
+def wrap(body: str, footer: str = _PIE_RESET) -> str:
+    """Envuelve un cuerpo HTML en la plantilla de marca de SHOWMA."""
+    return _WRAP.format(body=body, footer=footer)
 
 
 def reset_email(full_name: str, link: str, minutes: int) -> tuple[str, str, str]:
@@ -105,4 +112,4 @@ def reset_email(full_name: str, link: str, minutes: int) -> tuple[str, str, str]
         "minutos y sólo se puede usar una vez. Si el botón no funciona, copia y "
         f'pega esta dirección:<br><span style="word-break:break-all">{link}</span></p>'
     )
-    return subject, text, _WRAP.format(body=body)
+    return subject, text, wrap(body)

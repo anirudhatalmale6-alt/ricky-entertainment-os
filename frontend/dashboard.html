@@ -3611,6 +3611,7 @@ const M_MENU = [
   {v:'reportes', ic:'📈', label:'Reportes'},
   {sec:'Configuración'},
   {v:'cfg_taxes',         ic:'🧮', label:'Impuestos'},
+  {v:'cfg_correo',        ic:'✉️', label:'Avisos por correo'},
   {v:'cfg_usuarios',      ic:'👥', label:'Usuarios y roles'},
   {v:'cfg_general',       ic:'⚙️', label:'Configuración general'},
   {v:'cfg_plantillas',    ic:'📄', label:'Plantillas'},
@@ -3646,6 +3647,7 @@ async function mNav(v){
     else if(v==='pagos')     await mPagos(body);
     else if(v==='reportes')  mReportes(body);
     else if(v==='cfg_taxes') await mTaxes(body);
+    else if(v==='cfg_correo') await mCorreo(body);
     else if(v==='cfg_plantillas') await mPlantillas(body);
     else if(v==='cfg_usuarios') await mUsuarios(body);
     else if(v==='periodos')  await mPeriodos(body);
@@ -4517,6 +4519,76 @@ async function doResetPw(id,mode){
     toast('No se pudo restablecer: '+(e.message||''),true);
   }
 }
+
+/* ============ CONFIGURACIÓN · Avisos por correo ============ */
+const CORREO_EVENTOS = [
+  ['🎫','Nueva actuación','Al músico, cuando el hotel guarda y notifica el calendario.'],
+  ['✅','Actuación confirmada','Al músico si su perfil confirma automático; al hotel cuando el músico acepta.'],
+  ['🕒','Cambio de horario','Al músico, cuando se mueve la fecha o la hora de su actuación.'],
+  ['🚫','Cancelación del hotel','Al músico, con el motivo.'],
+  ['⚠️','Cancelación del músico','Al hotel — el más urgente: hay que buscar reemplazo.'],
+  ['💬','Mensaje nuevo en el chat','Sólo del primer mensaje sin leer de cada conversación, para no llenar el buzón.'],
+];
+
+async function mCorreo(box){
+  box.innerHTML = mHead('Avisos por correo','Los mismos avisos de la plataforma, enviados al correo de músicos y hoteles')
+    + `<div id="mres"><div class="load">Cargando…</div></div>`;
+  const res = document.getElementById('mres');
+  let d;
+  try{ d = await api('/admin/correo/estado'); }
+  catch(e){ res.innerHTML = mEmpty('No se pudo consultar el estado del correo: '+(e.message||'')); return; }
+
+  const on = !!d.avisos_activos;
+  const badge = on
+    ? `<span class="mchip" style="background:#dcfce7;color:#166534">Activo</span>`
+    : `<span class="mchip" style="background:#fee2e2;color:#991b1b">Sin configurar</span>`;
+  const fila = (k,v)=>`<tr><td style="color:var(--mut);width:200px">${esc(k)}</td><td><b>${esc(v==null||v===''?'—':String(v))}</b></td></tr>`;
+
+  res.innerHTML = `
+    <div class="mnote">${on
+      ? 'El envío está configurado. Cada aviso de la plataforma sale también por correo, así que músicos y hoteles se enteran sin entrar al panel.'
+      : 'Todavía no hay un buzón de salida. La plataforma funciona igual y los avisos siguen guardándose dentro (la campanita), pero <b>no sale ningún correo</b>. En cuanto se carguen los datos del buzón en el servidor, empieza a enviar solo.'}
+    </div>
+    <div class="mtw" style="margin-bottom:14px">
+      <table class="mt"><thead><tr><th colspan="2">Buzón de salida ${badge}</th></tr></thead><tbody>
+        ${fila('Servidor', d.servidor)}
+        ${fila('Puerto', d.puerto)}
+        ${fila('Seguridad', d.seguridad)}
+        ${fila('Usuario', d.usuario)}
+        ${fila('Remite como', d.remitente ? `${d.nombre_remitente} <${d.remitente}>` : null)}
+      </tbody></table>
+    </div>
+    <div class="maddbox">
+      <div class="mah">Mandar un correo de prueba</div>
+      <div class="marow">
+        <input class="mtin" id="co_to" placeholder="Tu correo, para comprobar que llega" style="min-width:280px">
+        <button class="mbtn solid" id="co_btn" onclick="mCorreoPrueba()" ${on?'':'disabled title="Falta configurar el buzón de salida"'}>Enviar prueba</button>
+      </div>
+      <div id="co_out" style="margin-top:10px;font-size:13px"></div>
+    </div>
+    <div class="mtw" style="margin-top:16px">
+      <table class="mt"><thead><tr><th colspan="3">Qué se avisa por correo</th></tr></thead><tbody>
+        ${CORREO_EVENTOS.map(([ic,t,s])=>`<tr><td style="width:40px;font-size:18px">${ic}</td><td style="width:230px"><b>${esc(t)}</b></td><td style="color:var(--mut)">${esc(s)}</td></tr>`).join('')}
+      </tbody></table>
+    </div>`;
+}
+
+async function mCorreoPrueba(){
+  const to = mVal('co_to');
+  const out = document.getElementById('co_out');
+  const btn = document.getElementById('co_btn');
+  if(!to || to.indexOf('@')<1){ out.innerHTML = '<span style="color:#991b1b">Escribe un correo válido.</span>'; return; }
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  out.innerHTML = '';
+  try{
+    const r = await post('/admin/correo/prueba?para='+encodeURIComponent(to), {});
+    out.innerHTML = `<span style="color:#166534">✅ Enviado a <b>${esc(r.para)}</b> desde <b>${esc(r.desde||'')}</b>. Si no aparece en unos minutos, revisa la carpeta de spam: eso significa que falta el SPF/DKIM del dominio.</span>`;
+  }catch(e){
+    out.innerHTML = `<span style="color:#991b1b">❌ No salió: ${esc(e.message||'')}</span>`;
+  }
+  btn.disabled = false; btn.textContent = 'Enviar prueba';
+}
+window.mCorreo = mCorreo; window.mCorreoPrueba = mCorreoPrueba;
 
 function mConfig(box, key){
   const titles={cfg_usuarios:['Usuarios y roles','Gestión de usuarios y permisos'],

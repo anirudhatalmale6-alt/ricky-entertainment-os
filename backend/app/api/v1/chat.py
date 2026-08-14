@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentScope, DbSession, require_permission
@@ -19,6 +19,7 @@ from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
 from app.models.company import Company
 from app.models.conversation import Conversation, Message
+from app.services import avisos
 from app.schemas.chat import (
     MAX_CHAT_IMAGES,
     ConversationCreate,
@@ -197,7 +198,7 @@ async def list_messages(conversation_id: int, scope: CurrentScope, db: DbSession
     response_model=MessageOut,
     status_code=status.HTTP_201_CREATED,
 )
-async def send_message(conversation_id: int, payload: MessageCreate, scope: CurrentScope, db: DbSession):
+async def send_message(conversation_id: int, payload: MessageCreate, scope: CurrentScope, db: DbSession, bg: BackgroundTasks):
     conv = await _get_conversation_or_404(db, conversation_id)
     await _assert_participant(db, scope, conv)
     data = payload.model_dump()
@@ -210,9 +211,58 @@ async def send_message(conversation_id: int, payload: MessageCreate, scope: Curr
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "El mensaje no puede ir vacío.")
     msg = Message(conversation_id=conversation_id, **data)
     db.add(msg)
+
+    correos = await _avisar_por_correo(db, conv, msg)
     await db.commit()
     await db.refresh(msg)
+    avisos.despachar(bg, correos)
     return msg
+
+
+async def _avisar_por_correo(db: DbSession, conv: Conversation, msg: Message) -> list:
+    """Correo al otro lado avisando que tiene un mensaje nuevo.
+
+    Sólo se avisa del PRIMER mensaje sin leer de la conversación: si ya tiene
+    otros pendientes es que ya se le avisó y todavía no ha entrado, y no vamos a
+    mandarle un correo por cada línea que escriba el otro. Cuando entra y lee,
+    el contador vuelve a cero y el siguiente mensaje sí vuelve a avisar.
+    """
+    if not avisos.activo():
+        return []
+    # El mensaje recién creado tiene que tener id ANTES de armar la consulta:
+    # si se filtrara por `Message.id != None` la comparación con NULL descarta
+    # todas las filas y el conteo saldría siempre 0 (un correo por mensaje).
+    await db.flush()
+    pendientes = (
+        await db.execute(
+            select(func.count(Message.id)).where(
+                Message.conversation_id == conv.id,
+                Message.sender_role == msg.sender_role,
+                Message.read_at.is_(None),
+                Message.id != msg.id,
+            )
+        )
+    ).scalar_one()
+    if pendientes:
+        return []
+
+    cuerpo = (msg.body or "").strip()
+    extracto = (cuerpo[:200] + "…") if len(cuerpo) > 200 else (cuerpo or "(te mandó una foto)")
+    artist = await db.get(Artist, conv.artist_id) if conv.artist_id else None
+    company = await db.get(Company, conv.company_id) if conv.company_id else None
+
+    if msg.sender_role == "artist":
+        de = (artist.stage_name if artist else None) or "Un artista"
+        destinos = await avisos.correos_hotel(db, conv.company_id)
+    else:
+        de = (company.name if company else None) or "Un hotel"
+        destino = await avisos.correo_artista(db, artist)
+        destinos = [destino] if destino else []
+
+    if not destinos:
+        return []
+    asunto, texto, html = avisos.mensaje_chat(de=de, extracto=extracto)
+    return [avisos.Aviso(to=d, subject=asunto, text=texto, html=html) for d in destinos]
 
 
 @router.post("/{conversation_id}/images", status_code=status.HTTP_201_CREATED)
