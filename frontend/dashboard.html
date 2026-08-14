@@ -548,7 +548,9 @@
   .tx{background:var(--ov);border:0;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;color:var(--mut);line-height:1}
   .tx:hover{background:var(--bad);color:#fff}
   /* Artist profile pop-up */
-  .amod.apmod{max-width:620px;max-height:90vh}
+  /* 900px, no 620: la barra verificada mide 830px con sus seis datos y a 620
+     se partía en dos renglones. David la pidió EN UNA SOLA LÍNEA. */
+  .amod.apmod{max-width:900px;max-height:90vh}
   .aphero{height:190px;background:var(--grad);background-size:cover;background-position:center;position:relative;flex:none}
   .aphscrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,16,32,.05) 0%,rgba(6,16,32,.72) 100%)}
   .aphttl{position:absolute;left:20px;right:20px;bottom:14px;color:#fff}
@@ -557,7 +559,7 @@
   .apchips{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
   .apchips span{font-size:11px;background:rgba(255,255,255,.16);color:#fff;padding:3px 10px;border-radius:20px;
     backdrop-filter:blur(4px);display:inline-flex;align-items:center;gap:5px}
-  .apchips span .ic1{opacity:.85}
+  .apchips span .ic1{opacity:.85;color:#fff}
   .apbody{padding:18px 20px 6px}
   .apsec{margin-bottom:18px}
   .apsec h4{margin:0 0 8px;font-size:12.5px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.4px}
@@ -592,10 +594,11 @@
   /* ---- Perfil del proveedor (rediseño sobre el mockup de David) ---- */
   .apvchk{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;
     border-radius:50%;background:#1d9bf0;color:#fff;font-size:11px;font-weight:900;vertical-align:middle;margin-left:6px}
-  /* Iconos de una sola tinta. Los emoji meten cinco colores en cada fila y
-     ensucian el perfil; con un solo trazo gris la vista va al dato (David). */
-  .ic1{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;
-    stroke-linecap:round;stroke-linejoin:round;opacity:.62;vertical-align:-2px}
+  /* Iconos de una sola tinta: el azul de la marca (David mandó el set de
+     referencia el 2026-08-14, todos del mismo azul). Los emoji metían cinco
+     colores por renglón. Sobre fondo oscuro se pisa el color a blanco abajo. */
+  .ic1{width:15px;height:15px;flex:none;color:var(--acc);stroke:currentColor;fill:none;
+    stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.85;vertical-align:-2px}
   .apvbadge{position:absolute;top:14px;right:16px;display:flex;align-items:center;gap:7px;
     background:rgba(15,14,23,.62);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.16);
     color:#fff;padding:7px 12px;border-radius:11px;font-size:11px;line-height:1.25}
@@ -660,7 +663,8 @@
     background-size:cover;background-position:center;display:block;text-decoration:none}
   .apvid .pl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;
     background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.55))}
-  .apvid .pl .ic1{width:22px;height:22px;opacity:1;stroke-width:1.4}
+  .apvid .pl .ic1{width:22px;height:22px;opacity:1;stroke-width:1.4;color:#fff}
+  .apvbadge .ic1{color:#fff;opacity:.95;width:17px;height:17px}
   .apvid b{position:absolute;left:7px;bottom:5px;color:#fff;font-size:10px;font-weight:650;
     text-shadow:0 1px 3px rgba(0,0,0,.6);max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .apfotos{display:flex;gap:7px;flex-wrap:wrap}
@@ -3286,7 +3290,7 @@ async function openArtistProfile(artistId, showId){
     <button class="ax" onclick="apClose()" aria-label="Cerrar">✕</button>
     <div class="aphero" ${cover?`style="background-image:url('${cover}')"`:''}>
       <div class="aphscrim"></div>
-      ${verificado?`<div class="apvbadge"><span style="font-size:16px">🛡️</span><div>Perfil verificado por<b>SHOWMA</b></div></div>`:''}
+      ${verificado?`<div class="apvbadge">${ico('medal')}<div>Perfil verificado por<b>SHOWMA</b></div></div>`:''}
       <div class="aphttl">
         <h2>${esc(sel?(sel.show_name||'Show'):(a.stage_name||'Artista'))}${(!sel&&verificado)?'<span class="apvchk" title="Perfil verificado por SHOWMA">✓</span>':''}</h2>
         ${sel
