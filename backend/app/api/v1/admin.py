@@ -996,13 +996,33 @@ async def cerrar_periodo(period: str, scope: CurrentScope, db: DbSession):
 
 @router.get("/correo/estado")
 async def estado_correo(scope: CurrentScope):
-    """Cómo está configurado el envío, sin exponer la contraseña."""
+    """Cómo está configurado el envío, sin exponer la contraseña.
+
+    Además comprueba que el servidor PUEDA SALIR al puerto del SMTP. Estar bien
+    configurado no basta: DigitalOcean bloquea de fábrica los puertos de correo
+    (25/465/587) y con esa salida cerrada la configuración se ve perfecta y no
+    sale ni un correo. Sin este dato, el tablero mentiría.
+    """
     _require_admin(scope)
+    import asyncio
+    import socket
+
     from app.services import avisos, mailer
+
+    alcanzable = None
+    if settings.SMTP_HOST:
+        def _probar() -> bool:
+            try:
+                with socket.create_connection((settings.SMTP_HOST, settings.SMTP_PORT), timeout=4):
+                    return True
+            except OSError:
+                return False
+        alcanzable = await asyncio.to_thread(_probar)
 
     return {
         "smtp_configurado": mailer.is_configured(),
         "avisos_activos": avisos.activo(),
+        "puerto_alcanzable": alcanzable,
         "servidor": settings.SMTP_HOST or None,
         "puerto": settings.SMTP_PORT,
         "seguridad": settings.SMTP_SECURITY,

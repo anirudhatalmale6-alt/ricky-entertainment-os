@@ -4851,13 +4851,20 @@ async function mCorreo(box){
   catch(e){ res.innerHTML = mEmpty('No se pudo consultar el estado del correo: '+(e.message||'')); return; }
 
   const on = !!d.avisos_activos;
-  const badge = on
-    ? `<span class="mchip" style="background:#dcfce7;color:#166534">Activo</span>`
-    : `<span class="mchip" style="background:#fee2e2;color:#991b1b">Sin configurar</span>`;
+  // Configurado no es lo mismo que funcionando: si el servidor no puede salir
+  // por el puerto del SMTP, todo se ve bien y no sale ni un correo.
+  const bloqueado = on && d.puerto_alcanzable === false;
+  const badge = bloqueado
+    ? `<span class="mchip" style="background:#fef3c7;color:#92400e">Configurado, sin salida</span>`
+    : on
+      ? `<span class="mchip" style="background:#dcfce7;color:#166534">Activo</span>`
+      : `<span class="mchip" style="background:#fee2e2;color:#991b1b">Sin configurar</span>`;
   const fila = (k,v)=>`<tr><td style="color:var(--mut);width:200px">${esc(k)}</td><td><b>${esc(v==null||v===''?'—':String(v))}</b></td></tr>`;
 
   res.innerHTML = `
-    <div class="mnote">${on
+    <div class="mnote">${bloqueado
+      ? `El buzón está bien configurado, pero <b>el servidor no logra salir al puerto ${esc(String(d.puerto))} de ${esc(d.servidor||'')}</b>. DigitalOcean bloquea de fábrica los puertos de correo en los servidores nuevos: hay que pedirles que los abran (soporte, desde el panel de DigitalOcean) o enviar a través de un servicio de reenvío. Mientras tanto los avisos se siguen guardando dentro de la plataforma, no se pierde ninguno.`
+      : on
       ? 'El envío está configurado. Cada aviso de la plataforma sale también por correo, así que músicos y hoteles se enteran sin entrar al panel.'
       : 'Todavía no hay un buzón de salida. La plataforma funciona igual y los avisos siguen guardándose dentro (la campanita), pero <b>no sale ningún correo</b>. En cuanto se carguen los datos del buzón en el servidor, empieza a enviar solo.'}
     </div>
