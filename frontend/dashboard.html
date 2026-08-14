@@ -2945,7 +2945,7 @@ function artistCard(i){
   const badge=`<span class="av-badge">● Disponible</span>`;
   const ph=i.img?`style="background-image:url('${i.img}')"`:`style="background:${artGrad(i.cat)}"`;
   const tags=(i.sub?[pretty(i.sub)]:[]).concat((i.genres||[]).slice(0,2)).slice(0,3);
-  return `<div class="acard" onclick="openArtistProfile(${i.artistId||'null'})">
+  return `<div class="acard" onclick="openArtistProfile(${i.artistId||'null'},${i.id||'null'})">
     <div class="ph" ${ph}>${badge}<div class="play">▶</div></div>
     <div class="ab">
       <div class="arow"><h4>${esc(i.show||i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
@@ -3088,10 +3088,10 @@ function apInfoHTML(t, a){
     `<div class="apirow"><span class="ic">${ic}</span><div><div class="t">${esc(tt)}</div>
       <div class="v">${esc(vv)}</div></div></div>`).join('')}</div>`;
 }
-function apShowsHTML(shows, t){
+function apShowsHTML(shows, t, titulo){
   if(!shows.length) return '';
   const st=(t&&t.shows)||{};
-  return `<div class="apsec"><h4>Shows disponibles</h4>${shows.map(s=>{
+  return `<div class="apsec"><h4>${esc(titulo||'Shows disponibles')}</h4>${shows.map(s=>{
     const img=(s.images&&s.images[0]&&s.images[0].url)||'';
     const e=st[String(s.id)]||null;
     const meta=[pretty(s.category), s.subcategory?pretty(s.subcategory):'', s.duration_minutes?s.duration_minutes+' min':'']
@@ -3111,6 +3111,14 @@ function apShowsHTML(shows, t){
       </div></div>`;
   }).join('')}</div>`;
 }
+// "Cuanta más información, más transparencia" (David): junto a cada reseña va
+// de qué show fue y cuándo, y firma con nombre y puesto. Así el hotel que la
+// lee puede juzgarla, no sólo creerla.
+function revFecha(iso){
+  const d=new Date(iso);
+  if(isNaN(d)) return '';
+  return d.toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+}
 function apReviewsHTML(rev){
   if(!rev||!rev.items||!rev.items.length) return '';
   const cab=rev.promedio!=null
@@ -3121,12 +3129,18 @@ function apReviewsHTML(rev){
         <div class="lg" ${r.company_logo?`style="background-image:url('${esc(r.company_logo)}')"`:''}></div>
         <div><b>${esc(r.company_name||'Hotel')}</b><div>${apStars(r.rating)} <span class="muted" style="font-size:11.5px">${r.rating}.0</span></div></div>
       </div>
+      ${(r.show_name||r.actuacion_fecha)?`<div class="muted" style="font-size:11px;margin:-1px 0 4px">${esc([r.show_name, r.actuacion_fecha?revFecha(r.actuacion_fecha):''].filter(Boolean).join(' · '))}</div>`:''}
       ${r.comment?`<p>${esc(r.comment)}</p>`:''}
-      ${(r.author_position||r.author_name)?`<div class="sig">— ${esc(r.author_position||r.author_name)}</div>`:''}
+      ${(r.author_name||r.author_position)?`<div class="sig">— ${esc([r.author_name, r.author_position].filter(Boolean).join(' · '))}</div>`:''}
     </div>`).join('')}</div></div>`;
 }
 
-async function openArtistProfile(artistId){
+/* showId: el show por el que se entró. Lo que el hotel contrata es el SHOW, no
+   el proveedor, así que cuando se abre desde una tarjeta el show manda en el
+   encabezado y el proveedor va debajo — igual que en la tarjeta del catálogo
+   (David, 2026-08-14). El resto de su catálogo baja a "Otros shows del
+   proveedor". Sin showId (perfil abierto desde otro lado) manda el proveedor. */
+async function openArtistProfile(artistId, showId){
   if(!artistId){ toast('Perfil no disponible para este artista.',true); return; }
   let ov=document.getElementById('apMov');
   if(!ov){ ov=document.createElement('div'); ov.id='apMov'; ov.className='mov'; document.body.appendChild(ov);
@@ -3145,7 +3159,13 @@ async function openArtistProfile(artistId){
   const sl=a.social_links||{};
   // Solo dejamos YouTube (y las fotos/videos); se quitaron el resto de redes y las páginas web propias.
   const socLinks=Object.entries(sl).filter(([k,v])=>v && k==='youtube').map(([k,v])=>`<a class="socpill" href="${esc(socialUrl(k,v))}" target="_blank" rel="noopener">${esc(SOCNAME[k]||_cap(k))}</a>`);
+  const sel = showId ? shows.find(s=>s.id===showId) : null;
   const chips=[]; if(a.base_city||a.city) chips.push('📍 '+esc(a.base_city||a.city)); if(langs.length) chips.push('🗣 '+esc(langs.join(', ')));
+  if(sel){
+    const m=[pretty(sel.category), sel.subcategory?pretty(sel.subcategory):'', sel.duration_minutes?sel.duration_minutes+' min':'']
+      .filter(Boolean).join(' · ');
+    if(m) chips.unshift('🎭 '+esc(m));
+  }
   const v=(tray&&tray.verificaciones)||{};
   // La palomita azul se gana: identidad comprobada. No la da el propio artista.
   const verificado=!!v.identidad;
@@ -3163,13 +3183,17 @@ async function openArtistProfile(artistId){
     <div class="aphero" ${cover?`style="background-image:url('${cover}')"`:''}>
       <div class="aphscrim"></div>
       ${verificado?`<div class="apvbadge"><span style="font-size:16px">🛡️</span><div>Perfil verificado por<b>SHOWMA</b></div></div>`:''}
-      <div class="aphttl"><h2>${esc(a.stage_name||'Artista')}${verificado?'<span class="apvchk" title="Perfil verificado por SHOWMA">✓</span>':''}</h2>
-        ${subt?`<div style="font-size:13px;opacity:.92;margin-top:3px">${esc(subt)}</div>`:''}
+      <div class="aphttl">
+        <h2>${esc(sel?(sel.show_name||'Show'):(a.stage_name||'Artista'))}${(!sel&&verificado)?'<span class="apvchk" title="Perfil verificado por SHOWMA">✓</span>':''}</h2>
+        ${sel
+          ? `<div style="font-size:13px;opacity:.92;margin-top:3px">Por <b>${esc(a.stage_name||'')}</b>${verificado?'<span class="apvchk" title="Proveedor verificado por SHOWMA">✓</span>':''}${subt?' · '+esc(subt):''}</div>`
+          : (subt?`<div style="font-size:13px;opacity:.92;margin-top:3px">${esc(subt)}</div>`:'')}
         <div class="apchips">${chips.map(c=>`<span>${c}</span>`).join('')}</div></div>
     </div>
     <div class="rqbody apbody">
       ${apStatsHTML(tray,a)}
       ${(tray&&tray.nuevo)?`<div class="trbox"><div class="trnew"><b>Nuevo en SHOWMA.</b> Todavía no tiene actuaciones suficientes para mostrar historial. Lo que se muestra abajo sí está comprobado por la plataforma.</div>${checks.length?`<div class="trchecks">${checks.join('')}</div>`:''}</div>`:''}
+      ${sel?apShowsHTML([sel],tray,'El show'):''}
       ${a.bio?`<div class="apsec"><h4>Sobre ${esc(a.stage_name||'el artista')}</h4><p>${esc(a.bio)}</p></div>`:''}
       <div class="apcols">
         <div>${apHotelesHTML(tray)||`<div class="apsec"><h4>Experiencia en hoteles</h4><div class="muted" style="font-size:12.5px">Todavía no tiene actuaciones registradas en la plataforma.</div></div>`}</div>
@@ -3180,7 +3204,9 @@ async function openArtistProfile(artistId){
       ${socLinks.length?`<div class="apsec"><h4>Redes y enlaces</h4><div class="socrow">${socLinks.join('')}</div></div>`:''}
       ${videos.length?`<div class="apsec"><h4>Videos destacados</h4><div class="socrow">${videos.map(v=>`<a class="socpill vid" href="${esc(v.url)}" target="_blank" rel="noopener">▶ ${esc(v.name)}</a>`).join('')}</div></div>`:''}
       ${photos.length>1?`<div class="apsec"><h4>Galería de fotos</h4><div class="apgal">${photos.slice(0,12).map(u=>`<div class="apthumb" style="background-image:url('${esc(u)}')"></div>`).join('')}</div></div>`:''}
-      ${apShowsHTML(shows,tray)}
+      ${sel
+        ? apShowsHTML(shows.filter(s=>s.id!==sel.id),tray,'Otros shows del proveedor')
+        : apShowsHTML(shows,tray)}
       ${apReviewsHTML(rev)}
     </div>
     <div class="af"><button class="btn ghost" onclick="apClose()">Cerrar</button><button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button></div>
