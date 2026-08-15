@@ -13,6 +13,7 @@ from app.api.v1 import (
     intelligence,
     leads,
     me,
+    public,
     reports,
     requests,
     reviews,
@@ -39,3 +40,4 @@ api_router.include_router(support.router)
 api_router.include_router(admin.router)
 api_router.include_router(documents.router)
 api_router.include_router(reviews.router)
+api_router.include_router(public.router)
