@@ -1108,8 +1108,9 @@
   .pst svg{width:19px;height:19px;fill:none;stroke:#ff5091;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
   .pstn{font-size:16px;font-weight:800;margin-top:5px;letter-spacing:-.3px}
   .pstl{font-size:9.5px;color:#8f91a8;line-height:1.25;margin-top:2px}
-  /* Bloque de testimonio. Se queda apagado hasta que haya una frase REAL de un
-     artista de verdad, con su permiso. Se enciende llenando POP_TESTI. */
+  /* Bloque de testimonio. El contenido sale de POP_TESTI (más abajo, en el JS)
+     y sólo lleva frases de personas reales. Lo que falta se omite, no se
+     rellena: por eso el pie y las estrellas pueden no estar. */
   .poptesti{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
       border-radius:14px;padding:14px 15px;margin-bottom:16px}
   .ptq{display:flex;gap:10px;align-items:flex-start}
@@ -1121,6 +1122,13 @@
   .ptw b{font-size:11.5px;display:block}
   .ptw em{font-style:normal;font-size:10.5px;color:#8f91a8;display:block}
   .ptst{margin-left:auto;color:#ff2f77;font-size:12px;letter-spacing:1px;flex:none}
+  /* El botón se queda pegado al fondo de la tarjeta. Con el testimonio dentro,
+     el contenido pasa del alto de una pantalla de portátil y el botón se iba
+     abajo del todo: había que arrastrar dentro del aviso para encontrarlo.
+     Pegado, se ve siempre y el resto se lee arrastrando si a alguien le
+     interesa. El degradado es para que el texto no choque de golpe con él. */
+  .popact{position:sticky;bottom:-20px;z-index:2;padding-bottom:20px;
+      background:linear-gradient(180deg,rgba(5,4,12,0) 0,#05040c 16px,#05040c 100%)}
   .popcta{width:100%;border:0;border-radius:12px;padding:15px;font-weight:800;font-size:14.5px;cursor:pointer;
       color:#fff;background:linear-gradient(135deg,#ff2f77,#df0b5f);box-shadow:0 10px 28px rgba(223,11,95,.38)}
   .popcta:hover{filter:brightness(1.08)}
@@ -1454,10 +1462,12 @@
       </div>
       <div class="popstats" id="popStats" style="display:none"></div>
       <div class="poptesti" id="popTesti" style="display:none"></div>
-      <button class="popcta" onclick="popCrear()">Quiero unirme a SHOWMA</button>
-      <div class="popfoot">
-        <span>Registrarte es gratis y no te compromete a nada.</span>
-        <button class="poplink" onclick="popCerrar(true)">No volver a mostrar</button>
+      <div class="popact">
+        <button class="popcta" onclick="popCrear()">Quiero unirme a SHOWMA</button>
+        <div class="popfoot">
+          <span>Registrarte es gratis y no te compromete a nada.</span>
+          <button class="poplink" onclick="popCerrar(true)">No volver a mostrar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2003,21 +2013,35 @@ async function popStats(){
     `<div class="pstn">${esc(String(n))}</div><div class="pstl">${esc(l)}</div></div>`).join('');
   caja.style.display='grid';
 }
-/* Testimonio. APAGADO a propósito hasta que haya una frase de un artista real
-   que haya dado permiso de publicarla. Para encenderlo basta llenar esto:
-   POP_TESTI={texto:'...', nombre:'...', rol:'...', foto:'', estrellas:5}
-   Nunca poner aquí una reseña inventada: se le enseña a artistas y a hoteles,
-   y es de las cosas que se comprueban preguntando. */
-const POP_TESTI=null;
+/* Testimonio. La frase la manda David (2026-08-15). Sólo se pone aquí lo que
+   dijo una persona de verdad y con su permiso: esto lo leen artistas y hoteles
+   del mismo medio y se comprueba preguntando.
+   Campos: texto (lo único obligatorio), nombre, rol, foto, estrellas.
+   Lo que falte NO se inventa ni se rellena con un hueco gris: si no hay nombre
+   sale sólo la etiqueta genérica, y si no hay estrellas no se pintan. Poner
+   cinco estrellas sin saber qué calificó esa persona ya es afirmar algo. */
+const POP_TESTI={
+  texto:'SHOWMA me abrió la puerta a nuevos hoteles, nuevas fechas y gente que antes no conocía mi trabajo',
+  nombre:'',            // pendiente: nombre real
+  rol:'Artista en SHOWMA',
+  foto:'',              // pendiente: foto con permiso
+  estrellas:0           // pendiente: sólo si esa persona calificó de verdad
+};
 function popTestimonio(){
   const caja=document.getElementById('popTesti');
   if(!caja || !POP_TESTI || !POP_TESTI.texto) return;
-  const t=POP_TESTI, n=Math.max(0,Math.min(5,t.estrellas||5));
+  const t=POP_TESTI, n=Math.max(0,Math.min(5,t.estrellas||0));
+  let pie='';
+  if(t.foto) pie+=`<img class="ptav" src="${esc(t.foto)}" alt="">`;
+  // Sin nombre, el cargo sube a la línea fuerte: si no, el pie queda en un gris
+  // suelto que parece que se cortó algo.
+  if(t.nombre||t.rol) pie+= t.nombre
+    ? `<div><b>${esc(t.nombre)}</b>${t.rol?`<em>${esc(t.rol)}</em>`:''}</div>`
+    : `<div><b>${esc(t.rol)}</b></div>`;
+  if(n) pie+=`<div class="ptst">${'★'.repeat(n)}</div>`;
   caja.innerHTML=
     `<div class="ptq"><b>&ldquo;</b><div class="ptx">${esc(t.texto)}</div></div>`+
-    `<div class="ptw">${t.foto?`<img class="ptav" src="${esc(t.foto)}" alt="">`:'<div class="ptav"></div>'}`+
-    `<div><b>${esc(t.nombre||'')}</b><em>${esc(t.rol||'')}</em></div>`+
-    `<div class="ptst">${'★'.repeat(n)}</div></div>`;
+    (pie?`<div class="ptw">${pie}</div>`:'');
   caja.style.display='block';
 }
 function popCerrar(paraSiempre){
