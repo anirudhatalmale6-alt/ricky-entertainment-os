@@ -261,6 +261,10 @@
   .badge{margin-left:auto;background:var(--acc2);color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;padding:0 5px}
   .thread{display:flex;flex-direction:column;min-height:0}
   .thead{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:600}
+  /* En el encabezado del chat el nombre abre el perfil, pero sigue leyéndose
+     como título: el subrayado sólo aparece al pasar el cursor. */
+  .thead .plink{font-size:inherit;font-weight:inherit;text-decoration:none}
+  .thead .plink:hover{text-decoration:underline}
   /* min-height:0 para que el hilo ceda alto cuando la barra crece con las
      miniaturas de las fotos adjuntas; si no, empuja la barra fuera del panel. */
   .msgs{flex:1;min-height:0;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
@@ -517,6 +521,14 @@
   .crrow span{font-size:11.5px;color:var(--mut)}
   .acard3 .ac3-act{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:auto;padding-top:4px}
   .acard3 .ac3-pick{font-size:11px;font-weight:700;color:var(--acc)}
+  .acard3 .ac3-btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  /* "Ver perfil" pesa más que "Mensaje": es el paso que decide la contratación
+     (David 2026-08-15). Se marca con el azul de la marca, no con otro color. */
+  .mini.ver{border-color:var(--acc);color:var(--acc)}
+  /* El perfil se abre ENCIMA del buscador de artistas sin cerrarlo: al volver,
+     la fecha y el hotel que ya venía capturando siguen ahí. Sin esta línea las
+     dos capas comparten z-index y el orden depende de quién se creó primero. */
+  #apMov{z-index:70}
   @media(max-width:560px){ .artgrid{grid-template-columns:1fr} }
   .amod .af{border-top:1px solid var(--line);padding:13px 18px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
   .amod .af .fld{display:flex;flex-direction:column;gap:4px}
@@ -2564,7 +2576,10 @@ function actRender(){
         ${tags.length?`<div class="ac3-tags">${tags.join('')}</div>`:''}
         <div class="ac3-act">
           <span class="ac3-pick">${nd?'No disponible':(ADDACT.showId===s.id?'✓ Seleccionado':'Seleccionar')}</span>
-          ${s.artist_id?`<button class="mini" onclick="event.stopPropagation();pickerMessage(${s.artist_id})">💬 Mensaje</button>`:''}
+          ${s.artist_id?`<div class="ac3-btns">
+            <button class="mini ver" onclick="event.stopPropagation();openArtistProfile(${s.artist_id},${s.id})">👤 Ver perfil</button>
+            <button class="mini" onclick="event.stopPropagation();pickerMessage(${s.artist_id})">💬 Mensaje</button>
+          </div>`:''}
         </div>
       </div></div>`;
   }).join('');
@@ -3408,9 +3423,29 @@ async function openArtistProfile(artistId, showId){
         : apShowsHTML(shows,tray)}
       ${apReviewsHTML(rev)}
     </div>
-    <div class="af"><button class="btn ghost" onclick="apClose()">Cerrar</button><button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button></div>
+    <div class="af"><button class="btn ghost" onclick="apClose()">Cerrar</button>
+      ${apPickerAbierto(sel)?`<button class="btn ghost" onclick="apMessage(${artistId})">Mandar mensaje</button>
+        <button class="ago" onclick="apSeleccionar(${sel.id})">Seleccionar este show</button>`
+       : `<button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button>`}</div>
   </div>`;
 }
+/* Si el perfil se abrió desde el buscador de "Agregar actuación", el que decide
+   ya está decidiendo: puede elegir ahí mismo y no tiene que cerrar, buscar otra
+   vez la tarjeta y volver a dar clic (David, 2026-08-15). */
+function apPickerAbierto(sel){
+  if(!sel) return false;
+  const ov=document.getElementById('actMov');
+  if(!ov || ov.style.display!=='flex') return false;
+  // La disponibilidad de ESA fecha la calcula el buscador, no el perfil.
+  const enPicker=(CACHE.shows||[]).find(s=>s.id===sel.id);
+  return !!enPicker && enPicker.is_available!==false;
+}
+function apSeleccionar(showId){
+  apClose();
+  actPick(showId);
+  toast('Show seleccionado ✓ Confirma hora y precio para agregarlo.');
+}
+window.apSeleccionar=apSeleccionar;
 function apClose(){ const ov=document.getElementById('apMov'); if(ov) ov.style.display='none'; }
 // Toda la comunicación se queda dentro de la plataforma: abre (o reutiliza) el chat con el artista.
 async function anyCompanyId(){
@@ -6590,7 +6625,14 @@ async function openConv(id,el){
   if(el){document.querySelectorAll('.citem').forEach(x=>x.classList.remove('on'));el.classList.add('on');}
   if(CACHE.cur!==id){ CHAT_IMGS=[]; renderChatPrev(); }
   const c=(CACHE.convs||[]).find(x=>x.id===id)||{};
-  document.getElementById('thead').textContent=(c.artist_name||'Artista')+' · '+(c.company_name||'Hotel');
+  // Desde el chat el hotel puede abrir el perfil del proveedor con el que está
+  // hablando: es justo cuando quiere revisar el video o el historial otra vez.
+  const quien=esc(c.artist_name||'Artista');
+  document.getElementById('thead').innerHTML=
+    ((SENDER!=='artist'&&c.artist_id)
+      ? `<button class="plink" onclick="openArtistProfile(${c.artist_id})">${quien}</button>`
+      : quien)
+    +' · '+esc(c.company_name||'Hotel');
   const msgs=await api(`/conversations/${id}/messages`);
   CACHE.cur=id;
   document.getElementById('msgs').innerHTML=msgs.map(m=>{
