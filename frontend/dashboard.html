@@ -588,7 +588,9 @@
      número lleva debajo sobre cuántas actuaciones está calculado — sin eso un
      porcentaje no significa nada y el bloque entero pierde el sentido. */
   .trbox{border:1px solid var(--line);border-radius:11px;overflow:hidden;margin-bottom:16px}
-  .trhd{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--ov2);border-bottom:1px solid var(--line)}
+  /* Sin relleno gris detrás de "Verificaciones" (David 2026-08-15): la raya de
+     abajo ya separa el encabezado del contenido, la banda sólo ensuciaba. */
+  .trhd{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line)}
   .trhd b{font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--acc)}
   .trhd .trsub{font-size:10.5px;color:var(--mut);margin-left:auto;text-align:right}
   /* Una sola línea, fina: valor en negrita, etiqueta al lado y la muestra entre
@@ -609,10 +611,11 @@
   .apdist{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 14px}
   /* Reparten el renglón en partes iguales y el texto crece hacia abajo: las
      tres medallas caben en una fila aunque el perfil mida 650 (David
-     2026-08-15). El tope en px, no en %, para que una medalla sola no se
-     estire de lado a lado. */
-  .apdchip{flex:1 1 0;min-width:150px;max-width:240px;
-    display:flex;align-items:flex-start;gap:7px;padding:8px 10px;border-radius:8px;
+     2026-08-15). Sin tope de ancho: las pidió "centradas ocupando todo el
+     ancho", así que se reparten la fila completa y el contenido va centrado. */
+  .apdchip{flex:1 1 0;min-width:150px;
+    display:flex;align-items:flex-start;justify-content:center;gap:7px;
+    padding:9px 10px;border-radius:8px;
     border:1px solid var(--line);background:var(--card);line-height:1.25}
   .apdchip .ic1{margin-top:1px}
   .apdchip .apdtx{min-width:0}
