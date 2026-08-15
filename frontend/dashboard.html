@@ -1886,8 +1886,11 @@ document.addEventListener('DOMContentLoaded', restoreSession);
    Temporal, para las primeras semanas: en vez de tocar la portada se muestra
    un aviso encima. Para apagarlo antes o correrlo, se cambia SOLO esta fecha.
    No sale nunca: a quien ya tiene sesión guardada (no es un visitante nuevo),
-   en /master, a quien viene del enlace de recuperar contraseña, a quien lo
-   cerró para siempre, ni dos veces el mismo día. */
+   en /master, a quien viene del enlace de recuperar contraseña, ni a quien lo
+   cerró con "No volver a mostrar".
+   Cerrarlo con la cruz NO lo apaga: vuelve a salir la próxima vez que se abra
+   la página (David 2026-08-15). La única excepción es quien ya le dio al botón
+   de unirse: en esa pestaña no se le vuelve a atravesar mientras se registra. */
 const POP_HASTA='2026-10-15';
 function popHoy(){
   const d=new Date();
@@ -1900,7 +1903,7 @@ function popPuede(){
   try{
     if(localStorage.getItem('ricky_token')) return false;
     if(localStorage.getItem('showma_pop_off')==='1') return false;
-    if(localStorage.getItem('showma_pop_dia')===popHoy()) return false;
+    if(sessionStorage.getItem('showma_pop_reg')==='1') return false;
   }catch(e){}
   return true;
 }
@@ -1921,13 +1924,12 @@ function popAbrir(){
 function popCerrar(paraSiempre){
   const ov=document.getElementById('popTal'); if(ov) ov.style.display='none';
   document.removeEventListener('keydown', popEsc);
-  try{
-    localStorage.setItem('showma_pop_dia', popHoy());
-    if(paraSiempre) localStorage.setItem('showma_pop_off','1');
-  }catch(e){}
+  try{ if(paraSiempre) localStorage.setItem('showma_pop_off','1'); }catch(e){}
 }
 function popCrear(){
   popCerrar(false);
+  // Ya va camino al registro: no volvérselo a poner encima si recarga el formulario.
+  try{ sessionStorage.setItem('showma_pop_reg','1'); }catch(e){}
   // El aviso es para artistas: si la portada estaba en modo Hoteles, se cambia.
   try{ if(typeof AUD!=='undefined' && AUD==='hotel') toggleAudience(); }catch(e){}
   const reg=document.getElementById('regTitle');
