@@ -5828,7 +5828,7 @@ function audPintarTabla(){
           ? `Sin referencia publicable: sólo ${fu.noches} ${fu.noches===1?'noche':'noches'} en ${fu.propiedades} ${fu.propiedades===1?'propiedad':'propiedades'} fuera de aquí.`
           : 'Sin historia fuera de esta propiedad.');
     const catTxt=f.categoria_noches
-      ? `Contra el resto de "${f.categoria}" en esta propiedad (${f.categoria_noches} noches), sin contarse a sí mismo.`
+      ? `Contra el resto de "${f.categoria}" en esta propiedad (${f.categoria_noches} ${f.categoria_noches===1?'noche':'noches'}), sin contarse a sí mismo.`
       : 'Es el único de su género aquí: no hay contra qué compararlo.';
     return `<tr>
       <td><input type="checkbox" onchange="audMarcar('${esc(k)}',this.checked)"${AUD_SEL.has(k)?' checked':''}></td>
@@ -5926,7 +5926,7 @@ function audDetalle(i){
       <td>${esc(n.show)}</td>
       <td class="num">${esc(String(n.gente))}</td>
       <td class="num">${n.se_quedaron==null?'—':esc(String(n.se_quedaron))}</td>
-      <td class="num">${pc(n.retencion)}</td>
+      <td class="num"${n.retencion>100?' title="Se contó más gente al terminar que al empezar: el público creció durante el show. Se muestra tal cual, no se recorta a 100%."':''}>${pc(n.retencion)}${n.retencion>100?'<span class="sub">el público creció</span>':''}</td>
       <td class="num">${n.atraccion==null?'—':pc(n.atraccion)}</td>
       <td class="num">${n.precio==null?'—':MXN(n.precio)}</td>
       <td class="num">${n.costo_persona==null?'—':MXN2(n.costo_persona)}</td></tr>`).join('');
@@ -5966,7 +5966,7 @@ function audDetalle(i){
                  ${linea('Retención',f.vs_categoria_retencion,' pts')}
                  ${linea('Costo por persona',f.vs_categoria_costo,'%',true)}
                </ul>
-               <div class="hint" style="margin:6px 0 0">Contra ${f.categoria_noches} noches de su mismo género aquí, sin contarse a sí mismo.</div>`
+               <div class="hint" style="margin:6px 0 0">Contra ${f.categoria_noches} ${f.categoria_noches===1?'noche':'noches'} de su mismo género aquí, sin contarse a sí mismo.</div>`
             : `<div class="hint" style="margin:0">Es el único de su género en esta propiedad, así que no hay contra qué compararlo.</div>`}
         </div>
       </div>
