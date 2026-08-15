@@ -160,6 +160,12 @@
   td{padding:10px 10px 10px 0;border-top:1px solid var(--line);font-size:13px;vertical-align:middle}
   tr:first-child td{border-top:0}
   .muted{color:var(--mut)}
+  /* Columnas de números: alineadas a la derecha y con cifras del mismo ancho,
+     que es lo que deja comparar una columna de un vistazo (pantalla Audiencia). */
+  #panel-aud th.num,#panel-aud td.num{text-align:right;font-variant-numeric:tabular-nums;
+      white-space:nowrap;padding-right:0;padding-left:14px}
+  #panel-aud select{background:var(--inp);border:1px solid var(--line);color:var(--txt);
+      border-radius:8px;height:34px;padding:0 9px;font-size:12.7px;font-family:inherit}
 
   .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
   .c-pending{background:#fbbf241f;color:var(--warn)}
@@ -1498,6 +1504,7 @@
     <div class="nav" data-p="chat"><span class="ic">💬</span> Chat</div>
     <div class="nav" data-p="budget" style="display:none"><span class="ic">💰</span> Presupuesto</div>
     <div class="nav" data-p="bill" style="display:none"><span class="ic">🧾</span> Facturación</div>
+    <div class="nav" data-p="aud" style="display:none"><span class="ic">👥</span> Audiencia</div>
     <div class="nav" data-p="reports" style="display:none"><span class="ic">📊</span> Reportes</div>
     <div class="nav" data-p="profile" style="display:none"><span class="ic">👤</span> Mi Perfil</div>
     <div class="navlbl">Inteligencia · Partner</div>
@@ -1538,6 +1545,7 @@
       <div class="panel" id="panel-chat"></div>
       <div class="panel" id="panel-budget"></div>
       <div class="panel" id="panel-bill"></div>
+      <div class="panel" id="panel-aud"></div>
       <div class="panel" id="panel-reports"></div>
       <div class="panel" id="panel-profile"></div>
       <div class="panel" id="panel-market"></div>
@@ -1666,6 +1674,7 @@ const NAVICON={
   budget:SVG+'<path d="M4 8A1.5 1.5 0 0 1 5.5 6.5H18V9"/><rect x="4" y="8" width="16" height="11.5" rx="2"/><path d="M16 12.8h3.5v3.6H16a1.8 1.8 0 0 1 0-3.6Z"/></svg>',
   bill:SVG+'<path d="M6 3.5h12v17l-2.2-1.4-2 1.4-2-1.4-2 1.4L6 20.5V3.5Z"/><path d="M9 8h6M9 11.5h6M9 15h4"/></svg>',
   reports:SVG+'<path d="M4 20h16"/><rect x="5.4" y="11" width="3.2" height="7" rx="1"/><rect x="10.4" y="6" width="3.2" height="12" rx="1"/><rect x="15.4" y="13.5" width="3.2" height="4.5" rx="1"/></svg>',
+  aud:SVG+'<circle cx="9" cy="8" r="3.2"/><path d="M3.4 19.5a5.6 5.6 0 0 1 11.2 0"/><path d="M16.6 5.4a3 3 0 0 1 0 5.9"/><path d="M20.6 19.5a5 5 0 0 0-3.4-4.7"/></svg>',
   profile:SVG+'<circle cx="12" cy="8" r="3.6"/><path d="M5.5 20c0-3.4 2.9-5.8 6.5-5.8S18.5 16.6 18.5 20"/></svg>',
   market:SVG+'<path d="M4 5v14h16"/><path d="M7.5 15l3.3-3.8 3 2.1 4.4-5.8"/></svg>',
   demand:SVG+'<path d="M12 3.5c.6 2.6 2.3 3.7 3.5 5.3A5.6 5.6 0 1 1 7 12.6c0-1.1.4-1.9.9-2.5.3.8 1 1.3 1.8 1.3-1-2.3.3-5.4 2.3-7.9Z"/></svg>',
@@ -2221,6 +2230,9 @@ function applyRole(){
   show('artists', isHotel);                              // hotels browse the talent catalog
   show('budget', canPartner);                            // presupuesto (chain scope)
   show('reports', canPartner);                           // reportes
+  // Audiencia: la ve cualquier contratante, incluido el hotel de una sola
+  // propiedad. Es justo lo que pidió David: que cada hotel vea LO SUYO.
+  show('aud', isHotel);
   show('bill', isArtist || canPartner);                 // facturación (artist self / hotel)
   show('profile', isArtist);                            // artist-only self-service
   show('leads', ME.is_admin);                            // Prospectos: solo el administrador (master); oculto para hoteles/artistas
@@ -2335,6 +2347,7 @@ const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Ac
   leads:["Prospectos","Hoteles que solicitaron acceso"],
   budget:["Presupuesto","Planifica y controla el gasto de entretenimiento"],
   bill:["Facturación","Todas tus facturas en un solo lugar"],
+  aud:["Audiencia","Cuánta gente atrajo cada show y cuánto costó cada persona"],
   reports:["Reportes","Indicadores clave de tu operación"],
   profile:["Mi Perfil","Tus datos, tarifas y publicaciones"],
   market:["Market Intelligence","Estudio de mercado por destino"],
@@ -5546,6 +5559,40 @@ function mConfig(box, key){
       <div style="max-width:440px;margin:8px auto 0;font-size:13px">Estoy dejando lista la estructura del menú. En cuanto cierres el diseño de esta sección, la implemento tal cual la definas.</div></div></div>`;
 }
 
+/* Filtros de la pantalla Audiencia. Viven fuera del RENDER porque el usuario
+   los cambia y la pantalla se vuelve a pintar con ellos.
+   Ojo: NO usar el nombre AUD, que ya es el modo hotel/artista de la portada. */
+let AUDF={company:'', meses:0};
+let AUD_DATA=null;
+function audFiltrar(){
+  const p=document.getElementById('audProp'), m=document.getElementById('audPer');
+  AUDF={company:p?p.value:'', meses:m?+m.value:0};
+  show('aud',true);
+}
+/* Descarga el detalle noche por noche. Es la pieza que vuelve discutible el
+   análisis: el hotel puede abrirlo en Excel y comprobar cada renglón contra su
+   propia bitácora en vez de creerle a un promedio. */
+function audCSV(){
+  if(!AUD_DATA || !AUD_DATA.detalle.length) return;
+  const col=['Fecha','Salón','Show','Proveedor','Capacidad','Asistieron','Se quedaron',
+             'Atracción %','Retención %','Costo','Costo por persona'];
+  const celda=v=>{
+    if(v===null||v===undefined) return '';
+    const s=String(v);
+    return /[",;\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  };
+  const filas=AUD_DATA.detalle.map(x=>[
+    x.fecha.slice(0,10), x.venue, x.show, x.artista, x.capacidad, x.asistentes,
+    x.se_quedaron, x.atraccion, x.retencion, x.gasto, x.costo_persona].map(celda).join(','));
+  // BOM para que Excel en Windows no rompa los acentos.
+  const blob=new Blob(['﻿'+[col.join(','),...filas].join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='audiencia-showma.csv';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+
 const RENDER = {
   async master(box){
     box.innerHTML=mShell();
@@ -5879,6 +5926,107 @@ const RENDER = {
           <div style="margin-top:14px">${bars(orderedCats.map(c=>({lbl:pretty(c),pct:Math.round(catTot(c)/Math.max(usado,1)*100),val:money0(catTot(c)),col:CATCOL[c]})))}</div>
         </div>
       </div>`;
+  },
+
+  /* Audiencia — lo que el hotel pregunta de verdad: cuánta gente atrajo cada
+     show, cuánta se quedó y cuánto costó cada persona. Todo sale de dos números
+     que ya se capturan la noche del show (aforo al iniciar y al terminar) más
+     la capacidad del salón y el precio pactado. */
+  async aud(box){
+    const q=[];
+    if(AUDF.company) q.push('company_id='+AUDF.company);
+    if(AUDF.meses){
+      const desde=new Date(); desde.setMonth(desde.getMonth()-AUDF.meses);
+      q.push('desde='+desde.toISOString().slice(0,19));
+    }
+    const d=await api('/audiencia'+(q.length?'?'+q.join('&'):''));
+    AUD_DATA=d;
+    const r=d.resumen, cob=d.cobertura;
+    const pct=v=>v==null?'—':v.toFixed(0)+'%';
+    const num=v=>(v||0).toLocaleString('es-MX');
+    const cpp=v=>v==null?'—':MXN2(v);
+    const props=d.propiedades||[];
+    const selProp=props.length>1
+      ? `<select id="audProp" onchange="audFiltrar()"><option value="">Toda la cadena (${props.length} propiedades)</option>`
+        +props.map(p=>`<option value="${p.id}"${String(AUDF.company)===String(p.id)?' selected':''}>${esc(p.name)}</option>`).join('')+'</select>'
+      : `<b style="font-size:13px">${esc(props[0]?props[0].name:'')}</b>`;
+    const selPer=`<select id="audPer" onchange="audFiltrar()">
+        <option value="">Todo el histórico</option>
+        <option value="3"${AUDF.meses==3?' selected':''}>Últimos 3 meses</option>
+        <option value="6"${AUDF.meses==6?' selected':''}>Últimos 6 meses</option>
+        <option value="12"${AUDF.meses==12?' selected':''}>Últimos 12 meses</option></select>`;
+
+    if(!r.actuaciones){
+      box.innerHTML=`<div class="box" style="text-align:center;padding:34px 18px">
+        <div style="display:flex;gap:10px;justify-content:center;margin-bottom:16px">${selProp}${selPer}</div>
+        <b>Todavía no hay noches con público capturado</b>
+        <div class="hint" style="max-width:460px;margin:8px auto 0">Este análisis se arma con el conteo de gente que se registra al terminar cada
+        actuación (cuántos había al empezar y cuántos al terminar). En cuanto se capture la primera, aquí sale sola.
+        ${cob.realizadas?`<br><br>De las ${cob.realizadas} actuaciones ya realizadas, ${cob.sin_conteo} no tienen ese conteo.`:''}</div></div>`;
+      return;
+    }
+
+    // Aviso de cobertura: la diferencia entre "mi hotel atrae poco" y "no lo
+    // estamos capturando". Va arriba, no escondido en una nota al pie.
+    const faltas=[];
+    if(cob.sin_conteo)     faltas.push(`${cob.sin_conteo} sin conteo de público`);
+    if(cob.sin_precio)     faltas.push(`${cob.sin_precio} sin precio registrado`);
+    if(cob.sin_capacidad)  faltas.push(`${cob.sin_capacidad} sin capacidad del salón (no cuentan para atracción)`);
+    const aviso=faltas.length?`<div class="box" style="padding:12px 15px;margin-bottom:16px;border-color:#fbbf2440">
+        <b style="font-size:12.5px">📋 De ${cob.realizadas} actuaciones realizadas, el análisis usa ${cob.analizadas}.</b>
+        <div class="hint" style="margin:5px 0 0">${esc(faltas.join(' · '))}. Se dice para que ningún número se lea de más:
+        lo que no se capturó no se estima.</div></div>`:'';
+
+    const tabla=(filas,titulo,sub,col1)=>`<div class="box"><div class="bhead"><h3 style="margin:0">${titulo}</h3><span class="hint" style="margin:0">${sub}</span></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>${col1}</th><th class="num">Noches</th><th class="num">Gente</th>
+        <th class="num">Atracción</th><th class="num">Se quedó</th><th class="num">Costo/persona</th></tr></thead><tbody>
+      ${filas.map(f=>`<tr><td><b>${esc(f.nombre)}</b>${f.capacidad?`<span class="hint" style="margin:0;display:block">aforo ${num(f.capacidad)}</span>`:''}</td>
+        <td class="num">${f.actuaciones}</td><td class="num">${num(f.asistentes)}</td>
+        <td class="num">${pct(f.atraccion)}</td><td class="num">${pct(f.retencion)}</td>
+        <td class="num"><b>${cpp(f.costo_persona)}</b></td></tr>`).join('')}
+      </tbody></table></div></div>`;
+
+    const meses=d.por_mes||[];
+    const maxMes=Math.max(1,...meses.map(m=>m.asistentes));
+    const barras=meses.length>1?`<div class="box"><div class="bhead"><h3 style="margin:0">Mes a mes</h3><span class="hint" style="margin:0">Gente que asistió</span></div>
+      <div class="barchart" style="height:170px">${meses.map(m=>`<div class="bc" title="${esc(m.nombre)}: ${num(m.asistentes)} personas · ${cpp(m.costo_persona)} por persona">
+        <div class="bb"><i style="height:${Math.round(m.asistentes/maxMes*140)}px;background:var(--acc)"></i></div><small>${esc(m.nombre.split(' ')[0])}</small></div>`).join('')}</div></div>`:'';
+
+    const rank=(filas,titulo,sub,cls)=>filas.length?`<div class="box"><div class="bhead"><h3 style="margin:0">${titulo}</h3><span class="hint" style="margin:0">${sub}</span></div>
+      ${filas.map((f,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(f.nombre)}</b>
+        <span>${f.actuaciones} noches · ${num(f.asistentes)} personas</span></div><b style="color:${cls}">${cpp(f.costo_persona)}</b></div>`).join('')}</div>`:'';
+
+    box.innerHTML=`
+      <div class="box" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:13px 16px;margin-bottom:16px">
+        <span class="hint" style="margin:0">Propiedad</span>${selProp}
+        <span class="hint" style="margin:0 0 0 8px">Periodo</span>${selPer}
+        <button class="btn ghost" style="margin-left:auto" onclick="audCSV()">⬇ Descargar detalle (CSV)</button>
+      </div>
+      ${aviso}
+      <div class="kpis">
+        <div class="kpi"><div class="kh"><div><div class="k">Gente que asistió</div><div class="v">${num(r.asistentes)}</div>
+          <div class="d">en ${r.actuaciones} ${r.actuaciones===1?'noche':'noches'}</div></div><div class="kc blue">👥</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Costo por persona</div><div class="v">${cpp(r.costo_persona)}</div>
+          <div class="d">${MXN(r.gasto)} entre ${num(r.asistentes)} personas</div></div><div class="kc violet">💵</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Atracción</div><div class="v">${pct(r.atraccion)}</div>
+          <div class="d">${r.noches_con_aforo<r.actuaciones
+            ? `del aforo · medido en ${r.noches_con_aforo} de ${r.actuaciones} noches`
+            : 'del aforo de los salones'}</div></div><div class="kc green">🎯</div></div></div>
+        <div class="kpi"><div class="kh"><div><div class="k">Retención</div><div class="v">${pct(r.retencion)}</div>
+          <div class="d">se quedaron hasta el final</div></div><div class="kc amber">🔁</div></div></div>
+      </div>
+      ${tabla(d.por_venue,'Por salón','Dónde se llena y dónde no','Salón')}
+      <div style="height:16px"></div>
+      ${tabla(d.por_show,'Por show','Qué trae gente y a qué precio','Show')}
+      <div style="height:16px"></div>
+      <div class="grid2">
+        ${rank(d.mejores,'Más rendidor','Menor costo por persona (2+ noches)','var(--ok)')
+          || '<div class="box"><div class="hint" style="margin:0">Todavía no hay shows con más de una noche para comparar de forma justa.</div></div>'}
+        ${rank(d.peores,'Más caro por persona','Mismo criterio, del otro lado','var(--bad)')||barras}
+      </div>
+      ${d.peores.length&&barras?'<div style="height:16px"></div>'+barras:''}
+      <div style="height:16px"></div>
+      ${tabla(d.por_artista,'Por proveedor','Con quién rinde más el presupuesto','Proveedor')}`;
   },
 
   async reports(box){
