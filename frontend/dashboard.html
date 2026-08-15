@@ -1058,26 +1058,39 @@
      debajo de la compuerta del contrato (.cgate, 9999). */
   .popov{position:fixed;inset:0;z-index:120;background:rgba(6,6,12,.72);backdrop-filter:blur(3px);
       display:flex;align-items:center;justify-content:center;padding:18px}
-  .popbox{position:relative;width:min(430px,100%);max-height:88vh;overflow-y:auto;
+  .popbox{position:relative;width:min(430px,100%);max-height:90vh;overflow-y:auto;
       background:#14141d;border:1px solid rgba(255,255,255,.10);border-radius:16px;
-      padding:26px 24px 20px;color:#eef0f7;box-shadow:0 26px 70px rgba(0,0,0,.6)}
-  .popx{position:absolute;top:10px;right:10px;width:30px;height:30px;border-radius:50%;
-      border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#c9cbdc;
-      font-size:13px;cursor:pointer;display:grid;place-items:center;padding:0}
-  .popx:hover{background:rgba(255,255,255,.13);color:#fff}
-  .popkick{font-size:9.5px;letter-spacing:2.6px;font-weight:700;color:#b98bff;margin-bottom:8px}
-  .popbox h3{font-size:20px;font-weight:750;line-height:1.25;margin-bottom:8px;padding-right:26px}
-  .poplead{font-size:13px;line-height:1.6;color:#b9bbd0;margin-bottom:14px}
-  .poplist{list-style:none;padding:0;margin:0 0 18px;display:grid;gap:8px}
-  .poplist li{font-size:12.5px;line-height:1.45;color:#dcdcea;padding-left:22px;position:relative}
-  .poplist li::before{content:"✓";position:absolute;left:0;top:0;color:#34d399;font-weight:700}
+      color:#eef0f7;box-shadow:0 26px 70px rgba(0,0,0,.6)}
+  .popx{position:absolute;top:10px;right:10px;z-index:3;width:30px;height:30px;border-radius:50%;
+      border:1px solid rgba(255,255,255,.18);background:rgba(10,10,18,.55);color:#e6e7f0;
+      font-size:13px;cursor:pointer;display:grid;place-items:center;padding:0;backdrop-filter:blur(3px)}
+  .popx:hover{background:rgba(10,10,18,.85);color:#fff}
+  /* Cabecera con la misma foto de la portada, el título encima. */
+  .pophd{position:relative;height:215px;overflow:hidden;border-radius:15px 15px 0 0;background:#08080f}
+  .pophd img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:62% 32%}
+  .popscrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,8,15,.30) 0%,rgba(8,8,15,.10) 30%,rgba(8,8,15,.80) 74%,rgba(20,20,29,1) 100%)}
+  .pophd h3{position:absolute;left:22px;right:22px;bottom:14px;font-size:22px;font-weight:800;
+      line-height:1.2;letter-spacing:-.3px;text-shadow:0 2px 16px rgba(0,0,0,.9)}
+  .pophd h3 span{color:#c39bff}
+  .popbody{padding:16px 22px 20px}
+  .poplead{font-size:12.5px;line-height:1.6;color:#b9bbd0;margin-bottom:15px}
+  .popfeat{display:grid;gap:11px;margin-bottom:18px}
+  .popf{display:flex;gap:12px;align-items:flex-start}
+  .pfi{width:36px;height:36px;border-radius:10px;flex:none;display:grid;place-items:center;
+      background:rgba(124,92,252,.13);border:1px solid rgba(124,92,252,.26)}
+  .pfi svg{width:18px;height:18px;fill:none;stroke:#b98bff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .popf b{font-size:12.5px;display:block;margin-bottom:2px}
+  .popf span{font-size:11.5px;color:#9a9cb4;line-height:1.45;display:block}
   .popcta{width:100%;border:0;border-radius:10px;padding:13px;font-weight:700;font-size:14px;cursor:pointer;
       color:#fff;background:linear-gradient(135deg,#7c5cfc,#9b6bff);box-shadow:0 8px 24px rgba(124,92,252,.34)}
   .popcta:hover{filter:brightness(1.07)}
   .popfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
       margin-top:12px;font-size:11px;color:#8688a0}
   .poplink{background:none;border:0;padding:0;color:#9b7bff;font-size:11px;cursor:pointer;text-decoration:underline}
-  @media(max-height:640px){.popbox{padding:20px 20px 16px}.poplead{margin-bottom:10px}.poplist{gap:6px;margin-bottom:14px}}
+  /* Pantallas cortas: la foto cede espacio primero, el texto no se toca. */
+  @media(max-height:720px){.pophd{height:160px}.pophd h3{font-size:20px}.popbody{padding:14px 20px 18px}
+    .popfeat{gap:9px;margin-bottom:15px}}
+  @media(max-height:600px){.pophd{height:120px}.poplead{display:none}}
   /* En celular la portada se salía 60px de la pantalla y no se podía arrastrar
      para verlos: quedaban cortados el ojo de la contraseña y "¿Olvidaste tu
      contraseña?". Lo forzaba la fila de tres columnas de abajo, que no cabe en
@@ -1363,18 +1376,42 @@
 <div class="popov" id="popTal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="popTitulo" onclick="if(event.target===this)popCerrar(false)">
   <div class="popbox">
     <button class="popx" onclick="popCerrar(false)" aria-label="Cerrar">✕</button>
-    <div class="popkick">CONVOCATORIA ABIERTA</div>
-    <h3 id="popTitulo">¿Eres artista o proveedor de shows?</h3>
-    <p class="poplead">SHOWMA es donde los hoteles y resorts buscan y contratan su entretenimiento. Estamos armando el catálogo y tu perfil puede estar desde el primer día.</p>
-    <ul class="poplist">
-      <li>Tu perfil con videos, fotos, precios y disponibilidad.</li>
-      <li>Los hoteles te encuentran y te contratan aquí mismo.</li>
-      <li>Calendario, contratos y pagos en un solo lugar.</li>
-    </ul>
-    <button class="popcta" onclick="popCrear()">Crear mi perfil gratis</button>
-    <div class="popfoot">
-      <span>Registrarte no cuesta nada.</span>
-      <button class="poplink" onclick="popCerrar(true)">No volver a mostrar</button>
+    <div class="pophd">
+      <!-- La imagen no se vuelve a incrustar: se copia en popAbrir() la que ya
+           trae la portada, así el aviso no le suma un solo byte a la página. -->
+      <img id="popImg" alt="">
+      <div class="popscrim"></div>
+      <h3 id="popTitulo">Conectamos tu talento con <span>oportunidades reales.</span></h3>
+    </div>
+    <div class="popbody">
+      <p class="poplead">SHOWMA conecta artistas y proveedores de espectáculos con hoteles, eventos y venues que buscan experiencias inolvidables.</p>
+      <div class="popfeat">
+        <div class="popf">
+          <div class="pfi"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M17 11.5a3 3 0 0 0 0-6M20.5 20a5 5 0 0 0-3.5-4.8"/></svg></div>
+          <div><b>Más visibilidad</b><span>Tu perfil llega a hoteles y organizadores en Cancún y todo México.</span></div>
+        </div>
+        <div class="popf">
+          <div class="pfi"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg></div>
+          <div><b>Más contrataciones</b><span>Recibe solicitudes y gestiona tus actuaciones desde un solo lugar.</span></div>
+        </div>
+        <div class="popf">
+          <div class="pfi"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <div><b>Pagos claros y puntuales</b><span>Precios pactados, facturación y fechas de pago a la vista.</span></div>
+        </div>
+        <div class="popf">
+          <div class="pfi"><svg viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-5"/></svg></div>
+          <div><b>Impulsa tu carrera</b><span>Construye tu reputación con reseñas y estadísticas verificadas.</span></div>
+        </div>
+        <div class="popf">
+          <div class="pfi"><svg viewBox="0 0 24 24"><circle cx="12" cy="15" r="5"/><path d="M8.5 10.5L6 3h12l-2.5 7.5"/></svg></div>
+          <div><b>Distinciones que se ganan</b><span>Tu constancia y tus resultados se muestran solos en tu perfil.</span></div>
+        </div>
+      </div>
+      <button class="popcta" onclick="popCrear()">Quiero unirme a SHOWMA</button>
+      <div class="popfoot">
+        <span>Registrarte es gratis y no te compromete a nada.</span>
+        <button class="poplink" onclick="popCerrar(true)">No volver a mostrar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1873,6 +1910,11 @@ function popAbrir(){
   const app=document.getElementById('app');
   if(app && app.style.display && app.style.display!=='none') return;
   const ov=document.getElementById('popTal'); if(!ov) return;
+  // Se reaprovecha la foto que ya cargó la portada en vez de incrustar otra.
+  try{
+    const img=document.getElementById('popImg'), fondo=document.querySelector('.lg-bg');
+    if(img && fondo && !img.src) img.src=fondo.src;
+  }catch(e){}
   ov.style.display='flex';
   document.addEventListener('keydown', popEsc);
 }
@@ -1893,7 +1935,9 @@ function popCrear(){
   setTimeout(()=>{ const el=document.getElementById('a_name'); if(el) el.focus(); },420);
 }
 window.popCerrar=popCerrar; window.popCrear=popCrear;
-document.addEventListener('DOMContentLoaded', ()=>{ if(popPuede()) setTimeout(popAbrir,1100); });
+// "Que aparezca en los primeros segundos" (David): 700 ms — lo justo para que
+// la portada alcance a pintarse detrás y el aviso no salga sobre una hoja gris.
+document.addEventListener('DOMContentLoaded', ()=>{ if(popPuede()) setTimeout(popAbrir,700); });
 async function refreshLeadsBadge(){
   if(!ME||!ME.is_admin) return;
   try{ const c=await api('/leads/hotel/count'); const b=document.getElementById('leadsBadge');
