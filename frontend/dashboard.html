@@ -164,8 +164,27 @@
      que es lo que deja comparar una columna de un vistazo (pantalla Audiencia). */
   #panel-aud th.num,#panel-aud td.num{text-align:right;font-variant-numeric:tabular-nums;
       white-space:nowrap;padding-right:0;padding-left:14px}
-  #panel-aud select{background:var(--inp);border:1px solid var(--line);color:var(--txt);
+  #panel-aud select,#panel-aud input[type=search]{background:var(--inp);border:1px solid var(--line);color:var(--txt);
       border-radius:8px;height:34px;padding:0 9px;font-size:12.7px;font-family:inherit}
+  .audtabs{display:flex;gap:6px;margin-bottom:16px}
+  .audtabs button{background:none;border:1px solid transparent;border-radius:9px;padding:8px 14px;
+      font-size:13px;font-weight:600;color:var(--mut);cursor:pointer;font-family:inherit}
+  .audtabs button:hover{color:var(--txt)}
+  .audtabs button.on{background:var(--card);border-color:var(--line);color:var(--txt);box-shadow:var(--shadow)}
+  /* Barra de filtros: cada control con su etiqueta encima, como en la maqueta. */
+  .audfilt{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:14px 16px;margin-bottom:16px}
+  .audfilt label{display:flex;flex-direction:column;gap:5px;font-size:10.5px;color:var(--mut2);
+      text-transform:uppercase;letter-spacing:.7px;font-weight:600}
+  .audfilt .btn{margin-left:auto}
+  .audtbl th.ord{cursor:pointer;user-select:none}
+  .audtbl th.ord:hover{color:var(--txt)}
+  .audtbl td{vertical-align:top}
+  /* Verde por encima de la referencia, rojo por debajo, gris cuando no hay
+     con qué comparar. El gris es un dato en sí: dice que falta historia. */
+  .dchip{display:inline-block;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .dchip.dp{color:var(--ok)} .dchip.dm{color:var(--bad)} .dchip.dn{color:var(--mut)}
+  .dz{color:var(--mut2)}
+  .btn.mini{padding:6px 11px;font-size:11.5px;border-radius:8px;white-space:nowrap}
 
   .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
   .c-pending{background:#fbbf241f;color:var(--warn)}
@@ -2703,26 +2722,33 @@ async function dropBooking(vid,date){
     renderMaestro(); notifyMark(bid,'reschedule'); toast('Actuación reprogramada ✓');
   }catch(e){ renderMaestro(); toast('No se pudo mover: '+(e.message||''),true); }
 }
+/* Quitar un salón. Con historia NO se borra: el servidor lo desactiva y las
+   actuaciones se quedan enteras (David eligió esto el 15/ago, después de que
+   87 actuaciones perdieran el aforo de su salón y con él la medición de
+   llenado). Aquí ya no se borran sus actuaciones: eso era justo lo que se
+   llevaba la historia por delante. */
 async function delVenue(id,name,count){
   const warn = count>0
-    ? `¿Eliminar el venue "${name}"?\n\nSe eliminarán también sus ${count} ${count===1?'actuación':'actuaciones'} y ese gasto se descontará del presupuesto. Esta acción no se puede deshacer.`
-    : `¿Eliminar el venue "${name}"?`;
+    ? `¿Quitar el salón "${name}"?\n\nTiene ${count} ${count===1?'actuación':'actuaciones'} en su historia, así que NO se borra: se desactiva. Deja de aparecer para agendar y sigue contando en los análisis.`
+    : `¿Eliminar el salón "${name}"?`;
   if(!confirm(warn)) return;
   const bk=CACHE.homeBk||[];
-  const victims=bk.filter(b=>(b.venue_id||0)===id).map(b=>b.id);
   try{
-    if(victims.length) toast('Eliminando venue y sus actuaciones…');
-    // El borrado del venue va primero (es la acción con permiso): si falla, no perdemos nada.
-    await del('/companies/venues/'+id);
-    // Luego sus actuaciones, una por una (secuencial, para no saturar el servidor),
-    // así el gasto se ajusta igual que cuando se elimina una actuación suelta.
-    for(const bid of victims){ try{ await del('/bookings/'+bid); }catch(_){ /* seguimos con las demás */ } }
-    CACHE.homeBk=bk.filter(b=>(b.venue_id||0)!==id);
+    const res=await del('/companies/venues/'+id);
+    const desactivado=!!(res&&res.desactivado);
+    // Fuera de la lista de lugares donde se puede agendar. Si se desactivó, sus
+    // actuaciones siguen en homeBk y el Maestro las sigue enseñando con el
+    // nombre del salón, que es el punto de haberlo desactivado.
     CACHE.venues=(CACHE.venues||[]).filter(v=>v.id!==id);
-    if(CACHE.agenda) CACHE.agenda=CACHE.agenda.filter(b=>(b.venue_id||0)!==id);
+    if(!desactivado){
+      CACHE.homeBk=bk.filter(b=>(b.venue_id||0)!==id);
+      if(CACHE.agenda) CACHE.agenda=CACHE.agenda.filter(b=>(b.venue_id||0)!==id);
+    }
     renderMaestro();
-    toast(victims.length ? `Venue y ${victims.length} ${victims.length===1?'actuación':'actuaciones'} eliminados ✓` : 'Venue eliminado ✓');
-  }catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
+    toast(desactivado
+      ? `"${name}" desactivado ✓ · sus ${res.actuaciones} ${res.actuaciones===1?'actuación':'actuaciones'} se conservan`
+      : 'Salón eliminado ✓');
+  }catch(e){ toast('No se pudo quitar: '+(e.message||''),true); }
 }
 
 /* Propiedades del usuario. Un director (rol hotel) no puede pedir /companies
@@ -5562,13 +5588,40 @@ function mConfig(box, key){
 /* Filtros de la pantalla Audiencia. Viven fuera del RENDER porque el usuario
    los cambia y la pantalla se vuelve a pintar con ellos.
    Ojo: NO usar el nombre AUD, que ya es el modo hotel/artista de la portada. */
-let AUDF={company:'', meses:0};
+let AUDF={company:'', meses:0, tab:'resumen', venue:'', categoria:'', por:'proveedor', busca:''};
 let AUD_DATA=null;
+let AUD_DES=null;                       // último desempeño traído
+let AUD_ORD={col:'gente', dir:-1};      // orden de la tabla comparativa
 function audFiltrar(){
-  const p=document.getElementById('audProp'), m=document.getElementById('audPer');
-  AUDF={company:p?p.value:'', meses:m?+m.value:0};
+  const v=id=>{const e=document.getElementById(id); return e?e.value:'';};
+  AUDF.company=v('audProp');
+  AUDF.meses=+v('audPer')||0;
+  if(document.getElementById('audVenue'))  AUDF.venue=v('audVenue');
+  if(document.getElementById('audCat'))    AUDF.categoria=v('audCat');
+  if(document.getElementById('audPor'))    AUDF.por=v('audPor')||'proveedor';
   show('aud',true);
 }
+function audTab(t){ AUDF.tab=t; show('aud',true); }
+function audOrdenar(col){
+  AUD_ORD = (AUD_ORD.col===col) ? {col,dir:-AUD_ORD.dir} : {col,dir:-1};
+  audPintarTabla();
+}
+function audBuscar(txt){ AUDF.busca=(txt||'').toLowerCase(); audPintarTabla(); }
+/* Periodo -> parámetros. El mismo recorte se aplica a lo de aquí y a lo de
+   afuera: si sólo se filtrara un lado, la diferencia sería de temporada. */
+function audParams(){
+  const q=[];
+  if(AUDF.company) q.push('company_id='+AUDF.company);
+  if(AUDF.meses){
+    const desde=new Date(); desde.setMonth(desde.getMonth()-AUDF.meses);
+    q.push('desde='+desde.toISOString().slice(0,19));
+  }
+  return q;
+}
+const audTabs = t => `<div class="audtabs">
+    <button class="${t==='resumen'?'on':''}" onclick="audTab('resumen')">Resumen</button>
+    <button class="${t==='desempeno'?'on':''}" onclick="audTab('desempeno')">Análisis de desempeño</button>
+  </div>`;
 /* Descarga el detalle noche por noche. Es la pieza que vuelve discutible el
    análisis: el hotel puede abrirlo en Excel y comprobar cada renglón contra su
    propia bitácora en vez de creerle a un promedio. */
@@ -5590,6 +5643,134 @@ function audCSV(){
   a.href=URL.createObjectURL(blob);
   a.download='audiencia-showma.csv';
   a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+
+/* ---- Análisis de desempeño (tabla comparativa) --------------------------
+   Lo pidió David con una maqueta: una lista con filtros donde el hotel ve a
+   cada proveedor con SUS números y, al lado, cómo le va a ese mismo proveedor
+   en otras propiedades. Ése es el argumento de venta: el hotel ya lleva estos
+   datos, lo que no tiene es contra qué compararlos.
+   Nunca sale de aquí el nombre de las otras propiedades ni sus precios. */
+async function audDesempeno(box){
+  const q=audParams();
+  if(AUDF.venue)     q.push('venue_id='+AUDF.venue);
+  if(AUDF.categoria) q.push('categoria='+encodeURIComponent(AUDF.categoria));
+  if(AUDF.por)       q.push('por='+AUDF.por);
+  AUD_DES=await api('/audiencia/desempeno'+(q.length?'?'+q.join('&'):''));
+  const d=AUD_DES, props=d.propiedades||[];
+  const opt=(v,txt,sel)=>`<option value="${esc(String(v))}"${String(sel)===String(v)?' selected':''}>${esc(txt)}</option>`;
+  const venuesVisibles=(d.venues||[]).filter(v=>!AUDF.company||String(v.company_id)===String(AUDF.company));
+  box.innerHTML=audTabs('desempeno')+`
+    <div class="box audfilt">
+      <label>Propiedad
+        <select id="audProp" onchange="audFiltrar()">
+          ${props.length>1?opt('','Todas las propiedades',AUDF.company):''}
+          ${props.map(p=>opt(p.id,p.name,AUDF.company)).join('')}</select></label>
+      <label>Salón
+        <select id="audVenue" onchange="audFiltrar()">${opt('','Todos los salones',AUDF.venue)}
+          ${venuesVisibles.map(v=>opt(v.id,v.name,AUDF.venue)).join('')}</select></label>
+      <label>Categoría
+        <select id="audCat" onchange="audFiltrar()">${opt('','Todas',AUDF.categoria)}
+          ${(d.categorias||[]).map(c=>opt(c,c,AUDF.categoria)).join('')}</select></label>
+      <label>Periodo
+        <select id="audPer" onchange="audFiltrar()">${opt('','Todo el histórico',AUDF.meses||'')}
+          ${opt(3,'Últimos 3 meses',AUDF.meses)}${opt(6,'Últimos 6 meses',AUDF.meses)}${opt(12,'Últimos 12 meses',AUDF.meses)}</select></label>
+      <label>Ver por
+        <select id="audPor" onchange="audFiltrar()">${opt('proveedor','Proveedor',AUDF.por)}${opt('show','Show',AUDF.por)}</select></label>
+      <label>Buscar
+        <input id="audBusca" type="search" placeholder="Nombre…" value="${esc(AUDF.busca)}" oninput="audBuscar(this.value)"></label>
+      <button class="btn ghost" onclick="audDesCSV()">⬇ Exportar</button>
+    </div>
+    <div id="audTablaWrap"></div>`;
+  audPintarTabla();
+}
+function audPintarTabla(){
+  const cont=document.getElementById('audTablaWrap'); if(!cont||!AUD_DES) return;
+  const d=AUD_DES;
+  const filas=(d.filas||[]).filter(f=>!AUDF.busca || f.nombre.toLowerCase().includes(AUDF.busca));
+  const dir=AUD_ORD.dir, col=AUD_ORD.col;
+  filas.sort((a,b)=>{
+    const va=a[col], vb=b[col];
+    // Lo que no se puede comparar se va al fondo, ordenes como ordenes: si
+    // subiera al principio parecería el mejor dato y es justo el que falta.
+    if(va==null&&vb==null) return 0;
+    if(va==null) return 1;
+    if(vb==null) return -1;
+    return typeof va==='string' ? va.localeCompare(vb)*dir : (va-vb)*dir;
+  });
+  const flecha=c=>col===c?(dir<0?' ▾':' ▴'):'';
+  const th=(c,txt,cls)=>`<th class="${cls||''} ord" onclick="audOrdenar('${c}')">${txt}${flecha(c)}</th>`;
+  const n1=v=>v==null?'—':v.toLocaleString('es-MX',{maximumFractionDigits:1});
+  const pc=v=>v==null?'—':v.toFixed(0)+'%';
+  // El signo manda el color: verde = por encima de la referencia.
+  const chip=(v,suf,inv)=>{
+    if(v==null) return '<span class="dz">—</span>';
+    const bueno=inv?v<0:v>0;
+    const cls=Math.abs(v)<0.05?'dn':(bueno?'dp':'dm');
+    const sig=v>0?'▲':(v<0?'▼':'=');
+    return `<span class="dchip ${cls}">${sig} ${Math.abs(v).toLocaleString('es-MX',{maximumFractionDigits:1})}${suf}</span>`;
+  };
+  const sinRef=d.reglas.sin_referencia, reglas=d.reglas;
+  const cuerpo=filas.map(f=>{
+    const fu=f.fuera||{};
+    const refTxt=fu.publicable
+      ? `${n1(fu.convocatoria)} pers/noche en ${fu.propiedades} propiedades`
+      : (fu.noches
+          ? `sólo ${fu.noches} ${fu.noches===1?'noche':'noches'} en ${fu.propiedades} ${fu.propiedades===1?'propiedad':'propiedades'} fuera de aquí`
+          : 'sin historia fuera de aquí');
+    return `<tr>
+      <td><b>${esc(f.nombre)}</b><span class="hint" style="margin:0;display:block">${esc(f.categoria)}</span></td>
+      <td class="num">${f.noches}</td>
+      <td class="num"><b>${n1(f.convocatoria)}</b><span class="hint" style="margin:0;display:block">${n1(f.gente)} en total</span></td>
+      <td class="num" title="${esc(refTxt)}">${chip(f.vs_fuera_convocatoria,'%')}</td>
+      <td class="num"><b>${pc(f.retencion)}</b></td>
+      <td class="num" title="${esc(refTxt)}">${chip(f.vs_fuera_retencion,' pts')}</td>
+      <td class="num">${chip(f.vs_categoria_convocatoria,'%')}
+        <span class="hint" style="margin:0;display:block">${f.vs_categoria_retencion==null?'&nbsp;':
+          (f.vs_categoria_retencion>0?'+':'')+f.vs_categoria_retencion.toLocaleString('es-MX',{maximumFractionDigits:1})+' pts ret.'}</span></td>
+      <td class="num">${f.costo_persona==null?'—':MXN2(f.costo_persona)}</td>
+      <td class="num">${f.artist_id?`<button class="btn ghost mini" onclick="openArtistProfile(${f.artist_id})">Ver perfil</button>`:''}</td></tr>`;
+  }).join('');
+  cont.innerHTML=`
+    <div class="box">
+      <div class="bhead"><h3 style="margin:0">${filas.length} ${filas.length===1?'resultado':'resultados'}</h3>
+        <span class="hint" style="margin:0">Verde = por encima de la referencia</span></div>
+      <div style="overflow-x:auto"><table class="audtbl"><thead><tr>
+        ${th('nombre',d.por==='show'?'Show':'Proveedor')}
+        ${th('noches','Noches','num')}
+        ${th('convocatoria','Convocatoria<span class="hint" style="margin:0;display:block;font-weight:400">gente por noche</span>','num')}
+        ${th('vs_fuera_convocatoria','vs. otras<br>propiedades','num')}
+        ${th('retencion','Retención','num')}
+        ${th('vs_fuera_retencion','vs. otras<br>propiedades','num')}
+        ${th('vs_categoria_convocatoria','vs. su categoría<br>aquí','num')}
+        ${th('costo_persona','Costo/persona','num')}
+        <th></th>
+      </tr></thead><tbody>${cuerpo||'<tr><td colspan="9" class="muted" style="padding:18px 0">Sin resultados con estos filtros.</td></tr>'}</tbody></table></div>
+      <div class="hint" style="margin:14px 0 0;line-height:1.6">
+        <b>Cómo leerlo.</b> "vs. otras propiedades" compara a ese mismo proveedor aquí contra su promedio en el resto de los hoteles donde trabaja,
+        en el mismo periodo. La convocatoria se compara en % y la retención en puntos.
+        "vs. su categoría aquí" lo compara contra los demás proveedores de su misma categoría en esta propiedad, sin contarse a sí mismo.<br>
+        Sólo se muestra la referencia externa cuando hay al menos ${reglas.min_propiedades_fuera} propiedades y ${reglas.min_noches_fuera} noches detrás.
+        Con una sola propiedad, ese "promedio" sería el dato de ese hotel con nombre y apellido, y eso no se enseña.
+        ${sinRef?`Hoy ${sinRef} ${sinRef===1?'proveedor no tiene':'proveedores no tienen'} suficiente historia fuera de aquí.`:''}
+        Nunca se muestran precios de otras propiedades.
+      </div>
+    </div>`;
+}
+function audDesCSV(){
+  if(!AUD_DES||!AUD_DES.filas.length) return;
+  const col=['Proveedor','Categoría','Noches','Gente','Convocatoria (pers/noche)','Retención %',
+             'Vs otras propiedades (convocatoria %)','Vs otras propiedades (retención pts)',
+             'Vs su categoría aquí (%)','Propiedades fuera','Noches fuera','Costo por persona'];
+  const celda=v=>{ if(v===null||v===undefined) return '';
+    const s=String(v); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const filas=AUD_DES.filas.map(f=>[f.nombre,f.categoria,f.noches,f.gente,f.convocatoria,f.retencion,
+    f.vs_fuera_convocatoria,f.vs_fuera_retencion,f.vs_categoria_convocatoria,
+    f.fuera.propiedades,f.fuera.noches,f.costo_persona].map(celda).join(','));
+  const blob=new Blob(['﻿'+[col.join(','),...filas].join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='desempeno-showma.csv'; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),4000);
 }
 
@@ -5728,7 +5909,11 @@ const RENDER = {
     const wc={}; bk.forEach(b=>{const k=ymd(mondayOf(new Date(b.starts_at)));wc[k]=(wc[k]||0)+1;});
     let bestW=null,bestN=-1; for(const k in wc){ if(wc[k]>bestN){bestN=wc[k];bestW=k;} }
     // Lista real de venues de la cadena (para mostrar también los vacíos/nuevos en el Maestro).
-    CACHE.venues = (gb.comps||[]).flatMap(c=>(c.venues||[]).map(v=>({id:v.id,name:v.name,capacity:(v.capacity!=null?v.capacity:null),company_id:c.id,company_name:c.name})));
+    // Sólo los salones EN SERVICIO: los desactivados no se pueden agendar. Sus
+    // actuaciones pasadas sí siguen saliendo, porque entran por las reservas.
+    CACHE.venues = (gb.comps||[]).flatMap(c=>(c.venues||[])
+      .filter(v=>v.is_active!==false)
+      .map(v=>({id:v.id,name:v.name,capacity:(v.capacity!=null?v.capacity:null),company_id:c.id,company_name:c.name})));
     CACHE.homeBk = bk; CACHE.homeBudget = budget; if(!MAESTRO_REF) MAESTRO_REF = bestW? new Date(bestW+'T00:00:00') : new Date();
     box.innerHTML=`
       <div class="kpis">
@@ -5933,12 +6118,8 @@ const RENDER = {
      que ya se capturan la noche del show (aforo al iniciar y al terminar) más
      la capacidad del salón y el precio pactado. */
   async aud(box){
-    const q=[];
-    if(AUDF.company) q.push('company_id='+AUDF.company);
-    if(AUDF.meses){
-      const desde=new Date(); desde.setMonth(desde.getMonth()-AUDF.meses);
-      q.push('desde='+desde.toISOString().slice(0,19));
-    }
+    if(AUDF.tab==='desempeno') return audDesempeno(box);
+    const q=audParams();
     const d=await api('/audiencia'+(q.length?'?'+q.join('&'):''));
     AUD_DATA=d;
     const r=d.resumen, cob=d.cobertura;
@@ -5957,7 +6138,7 @@ const RENDER = {
         <option value="12"${AUDF.meses==12?' selected':''}>Últimos 12 meses</option></select>`;
 
     if(!r.actuaciones){
-      box.innerHTML=`<div class="box" style="text-align:center;padding:34px 18px">
+      box.innerHTML=audTabs('resumen')+`<div class="box" style="text-align:center;padding:34px 18px">
         <div style="display:flex;gap:10px;justify-content:center;margin-bottom:16px">${selProp}${selPer}</div>
         <b>Todavía no hay noches con público capturado</b>
         <div class="hint" style="max-width:460px;margin:8px auto 0">Este análisis se arma con el conteo de gente que se registra al terminar cada
@@ -5996,7 +6177,7 @@ const RENDER = {
       ${filas.map((f,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(f.nombre)}</b>
         <span>${f.actuaciones} noches · ${num(f.asistentes)} personas</span></div><b style="color:${cls}">${cpp(f.costo_persona)}</b></div>`).join('')}</div>`:'';
 
-    box.innerHTML=`
+    box.innerHTML=audTabs('resumen')+`
       <div class="box" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:13px 16px;margin-bottom:16px">
         <span class="hint" style="margin:0">Propiedad</span>${selProp}
         <span class="hint" style="margin:0 0 0 8px">Periodo</span>${selPer}
@@ -6491,6 +6672,10 @@ async function patch(path,body){
 async function del(path){
   const r=await fetch(API+path,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}});
   if(!r.ok) throw new Error(path+' '+r.status);
+  // Casi todos los borrados contestan 204 sin cuerpo; el de salones contesta
+  // diciendo si lo borró o sólo lo desactivó. Quien no lo use, lo ignora.
+  if(r.status===204) return null;
+  try{ return await r.json(); }catch(e){ return null; }
 }
 
 function pad2(n){return String(n).padStart(2,'0');}

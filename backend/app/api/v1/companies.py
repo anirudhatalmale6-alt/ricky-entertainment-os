@@ -2,7 +2,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from pydantic import BaseModel
@@ -174,15 +174,53 @@ async def update_venue(venue_id: int, payload: VenueUpdate, user: CurrentUser, d
     return venue
 
 
-@router.delete(
-    "/venues/{venue_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
+@router.delete("/venues/{venue_id}")
 async def delete_venue(venue_id: int, user: CurrentUser, db: DbSession):
+    """Quita un salón. Si ya tiene historia NO se borra: se desactiva.
+
+    Borrarlo de verdad se llevaba por delante el pasado. SQLite no aplica el
+    ON DELETE SET NULL (el pragma foreign_keys va apagado), así que las
+    actuaciones viejas se quedaban apuntando a un salón inexistente: perdían el
+    nombre y, sobre todo, la capacidad, y sin capacidad ya no se puede decir si
+    esas 300 personas eran lleno total o media entrada. Así se perdió el aforo
+    de 87 actuaciones en producción (David eligió este arreglo, 2026-08-15).
+
+    Desactivado deja de ofrecerse para agendar y desaparece del Calendario
+    Maestro, pero su historia sigue completa en los análisis.
+    """
     venue = await _get_venue_or_404(db, venue_id)
     await ensure_company_access(user, venue.company_id, db)
+
+    usos = await db.scalar(
+        select(func.count()).select_from(Booking).where(Booking.venue_id == venue_id)
+    )
+    if usos:
+        venue.is_active = False
+        await db.commit()
+        return {
+            "desactivado": True,
+            "actuaciones": int(usos),
+            "detail": (
+                f"El salón «{venue.name}» tiene {usos} actuaciones en su historia. "
+                "Se desactivó: ya no aparece para agendar, y sus datos siguen "
+                "contando en los análisis."
+            ),
+        }
+
     await db.delete(venue)
     await db.commit()
+    return {"desactivado": False, "actuaciones": 0, "detail": "Salón eliminado."}
+
+
+@router.post("/venues/{venue_id}/reactivar", response_model=VenueOut)
+async def reactivate_venue(venue_id: int, user: CurrentUser, db: DbSession):
+    """Vuelve a poner en servicio un salón desactivado."""
+    venue = await _get_venue_or_404(db, venue_id)
+    await ensure_company_access(user, venue.company_id, db)
+    venue.is_active = True
+    await db.commit()
+    await db.refresh(venue)
+    return venue
 
 
 # --- Monthly budget ("perfil de presupuesto") ------------------------------

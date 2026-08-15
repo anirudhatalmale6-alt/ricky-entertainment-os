@@ -257,3 +257,278 @@ async def analisis_audiencia(
             "sin_capacidad": sin_capacidad,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Analisis de desempeno: lo mismo, pero comparado
+# ---------------------------------------------------------------------------
+# David (2026-08-15): "comparar con el dato promedio de retencion y convocatoria
+# de esa persona en OTRAS propiedades, marcando si esta por debajo o por encima".
+# Su argumento de venta es exactamente ese: el hotel ya lleva estos numeros,
+# lo que no tiene es contra que compararlos.
+#
+# DOS COMPARACIONES, y conviene no confundirlas:
+#   1. vs. el mismo proveedor en otras propiedades  -> "aqui rinde mas o menos
+#      que en el resto del mercado".
+#   2. vs. el promedio de su categoria EN ESTE HOTEL -> "comparado con lo que
+#      normalmente me funciona a mi".
+#
+# LO QUE NUNCA SALE DE AQUI: el nombre de las otras propiedades, sus precios y
+# su costo por persona. Un hotel no puede enterarse por este panel de lo que
+# paga el de enfrente. Solo viajan promedios de asistencia y retencion.
+#
+# PISO DE PRIVACIDAD: la comparacion externa exige al menos 2 propiedades
+# distintas y 3 noches. Con una sola propiedad detras, el "promedio en otras
+# propiedades" ES el dato de ese hotel, con nombre y todo para quien conozca el
+# mercado. Es el mismo criterio de las distinciones del perfil.
+_MIN_PROPIEDADES_FUERA = 2
+_MIN_NOCHES_FUERA = 3
+
+
+class _Medida:
+    """Convocatoria y retencion de un conjunto de noches."""
+
+    def __init__(self):
+        self.noches = 0
+        self.gente = 0
+        self.se_quedaron = 0
+        self.gasto = 0.0
+        # Una noche sin precio SI cuenta para la asistencia (el conteo de gente
+        # es real) pero no puede contar para el costo por persona: su gente
+        # entraria al divisor sin que su dinero entre al dividendo, y el costo
+        # saldria mas barato de lo que fue.
+        self.gente_con_precio = 0
+        self.noches_con_precio = 0
+        self.propiedades: set[int] = set()
+
+    def suma(self, b, asistentes: int, precio: float | None):
+        self.noches += 1
+        self.gente += asistentes
+        self.se_quedaron += b.headcount_end if b.headcount_end is not None else asistentes
+        if precio is not None:
+            self.gasto += precio
+            self.gente_con_precio += asistentes
+            self.noches_con_precio += 1
+        if b.company_id:
+            self.propiedades.add(b.company_id)
+
+    @property
+    def convocatoria(self) -> float | None:
+        """Gente por noche. Comparar totales seria comparar quien trabajo mas."""
+        return round(self.gente / self.noches, 1) if self.noches else None
+
+    @property
+    def retencion(self) -> float | None:
+        return _pct(self.se_quedaron, self.gente)
+
+
+def _delta_pct(mio: float | None, otro: float | None) -> float | None:
+    """Cuanto mas (o menos) que la referencia, en %."""
+    if mio is None or not otro:
+        return None
+    return round((mio - otro) / otro * 100, 1)
+
+
+def _delta_puntos(mio: float | None, otro: float | None) -> float | None:
+    """Diferencia entre dos porcentajes, en puntos. Un 92% contra un 85% son
+    7 puntos, no un 8%: decirlo en % de % confunde a quien lo lee."""
+    if mio is None or otro is None:
+        return None
+    return round(mio - otro, 1)
+
+
+@router.get("/desempeno")
+async def desempeno(
+    scope: CurrentScope,
+    db: DbSession,
+    company_id: int | None = Query(default=None),
+    venue_id: int | None = Query(default=None),
+    categoria: str | None = Query(default=None),
+    desde: datetime | None = None,
+    hasta: datetime | None = None,
+    por: str = Query(default="proveedor", pattern="^(proveedor|show)$"),
+):
+    propiedades = await _propiedades_visibles(scope, db)
+    if not propiedades:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu cuenta no tiene ninguna propiedad asociada.",
+        )
+    permitidas = {c.id for c in propiedades}
+    if company_id is not None and company_id not in permitidas:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes acceso a esa propiedad.",
+        )
+    objetivo = [company_id] if company_id is not None else sorted(permitidas)
+
+    stmt = select(Booking).where(
+        Booking.company_id.in_(objetivo),
+        Booking.status == BookingStatus.COMPLETED,
+        Booking.headcount_start.isnot(None),
+        Booking.headcount_start > 0,
+    )
+    if desde is not None:
+        stmt = stmt.where(Booking.starts_at >= desde)
+    if hasta is not None:
+        stmt = stmt.where(Booking.starts_at <= hasta)
+    if venue_id is not None:
+        stmt = stmt.where(Booking.venue_id == venue_id)
+    mias = list((await db.execute(stmt)).scalars().all())
+
+    sids = {b.show_id for b in mias if b.show_id}
+    aids = {b.artist_id for b in mias if b.artist_id}
+    shows = {s.id: s for s in (
+        (await db.execute(select(Show).where(Show.id.in_(sids)))).scalars().all() if sids else []
+    )}
+    artistas = {a.id: a for a in (
+        (await db.execute(select(Artist).where(Artist.id.in_(aids)))).scalars().all() if aids else []
+    )}
+    venues_mios = {v.id: v for v in (
+        (await db.execute(select(Venue).where(Venue.company_id.in_(objetivo)))).scalars().all()
+    )}
+
+    def etiqueta_categoria(show) -> str:
+        if not show:
+            return "Sin categoría"
+        return show.subcategory or show.category or "Sin categoría"
+
+    # El filtro de categoria se aplica DESPUES de resolver los shows: la
+    # categoria vive en el show, no en la actuacion.
+    if categoria:
+        mias = [b for b in mias if etiqueta_categoria(shows.get(b.show_id)) == categoria]
+
+    # --- lo mio, agrupado -------------------------------------------------
+    grupos: dict[tuple, dict] = {}
+    for b in mias:
+        show = shows.get(b.show_id) if b.show_id else None
+        artista = artistas.get(b.artist_id) if b.artist_id else None
+        if por == "show":
+            clave = ("show", b.show_id)
+            nombre = show.show_name if show else "Show no identificado"
+        else:
+            clave = ("artista", b.artist_id)
+            nombre = artista.stage_name if artista else "Proveedor no identificado"
+        g = grupos.setdefault(clave, {
+            "nombre": nombre,
+            "artist_id": b.artist_id,
+            "show_id": b.show_id if por == "show" else None,
+            "medida": _Medida(),
+            "cats": {},
+        })
+        g["medida"].suma(b, b.headcount_start, float(b.agreed_price) if b.agreed_price is not None else None)
+        cat = etiqueta_categoria(show)
+        g["cats"][cat] = g["cats"].get(cat, 0) + 1
+
+    # --- los mismos proveedores, FUERA de las propiedades analizadas ------
+    fuera: dict[int, _Medida] = {}
+    ids_fuera = {g["artist_id"] for g in grupos.values() if g["artist_id"]}
+    if ids_fuera:
+        f = select(Booking).where(
+            Booking.artist_id.in_(ids_fuera),
+            Booking.status == BookingStatus.COMPLETED,
+            Booking.headcount_start.isnot(None),
+            Booking.headcount_start > 0,
+            Booking.company_id.isnot(None),
+            Booking.company_id.notin_(objetivo),
+        )
+        # Mismo periodo en los dos lados: en la Riviera un agosto no se compara
+        # con un septiembre, y si el filtro solo aplicara a un lado la diferencia
+        # seria de temporada, no del show.
+        if desde is not None:
+            f = f.where(Booking.starts_at >= desde)
+        if hasta is not None:
+            f = f.where(Booking.starts_at <= hasta)
+        for b in (await db.execute(f)).scalars().all():
+            fuera.setdefault(b.artist_id, _Medida()).suma(b, b.headcount_start, None)
+
+    # --- promedio de cada categoria EN ESTE HOTEL -------------------------
+    # Se guarda tambien lo que aporto cada fila para poder restarselo: si un
+    # proveedor se compara contra un promedio que lo incluye a el, se esta
+    # comparando en parte consigo mismo y la diferencia sale achicada.
+    por_categoria: dict[str, _Medida] = {}
+    aporte: dict[tuple, _Medida] = {}
+    for b in mias:
+        cat = etiqueta_categoria(shows.get(b.show_id))
+        por_categoria.setdefault(cat, _Medida()).suma(b, b.headcount_start, None)
+        clave = ("show", b.show_id) if por == "show" else ("artista", b.artist_id)
+        aporte.setdefault((cat, clave), _Medida()).suma(b, b.headcount_start, None)
+
+    def resto_de_categoria(cat: str, clave: tuple) -> _Medida | None:
+        """El promedio de la categoria SIN esta fila. None si no queda nadie."""
+        total = por_categoria.get(cat)
+        if total is None:
+            return None
+        propio = aporte.get((cat, clave))
+        r = _Medida()
+        r.noches = total.noches - (propio.noches if propio else 0)
+        r.gente = total.gente - (propio.gente if propio else 0)
+        r.se_quedaron = total.se_quedaron - (propio.se_quedaron if propio else 0)
+        return r if r.noches > 0 and r.gente > 0 else None
+
+    filas = []
+    for clave, g in grupos.items():
+        m: _Medida = g["medida"]
+        cat = max(g["cats"].items(), key=lambda kv: kv[1])[0] if g["cats"] else "Sin categoría"
+        ref_cat = resto_de_categoria(cat, clave)
+
+        ext = fuera.get(g["artist_id"]) if g["artist_id"] else None
+        # El piso de privacidad se aplica aqui y no se negocia.
+        publicable = bool(
+            ext
+            and len(ext.propiedades) >= _MIN_PROPIEDADES_FUERA
+            and ext.noches >= _MIN_NOCHES_FUERA
+        )
+        bloque_fuera = {
+            "propiedades": len(ext.propiedades) if ext else 0,
+            "noches": ext.noches if ext else 0,
+            "convocatoria": ext.convocatoria if publicable else None,
+            "retencion": ext.retencion if publicable else None,
+            "publicable": publicable,
+        }
+
+        filas.append({
+            "nombre": g["nombre"],
+            "artist_id": g["artist_id"],
+            "show_id": g["show_id"],
+            "categoria": cat,
+            "noches": m.noches,
+            "gente": m.gente,
+            "convocatoria": m.convocatoria,
+            "retencion": m.retencion,
+            "costo_persona": _por_persona(m.gasto, m.gente_con_precio),
+            "gasto": round(m.gasto, 2),
+            "noches_con_precio": m.noches_con_precio,
+            "fuera": bloque_fuera,
+            # Positivo = aqui le va mejor que en el resto del mercado.
+            "vs_fuera_convocatoria": _delta_pct(m.convocatoria, bloque_fuera["convocatoria"]),
+            "vs_fuera_retencion": _delta_puntos(m.retencion, bloque_fuera["retencion"]),
+            # Contra lo que normalmente funciona en esta propiedad. Con una sola
+            # fila en la categoria no hay contra que comparar: seria consigo mismo.
+            "vs_categoria_convocatoria": (
+                _delta_pct(m.convocatoria, ref_cat.convocatoria) if ref_cat else None
+            ),
+            "vs_categoria_retencion": (
+                _delta_puntos(m.retencion, ref_cat.retencion) if ref_cat else None
+            ),
+            "categoria_noches": ref_cat.noches if ref_cat else 0,
+        })
+
+    filas.sort(key=lambda f: f["gente"], reverse=True)
+    sin_referencia = sum(1 for f in filas if not f["fuera"]["publicable"])
+
+    return {
+        "propiedades": [{"id": c.id, "name": c.name} for c in propiedades],
+        "venues": [
+            {"id": v.id, "name": v.name, "company_id": v.company_id}
+            for v in sorted(venues_mios.values(), key=lambda v: v.name)
+        ],
+        "categorias": sorted(por_categoria),
+        "por": por,
+        "filas": filas,
+        "reglas": {
+            "min_propiedades_fuera": _MIN_PROPIEDADES_FUERA,
+            "min_noches_fuera": _MIN_NOCHES_FUERA,
+            "sin_referencia": sin_referencia,
+        },
+    }
