@@ -1188,9 +1188,12 @@
         <h2>Iniciar sesión</h2>
         <div class="lead">Bienvenido de nuevo</div>
         <div class="lg-lab">Correo electrónico</div>
-        <div class="lg-in"><input id="email" type="email" placeholder="tu@correo.com" value="admin@ricky.os"></div>
+        <!-- Vacíos a propósito. Traían el correo Y LA CONTRASEÑA del
+             administrador escritos en el HTML: cualquiera que abriera
+             showma.mx entraba con sólo dar clic (David lo vio 2026-08-15). -->
+        <div class="lg-in"><input id="email" type="email" placeholder="tu@correo.com" autocomplete="username"></div>
         <div class="lg-lab">Contraseña</div>
-        <div class="lg-in"><input id="pass" type="password" placeholder="••••••••" value="Admin123!"><span class="eye" onclick="pwEye('pass',this)">👁</span></div>
+        <div class="lg-in"><input id="pass" type="password" placeholder="••••••••" autocomplete="current-password"><span class="eye" onclick="pwEye('pass',this)">👁</span></div>
         <input id="otp" placeholder="Código 2FA" class="lg-hide">
         <div class="lg-row">
           <label class="lg-chk"><input type="checkbox" checked> Recuérdame</label>
