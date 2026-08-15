@@ -560,9 +560,11 @@
   .tx{background:var(--ov);border:0;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;color:var(--mut);line-height:1}
   .tx:hover{background:var(--bad);color:#fff}
   /* Artist profile pop-up */
-  /* 900px, no 620: la barra verificada mide 830px con sus seis datos y a 620
-     se partía en dos renglones. David la pidió EN UNA SOLA LÍNEA. */
-  .amod.apmod{max-width:900px;max-height:90vh}
+  /* Los 900px eran para que la barra verificada cupiera en un renglón cuando
+     traía seis datos. David quitó dos, ahora mide 493px y entra de sobra: se
+     regresa a 760 (David 2026-08-15, "se hizo muy ancho"). Si algún día vuelve
+     a crecer esa barra, medir antes de tocar este número. */
+  .amod.apmod{max-width:760px;max-height:90vh}
   .aphero{height:190px;background:var(--grad);background-size:cover;background-position:center;position:relative;flex:none}
   .aphscrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,16,32,.05) 0%,rgba(6,16,32,.72) 100%)}
   .aphttl{position:absolute;left:20px;right:20px;bottom:14px;color:#fff}
