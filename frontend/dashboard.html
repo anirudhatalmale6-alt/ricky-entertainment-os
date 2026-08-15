@@ -1027,6 +1027,16 @@
   .lg-hide{display:none!important}
   @media(max-width:1040px){.lg{grid-template-columns:1fr}.lg-hero{display:none}
     .lg-cols{grid-template-columns:1fr}.lg-pane+.lg-pane{border-left:0;border-top:1px solid rgba(255,255,255,.06)}}
+  /* En celular la portada se salía 60px de la pantalla y no se podía arrastrar
+     para verlos: quedaban cortados el ojo de la contraseña y "¿Olvidaste tu
+     contraseña?". Lo forzaba la fila de tres columnas de abajo, que no cabe en
+     390px. David va a mandar el link a los artistas y casi todos van a entrar
+     desde el teléfono (2026-08-15). */
+  @media(max-width:640px){
+    .lg-forms,.lg-cols,.lg-pane{min-width:0}
+    .lg-pane{padding:34px 20px}
+    .lg-trust{grid-template-columns:1fr;gap:14px;padding:18px 20px}
+  }
   .err{color:var(--bad);font-size:12px;min-height:16px;margin-top:6px}
   .load{color:var(--mut);padding:30px;text-align:center}
 
