@@ -337,6 +337,32 @@ def _delta_puntos(mio: float | None, otro: float | None) -> float | None:
     return round(mio - otro, 1)
 
 
+# Debajo de estos margenes la diferencia es ruido y se llama "parejo". Sin este
+# corte, un 0.4% de mas pintaria verde y el hotel leeria una ventaja que no hay.
+_RUIDO_PCT = 5.0
+_RUIDO_PUNTOS = 2.0
+
+
+def _veredicto(delta_conv: float | None, delta_ret: float | None) -> str | None:
+    """Resume las dos comparaciones en una palabra. Si apuntan a lados
+    distintos se dice "mixto" en vez de inventar un ganador: que llene mas pero
+    retenga menos es informacion, no un empate."""
+    signos = []
+    if delta_conv is not None:
+        signos.append(0 if abs(delta_conv) < _RUIDO_PCT else (1 if delta_conv > 0 else -1))
+    if delta_ret is not None:
+        signos.append(0 if abs(delta_ret) < _RUIDO_PUNTOS else (1 if delta_ret > 0 else -1))
+    if not signos:
+        return None
+    if 1 in signos and -1 in signos:
+        return "mixto"
+    if 1 in signos:
+        return "arriba"
+    if -1 in signos:
+        return "abajo"
+    return "parejo"
+
+
 @router.get("/desempeno")
 async def desempeno(
     scope: CurrentScope,
@@ -413,12 +439,32 @@ async def desempeno(
             "nombre": nombre,
             "artist_id": b.artist_id,
             "show_id": b.show_id if por == "show" else None,
+            "foto": artista.profile_image_url if artista else None,
             "medida": _Medida(),
             "cats": {},
+            "noches_lista": [],
         })
-        g["medida"].suma(b, b.headcount_start, float(b.agreed_price) if b.agreed_price is not None else None)
+        precio = float(b.agreed_price) if b.agreed_price is not None else None
+        g["medida"].suma(b, b.headcount_start, precio)
         cat = etiqueta_categoria(show)
         g["cats"][cat] = g["cats"].get(cat, 0) + 1
+        # Detalle noche por noche: es lo que vuelve discutible el promedio. El
+        # hotel abre el renglon y compara contra su propia bitacora.
+        v = venues_mios.get(b.venue_id) if b.venue_id else None
+        fin = b.headcount_end if b.headcount_end is not None else None
+        g["noches_lista"].append({
+            "booking_id": b.id,
+            "fecha": b.starts_at.isoformat() if b.starts_at else None,
+            "venue": v.name if v else "Sin salón registrado",
+            "capacidad": v.capacity if v else None,
+            "show": show.show_name if show else "—",
+            "gente": b.headcount_start,
+            "se_quedaron": fin,
+            "atraccion": _pct(b.headcount_start, v.capacity) if (v and v.capacity) else None,
+            "retencion": _pct(fin, b.headcount_start) if fin is not None else None,
+            "precio": round(precio, 2) if precio is not None else None,
+            "costo_persona": _por_persona(precio, b.headcount_start) if precio is not None else None,
+        })
 
     # --- los mismos proveedores, FUERA de las propiedades analizadas ------
     fuera: dict[int, _Medida] = {}
@@ -446,13 +492,17 @@ async def desempeno(
     # Se guarda tambien lo que aporto cada fila para poder restarselo: si un
     # proveedor se compara contra un promedio que lo incluye a el, se esta
     # comparando en parte consigo mismo y la diferencia sale achicada.
+    # Aqui SI entra el dinero, al reves que en la referencia externa: es el
+    # dinero de esta misma casa, el que ya paga y ya ve. Lo que nunca sale de
+    # su propiedad es el precio de las OTRAS.
     por_categoria: dict[str, _Medida] = {}
     aporte: dict[tuple, _Medida] = {}
     for b in mias:
         cat = etiqueta_categoria(shows.get(b.show_id))
-        por_categoria.setdefault(cat, _Medida()).suma(b, b.headcount_start, None)
+        precio = float(b.agreed_price) if b.agreed_price is not None else None
+        por_categoria.setdefault(cat, _Medida()).suma(b, b.headcount_start, precio)
         clave = ("show", b.show_id) if por == "show" else ("artista", b.artist_id)
-        aporte.setdefault((cat, clave), _Medida()).suma(b, b.headcount_start, None)
+        aporte.setdefault((cat, clave), _Medida()).suma(b, b.headcount_start, precio)
 
     def resto_de_categoria(cat: str, clave: tuple) -> _Medida | None:
         """El promedio de la categoria SIN esta fila. None si no queda nadie."""
@@ -464,6 +514,9 @@ async def desempeno(
         r.noches = total.noches - (propio.noches if propio else 0)
         r.gente = total.gente - (propio.gente if propio else 0)
         r.se_quedaron = total.se_quedaron - (propio.se_quedaron if propio else 0)
+        r.gasto = total.gasto - (propio.gasto if propio else 0.0)
+        r.gente_con_precio = total.gente_con_precio - (propio.gente_con_precio if propio else 0)
+        r.noches_con_precio = total.noches_con_precio - (propio.noches_con_precio if propio else 0)
         return r if r.noches > 0 and r.gente > 0 else None
 
     filas = []
@@ -487,31 +540,46 @@ async def desempeno(
             "publicable": publicable,
         }
 
+        costo = _por_persona(m.gasto, m.gente_con_precio)
+        costo_cat = _por_persona(ref_cat.gasto, ref_cat.gente_con_precio) if ref_cat else None
+        vs_fuera_conv = _delta_pct(m.convocatoria, bloque_fuera["convocatoria"])
+        vs_fuera_ret = _delta_puntos(m.retencion, bloque_fuera["retencion"])
+        vs_cat_conv = _delta_pct(m.convocatoria, ref_cat.convocatoria) if ref_cat else None
+        vs_cat_ret = _delta_puntos(m.retencion, ref_cat.retencion) if ref_cat else None
+
         filas.append({
             "nombre": g["nombre"],
             "artist_id": g["artist_id"],
             "show_id": g["show_id"],
+            "foto": g["foto"],
             "categoria": cat,
             "noches": m.noches,
+            "propiedades": len(m.propiedades),
             "gente": m.gente,
             "convocatoria": m.convocatoria,
             "retencion": m.retencion,
-            "costo_persona": _por_persona(m.gasto, m.gente_con_precio),
+            "costo_persona": costo,
             "gasto": round(m.gasto, 2),
             "noches_con_precio": m.noches_con_precio,
             "fuera": bloque_fuera,
             # Positivo = aqui le va mejor que en el resto del mercado.
-            "vs_fuera_convocatoria": _delta_pct(m.convocatoria, bloque_fuera["convocatoria"]),
-            "vs_fuera_retencion": _delta_puntos(m.retencion, bloque_fuera["retencion"]),
+            "vs_fuera_convocatoria": vs_fuera_conv,
+            "vs_fuera_retencion": vs_fuera_ret,
             # Contra lo que normalmente funciona en esta propiedad. Con una sola
             # fila en la categoria no hay contra que comparar: seria consigo mismo.
-            "vs_categoria_convocatoria": (
-                _delta_pct(m.convocatoria, ref_cat.convocatoria) if ref_cat else None
-            ),
-            "vs_categoria_retencion": (
-                _delta_puntos(m.retencion, ref_cat.retencion) if ref_cat else None
-            ),
+            "vs_categoria_convocatoria": vs_cat_conv,
+            "vs_categoria_retencion": vs_cat_ret,
+            # El costo se compara SOLO contra la categoria de esta misma casa:
+            # es dinero propio. Mas barato es mejor, el signo se lee al reves.
+            "vs_categoria_costo": _delta_pct(costo, costo_cat),
             "categoria_noches": ref_cat.noches if ref_cat else 0,
+            # Las dos comparaciones resumidas en una palabra, para la columna
+            # de veredicto de la maqueta.
+            "marca_fuera": _veredicto(vs_fuera_conv, vs_fuera_ret),
+            "marca_categoria": _veredicto(vs_cat_conv, vs_cat_ret),
+            "noches_detalle": sorted(
+                g["noches_lista"], key=lambda n: n["fecha"] or "", reverse=True
+            ),
         })
 
     filas.sort(key=lambda f: f["gente"], reverse=True)

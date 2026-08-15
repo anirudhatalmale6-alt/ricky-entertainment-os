@@ -162,8 +162,8 @@
   .muted{color:var(--mut)}
   /* Columnas de números: alineadas a la derecha y con cifras del mismo ancho,
      que es lo que deja comparar una columna de un vistazo (pantalla Audiencia). */
-  #panel-aud th.num,#panel-aud td.num{text-align:right;font-variant-numeric:tabular-nums;
-      white-space:nowrap;padding-right:0;padding-left:14px}
+  #panel-aud th.num,#panel-aud td.num,.audtbl th.num,.audtbl td.num{text-align:right;
+      font-variant-numeric:tabular-nums;white-space:nowrap;padding-right:0;padding-left:14px}
   #panel-aud select,#panel-aud input[type=search]{background:var(--inp);border:1px solid var(--line);color:var(--txt);
       border-radius:8px;height:34px;padding:0 9px;font-size:12.7px;font-family:inherit}
   .audtabs{display:flex;gap:6px;margin-bottom:16px}
@@ -176,6 +176,12 @@
   .audfilt label{display:flex;flex-direction:column;gap:5px;font-size:10.5px;color:var(--mut2);
       text-transform:uppercase;letter-spacing:.7px;font-weight:600}
   .audfilt .btn{margin-left:auto}
+  /* Los títulos SÍ pueden partirse en dos renglones; si se les deja nowrap, el
+     de "Costo por persona" se sale de su columna y se encima con el siguiente. */
+  .audtbl th,#panel-aud .audtbl th.num{white-space:normal;vertical-align:bottom;line-height:1.35}
+  /* Aire entre columnas: sin esto "Costo por persona" y "Vs. promedio talento"
+     se tocan y se leen como una sola palabra. */
+  .audtbl th:not(:first-child),.audtbl td:not(:first-child){padding-left:14px}
   .audtbl th.ord{cursor:pointer;user-select:none}
   .audtbl th.ord:hover{color:var(--txt)}
   .audtbl td{vertical-align:top}
@@ -185,6 +191,60 @@
   .dchip.dp{color:var(--ok)} .dchip.dm{color:var(--bad)} .dchip.dn{color:var(--mut)}
   .dz{color:var(--mut2)}
   .btn.mini{padding:6px 11px;font-size:11.5px;border-radius:8px;white-space:nowrap}
+  /* --- Tabla de desempeño, 2ª maqueta de David ------------------------- */
+  .audfilt .fclear{margin-left:auto;background:none;border:0;color:var(--acc);font-size:12px;
+      font-weight:600;cursor:pointer;font-family:inherit;padding:0 2px;height:34px}
+  .audfilt .fclear:disabled{color:var(--mut2);cursor:default}
+  .audtop{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .audtop .cnt{font-size:13.5px;font-weight:650}
+  .audtop .btn{margin-left:auto}
+  .who{display:flex;align-items:center;gap:11px;min-width:0}
+  .avat{width:36px;height:36px;border-radius:50%;flex:none;background-size:cover;background-position:center;
+      display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;
+      background-image:var(--grad);letter-spacing:.3px}
+  .who b{font-weight:650;font-size:13px}
+  /* Pastilla de género. El color sale del nombre, así que un mismo género se
+     ve siempre igual sin tener que mantener una lista a mano. */
+  .gpill{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;
+      white-space:nowrap;line-height:1.5}
+  /* Veredicto: arriba / abajo / mixto / parejo. "Mixto" existe a propósito —
+     que llene más pero retenga menos no es un empate, es un aviso. */
+  .vpill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:650;
+      padding:3px 10px;border-radius:20px;white-space:nowrap}
+  .vpill.v-arriba{background:rgba(16,185,129,.12);color:#047857}
+  .vpill.v-abajo{background:rgba(239,68,68,.12);color:#b91c1c}
+  .vpill.v-mixto{background:rgba(245,158,11,.14);color:#a16207}
+  .vpill.v-parejo{background:var(--ov);color:var(--mut)}
+  .vpill.v-nada{background:none;color:var(--mut2);padding-left:0}
+  .audtbl tbody tr:hover{background:var(--ov)}
+  .audtbl td.who-td{padding-top:9px;padding-bottom:9px}
+  .audtbl .sub{font-size:11px;color:var(--mut);display:block;margin-top:2px;font-weight:400}
+  .info{display:inline-grid;place-items:center;width:13px;height:13px;border-radius:50%;
+      border:1px solid var(--mut2);color:var(--mut2);font-size:9px;font-weight:700;cursor:help;
+      vertical-align:middle;margin-left:4px;text-transform:none;letter-spacing:0}
+  .audtbl input[type=checkbox]{width:15px;height:15px;accent-color:var(--acc);cursor:pointer;vertical-align:middle}
+  .audpag{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:15px;
+      padding-top:14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mut)}
+  .audpag .rango{margin-left:auto}
+  .audpag .pg{display:inline-flex;gap:5px}
+  .audpag .pg button{min-width:29px;height:29px;border-radius:8px;border:1px solid var(--line);
+      background:var(--card);color:var(--txt);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+  .audpag .pg button.on{background:var(--grad);color:#fff;border-color:transparent}
+  .audpag .pg button:disabled{color:var(--mut2);cursor:default}
+  .audmod{background:var(--card);border-radius:16px;width:100%;max-width:820px;max-height:88vh;
+      display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(12,16,30,.4);overflow:hidden}
+  .audmod .mh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .audmod .mb{overflow:auto;padding:16px 18px}
+  .audmod .mx{margin-left:auto;background:var(--ov);border:0;width:30px;height:30px;border-radius:50%;
+      cursor:pointer;font-size:15px;color:var(--mut);flex:none}
+  .audmod .rr{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+  .audmod .rr div{background:var(--ov);border-radius:11px;padding:11px 13px}
+  .audmod .rr span{display:block;font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+  .audmod .rr b{font-size:17px;font-weight:700;letter-spacing:-.3px}
+  .audmod .sub{font-size:11px;color:var(--mut);display:block;margin-top:3px}
+  .audmod tbody td:first-child{white-space:nowrap}
+  .audmod ul{list-style:none}
+  @media(max-width:700px){.audmod .rr{grid-template-columns:repeat(2,1fr)}}
 
   .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
   .c-pending{background:#fbbf241f;color:var(--warn)}
@@ -5592,6 +5652,9 @@ let AUDF={company:'', meses:0, tab:'resumen', venue:'', categoria:'', por:'prove
 let AUD_DATA=null;
 let AUD_DES=null;                       // último desempeño traído
 let AUD_ORD={col:'gente', dir:-1};      // orden de la tabla comparativa
+let AUD_VIS=[];                         // filas visibles (ya filtradas y ordenadas)
+let AUD_SEL=new Set();                  // renglones marcados
+let AUD_PAG={n:10, p:1};                // paginación de la tabla
 function audFiltrar(){
   const v=id=>{const e=document.getElementById(id); return e?e.value:'';};
   AUDF.company=v('audProp');
@@ -5599,14 +5662,28 @@ function audFiltrar(){
   if(document.getElementById('audVenue'))  AUDF.venue=v('audVenue');
   if(document.getElementById('audCat'))    AUDF.categoria=v('audCat');
   if(document.getElementById('audPor'))    AUDF.por=v('audPor')||'proveedor';
+  // Cambió el universo: lo marcado y la página ya no significan lo mismo.
+  AUD_SEL.clear(); AUD_PAG.p=1;
   show('aud',true);
+}
+function audLimpiar(){
+  AUDF.venue=''; AUDF.categoria=''; AUDF.meses=0; AUDF.por='proveedor'; AUDF.busca='';
+  AUD_SEL.clear(); AUD_PAG.p=1;
+  show('aud',true);
+}
+function audHayFiltros(){
+  return !!(AUDF.venue||AUDF.categoria||AUDF.meses||AUDF.busca||AUDF.por==='show');
 }
 function audTab(t){ AUDF.tab=t; show('aud',true); }
 function audOrdenar(col){
   AUD_ORD = (AUD_ORD.col===col) ? {col,dir:-AUD_ORD.dir} : {col,dir:-1};
+  AUD_PAG.p=1;
   audPintarTabla();
 }
-function audBuscar(txt){ AUDF.busca=(txt||'').toLowerCase(); audPintarTabla(); }
+function audBuscar(txt){ AUDF.busca=(txt||'').toLowerCase(); AUD_PAG.p=1; audPintarTabla(); }
+function audPorPag(n){ AUD_PAG.n=(n==='0'?0:+n); AUD_PAG.p=1; audPintarTabla(); }
+function audIrPag(p){ AUD_PAG.p=p; audPintarTabla();
+  const w=document.getElementById('audTablaWrap'); if(w) w.scrollIntoView({block:'start',behavior:'smooth'}); }
 /* Periodo -> parámetros. El mismo recorte se aplica a lo de aquí y a lo de
    afuera: si sólo se filtrara un lado, la diferencia sería de temporada. */
 function audParams(){
@@ -5647,11 +5724,31 @@ function audCSV(){
 }
 
 /* ---- Análisis de desempeño (tabla comparativa) --------------------------
-   Lo pidió David con una maqueta: una lista con filtros donde el hotel ve a
+   Lo pidió David con dos maquetas: una lista con filtros donde el hotel ve a
    cada proveedor con SUS números y, al lado, cómo le va a ese mismo proveedor
    en otras propiedades. Ése es el argumento de venta: el hotel ya lleva estos
    datos, lo que no tiene es contra qué compararlos.
    Nunca sale de aquí el nombre de las otras propiedades ni sus precios. */
+const audKey = f => f.show_id ? 's'+f.show_id : (f.artist_id ? 'a'+f.artist_id : 'n'+f.nombre);
+/* El color del género sale de su propio nombre: un mismo género se ve siempre
+   igual sin tener que mantener a mano una lista que se queda corta. */
+function audColorCat(txt){
+  let h=0; for(let i=0;i<(txt||'').length;i++) h=(h*31+txt.charCodeAt(i))%360;
+  return `background:hsl(${h} 70% 94%);color:hsl(${h} 55% 30%)`;
+}
+function audAvatar(f){
+  if(f.foto) return `<span class="avat" style="background-image:url('${esc(f.foto)}')"></span>`;
+  const ini=((f.nombre||'?').split(/\s+/).filter(Boolean).map(s=>s[0]).slice(0,2).join('')||'?').toUpperCase();
+  return `<span class="avat">${esc(ini)}</span>`;
+}
+const AUD_VER={arriba:['▲','Arriba'], abajo:['▼','Abajo'], mixto:['◆','Mixto'], parejo:['=','Parejo']};
+function audVeredicto(m,titulo){
+  if(!m||!AUD_VER[m]) return `<span class="vpill v-nada" title="Sin referencia suficiente">—</span>`;
+  const [ic,txt]=AUD_VER[m];
+  return `<span class="vpill v-${m}"${titulo?` title="${esc(titulo)}"`:''}>${ic} ${txt}</span>`;
+}
+const audInfo = t => `<span class="info" title="${esc(t)}">i</span>`;
+
 async function audDesempeno(box){
   const q=audParams();
   if(AUDF.venue)     q.push('venue_id='+AUDF.venue);
@@ -5663,6 +5760,9 @@ async function audDesempeno(box){
   const venuesVisibles=(d.venues||[]).filter(v=>!AUDF.company||String(v.company_id)===String(AUDF.company));
   box.innerHTML=audTabs('desempeno')+`
     <div class="box audfilt">
+      <label>Periodo
+        <select id="audPer" onchange="audFiltrar()">${opt('','Todo el histórico',AUDF.meses||'')}
+          ${opt(3,'Últimos 3 meses',AUDF.meses)}${opt(6,'Últimos 6 meses',AUDF.meses)}${opt(12,'Últimos 12 meses',AUDF.meses)}</select></label>
       <label>Propiedad
         <select id="audProp" onchange="audFiltrar()">
           ${props.length>1?opt('','Todas las propiedades',AUDF.company):''}
@@ -5670,21 +5770,19 @@ async function audDesempeno(box){
       <label>Salón
         <select id="audVenue" onchange="audFiltrar()">${opt('','Todos los salones',AUDF.venue)}
           ${venuesVisibles.map(v=>opt(v.id,v.name,AUDF.venue)).join('')}</select></label>
-      <label>Categoría
-        <select id="audCat" onchange="audFiltrar()">${opt('','Todas',AUDF.categoria)}
+      <label>Género
+        <select id="audCat" onchange="audFiltrar()">${opt('','Todos',AUDF.categoria)}
           ${(d.categorias||[]).map(c=>opt(c,c,AUDF.categoria)).join('')}</select></label>
-      <label>Periodo
-        <select id="audPer" onchange="audFiltrar()">${opt('','Todo el histórico',AUDF.meses||'')}
-          ${opt(3,'Últimos 3 meses',AUDF.meses)}${opt(6,'Últimos 6 meses',AUDF.meses)}${opt(12,'Últimos 12 meses',AUDF.meses)}</select></label>
       <label>Ver por
         <select id="audPor" onchange="audFiltrar()">${opt('proveedor','Proveedor',AUDF.por)}${opt('show','Show',AUDF.por)}</select></label>
       <label>Buscar
         <input id="audBusca" type="search" placeholder="Nombre…" value="${esc(AUDF.busca)}" oninput="audBuscar(this.value)"></label>
-      <button class="btn ghost" onclick="audDesCSV()">⬇ Exportar</button>
+      <button class="fclear" onclick="audLimpiar()"${audHayFiltros()?'':' disabled'}>↺ Limpiar filtros</button>
     </div>
     <div id="audTablaWrap"></div>`;
   audPintarTabla();
 }
+
 function audPintarTabla(){
   const cont=document.getElementById('audTablaWrap'); if(!cont||!AUD_DES) return;
   const d=AUD_DES;
@@ -5699,11 +5797,18 @@ function audPintarTabla(){
     if(vb==null) return -1;
     return typeof va==='string' ? va.localeCompare(vb)*dir : (va-vb)*dir;
   });
+  AUD_VIS=filas;
+  const total=filas.length, tam=AUD_PAG.n||total||1;
+  const paginas=Math.max(1,Math.ceil(total/tam));
+  if(AUD_PAG.p>paginas) AUD_PAG.p=paginas;
+  const desde=(AUD_PAG.p-1)*tam, pagina=AUD_PAG.n?filas.slice(desde,desde+tam):filas;
+
   const flecha=c=>col===c?(dir<0?' ▾':' ▴'):'';
   const th=(c,txt,cls)=>`<th class="${cls||''} ord" onclick="audOrdenar('${c}')">${txt}${flecha(c)}</th>`;
   const n1=v=>v==null?'—':v.toLocaleString('es-MX',{maximumFractionDigits:1});
   const pc=v=>v==null?'—':v.toFixed(0)+'%';
-  // El signo manda el color: verde = por encima de la referencia.
+  // El signo manda el color: verde = por encima de la referencia. En el costo
+  // se lee al revés (inv), porque ahí lo bueno es gastar menos por persona.
   const chip=(v,suf,inv)=>{
     if(v==null) return '<span class="dz">—</span>';
     const bueno=inv?v<0:v>0;
@@ -5712,45 +5817,81 @@ function audPintarTabla(){
     return `<span class="dchip ${cls}">${sig} ${Math.abs(v).toLocaleString('es-MX',{maximumFractionDigits:1})}${suf}</span>`;
   };
   const sinRef=d.reglas.sin_referencia, reglas=d.reglas;
-  const cuerpo=filas.map(f=>{
-    const fu=f.fuera||{};
+  const marcados=filas.filter(f=>AUD_SEL.has(audKey(f))).length;
+  const todosMarcados=total>0&&marcados===total;
+
+  const cuerpo=pagina.map((f,i)=>{
+    const idx=filas.indexOf(f), k=audKey(f), fu=f.fuera||{};
     const refTxt=fu.publicable
-      ? `${n1(fu.convocatoria)} pers/noche en ${fu.propiedades} propiedades`
+      ? `Su promedio en otras propiedades: ${n1(fu.convocatoria)} personas por noche y ${pc(fu.retencion)} de retención, sobre ${fu.noches} noches en ${fu.propiedades} propiedades.`
       : (fu.noches
-          ? `sólo ${fu.noches} ${fu.noches===1?'noche':'noches'} en ${fu.propiedades} ${fu.propiedades===1?'propiedad':'propiedades'} fuera de aquí`
-          : 'sin historia fuera de aquí');
+          ? `Sin referencia publicable: sólo ${fu.noches} ${fu.noches===1?'noche':'noches'} en ${fu.propiedades} ${fu.propiedades===1?'propiedad':'propiedades'} fuera de aquí.`
+          : 'Sin historia fuera de esta propiedad.');
+    const catTxt=f.categoria_noches
+      ? `Contra el resto de "${f.categoria}" en esta propiedad (${f.categoria_noches} noches), sin contarse a sí mismo.`
+      : 'Es el único de su género aquí: no hay contra qué compararlo.';
     return `<tr>
-      <td><b>${esc(f.nombre)}</b><span class="hint" style="margin:0;display:block">${esc(f.categoria)}</span></td>
-      <td class="num">${f.noches}</td>
-      <td class="num"><b>${n1(f.convocatoria)}</b><span class="hint" style="margin:0;display:block">${n1(f.gente)} en total</span></td>
-      <td class="num" title="${esc(refTxt)}">${chip(f.vs_fuera_convocatoria,'%')}</td>
-      <td class="num"><b>${pc(f.retencion)}</b></td>
-      <td class="num" title="${esc(refTxt)}">${chip(f.vs_fuera_retencion,' pts')}</td>
-      <td class="num">${chip(f.vs_categoria_convocatoria,'%')}
-        <span class="hint" style="margin:0;display:block">${f.vs_categoria_retencion==null?'&nbsp;':
-          (f.vs_categoria_retencion>0?'+':'')+f.vs_categoria_retencion.toLocaleString('es-MX',{maximumFractionDigits:1})+' pts ret.'}</span></td>
-      <td class="num">${f.costo_persona==null?'—':MXN2(f.costo_persona)}</td>
-      <td class="num">${f.artist_id?`<button class="btn ghost mini" onclick="openArtistProfile(${f.artist_id})">Ver perfil</button>`:''}</td></tr>`;
+      <td><input type="checkbox" onchange="audMarcar('${esc(k)}',this.checked)"${AUD_SEL.has(k)?' checked':''}></td>
+      <td class="who-td"><div class="who">${audAvatar(f)}<div style="min-width:0">
+        <b>${esc(f.nombre)}</b>
+        ${f.noches_con_precio<f.noches?`<span class="sub">${f.noches-f.noches_con_precio} sin precio capturado</span>`:''}
+      </div></div></td>
+      <td><span class="gpill" style="${audColorCat(f.categoria)}">${esc(f.categoria)}</span></td>
+      <td class="num"><b>${esc(String(f.noches))}</b>${f.propiedades>1?`<span class="sub">en ${f.propiedades} propiedades</span>`:''}</td>
+      <td class="num" title="${esc(refTxt)}"><b>${pc(f.retencion)}</b><span class="sub">${chip(f.vs_fuera_retencion,' pts')}</span></td>
+      <td class="num" title="${esc(refTxt)}"><b>${n1(f.convocatoria)}</b><span class="sub">${chip(f.vs_fuera_convocatoria,'%')}</span></td>
+      <td class="num" title="${esc(catTxt)}"><b>${f.costo_persona==null?'—':MXN2(f.costo_persona)}</b><span class="sub">${chip(f.vs_categoria_costo,'%',true)}</span></td>
+      <td>${audVeredicto(f.marca_fuera,refTxt)}</td>
+      <td>${audVeredicto(f.marca_categoria,catTxt)}</td>
+      <td class="num"><button class="btn ghost mini" onclick="audDetalle(${idx})">Ver detalle</button></td></tr>`;
   }).join('');
+
+  const btnPag=[];
+  for(let p=1;p<=paginas;p++){
+    if(paginas>7 && p>2 && p<paginas-1 && Math.abs(p-AUD_PAG.p)>1){
+      if(btnPag[btnPag.length-1]!=='<button disabled>…</button>') btnPag.push('<button disabled>…</button>');
+      continue;
+    }
+    btnPag.push(`<button class="${p===AUD_PAG.p?'on':''}" onclick="audIrPag(${p})">${p}</button>`);
+  }
+  const hasta=AUD_PAG.n?Math.min(desde+tam,total):total;
+
   cont.innerHTML=`
+    <div class="audtop">
+      <span class="cnt">${total} ${total===1?'resultado encontrado':'resultados encontrados'}</span>
+      ${marcados?`<span class="hint" style="margin:0">${marcados} seleccionado${marcados===1?'':'s'}</span>`:''}
+      <button class="btn ghost" onclick="audDesCSV()">⬇ Exportar${marcados?' selección':''}</button>
+    </div>
     <div class="box">
-      <div class="bhead"><h3 style="margin:0">${filas.length} ${filas.length===1?'resultado':'resultados'}</h3>
-        <span class="hint" style="margin:0">Verde = por encima de la referencia</span></div>
       <div style="overflow-x:auto"><table class="audtbl"><thead><tr>
-        ${th('nombre',d.por==='show'?'Show':'Proveedor')}
-        ${th('noches','Noches','num')}
-        ${th('convocatoria','Convocatoria<span class="hint" style="margin:0;display:block;font-weight:400">gente por noche</span>','num')}
-        ${th('vs_fuera_convocatoria','vs. otras<br>propiedades','num')}
-        ${th('retencion','Retención','num')}
-        ${th('vs_fuera_retencion','vs. otras<br>propiedades','num')}
-        ${th('vs_categoria_convocatoria','vs. su categoría<br>aquí','num')}
-        ${th('costo_persona','Costo/persona','num')}
-        <th></th>
-      </tr></thead><tbody>${cuerpo||'<tr><td colspan="9" class="muted" style="padding:18px 0">Sin resultados con estos filtros.</td></tr>'}</tbody></table></div>
+        <th style="width:26px"><input type="checkbox" onchange="audMarcarTodo(this.checked)"${todosMarcados?' checked':''}></th>
+        ${th('nombre',d.por==='show'?'Show':'Artista / Proveedor')}
+        ${th('categoria','Género')}
+        ${th('noches','Actuaciones<span class="sub" style="text-transform:none;letter-spacing:0">(propiedades)</span>','num')}
+        ${th('retencion','Retención<br>de público'+audInfo('De la gente que llegó, cuánta seguía ahí al terminar. Debajo, la diferencia en puntos contra su propio promedio en otras propiedades.'),'num')}
+        ${th('convocatoria','Convocatoria<br>de público'+audInfo('Personas por noche. Debajo, cuánto más (o menos) que su propio promedio en otras propiedades, en %.'),'num')}
+        ${th('costo_persona','Costo por persona<br>(MXN)'+audInfo('Lo pagado dividido entre la gente que llegó. Debajo, contra el promedio de su mismo género en esta propiedad. Verde = más barato.'),'num')}
+        ${th('vs_fuera_convocatoria','Vs. promedio<br>talento'+audInfo('Cómo le va aquí comparado con ese mismo proveedor en las otras propiedades donde trabaja.'))}
+        ${th('vs_categoria_convocatoria','Vs. promedio<br>segmento'+audInfo('Cómo le va comparado con los demás proveedores de su mismo género en esta propiedad.'))}
+        <th class="num">Acciones</th>
+      </tr></thead><tbody>${cuerpo||'<tr><td colspan="10" class="muted" style="padding:18px 0">Sin resultados con estos filtros.</td></tr>'}</tbody></table></div>
+      ${total?`<div class="audpag">
+        <label style="display:flex;align-items:center;gap:7px">Mostrar
+          <select onchange="audPorPag(this.value)">
+            ${[10,25,50].map(n=>`<option value="${n}"${AUD_PAG.n===n?' selected':''}>${n}</option>`).join('')}
+            <option value="0"${AUD_PAG.n?'':' selected'}>Todos</option>
+          </select> por página</label>
+        <span class="rango">${desde+1}–${hasta} de ${total}</span>
+        <span class="pg">
+          <button onclick="audIrPag(${Math.max(1,AUD_PAG.p-1)})"${AUD_PAG.p<=1?' disabled':''}>‹</button>
+          ${btnPag.join('')}
+          <button onclick="audIrPag(${Math.min(paginas,AUD_PAG.p+1)})"${AUD_PAG.p>=paginas?' disabled':''}>›</button>
+        </span></div>`:''}
       <div class="hint" style="margin:14px 0 0;line-height:1.6">
-        <b>Cómo leerlo.</b> "vs. otras propiedades" compara a ese mismo proveedor aquí contra su promedio en el resto de los hoteles donde trabaja,
-        en el mismo periodo. La convocatoria se compara en % y la retención en puntos.
-        "vs. su categoría aquí" lo compara contra los demás proveedores de su misma categoría en esta propiedad, sin contarse a sí mismo.<br>
+        <b>Cómo leerlo.</b> "Vs. promedio talento" compara a ese mismo proveedor aquí contra su promedio en el resto de los hoteles donde trabaja,
+        en el mismo periodo. La convocatoria se compara en % y la retención en puntos; cuando las dos no apuntan al mismo lado dice "Mixto",
+        porque llenar más pero retener menos no es un empate.
+        "Vs. promedio segmento" lo compara contra los demás proveedores de su mismo género en esta propiedad, sin contarse a sí mismo.<br>
         Sólo se muestra la referencia externa cuando hay al menos ${reglas.min_propiedades_fuera} propiedades y ${reglas.min_noches_fuera} noches detrás.
         Con una sola propiedad, ese "promedio" sería el dato de ese hotel con nombre y apellido, y eso no se enseña.
         ${sinRef?`Hoy ${sinRef} ${sinRef===1?'proveedor no tiene':'proveedores no tienen'} suficiente historia fuera de aquí.`:''}
@@ -5758,16 +5899,104 @@ function audPintarTabla(){
       </div>
     </div>`;
 }
+
+function audMarcar(k,on){ on?AUD_SEL.add(k):AUD_SEL.delete(k); audPintarTabla(); }
+function audMarcarTodo(on){
+  AUD_SEL.clear();
+  if(on) AUD_VIS.forEach(f=>AUD_SEL.add(audKey(f)));
+  audPintarTabla();
+}
+
+/* Detalle de un renglón: noche por noche. Es lo que vuelve discutible el
+   promedio — el hotel lo abre y lo compara contra su propia bitácora. */
+function audDetalle(i){
+  const f=AUD_VIS[i]; if(!f) return;
+  const fu=f.fuera||{};
+  const n1=v=>v==null?'—':v.toLocaleString('es-MX',{maximumFractionDigits:1});
+  const pc=v=>v==null?'—':v.toFixed(0)+'%';
+  const fecha=s=>s?new Date(s).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'—';
+  const linea=(txt,v,suf,inv)=>{
+    if(v==null) return '';
+    const bueno=inv?v<0:v>0, cls=Math.abs(v)<0.05?'dn':(bueno?'dp':'dm');
+    return `<li>${txt}: <span class="dchip ${cls}">${v>0?'+':''}${v.toLocaleString('es-MX',{maximumFractionDigits:1})}${suf}</span></li>`;
+  };
+  const noches=(f.noches_detalle||[]).map(n=>`<tr>
+      <td>${esc(fecha(n.fecha))}</td>
+      <td>${esc(n.venue)}${n.capacidad?`<span class="sub">cap. ${n.capacidad}</span>`:''}</td>
+      <td>${esc(n.show)}</td>
+      <td class="num">${esc(String(n.gente))}</td>
+      <td class="num">${n.se_quedaron==null?'—':esc(String(n.se_quedaron))}</td>
+      <td class="num">${pc(n.retencion)}</td>
+      <td class="num">${n.atraccion==null?'—':pc(n.atraccion)}</td>
+      <td class="num">${n.precio==null?'—':MXN(n.precio)}</td>
+      <td class="num">${n.costo_persona==null?'—':MXN2(n.costo_persona)}</td></tr>`).join('');
+  const ov=document.createElement('div');
+  ov.className='mov';
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<div class="audmod">
+    <div class="mh">${audAvatar(f)}
+      <div><b style="font-size:15px">${esc(f.nombre)}</b>
+        <span class="sub"><span class="gpill" style="${audColorCat(f.categoria)}">${esc(f.categoria)}</span></span></div>
+      <button class="mx" onclick="this.closest('.mov').remove()">✕</button></div>
+    <div class="mb">
+      <div class="rr">
+        <div><span>Actuaciones</span><b>${esc(String(f.noches))}</b></div>
+        <div><span>Convocatoria</span><b>${n1(f.convocatoria)}</b></div>
+        <div><span>Retención</span><b>${pc(f.retencion)}</b></div>
+        <div><span>Costo/persona</span><b>${f.costo_persona==null?'—':MXN2(f.costo_persona)}</b></div>
+      </div>
+      <div class="grid2b" style="gap:12px;margin-bottom:16px">
+        <div class="box" style="box-shadow:none;background:var(--ov);border:0">
+          <h3 style="margin:0 0 8px">Vs. su promedio en otras propiedades</h3>
+          ${fu.publicable
+            ? `<ul style="list-style:none;font-size:12.5px;line-height:2">
+                 ${linea('Convocatoria',f.vs_fuera_convocatoria,'%')}
+                 ${linea('Retención',f.vs_fuera_retencion,' pts')}
+               </ul>
+               <div class="hint" style="margin:6px 0 0">Su promedio afuera: ${n1(fu.convocatoria)} personas por noche y ${pc(fu.retencion)} de retención,
+                 sobre ${fu.noches} noches en ${fu.propiedades} propiedades. Sin nombres y sin precios.</div>`
+            : `<div class="hint" style="margin:0">Todavía no se puede comparar: ${fu.noches?`sólo ${fu.noches} ${fu.noches===1?'noche':'noches'} en ${fu.propiedades} ${fu.propiedades===1?'propiedad':'propiedades'}`:'no tiene historia'} fuera de aquí.
+                 Hacen falta al menos ${AUD_DES.reglas.min_propiedades_fuera} propiedades y ${AUD_DES.reglas.min_noches_fuera} noches: con una sola, ese promedio sería el dato de ese hotel.</div>`}
+        </div>
+        <div class="box" style="box-shadow:none;background:var(--ov);border:0">
+          <h3 style="margin:0 0 8px">Vs. ${esc(f.categoria)} en esta propiedad</h3>
+          ${f.categoria_noches
+            ? `<ul style="list-style:none;font-size:12.5px;line-height:2">
+                 ${linea('Convocatoria',f.vs_categoria_convocatoria,'%')}
+                 ${linea('Retención',f.vs_categoria_retencion,' pts')}
+                 ${linea('Costo por persona',f.vs_categoria_costo,'%',true)}
+               </ul>
+               <div class="hint" style="margin:6px 0 0">Contra ${f.categoria_noches} noches de su mismo género aquí, sin contarse a sí mismo.</div>`
+            : `<div class="hint" style="margin:0">Es el único de su género en esta propiedad, así que no hay contra qué compararlo.</div>`}
+        </div>
+      </div>
+      <h3 style="font-size:13.5px;font-weight:650;margin-bottom:8px">Noche por noche</h3>
+      <div style="overflow-x:auto"><table class="audtbl"><thead><tr>
+        <th>Fecha</th><th>Salón</th><th>Show</th><th class="num">Llegaron</th><th class="num">Se quedaron</th>
+        <th class="num">Retención</th><th class="num">Llenado</th><th class="num">Costo</th><th class="num">Por persona</th>
+      </tr></thead><tbody>${noches}</tbody></table></div>
+      ${f.artist_id?`<div style="margin-top:14px"><button class="btn ghost mini" onclick="this.closest('.mov').remove();openArtistProfile(${f.artist_id})">Ver perfil del proveedor</button></div>`:''}
+    </div></div>`;
+  document.body.appendChild(ov);
+}
+
 function audDesCSV(){
   if(!AUD_DES||!AUD_DES.filas.length) return;
-  const col=['Proveedor','Categoría','Noches','Gente','Convocatoria (pers/noche)','Retención %',
-             'Vs otras propiedades (convocatoria %)','Vs otras propiedades (retención pts)',
-             'Vs su categoría aquí (%)','Propiedades fuera','Noches fuera','Costo por persona'];
+  // Si hay renglones marcados se exportan sólo ésos: es lo que espera quien
+  // marcó tres proveedores para llevárselos a una junta.
+  const base=AUD_VIS.length?AUD_VIS:AUD_DES.filas;
+  const marcadas=base.filter(f=>AUD_SEL.has(audKey(f)));
+  const salida=marcadas.length?marcadas:base;
+  const col=['Proveedor','Género','Actuaciones','Propiedades','Gente','Convocatoria (pers/noche)','Retención %',
+             'Costo por persona','Vs otras propiedades (convocatoria %)','Vs otras propiedades (retención pts)',
+             'Veredicto vs su promedio','Vs su género aquí (convocatoria %)','Vs su género aquí (retención pts)',
+             'Vs su género aquí (costo %)','Veredicto vs su género','Propiedades fuera','Noches fuera'];
   const celda=v=>{ if(v===null||v===undefined) return '';
     const s=String(v); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
-  const filas=AUD_DES.filas.map(f=>[f.nombre,f.categoria,f.noches,f.gente,f.convocatoria,f.retencion,
-    f.vs_fuera_convocatoria,f.vs_fuera_retencion,f.vs_categoria_convocatoria,
-    f.fuera.propiedades,f.fuera.noches,f.costo_persona].map(celda).join(','));
+  const filas=salida.map(f=>[f.nombre,f.categoria,f.noches,f.propiedades,f.gente,f.convocatoria,f.retencion,
+    f.costo_persona,f.vs_fuera_convocatoria,f.vs_fuera_retencion,f.marca_fuera,
+    f.vs_categoria_convocatoria,f.vs_categoria_retencion,f.vs_categoria_costo,f.marca_categoria,
+    f.fuera.propiedades,f.fuera.noches].map(celda).join(','));
   const blob=new Blob(['﻿'+[col.join(','),...filas].join('\r\n')],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download='desempeno-showma.csv'; a.click();
