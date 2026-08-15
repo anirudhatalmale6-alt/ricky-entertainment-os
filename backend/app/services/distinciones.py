@@ -262,6 +262,12 @@ def _comparativas(datos: dict, artist_id: int) -> list[dict]:
                     "tipo": "top",
                     "metrica": metrica,
                     "texto": f"{tope} en {texto}",
+                    # Partido en dos para que la medalla se lea en varios
+                    # renglones y las tres quepan en una sola fila (David
+                    # 2026-08-15). `texto` se conserva: lo usa la tarjeta de
+                    # búsqueda, donde sí va todo seguido.
+                    "titulo": tope,
+                    "resto": f"en {texto}",
                     "grupo": etiqueta,
                     "detalle": (f"Lugar {lugar} de {total} proveedores comparados en "
                                 f"{etiqueta}, sobre {acc.n} actuaciones"),
@@ -277,6 +283,8 @@ def _comparativas(datos: dict, artist_id: int) -> list[dict]:
                     "tipo": "lider",
                     "metrica": "volumen",
                     "texto": f"El más contratado en {etiqueta}",
+                    "titulo": "El más contratado",
+                    "resto": f"en {etiqueta}",
                     "grupo": etiqueta,
                     "detalle": (f"{acc.n} actuaciones, más que cualquiera de los otros "
                                 f"{len(volumen) - 1} proveedores del grupo"),
@@ -304,12 +312,17 @@ def _absolutas(datos: dict, artist_id: int) -> list[dict]:
     if racha >= MIN_RACHA:
         if racha >= 12:
             años = racha // 12
-            texto = f"{años} año{'s' if años > 1 else ''} seguido{'s' if años > 1 else ''} con actuaciones"
+            titulo = f"{años} año{'s' if años > 1 else ''}"
+            resto = f"seguido{'s' if años > 1 else ''} con actuaciones"
         else:
-            texto = f"{racha} meses seguidos con actuaciones"
+            titulo = f"{racha} meses"
+            resto = "seguidos con actuaciones"
+        texto = f"{titulo} {resto}"
         fuera.append({
             "tipo": "constancia",
             "texto": texto,
+            "titulo": titulo,
+            "resto": resto,
             "grupo": "",
             "detalle": f"Encadena {racha} meses sin quedarse un solo mes sin trabajar en SHOWMA",
             "peso": 80 + min(racha, 18),
@@ -321,6 +334,8 @@ def _absolutas(datos: dict, artist_id: int) -> list[dict]:
         fuera.append({
             "tipo": "cumplimiento",
             "texto": f"Nunca ha cancelado en {ag} actuaciones",
+            "titulo": "Nunca ha cancelado",
+            "resto": f"en {ag} actuaciones",
             "grupo": "",
             "detalle": f"Aceptó {ag} actuaciones y se presentó a todas",
             "peso": 70 + min(ag // 10, 15),
@@ -333,6 +348,8 @@ def _absolutas(datos: dict, artist_id: int) -> list[dict]:
             fuera.append({
                 "tipo": "recontratacion",
                 "texto": "Todos los hoteles lo volvieron a contratar",
+                "titulo": "100% de recontratación",
+                "resto": "todos los hoteles repitieron",
                 "grupo": "",
                 "detalle": f"Los {len(todos.por_hotel)} hoteles que lo contrataron repitieron",
                 "peso": 90,

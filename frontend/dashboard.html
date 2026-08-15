@@ -560,11 +560,11 @@
   .tx{background:var(--ov);border:0;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;color:var(--mut);line-height:1}
   .tx:hover{background:var(--bad);color:#fff}
   /* Artist profile pop-up */
-  /* Los 900px eran para que la barra verificada cupiera en un renglón cuando
-     traía seis datos. David quitó dos, ahora mide 493px y entra de sobra: se
-     regresa a 760 (David 2026-08-15, "se hizo muy ancho"). Si algún día vuelve
-     a crecer esa barra, medir antes de tocar este número. */
-  .amod.apmod{max-width:760px;max-height:90vh}
+  /* 650: David lo quiere angosto y alto, no ancho y cortado (2026-08-15). Cabe
+     porque la barra verificada bajó a cuatro datos (493px) y porque tanto la
+     barra del encabezado como las medallas ahora crecen hacia abajo en vez de
+     a lo largo. Si algo de eso cambia, medir antes de tocar este número. */
+  .amod.apmod{max-width:650px;max-height:90vh}
   .aphero{height:190px;background:var(--grad);background-size:cover;background-position:center;position:relative;flex:none}
   .aphscrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,16,32,.05) 0%,rgba(6,16,32,.72) 100%)}
   .aphttl{position:absolute;left:20px;right:20px;bottom:14px;color:#fff}
@@ -607,10 +607,18 @@
   /* Distinciones. Un solo tono de marca y sin relleno de color: si cada medalla
      trae su propio color, el perfil vuelve a parecer una feria. */
   .apdist{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 14px}
-  .apdchip{display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:8px;
+  /* Reparten el renglón en partes iguales y el texto crece hacia abajo: las
+     tres medallas caben en una fila aunque el perfil mida 650 (David
+     2026-08-15). El tope en px, no en %, para que una medalla sola no se
+     estire de lado a lado. */
+  .apdchip{flex:1 1 0;min-width:150px;max-width:240px;
+    display:flex;align-items:flex-start;gap:7px;padding:8px 10px;border-radius:8px;
     border:1px solid var(--line);background:var(--card);line-height:1.25}
-  .apdchip b{font-size:11.5px;font-weight:750}
-  .apdchip span{font-size:10.5px;color:var(--mut)}
+  .apdchip .ic1{margin-top:1px}
+  .apdchip .apdtx{min-width:0}
+  .apdchip b{display:block;font-size:11.5px;font-weight:750;line-height:1.2}
+  .apdchip em{display:block;font-style:normal;font-size:10.5px;line-height:1.25;margin-top:1px}
+  .apdchip span{display:block;font-size:10px;color:var(--mut);line-height:1.25;margin-top:1px}
   .apdchip.top,.apdchip.lider{border-color:rgba(56,44,161,.28);background:rgba(56,44,161,.045)}
   /* En la tarjeta: una línea, sin envolver, con puntos suspensivos si no cabe. */
   .acdist{display:flex;align-items:center;gap:5px;margin:6px 0 0;font-size:10.5px;
@@ -638,13 +646,16 @@
     background:rgba(15,14,23,.62);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.16);
     color:#fff;padding:7px 12px;border-radius:11px;font-size:11px;line-height:1.25}
   .apvbadge b{display:block;font-size:12.5px;font-weight:800;letter-spacing:.3px}
-  .apstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+  .apstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));
     border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:-26px 0 16px;
     position:relative;z-index:2;background:var(--card,#fff);box-shadow:0 4px 16px rgba(15,14,35,.07)}
-  .apstat{display:flex;align-items:center;gap:9px;padding:11px 13px;border-right:1px solid var(--line)}
+  .apstat{display:flex;align-items:flex-start;gap:8px;padding:12px 12px 13px;border-right:1px solid var(--line)}
   .apstat:last-child{border-right:0}
-  .apstat .apsv{font-size:14px;font-weight:750;line-height:1.2;letter-spacing:-.1px}
-  .apstat .apsl{font-size:10.5px;color:var(--mut);margin-top:1px;line-height:1.3}
+  .apstat .ic1{margin-top:2px}
+  .apstat .apstx{min-width:0}
+  .apstat .apsn{font-size:15.5px;font-weight:750;line-height:1.15;letter-spacing:-.2px}
+  .apstat .apsv{font-size:11.5px;font-weight:650;line-height:1.25;margin-top:1px}
+  .apstat .apsl{font-size:10px;color:var(--mut);margin-top:2px;line-height:1.3}
   .apcols{display:grid;grid-template-columns:1.55fr 1fr;gap:20px;align-items:start;margin-bottom:16px}
   /* Sin esto la tira de hoteles (que se desborda a propósito) ensancha su
      columna y aplasta la de la derecha hasta partir "Tiempo de respuesta". */
@@ -659,15 +670,20 @@
   .aphlogo{height:46px;display:flex;align-items:center;justify-content:center;margin-bottom:7px;
     font-size:11px;font-weight:700;color:var(--txt);line-height:1.2;overflow:hidden}
   .aphlogo img{max-height:46px;max-width:100%;object-fit:contain}
+  /* Dos renglones en vez de recortar con puntos suspensivos: en un perfil
+     angosto "Hard Rock Riviera Maya" se quedaba en "Hard Rock Rivie…". */
   .aphcard .nom{font-size:10.5px;font-weight:650;line-height:1.25;margin-bottom:2px;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .aphcard .n{font-size:10.5px;font-weight:650;color:var(--mut)}
-  .aphnav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:26px;height:26px;
+  /* Las flechas van en el encabezado, no encima de la tira: sobre el perfil de
+     650 tapaban la tercera tarjeta (David 2026-08-15). */
+  .aphhd{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .aphnavs{display:flex;gap:5px;flex:none}
+  .aphnav{width:22px;height:22px;
     border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--txt);
-    cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;
-    box-shadow:0 2px 8px rgba(15,14,35,.12);padding:0}
+    cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;
+    padding:0}
   .aphnav:hover{border-color:var(--acc);color:var(--acc)}
-  .aphnav.pre{left:-11px} .aphnav.sig{right:-11px}
   .apinfo{border-left:1px solid var(--line);padding-left:16px}
   .apirow{display:flex;gap:9px;margin-bottom:11px}
   .apirow .t{font-size:11.5px;font-weight:700}
@@ -3038,11 +3054,19 @@ const DIST_ICO={top:'medal', lider:'star', constancia:'cal', cumplimiento:'check
 function apDistHTML(lista){
   if(!lista||!lista.length) return '';
   return `<div class="apdist">${lista.map(d=>{
+    // El título va solo en su renglón y la explicación debajo: así la medalla
+    // crece hacia abajo y las tres caben en una sola fila aunque el perfil sea
+    // angosto (David 2026-08-15). Los perfiles viejos que no traigan `titulo`
+    // siguen mostrando la frase completa.
+    const titulo=d.titulo||d.texto||'';
+    const resto=d.titulo?(d.resto||''):'';
     // "El más contratado en X" ya lleva el grupo dentro: repetirlo al lado se
     // lee como un error de la pantalla.
-    const grupo=(d.grupo && !(d.texto||'').includes(d.grupo)) ? d.grupo : '';
+    const dicho=titulo+' '+resto;
+    const grupo=(d.grupo && !dicho.includes(d.grupo)) ? d.grupo : '';
     return `<div class="apdchip ${esc(d.tipo||'')}"${d.detalle?` title="${esc(d.detalle)}"`:''}>
-      ${ico(DIST_ICO[d.tipo]||'medal')}<b>${esc(d.texto||'')}</b>${grupo?`<span>${esc(grupo)}</span>`:''}
+      ${ico(DIST_ICO[d.tipo]||'medal')}<div class="apdtx"><b>${esc(titulo)}</b>${
+        resto?`<em>${esc(resto)}</em>`:''}${grupo?`<span>${esc(grupo)}</span>`:''}</div>
     </div>`;}).join('')}</div>`;
 }
 /* En la tarjeta de búsqueda sólo cabe la más fuerte, y sin el grupo: la tarjeta
@@ -3191,26 +3215,34 @@ function trIt(valor, etiqueta, muestra, detalle){
 
 /* Barra de cuatro números del encabezado. Sólo entra el que tiene dato: más vale
    una barra de tres que un "0 hoteles" gritándole al hotel que nadie lo contrató. */
+/* La barra del encabezado: número arriba, de qué es debajo, y la aclaración al
+   final. Antes el número y la palabra iban en el mismo renglón y en un perfil
+   angosto se partían por donde caía; así crece hacia abajo y siempre se lee
+   completa (David 2026-08-15, "expandirla hacia abajo para que no quede tan
+   cortada"). */
 function apStatsHTML(t, a){
   if(!t) return '';
   const st=[];
-  if(t.hoteles) st.push(['hotel', String(t.hoteles)+(t.hoteles===1?' Hotel':' Hoteles'),'han contratado']);
-  if(t.actuaciones) st.push(['cal', String(t.actuaciones)+(t.actuaciones===1?' Actuación':' Actuaciones'),'registradas en SHOWMA']);
-  if(t.calificacion) st.push(['star', t.calificacion.promedio.toFixed(1)+' / 5',
-    `Calificación de ${t.calificacion.total} ${t.calificacion.total===1?'hotel':'hoteles'}`]);
-  if(t.desde) st.push(['medal', trAntiguedad(t.desde),'en SHOWMA']);
+  if(t.hoteles) st.push(['hotel', String(t.hoteles), t.hoteles===1?'Hotel':'Hoteles','han contratado']);
+  if(t.actuaciones) st.push(['cal', String(t.actuaciones), t.actuaciones===1?'Actuación':'Actuaciones','registradas en SHOWMA']);
+  if(t.calificacion) st.push(['star', t.calificacion.promedio.toFixed(1)+' / 5', 'Calificación',
+    `de ${t.calificacion.total} ${t.calificacion.total===1?'hotel':'hoteles'}`]);
+  if(t.desde){ const [n,u]=trAntiguedadPartes(t.desde); st.push(['medal', n, u,'en SHOWMA']); }
   if(!st.length) return '';
-  return `<div class="apstats">${st.map(([k,v,l])=>
-    `<div class="apstat">${ico(k)}<div><div class="apsv">${esc(v)}</div>
+  return `<div class="apstats">${st.map(([k,n,u,l])=>
+    `<div class="apstat">${ico(k)}<div class="apstx"><div class="apsn">${esc(n)}</div>
+      ${u?`<div class="apsv">${esc(u)}</div>`:''}
       <div class="apsl">${esc(l)}</div></div></div>`).join('')}</div>`;
 }
-function trAntiguedad(iso){
+// Devuelve [número, unidad] por separado: la barra los pone en renglones
+// distintos y necesita saber dónde parte.
+function trAntiguedadPartes(iso){
   const d=new Date(iso+'T00:00:00'), hoy=new Date();
   const meses=Math.max(0,(hoy.getFullYear()-d.getFullYear())*12+(hoy.getMonth()-d.getMonth()));
-  if(meses<1) return 'Recién llegado';
-  if(meses<12) return meses+(meses===1?' mes':' meses');
+  if(meses<1) return ['Nuevo',''];
+  if(meses<12) return [String(meses), meses===1?'mes':'meses'];
   const y=Math.floor(meses/12);
-  return y+(y===1?' año':' años');
+  return [String(y), y===1?'año':'años'];
 }
 function apStars(r){
   const llenas=Math.round(r||0);
@@ -3223,11 +3255,13 @@ function apHotelesHTML(t){
   const h=(t&&t.hoteles_detalle)||[];
   if(!h.length) return '';
   const flechas = h.length>3
-    ? `<button class="aphnav pre" onclick="apHotelScroll(-1)" aria-label="Anteriores">‹</button>
-       <button class="aphnav sig" onclick="apHotelScroll(1)" aria-label="Siguientes">›</button>` : '';
-  return `<div class="apsec"><h4>Experiencia en hoteles</h4>
+    ? `<div class="aphnavs">
+         <button class="aphnav" onclick="apHotelScroll(-1)" aria-label="Anteriores">‹</button>
+         <button class="aphnav" onclick="apHotelScroll(1)" aria-label="Siguientes">›</button>
+       </div>` : '';
+  return `<div class="apsec"><div class="aphhd"><h4>Experiencia en hoteles</h4>${flechas}</div>
     <div class="muted" style="font-size:12px;margin:-4px 0 9px">${h.length} ${h.length===1?'hotel':'hoteles'} · ${t.actuaciones} ${t.actuaciones===1?'actuación verificada':'actuaciones verificadas'}</div>
-    <div class="aphwrap">${flechas}
+    <div class="aphwrap">
       <div class="aphstrip" id="apHStrip">${h.map(x=>`<div class="aphcard">
         <div class="aphlogo">${x.logo_url?`<img src="${esc(x.logo_url)}" alt="${esc(x.nombre)}">`:esc(x.nombre)}</div>
         <div class="nom" title="${esc(x.nombre)}">${esc(x.nombre)}</div>
