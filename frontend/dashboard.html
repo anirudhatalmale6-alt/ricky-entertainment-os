@@ -243,6 +243,18 @@
   .audmod .rr b{font-size:17px;font-weight:700;letter-spacing:-.3px}
   .audmod .sub{font-size:11px;color:var(--mut);display:block;margin-top:3px}
   .audmod tbody td:first-child{white-space:nowrap}
+  /* Comentarios de hoteles en el panel del talento. Sin tarjetas de colores:
+     lo que tiene que resaltar es lo que escribió el hotel, no la caja. */
+  .resl{display:flex;flex-direction:column}
+  .resr{padding:12px 0;border-top:1px solid var(--line)}
+  .resr:first-child{border-top:0;padding-top:2px}
+  .resh{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px}
+  .resh .star{color:#f0a92b;letter-spacing:1px;font-size:12px}
+  .resh b{font-weight:650}
+  .ressh{font-size:11.5px;color:var(--mut)}
+  .resf{margin-left:auto;font-size:11px;color:var(--mut2);white-space:nowrap}
+  .resc{font-size:13px;line-height:1.5;margin-top:5px}
+  .resa{font-size:11px;color:var(--mut);margin-top:4px}
   .audmod ul{list-style:none}
   @media(max-width:700px){.audmod .rr{grid-template-columns:repeat(2,1fr)}}
 
@@ -6994,7 +7006,17 @@ async function artistHome(box){
   const upcoming=bk.filter(b=>['pending','confirmed'].includes(b.status)&&new Date(b.starts_at)>=today).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
   const totalRev=bk.filter(isRev).reduce((a,b)=>a+(b.agreed_price||0),0);
   const monthRev=bk.filter(b=>isRev(b)&&sameMonth(b.starts_at,now)).reduce((a,b)=>a+(b.agreed_price||0),0);
-  const score=p.rating?Math.round(p.rating*20):Math.min(98,72+done.length*3);
+  /* Calificación, comentarios y distinciones (David 2026-08-15).
+     Antes esta pantalla inventaba el score: sin reseñas ponía 72 y le sumaba 3
+     por actuación, y de ahí sacaba un "Top 30% de artistas" que no comparaba
+     con nadie. Un proveedor que enseñe eso a un hotel y se descubra, pierde el
+     hotel. Ahora sale de lo que el hotel calificó de verdad, y el "Top" sólo lo
+     manda el servidor cuando hay grupo con quién compararse. Sin reseñas se
+     dice que no hay, que también es información: le dice qué le falta. */
+  let resenas={promedio:null,total:0,items:[]}, tray=null;
+  try{ resenas=await api('/reviews/artists/'+p.id+'?limit=5'); }catch(e){}
+  try{ tray=await api('/artists/'+p.id+'/trayectoria'); }catch(e){}
+  const distinciones=(tray&&tray.distinciones)||[];
   const next=upcoming[0];
   const unread=convs.reduce((a,c)=>a+(c.unread_for_artist||0),0);
   const months=[]; for(let i=5;i>=0;i--) months.push(new Date(now.getFullYear(),now.getMonth()-i,1));
@@ -7015,11 +7037,14 @@ async function artistHome(box){
 
   box.innerHTML=`
     <div class="kpis">
-      <div class="kpi"><div class="k">⭐ Mi Score</div>
-        <div style="display:flex;align-items:center;gap:14px;margin-top:10px">
-          <div class="ring" style="background:conic-gradient(var(--acc) ${(score*3.6).toFixed(0)}deg,var(--ov2) 0)"><div class="cn"><b>${score}</b><s>/100</s></div></div>
-          <div><div class="star" style="font-size:14px">${'★'.repeat(Math.max(1,Math.round(score/20)))}</div><div class="d">Top ${score>=90?'5':score>=80?'15':'30'}% de artistas</div></div>
-        </div></div>
+      <div class="kpi"><div class="k">⭐ Mi calificación</div>
+        ${resenas.total?`<div style="display:flex;align-items:center;gap:14px;margin-top:10px">
+          <div class="ring" style="background:conic-gradient(var(--acc) ${(resenas.promedio/5*360).toFixed(0)}deg,var(--ov2) 0)"><div class="cn"><b>${resenas.promedio.toFixed(1)}</b><s>/5</s></div></div>
+          <div><div class="star" style="font-size:14px">${starRow(resenas.promedio)}</div>
+            <div class="d">${resenas.total} ${resenas.total===1?'calificación':'calificaciones'} de hoteles</div></div>
+        </div>`
+        :`<div class="v" style="font-size:15.5px;margin-top:9px">Sin calificaciones aún</div>
+          <div class="d" style="margin-top:4px">Cada hotel puede calificar una actuación ya realizada. En cuanto lo hagan, tu promedio aparece aquí.</div>`}</div>
       <div class="kpi"><div class="k">🗓️ Próxima actuación</div>
         ${next?`<div class="v" style="font-size:15.5px;margin-top:9px">${esc(next.company_name||next.show_name||'Actuación')}</div><div class="d">${fmtDate(next.starts_at)}</div><div style="margin-top:8px">${chip(next.status)}</div>`
         :`<div class="v" style="font-size:15.5px;margin-top:9px">—</div><div class="d">Sin actuaciones próximas</div>`}</div>
@@ -7038,11 +7063,34 @@ async function artistHome(box){
           <div class="srow"><div class="ic2">💬</div><div class="lb">Mensajes sin leer<s>de hoteles</s></div><div class="nb">${unread}</div></div>
           <div class="srow"><div class="ic2">🎭</div><div class="lb">Actuaciones próximas<s>confirmadas o pendientes</s></div><div class="nb">${upcoming.length}</div></div>
         </div>
-        <div class="box"><h3>👑 Top Performer</h3><div class="hint">Sube en las búsquedas y gana el distintivo de confianza</div>
+        <div class="box"><h3>🏅 Mis distinciones</h3>
+          <div class="hint">${distinciones.length?'Lo que la plataforma puede demostrar de ti. Los hoteles las ven en tu perfil y en las búsquedas.'
+            :'Se ganan solas con tus actuaciones. Nadie las escribe a mano.'}</div>
+          ${distinciones.length?apDistHTML(distinciones)
+            :`<div class="muted" style="padding:2px 0 12px;font-size:12.5px">Todavía no tienes ninguna.
+               Un "Top 10%" necesita al menos 5 actuaciones tuyas dentro de un grupo con 8 proveedores comparables;
+               las de constancia y cumplimiento salen antes, con tu propia historia. Llevas ${done.length}
+               ${done.length===1?'actuación realizada':'actuaciones realizadas'}.</div>`}
           <div class="srow" style="cursor:pointer" onclick="topPerformerInfo()"><div class="ic2">⭐</div><div class="lb">Ver beneficios<s>visibilidad, oportunidades y herramientas premium</s></div><div class="nb">›</div></div>
           <div class="srow"><div class="ic2">🎭</div><div class="lb">Shows publicados<s>completa tu catálogo para destacar</s></div><div class="nb">${(p.shows||[]).length}</div></div>
         </div>
       </div>
+    </div>
+    <div class="box" style="margin-top:16px"><h3>💬 Lo que dicen los hoteles</h3>
+      <div class="hint">${resenas.total?`Comentarios recientes · ${resenas.total} ${resenas.total===1?'calificación':'calificaciones'} en total`
+        :'Sólo puede calificarte un hotel que te contrató, sobre una actuación ya realizada'}</div>
+      ${resenas.total?`<div class="resl">${resenas.items.map(r=>`
+        <div class="resr">
+          <div class="resh"><span class="star">${starRow(r.rating)}</span>
+            <b>${esc(r.company_name||'Hotel')}</b>
+            ${r.show_name?`<span class="ressh">${esc(r.show_name)}</span>`:''}
+            <span class="resf">${r.actuacion_fecha?esc(new Date(r.actuacion_fecha).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})):''}</span></div>
+          ${r.comment?`<div class="resc">${esc(r.comment)}</div>`:'<div class="resc muted">Calificó sin dejar comentario.</div>'}
+          ${r.author_name||r.author_position?`<div class="resa">${esc([r.author_name,r.author_position].filter(Boolean).join(' · '))}</div>`:''}
+        </div>`).join('')}</div>`
+        :`<div class="muted" style="padding:4px 0 2px;font-size:12.5px">Todavía no tienes comentarios.
+           Es a propósito que no se puedan dejar de otra forma: una calificación que nace de una actuación real
+           es la única que un hotel no puede inventar, ni a tu favor ni en tu contra.</div>`}
     </div>
     <div class="grid2" style="margin-top:16px">
       <div class="box"><h3>📊 Rendimiento (6 meses)</h3><div class="hint">Ingresos por mes · ${MXN(totalRev)} acumulado</div>
