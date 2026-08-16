@@ -1710,7 +1710,13 @@ const pctRango = r => (r&&r.length===2&&r[0]!=null)
 const CATCOL = {"Musica":"#382ca1","Shows":"#f59e0b","Fotografia y Video":"#3b82f6","Produccion":"#10b981"};
 const palette=["#382ca1","#3b82f6","#10b981","#f59e0b","#06b6d4","#ef4444"];
 const stars = n => n? '★'.repeat(n):'—';
-const esc = s => (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+/* Las comillas TIENEN que ir escapadas. Sin esto, un texto con comillas dentro
+   de un title="…" cortaba el atributo a la mitad: el globo del costo por
+   persona decía 'Contra el resto de "' y ahí se acababa (David, 16/08). En
+   texto normal &quot; se pinta como una comilla, así que no estorba. Las
+   comillas simples se dejan crudas a propósito: hay onclick="f('${esc(x)}')"
+   por todo el archivo y escaparlas rompería esas llamadas. */
+const esc = s => (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // Display-only accent normalization for category/subcategory labels (keeps raw
 // keys intact for filtering & color lookup — only prettifies what the user sees).
 const PRETTY={"Musica":"Música","Produccion":"Producción","Fotografia y Video":"Fotografía y Video",
