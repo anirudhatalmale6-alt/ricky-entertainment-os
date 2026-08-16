@@ -299,9 +299,15 @@ class _Medida:
         # saldria mas barato de lo que fue.
         self.gente_con_precio = 0
         self.noches_con_precio = 0
+        # Convocatoria en % del aforo. Solo entran las noches con capacidad
+        # conocida: mezclar la gente de una noche sin salon con el aforo de las
+        # otras infla el porcentaje (mismo error que ya se corrigio en Resumen).
+        self.aforo = 0
+        self.gente_con_aforo = 0
+        self.noches_con_aforo = 0
         self.propiedades: set[int] = set()
 
-    def suma(self, b, asistentes: int, precio: float | None):
+    def suma(self, b, asistentes: int, precio: float | None, capacidad: int | None = None):
         self.noches += 1
         self.gente += asistentes
         self.se_quedaron += b.headcount_end if b.headcount_end is not None else asistentes
@@ -309,6 +315,10 @@ class _Medida:
             self.gasto += precio
             self.gente_con_precio += asistentes
             self.noches_con_precio += 1
+        if capacidad:
+            self.aforo += capacidad
+            self.gente_con_aforo += asistentes
+            self.noches_con_aforo += 1
         if b.company_id:
             self.propiedades.add(b.company_id)
 
@@ -316,6 +326,18 @@ class _Medida:
     def convocatoria(self) -> float | None:
         """Gente por noche. Comparar totales seria comparar quien trabajo mas."""
         return round(self.gente / self.noches, 1) if self.noches else None
+
+    @property
+    def convocatoria_pct(self) -> float | None:
+        """Que tan lleno dejo el lugar, en % del aforo.
+
+        David (2026-08-16): "si hay una propiedad de un teatro pequeno y se
+        compara con teatros grandes, siempre va a salir negativo, aunque su
+        lleno este completamente lleno". Tiene razon: en gente por noche, un
+        salon de 200 nunca le gana a uno de 600 aunque los llene los dos. El %
+        del aforo es la unica forma de comparar salas de tamanos distintos.
+        """
+        return _pct(self.gente_con_aforo, self.aforo)
 
     @property
     def retencion(self) -> float | None:
@@ -339,6 +361,7 @@ def _delta_puntos(mio: float | None, otro: float | None) -> float | None:
 
 # Debajo de estos margenes la diferencia es ruido y se llama "parejo". Sin este
 # corte, un 0.4% de mas pintaria verde y el hotel leeria una ventaja que no hay.
+# _RUIDO_PCT se sigue usando para el costo por persona, que si es un % de %.
 _RUIDO_PCT = 5.0
 _RUIDO_PUNTOS = 2.0
 
@@ -346,10 +369,13 @@ _RUIDO_PUNTOS = 2.0
 def _veredicto(delta_conv: float | None, delta_ret: float | None) -> str | None:
     """Resume las dos comparaciones en una palabra. Si apuntan a lados
     distintos se dice "mixto" en vez de inventar un ganador: que llene mas pero
-    retenga menos es informacion, no un empate."""
+    retenga menos es informacion, no un empate.
+
+    Las dos diferencias llegan en PUNTOS: desde que la convocatoria se mide en
+    % del aforo, los dos indicadores son porcentajes y se restan igual."""
     signos = []
     if delta_conv is not None:
-        signos.append(0 if abs(delta_conv) < _RUIDO_PCT else (1 if delta_conv > 0 else -1))
+        signos.append(0 if abs(delta_conv) < _RUIDO_PUNTOS else (1 if delta_conv > 0 else -1))
     if delta_ret is not None:
         signos.append(0 if abs(delta_ret) < _RUIDO_PUNTOS else (1 if delta_ret > 0 else -1))
     if not signos:
@@ -445,12 +471,12 @@ async def desempeno(
             "noches_lista": [],
         })
         precio = float(b.agreed_price) if b.agreed_price is not None else None
-        g["medida"].suma(b, b.headcount_start, precio)
+        v = venues_mios.get(b.venue_id) if b.venue_id else None
+        g["medida"].suma(b, b.headcount_start, precio, v.capacity if v else None)
         cat = etiqueta_categoria(show)
         g["cats"][cat] = g["cats"].get(cat, 0) + 1
         # Detalle noche por noche: es lo que vuelve discutible el promedio. El
         # hotel abre el renglon y compara contra su propia bitacora.
-        v = venues_mios.get(b.venue_id) if b.venue_id else None
         fin = b.headcount_end if b.headcount_end is not None else None
         g["noches_lista"].append({
             "booking_id": b.id,
@@ -485,8 +511,19 @@ async def desempeno(
             f = f.where(Booking.starts_at >= desde)
         if hasta is not None:
             f = f.where(Booking.starts_at <= hasta)
-        for b in (await db.execute(f)).scalars().all():
-            fuera.setdefault(b.artist_id, _Medida()).suma(b, b.headcount_start, None)
+        bks_fuera = list((await db.execute(f)).scalars().all())
+        # Aforo de los salones de las OTRAS propiedades. Se usa solo para sacar
+        # el % de llenado: de aqui no sale ni el nombre del salon ni su
+        # capacidad, igual que nunca sale un precio.
+        vids_fuera = {b.venue_id for b in bks_fuera if b.venue_id}
+        cap_fuera: dict[int, int | None] = {}
+        if vids_fuera:
+            for v in (await db.execute(select(Venue).where(Venue.id.in_(vids_fuera)))).scalars().all():
+                cap_fuera[v.id] = v.capacity
+        for b in bks_fuera:
+            fuera.setdefault(b.artist_id, _Medida()).suma(
+                b, b.headcount_start, None, cap_fuera.get(b.venue_id) if b.venue_id else None
+            )
 
     # --- promedio de cada categoria EN ESTE HOTEL -------------------------
     # Se guarda tambien lo que aporto cada fila para poder restarselo: si un
@@ -500,9 +537,11 @@ async def desempeno(
     for b in mias:
         cat = etiqueta_categoria(shows.get(b.show_id))
         precio = float(b.agreed_price) if b.agreed_price is not None else None
-        por_categoria.setdefault(cat, _Medida()).suma(b, b.headcount_start, precio)
+        v = venues_mios.get(b.venue_id) if b.venue_id else None
+        cap = v.capacity if v else None
+        por_categoria.setdefault(cat, _Medida()).suma(b, b.headcount_start, precio, cap)
         clave = ("show", b.show_id) if por == "show" else ("artista", b.artist_id)
-        aporte.setdefault((cat, clave), _Medida()).suma(b, b.headcount_start, precio)
+        aporte.setdefault((cat, clave), _Medida()).suma(b, b.headcount_start, precio, cap)
 
     def resto_de_categoria(cat: str, clave: tuple) -> _Medida | None:
         """El promedio de la categoria SIN esta fila. None si no queda nadie."""
@@ -517,6 +556,9 @@ async def desempeno(
         r.gasto = total.gasto - (propio.gasto if propio else 0.0)
         r.gente_con_precio = total.gente_con_precio - (propio.gente_con_precio if propio else 0)
         r.noches_con_precio = total.noches_con_precio - (propio.noches_con_precio if propio else 0)
+        r.aforo = total.aforo - (propio.aforo if propio else 0)
+        r.gente_con_aforo = total.gente_con_aforo - (propio.gente_con_aforo if propio else 0)
+        r.noches_con_aforo = total.noches_con_aforo - (propio.noches_con_aforo if propio else 0)
         return r if r.noches > 0 and r.gente > 0 else None
 
     filas = []
@@ -536,15 +578,20 @@ async def desempeno(
             "propiedades": len(ext.propiedades) if ext else 0,
             "noches": ext.noches if ext else 0,
             "convocatoria": ext.convocatoria if publicable else None,
+            "convocatoria_pct": ext.convocatoria_pct if publicable else None,
+            "noches_con_aforo": ext.noches_con_aforo if (ext and publicable) else 0,
             "retencion": ext.retencion if publicable else None,
             "publicable": publicable,
         }
 
         costo = _por_persona(m.gasto, m.gente_con_precio)
         costo_cat = _por_persona(ref_cat.gasto, ref_cat.gente_con_precio) if ref_cat else None
-        vs_fuera_conv = _delta_pct(m.convocatoria, bloque_fuera["convocatoria"])
+        # La convocatoria se compara en PUNTOS de llenado. Antes se comparaba la
+        # gente por noche en %, y eso castigaba a las salas chicas: llenar un
+        # salon de 200 salia "abajo" contra uno de 600 a media entrada.
+        vs_fuera_conv = _delta_puntos(m.convocatoria_pct, bloque_fuera["convocatoria_pct"])
         vs_fuera_ret = _delta_puntos(m.retencion, bloque_fuera["retencion"])
-        vs_cat_conv = _delta_pct(m.convocatoria, ref_cat.convocatoria) if ref_cat else None
+        vs_cat_conv = _delta_puntos(m.convocatoria_pct, ref_cat.convocatoria_pct) if ref_cat else None
         vs_cat_ret = _delta_puntos(m.retencion, ref_cat.retencion) if ref_cat else None
 
         filas.append({
@@ -556,6 +603,10 @@ async def desempeno(
             "noches": m.noches,
             "propiedades": len(m.propiedades),
             "gente": m.gente,
+            # Convocatoria: el numero que se ensena es el % del aforo; la gente
+            # por noche se conserva como dato de apoyo debajo.
+            "convocatoria_pct": m.convocatoria_pct,
+            "noches_con_aforo": m.noches_con_aforo,
             "convocatoria": m.convocatoria,
             "retencion": m.retencion,
             "costo_persona": costo,

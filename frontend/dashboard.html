@@ -262,6 +262,9 @@
   .audmod .rr div{background:var(--ov);border-radius:11px;padding:11px 13px}
   .audmod .rr span{display:block;font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
   .audmod .rr b{font-size:17px;font-weight:700;letter-spacing:-.3px}
+  /* El pie de la casilla (p. ej. las personas por noche bajo el % de llenado)
+     no es una etiqueta: va en minúsculas, no como el título de arriba. */
+  .audmod .rr .sub{text-transform:none;letter-spacing:0;font-size:10.5px;margin-top:3px}
   .audmod .sub{font-size:11px;color:var(--mut);display:block;margin-top:3px}
   .audmod tbody td:first-child{white-space:nowrap}
   /* Comentarios de hoteles en el panel del talento. Sin tarjetas de colores:
@@ -5883,7 +5886,7 @@ function audPintarTabla(){
   const cuerpo=pagina.map((f,i)=>{
     const idx=filas.indexOf(f), k=audKey(f), fu=f.fuera||{};
     const refTxt=fu.publicable
-      ? `Su promedio en otras propiedades: ${n1(fu.convocatoria)} personas por noche y ${pc(fu.retencion)} de retención, sobre ${fu.noches} noches en ${fu.propiedades} propiedades.`
+      ? `Su promedio en otras propiedades: ${fu.convocatoria_pct!=null?pc(fu.convocatoria_pct)+' de llenado ('+n1(fu.convocatoria)+' personas por noche)':n1(fu.convocatoria)+' personas por noche'} y ${pc(fu.retencion)} de retención, sobre ${fu.noches} noches en ${fu.propiedades} propiedades.`
       : (fu.noches
           ? `Sin referencia publicable: sólo ${fu.noches} ${fu.noches===1?'noche':'noches'} en ${fu.propiedades} ${fu.propiedades===1?'propiedad':'propiedades'} fuera de aquí.`
           : 'Sin historia fuera de esta propiedad.');
@@ -5899,7 +5902,9 @@ function audPintarTabla(){
       <td><span class="gpill" style="${audColorCat(f.categoria)}">${esc(f.categoria)}</span></td>
       <td class="num"><b>${esc(String(f.noches))}</b>${f.propiedades>1?`<span class="sub">en ${f.propiedades} propiedades</span>`:''}</td>
       <td class="num" title="${esc(refTxt)}"><b>${pc(f.retencion)}</b><span class="sub">${chip(f.vs_fuera_retencion,' pts')}</span></td>
-      <td class="num" title="${esc(refTxt)}"><b>${n1(f.convocatoria)}</b><span class="sub">${chip(f.vs_fuera_convocatoria,'%')}</span></td>
+      <td class="num" title="${esc(refTxt)}">${f.convocatoria_pct==null
+          ? `<b>${n1(f.convocatoria)}</b><span class="sub">personas · sin aforo capturado</span>`
+          : `<b>${pc(f.convocatoria_pct)}</b><span class="sub">${chip(f.vs_fuera_convocatoria,' pts')} · ${n1(f.convocatoria)} pers./noche</span>`}</td>
       <td class="num" title="${esc(catTxt)}"><b>${f.costo_persona==null?'—':MXN2(f.costo_persona)}</b><span class="sub">${chip(f.vs_categoria_costo,'%',true)}</span></td>
       <td>${audVeredicto(f.marca_fuera,refTxt)}</td>
       <td>${audVeredicto(f.marca_categoria,catTxt)}</td>
@@ -5929,7 +5934,7 @@ function audPintarTabla(){
         ${th('categoria','Género')}
         ${th('noches','Actuaciones<span class="sub" style="text-transform:none;letter-spacing:0">(propiedades)</span>','num')}
         ${th('retencion','Retención<br>de público'+audInfo('De la gente que llegó, cuánta seguía ahí al terminar. Debajo, la diferencia en puntos contra su propio promedio en otras propiedades.'),'num')}
-        ${th('convocatoria','Convocatoria<br>de público'+audInfo('Personas por noche. Debajo, cuánto más (o menos) que su propio promedio en otras propiedades, en %.'),'num')}
+        ${th('convocatoria_pct','Convocatoria<br>de público'+audInfo('Qué tan lleno dejó el lugar: la gente que llegó sobre el aforo del salón. Va en % para que un salón chico lleno no salga perdiendo contra uno grande a medias. Debajo, la diferencia en puntos contra su propio promedio en otras propiedades, y las personas por noche.'),'num')}
         ${th('costo_persona','Costo por persona<br>(MXN)'+audInfo('Lo pagado dividido entre la gente que llegó. Debajo, contra el promedio de su mismo género en esta propiedad. Verde = más barato.'),'num')}
         ${th('vs_fuera_convocatoria','Vs. promedio<br>talento'+audInfo('Cómo le va aquí comparado con ese mismo proveedor en las otras propiedades donde trabaja.'))}
         ${th('vs_categoria_convocatoria','Vs. promedio<br>segmento'+audInfo('Cómo le va comparado con los demás proveedores de su mismo género en esta propiedad.'))}
@@ -5949,8 +5954,9 @@ function audPintarTabla(){
         </span></div>`:''}
       <div class="hint" style="margin:14px 0 0;line-height:1.6">
         <b>Cómo leerlo.</b> "Vs. promedio talento" compara a ese mismo proveedor aquí contra su promedio en el resto de los hoteles donde trabaja,
-        en el mismo periodo. La convocatoria se compara en % y la retención en puntos; cuando las dos no apuntan al mismo lado dice "Mixto",
+        en el mismo periodo. Convocatoria y retención son porcentajes y se comparan en puntos; cuando las dos no apuntan al mismo lado dice "Mixto",
         porque llenar más pero retener menos no es un empate.
+        La convocatoria va en % del aforo a propósito: en personas por noche, un salón de 200 lleno siempre perdería contra uno de 600 a media entrada.
         "Vs. promedio segmento" lo compara contra los demás proveedores de su mismo género en esta propiedad, sin contarse a sí mismo.<br>
         Sólo se muestra la referencia externa cuando hay al menos ${reglas.min_propiedades_fuera} propiedades y ${reglas.min_noches_fuera} noches detrás.
         Con una sola propiedad, ese "promedio" sería el dato de ese hotel con nombre y apellido, y eso no se enseña.
@@ -6001,7 +6007,8 @@ function audDetalle(i){
     <div class="mb">
       <div class="rr">
         <div><span>Actuaciones</span><b>${esc(String(f.noches))}</b></div>
-        <div><span>Convocatoria</span><b>${n1(f.convocatoria)}</b></div>
+        <div><span>Convocatoria</span><b>${f.convocatoria_pct==null?n1(f.convocatoria):pc(f.convocatoria_pct)}</b>
+          <span class="sub">${f.convocatoria_pct==null?'personas por noche · sin aforo':n1(f.convocatoria)+' personas por noche'}</span></div>
         <div><span>Retención</span><b>${pc(f.retencion)}</b></div>
         <div><span>Costo/persona</span><b>${f.costo_persona==null?'—':MXN2(f.costo_persona)}</b></div>
       </div>
@@ -6010,10 +6017,10 @@ function audDetalle(i){
           <h3 style="margin:0 0 8px">Vs. su promedio en otras propiedades</h3>
           ${fu.publicable
             ? `<ul style="list-style:none;font-size:12.5px;line-height:2">
-                 ${linea('Convocatoria',f.vs_fuera_convocatoria,'%')}
+                 ${linea('Convocatoria (llenado)',f.vs_fuera_convocatoria,' pts')}
                  ${linea('Retención',f.vs_fuera_retencion,' pts')}
                </ul>
-               <div class="hint" style="margin:6px 0 0">Su promedio afuera: ${n1(fu.convocatoria)} personas por noche y ${pc(fu.retencion)} de retención,
+               <div class="hint" style="margin:6px 0 0">Su promedio afuera: ${fu.convocatoria_pct!=null?pc(fu.convocatoria_pct)+' de llenado ('+n1(fu.convocatoria)+' personas por noche)':n1(fu.convocatoria)+' personas por noche'} y ${pc(fu.retencion)} de retención,
                  sobre ${fu.noches} noches en ${fu.propiedades} propiedades. Sin nombres y sin precios.</div>`
             : `<div class="hint" style="margin:0">Todavía no se puede comparar: ${fu.noches?`sólo ${fu.noches} ${fu.noches===1?'noche':'noches'} en ${fu.propiedades} ${fu.propiedades===1?'propiedad':'propiedades'}`:'no tiene historia'} fuera de aquí.
                  Hacen falta al menos ${AUD_DES.reglas.min_propiedades_fuera} propiedades y ${AUD_DES.reglas.min_noches_fuera} noches: con una sola, ese promedio sería el dato de ese hotel.</div>`}
@@ -6022,7 +6029,7 @@ function audDetalle(i){
           <h3 style="margin:0 0 8px">Vs. ${esc(f.categoria)} en esta propiedad</h3>
           ${f.categoria_noches
             ? `<ul style="list-style:none;font-size:12.5px;line-height:2">
-                 ${linea('Convocatoria',f.vs_categoria_convocatoria,'%')}
+                 ${linea('Convocatoria (llenado)',f.vs_categoria_convocatoria,' pts')}
                  ${linea('Retención',f.vs_categoria_retencion,' pts')}
                  ${linea('Costo por persona',f.vs_categoria_costo,'%',true)}
                </ul>
@@ -6047,13 +6054,15 @@ function audDesCSV(){
   const base=AUD_VIS.length?AUD_VIS:AUD_DES.filas;
   const marcadas=base.filter(f=>AUD_SEL.has(audKey(f)));
   const salida=marcadas.length?marcadas:base;
-  const col=['Proveedor','Género','Actuaciones','Propiedades','Gente','Convocatoria (pers/noche)','Retención %',
-             'Costo por persona','Vs otras propiedades (convocatoria %)','Vs otras propiedades (retención pts)',
-             'Veredicto vs su promedio','Vs su género aquí (convocatoria %)','Vs su género aquí (retención pts)',
+  const col=['Proveedor','Género','Actuaciones','Propiedades','Gente','Convocatoria (% del aforo)',
+             'Convocatoria (pers/noche)','Noches con aforo','Retención %',
+             'Costo por persona','Vs otras propiedades (convocatoria pts)','Vs otras propiedades (retención pts)',
+             'Veredicto vs su promedio','Vs su género aquí (convocatoria pts)','Vs su género aquí (retención pts)',
              'Vs su género aquí (costo %)','Veredicto vs su género','Propiedades fuera','Noches fuera'];
   const celda=v=>{ if(v===null||v===undefined) return '';
     const s=String(v); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
-  const filas=salida.map(f=>[f.nombre,f.categoria,f.noches,f.propiedades,f.gente,f.convocatoria,f.retencion,
+  const filas=salida.map(f=>[f.nombre,f.categoria,f.noches,f.propiedades,f.gente,f.convocatoria_pct,
+    f.convocatoria,f.noches_con_aforo,f.retencion,
     f.costo_persona,f.vs_fuera_convocatoria,f.vs_fuera_retencion,f.marca_fuera,
     f.vs_categoria_convocatoria,f.vs_categoria_retencion,f.vs_categoria_costo,f.marca_categoria,
     f.fuera.propiedades,f.fuera.noches].map(celda).join(','));
