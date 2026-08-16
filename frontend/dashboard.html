@@ -1016,6 +1016,14 @@
   .acard .ph .nv-badge{position:absolute;top:10px;left:10px;background:#382ca1;color:#fff;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px}
   .acard .ph .heart{position:absolute;top:9px;right:10px;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.32);display:grid;place-items:center;font-size:14px;color:#fff}
   .acard .ph .play{position:absolute;left:12px;bottom:12px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;font-size:15px;color:#382ca1}
+  /* Portada de quien todavía no subió foto. Antes era el degradado a secas y se
+     veía como un hueco. Con las iniciales y el género puesto encima, la misma
+     tarjeta se lee como una portada hecha a propósito. Nada de emojis ni marcos:
+     un monograma tenue y una línea de texto. */
+  .acard .ph .mono{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+    background:radial-gradient(120% 90% at 50% 15%,rgba(255,255,255,.16),rgba(0,0,0,0) 62%);pointer-events:none}
+  .acard .ph .mono b{font-size:36px;font-weight:800;letter-spacing:2px;color:#fff;opacity:.34;line-height:1}
+  .acard .ph .mono span{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#fff;opacity:.6}
   .acard .ab{padding:13px 14px 15px}
   .acard .ab .arow{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
   .acard .ab h4{font-size:14px;font-weight:700;margin:0}
@@ -3075,7 +3083,7 @@ function actRender(){
     const km=s.distance_km!=null?`📏 ${s.distance_km<1?'<1':Math.round(s.distance_km)} km`:'';
     const meta=[s.artist_city?`📍 ${esc(s.artist_city)}`:'',km,langs?`🗣️ ${esc(langs)}`:''].filter(Boolean).join(' · ');
     return `<div class="acard3${ADDACT.showId===s.id?' sel':''}${nd?' nodisp':''}" onclick="${nd?`actBlocked(${s.id})`:`actPick(${s.id})`}">
-      <div class="ac3-ph" ${ph}>${s.image_url?'':'🎭'}${disp}</div>
+      <div class="ac3-ph" ${ph}>${s.image_url?'':`<b style="font-weight:800;letter-spacing:1px;opacity:.42">${esc(inicialesProv(s.artist_name||s.show_name))}</b>`}${disp}</div>
       <div class="ac3-b">
         <div class="ac3-h"><b>${titulo}</b>${priceHtml}</div>
         <div class="ac3-sub">${[who,esc(cat)].filter(Boolean).join(' · ')||'—'}</div>
@@ -3577,12 +3585,21 @@ async function cargarDistinciones(){
 /* ---- Buscar Artistas (screen 4) ---- */
 let AF={cat:'',loc:'',km:100};
 function artGrad(cat){ const c=CATCOL[cat]||'#382ca1'; return `linear-gradient(135deg,${c},#8b5cf6)`; }
+// Dos letras como mucho: "Sax & Soul" -> "SS", y el "&" no cuenta como palabra.
+function inicialesProv(nombre){
+  const p=(nombre||'').split(/\s+/).filter(w=>w && /[a-záéíóúñ0-9]/i.test(w[0]));
+  return (p.slice(0,2).map(w=>w[0]).join('')||'?').toUpperCase();
+}
 function artistCard(i){
   const badge=`<span class="av-badge">● Disponible</span>`;
   const ph=i.img?`style="background-image:url('${i.img}')"`:`style="background:${artGrad(i.cat)}"`;
+  // Sin foto: iniciales del proveedor y su género encima del degradado. El
+  // hueco liso se leía como "falta algo"; esto se lee como portada.
+  const mono=i.img?'':`<div class="mono"><b>${esc(inicialesProv(i.name))}</b>
+      <span>${esc(pretty(i.sub||i.cat||''))}</span></div>`;
   const tags=(i.sub?[pretty(i.sub)]:[]).concat((i.genres||[]).slice(0,2)).slice(0,3);
   return `<div class="acard" onclick="openArtistProfile(${i.artistId||'null'},${i.id||'null'})">
-    <div class="ph" ${ph}>${badge}<div class="play">▶</div></div>
+    <div class="ph" ${ph}>${mono}${badge}<div class="play">▶</div></div>
     <div class="ab">
       <div class="arow"><h4>${esc(i.show||i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
       <div class="ty">${esc(i.name)} · ${esc(pretty(i.cat))}</div>
