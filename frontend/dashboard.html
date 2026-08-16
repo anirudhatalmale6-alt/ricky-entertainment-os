@@ -201,6 +201,10 @@
   .audtbl th:not(:first-child),.audtbl td:not(:first-child){padding-left:14px}
   .audtbl th.ord{cursor:pointer;user-select:none}
   .audtbl th.ord:hover{color:var(--txt)}
+  /* Cabecera ordenable de la agenda de actuaciones */
+  th.ordag{cursor:pointer;user-select:none;white-space:nowrap}
+  th.ordag:hover{color:var(--txt)}
+  th.ordag span{font-size:9px;color:var(--acc);margin-left:2px}
   .audtbl td{vertical-align:top}
   /* Verde por encima de la referencia, rojo por debajo, gris cuando no hay
      con qué comparar. El gris es un dato en sí: dice que falta historia. */
@@ -4083,10 +4087,31 @@ function agendaReset(){
   ['ag_month','ag_from','ag_to','ag_status'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';});
   renderAgenda();
 }
+/* La agenda mezcla años (historia y lo que viene), así que ahí la fecha lleva
+   año cuando no es el actual; si no, "06-feb" no dice de cuándo se habla. */
+function fmtDateAg(iso){
+  if(!iso) return '—';
+  const d=new Date(iso), año=d.getFullYear();
+  const f=d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})
+        + (año!==new Date().getFullYear()?' '+año:'');
+  return f+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+}
+/* Orden de la agenda. Por defecto de la más nueva a la más antigua (David,
+   16/08): con el orden viejo había que bajar hasta el final de la lista para
+   ver lo que viene. Se puede voltear pulsando la columna "Fecha". */
+function agendaSort(){
+  CACHE.agendaAsc = !CACHE.agendaAsc;
+  renderAgenda();
+}
 function renderAgenda(fromRange){
   // A manual Desde/Hasta takes over from the month dropdown.
   if(fromRange){ const mm=document.getElementById('ag_month'); if(mm) mm.value=''; }
   const bk=CACHE.agenda||[];
+  const asc=!!CACHE.agendaAsc;
+  const flecha=document.getElementById('ag_arrow'); if(flecha) flecha.textContent = asc?'▲':'▼';
+  const th=document.getElementById('ag_th_fecha');
+  if(th) th.title = asc?'Ordenado de la más antigua a la más nueva · pulsa para voltear'
+                      :'Ordenado de la más nueva a la más antigua · pulsa para voltear';
   const m   =(document.getElementById('ag_month') ||{}).value||'';
   const from=(document.getElementById('ag_from')  ||{}).value||'';
   const to  =(document.getElementById('ag_to')    ||{}).value||'';
@@ -4099,6 +4124,7 @@ function renderAgenda(fromRange){
     if(st && b.status!==st) return false;
     return true;
   });
+  r.sort((a,b)=>{const c=(a.starts_at||'').localeCompare(b.starts_at||''); return asc?c:-c;});
   const noun=n=>n===1?'actuación':'actuaciones';
   const scope=document.getElementById('ag_scope');
   if(scope) scope.textContent = (r.length===bk.length)
@@ -4128,7 +4154,7 @@ function renderAgenda(fromRange){
     if(b.status==='confirmed' && fut)
       return `<td><div class="agact"><button class="mini" onclick="notifyStatus(${b.id},'on_way')">🚗 En camino</button><button class="mini ok" onclick="notifyStatus(${b.id},'arrived')">📍 Llegué</button><button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></div></td>`;
     return `<td><span class="muted">—</span></td>`; };
-  body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
+  body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDateAg(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
       ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}${isArtist?mapsLink(b):''}</td><td>${MXN(b.agreed_price)}</td>
       <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
     : `<tr><td colspan="${cols}" class="muted" style="text-align:center;padding:22px">Sin actuaciones para este filtro.</td></tr>`;
@@ -6531,7 +6557,8 @@ const RENDER = {
       catch(e){ CACHE.porCalificar=null; }
     }
     const scopeTxt = SELF ? (ME.artist_id?'tus actuaciones':'las de tu hotel') : 'toda la cadena';
-    const months=[...new Set(bk.map(b=>(b.starts_at||'').slice(0,7)).filter(Boolean))].sort();
+    // Meses del más nuevo al más viejo, igual que la tabla.
+    const months=[...new Set(bk.map(b=>(b.starts_at||'').slice(0,7)).filter(Boolean))].sort().reverse();
     const mlabel=k=>{const[y,m]=k.split('-');return _cap(new Date(y,m-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'}));};
     const pend = ME.artist_id ? bk.filter(b=>b.status==='pending').length : 0;
     box.innerHTML=`<div class="box"><h3>🗓️ Agenda de actuaciones</h3>
@@ -6544,7 +6571,7 @@ const RENDER = {
         <div class="field"><label>Estado</label><select id="ag_status" onchange="renderAgenda()"><option value="">Todos</option><option value="pending">Pendiente</option><option value="confirmed">Confirmada</option><option value="completed">Realizada</option><option value="cancelled">Cancelada</option></select></div>
         <button class="btn ghost" onclick="agendaReset()">Limpiar</button>
       </div></div>
-      <table><thead><tr><th>Fecha</th><th>Show</th>${ME.artist_id?'<th>Hotel</th>':''}<th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th><th>Acción</th></tr></thead>
+      <table><thead><tr><th class="ordag" id="ag_th_fecha" onclick="agendaSort()">Fecha <span id="ag_arrow">▼</span></th><th>Show</th>${ME.artist_id?'<th>Hotel</th>':''}<th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th><th>Acción</th></tr></thead>
       <tbody id="ag_body"></tbody></table></div>`;
     renderAgenda();
   },
