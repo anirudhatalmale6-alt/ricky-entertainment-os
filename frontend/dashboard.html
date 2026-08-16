@@ -1707,6 +1707,20 @@ const paxRango = r => (r&&r.length===2&&r[0]!=null)
   ? r[0].toLocaleString('es-MX')+'–'+r[1].toLocaleString('es-MX') : null;
 const pctRango = r => (r&&r.length===2&&r[0]!=null)
   ? r[0].toFixed(0)+'%–'+r[1].toFixed(0)+'%' : null;
+/* MARGEN DE ESTIMACIÓN. David lo fijó él mismo en la nota del detalle: entre
+   3% y 5%. Se usa el 5%, el extremo ancho, porque una banda de error se queda
+   corta o no se queda: prometer ±3% cuando puede ser 5% es peor que sobrar.
+   OJO — esto NO reemplaza a `rango_gente`/`rango_llenado`, que son la variación
+   MEDIDA entre noches. Son dos cosas distintas: la dispersión dice cuánto se
+   movió el público de una noche a otra, la banda dice cuánto puede errarle el
+   conteo de UNA noche. Por eso la banda sólo se pinta donde hay una sola
+   observación y no hay dispersión que enseñar; donde hay dos o más noches manda
+   el dato medido. Ver la nota del cliente al pie del modal de detalle. */
+const MARGEN_PCT = 5;
+const paxBanda = n => n==null ? null
+  : Math.round(n*(1-MARGEN_PCT/100)).toLocaleString('es-MX')+'–'+Math.round(n*(1+MARGEN_PCT/100)).toLocaleString('es-MX');
+const paxBandaTxt = n => n==null ? ''
+  : ` Con el margen de ±${MARGEN_PCT}% de la nota, entre ${paxBanda(n)} personas.`;
 const CATCOL = {"Musica":"#382ca1","Shows":"#f59e0b","Fotografia y Video":"#3b82f6","Produccion":"#10b981"};
 const palette=["#382ca1","#3b82f6","#10b981","#f59e0b","#06b6d4","#ef4444"];
 const stars = n => n? '★'.repeat(n):'—';
@@ -5925,7 +5939,7 @@ function audPintarTabla(){
     const dispTxt=(paxRango(f.rango_gente)||pctRango(f.rango_llenado))
       ? ` Entre sus ${f.noches} noches aquí fue de ${paxRango(f.rango_gente)||'—'} personas`
         +(pctRango(f.rango_llenado)?` (${pctRango(f.rango_llenado)} del aforo).`:'.')
-      : '';
+      : paxBandaTxt(f.convocatoria);
     const catTxt=f.categoria_noches
       ? `Contra el resto de "${f.categoria}" en esta propiedad (${f.categoria_noches} ${f.categoria_noches===1?'noche':'noches'}), sin contarse a sí mismo.`
       : 'Es el único de su género aquí: no hay contra qué compararlo.';
@@ -6028,8 +6042,10 @@ function audDetalle(i){
       <td>${esc(fecha(n.fecha))}</td>
       <td>${esc(n.venue)}${n.capacidad?`<span class="sub">cap. ${n.capacidad}</span>`:''}</td>
       <td>${esc(n.show)}</td>
-      <td class="num" title="${esc(paxExacto(n.gente))}">${pax(n.gente)}</td>
-      <td class="num" title="${esc(paxExacto(n.se_quedaron))}">${n.se_quedaron==null?'—':pax(n.se_quedaron)}</td>
+      <td class="num" title="${esc(paxExacto(n.gente)+paxBandaTxt(n.gente))}">${pax(n.gente)}${
+        n.gente==null?'':`<span class="sub">${paxBanda(n.gente)}</span>`}</td>
+      <td class="num" title="${esc(paxExacto(n.se_quedaron)+paxBandaTxt(n.se_quedaron))}">${n.se_quedaron==null?'—':pax(n.se_quedaron)}${
+        n.se_quedaron==null?'':`<span class="sub">${paxBanda(n.se_quedaron)}</span>`}</td>
       <td class="num"${n.retencion>100?' title="Se contó más gente al terminar que al empezar: el público creció durante el show. Se muestra tal cual, no se recorta a 100%."':''}>${pc(n.retencion)}${n.retencion>100?'<span class="sub">el público creció</span>':''}</td>
       <td class="num">${n.atraccion==null?'—':pc(n.atraccion)}</td>
       <td class="num">${n.precio==null?'—':MXN(n.precio)}</td>
@@ -6047,7 +6063,8 @@ function audDetalle(i){
         <div><span>Actuaciones</span><b>${esc(String(f.noches))}</b></div>
         <div><span>Convocatoria</span><b>${f.convocatoria_pct==null?pax(f.convocatoria):pc(f.convocatoria_pct)}</b>
           <span class="sub">${f.convocatoria_pct==null?'personas por noche · sin aforo':pax(f.convocatoria)+' personas por noche'}${
-            paxRango(f.rango_gente)?'<br>entre '+paxRango(f.rango_gente)+' según la noche':''}</span></div>
+            paxRango(f.rango_gente) ? '<br>entre '+paxRango(f.rango_gente)+' según la noche'
+            : (f.convocatoria!=null ? `<br>entre ${paxBanda(f.convocatoria)} con el margen de ±${MARGEN_PCT}%` : '')}</span></div>
         <div><span>Retención</span><b>${pc(f.retencion)}</b></div>
         <div><span>Costo/persona</span><b>${f.costo_persona==null?'—':MXN2(f.costo_persona)}</b></div>
       </div>
@@ -6078,7 +6095,9 @@ function audDetalle(i){
       </div>
       <h3 style="font-size:13.5px;font-weight:650;margin-bottom:8px">Noche por noche</h3>
       <div style="overflow-x:auto"><table class="audtbl"><thead><tr>
-        <th>Fecha</th><th>Salón</th><th>Show</th><th class="num">Llegaron</th><th class="num">Se quedaron</th>
+        <th>Fecha</th><th>Salón</th><th>Show</th>
+        <th class="num" title="El renglón gris es el rango con el margen de ±${MARGEN_PCT}%: se toma el extremo ancho del 3%-5% de la nota, porque una banda que se queda corta no sirve de nada.">Llegaron</th>
+        <th class="num" title="El renglón gris es el rango con el margen de ±${MARGEN_PCT}%: se toma el extremo ancho del 3%-5% de la nota, porque una banda que se queda corta no sirve de nada.">Se quedaron</th>
         <th class="num">Retención</th><th class="num">Llenado</th><th class="num">Costo</th><th class="num">Por persona</th>
       </tr></thead><tbody>${noches}</tbody></table></div>
       <!-- Texto tal cual lo redactó David (2026-08-16). No reescribirlo: es el
