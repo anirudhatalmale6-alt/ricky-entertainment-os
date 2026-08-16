@@ -57,12 +57,16 @@
   .promo button:hover{background:#2c2280}
   .help-btn{margin-top:12px;width:100%;background:rgba(255,255,255,.05);border:1px solid var(--s-line);color:var(--s-txt);padding:10px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:600;transition:.15s;font-family:inherit}
   .help-btn:hover{background:rgba(255,255,255,.10);border-color:var(--acc)}
-  .side-user{margin-top:14px;display:flex;align-items:center;gap:10px;padding:13px 8px 4px;border-top:1px solid var(--s-line)}
+  /* Nombre arriba y botones abajo. En una sola fila, los dos botones se comían
+     el ancho y un nombre normal quedaba cortado en "D…". */
+  .side-user{margin-top:14px;padding:13px 8px 4px;border-top:1px solid var(--s-line)}
+  .su-top{display:flex;align-items:center;gap:10px;min-width:0}
+  .su-btns{display:flex;gap:6px;margin-top:10px}
   .su-av{width:36px;height:36px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;flex:none}
   .su-meta{min-width:0;flex:1}
   .su-meta b{display:block;font-size:12.5px;line-height:1.2;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .su-meta span{font-size:10.5px;color:var(--s-mut)}
-  .su-out{background:rgba(255,255,255,.06);border:1px solid var(--s-line);color:var(--s-txt);height:30px;padding:0 11px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:600;flex:none;transition:.15s;display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .su-meta span{display:block;font-size:10.5px;color:var(--s-mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .su-out{background:rgba(255,255,255,.06);border:1px solid var(--s-line);color:var(--s-txt);height:30px;padding:0 11px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:600;flex:1;transition:.15s;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
   .su-out:hover{background:var(--bad);color:#fff;border-color:transparent}
 
   /* Topbar */
@@ -166,11 +170,24 @@
       font-variant-numeric:tabular-nums;white-space:nowrap;padding-right:0;padding-left:14px}
   #panel-aud select,#panel-aud input[type=search]{background:var(--inp);border:1px solid var(--line);color:var(--txt);
       border-radius:8px;height:34px;padding:0 9px;font-size:12.7px;font-family:inherit}
-  .audtabs{display:flex;gap:6px;margin-bottom:16px}
-  .audtabs button{background:none;border:1px solid transparent;border-radius:9px;padding:8px 14px;
-      font-size:13px;font-weight:600;color:var(--mut);cursor:pointer;font-family:inherit}
-  .audtabs button:hover{color:var(--txt)}
+  /* Pestañas de Audiencia. Iban sin recuadro y la de "Análisis de desempeño"
+     se leía como un texto apagado: nadie la pulsaba. Ahora es un selector
+     segmentado, con su marco, para que se vea que hay DOS vistas. */
+  .audtabs{display:inline-flex;gap:4px;margin-bottom:16px;padding:4px;
+      background:var(--ov2);border:1px solid var(--line);border-radius:13px}
+  .audtabs button{background:none;border:1px solid transparent;border-radius:9px;padding:8px 15px;
+      font-size:13px;font-weight:600;color:var(--mut);cursor:pointer;font-family:inherit;
+      display:flex;align-items:center;gap:7px;transition:.14s}
+  .audtabs button:hover{color:var(--txt);background:var(--ov2)}
   .audtabs button.on{background:var(--card);border-color:var(--line);color:var(--txt);box-shadow:var(--shadow)}
+  .audtabs .tg{font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+      background:var(--acc);color:#fff;border-radius:20px;padding:2px 7px;line-height:1.5}
+  /* Puente desde el Resumen hacia el análisis comparativo. */
+  .audgo{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;
+      padding:15px 18px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+  .audgo b{font-size:13.5px;display:block}
+  .audgo .hint{margin:2px 0 0}
+  .audgo .btn{margin-left:auto}
   /* Barra de filtros: cada control con su etiqueta encima, como en la maqueta. */
   .audfilt{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:14px 16px;margin-bottom:16px}
   .audfilt label{display:flex;flex-direction:column;gap:5px;font-size:10.5px;color:var(--mut2);
@@ -1605,10 +1622,14 @@
     <div class="promo" id="sidePromo" style="display:none"></div>
     <button class="help-btn" id="helpBtn" onclick="openHelp()">🆘 Ayuda · escríbele a MASTER</button>
     <div class="side-user">
-      <div class="su-av" id="suAv">RA</div>
-      <div class="su-meta"><b id="suName">Mi cuenta</b><span id="suRole">SHOWMA</span></div>
-      <button class="su-out" onclick="openChangePw()" title="Cambiar mi contraseña" aria-label="Cambiar mi contraseña">🔑</button>
-      <button class="su-out" onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión">↪ Salir</button>
+      <div class="su-top">
+        <div class="su-av" id="suAv">RA</div>
+        <div class="su-meta"><b id="suName">Mi cuenta</b><span id="suRole">SHOWMA</span></div>
+      </div>
+      <div class="su-btns">
+        <button class="su-out" onclick="openChangePw()" title="Cambiar mi contraseña" aria-label="Cambiar mi contraseña">🔑 Contraseña</button>
+        <button class="su-out" onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión">↪ Salir</button>
+      </div>
     </div>
     <div class="foot">SHOWMA · v0.1</div>
   </aside>
@@ -5709,7 +5730,8 @@ function audParams(){
 }
 const audTabs = t => `<div class="audtabs">
     <button class="${t==='resumen'?'on':''}" onclick="audTab('resumen')">Resumen</button>
-    <button class="${t==='desempeno'?'on':''}" onclick="audTab('desempeno')">Análisis de desempeño</button>
+    <button class="${t==='desempeno'?'on':''}" onclick="audTab('desempeno')">Análisis de desempeño
+      <span class="tg">Comparativas</span></button>
   </div>`;
 /* Descarga el detalle noche por noche. Es la pieza que vuelve discutible el
    análisis: el hotel puede abrirlo en Excel y comprobar cada renglón contra su
@@ -6448,7 +6470,14 @@ const RENDER = {
       </div>
       ${d.peores.length&&barras?'<div style="height:16px"></div>'+barras:''}
       <div style="height:16px"></div>
-      ${tabla(d.por_artista,'Por proveedor','Con quién rinde más el presupuesto','Proveedor')}`;
+      ${tabla(d.por_artista,'Por proveedor','Con quién rinde más el presupuesto','Proveedor')}
+      <div class="audgo">
+        <div style="flex:1;min-width:300px"><b>¿Y cómo le va a cada proveedor comparado con los demás?</b>
+          <div class="hint">En "Análisis de desempeño" está la tabla comparativa: lo que hace cada
+            proveedor aquí frente a su propio promedio en otras propiedades y frente a los de su
+            mismo género en esta casa, con el detalle noche por noche.</div></div>
+        <button class="btn" onclick="audTab('desempeno')">Ver análisis de desempeño →</button>
+      </div>`;
   },
 
   async reports(box){
