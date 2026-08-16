@@ -6075,9 +6075,12 @@ function audDetalle(i){
         <th>Fecha</th><th>Salón</th><th>Show</th><th class="num">Llegaron</th><th class="num">Se quedaron</th>
         <th class="num">Retención</th><th class="num">Llenado</th><th class="num">Costo</th><th class="num">Por persona</th>
       </tr></thead><tbody>${noches}</tbody></table></div>
-      <div class="hint" style="margin:10px 0 0">Las cifras de público van con "≈" porque nadie cuenta cabezas al terminar un show:
-        son lo que se capturó esa noche, no un conteo fino. Los porcentajes salen de esas mismas cifras.
-        Pasando el cursor sobre cada número se ve el valor tal como se registró.</div>
+      <!-- Texto tal cual lo redactó David (2026-08-16). No reescribirlo: es el
+           que va a leer en voz alta ante su consejo, y el margen de 3%-5% es un
+           dato suyo, no una estimación nuestra. -->
+      <div class="hint" style="margin:10px 0 0">Las cifras de público se muestran con el símbolo “≈” al tratarse de estimaciones
+        de asistencia y no de un conteo individual. Reflejan la afluencia registrada durante cada actuación. Los porcentajes se calculan
+        a partir de estas estimaciones con un margen de error de entre el 3%-5%.</div>
       ${f.artist_id?`<div style="margin-top:14px"><button class="btn ghost mini" onclick="this.closest('.mov').remove();openArtistProfile(${f.artist_id})">Ver perfil del proveedor</button></div>`:''}
     </div></div>`;
   document.body.appendChild(ov);
