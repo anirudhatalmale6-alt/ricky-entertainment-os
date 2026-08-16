@@ -152,8 +152,16 @@ async def list_shows(
         s.artist_partner = partners.get(s.artist_id, False)
         # La distancia va ANTES del precio: el extra por larga distancia
         # (gasolina) depende de a cuántos km está el hotel.
-        if origin is not None:
-            s.distance_km = geo.distance_km(origin[0], origin[1], s.artist_city, s.artist_region)
+        # SIEMPRE se asigna, aunque no haya de dónde medir. Antes sólo se ponía
+        # dentro del if y quien no tiene hotel de origen (un director de cadena
+        # o el administrador, que no cuelgan de una propiedad, o un hotel sin
+        # ciudad capturada) reventaba dos líneas abajo al leerla: AttributeError
+        # y 500 en toda la pantalla. Un dato que no se puede calcular es None,
+        # no es un atributo que no existe. (David, 16/08: error 500 en Presupuesto.)
+        s.distance_km = (
+            geo.distance_km(origin[0], origin[1], s.artist_city, s.artist_region)
+            if origin is not None else None
+        )
         # Precio efectivo = base → temporada del show (si la fecha cae dentro) →
         # tarifa especial pactada con ese hotel/cadena → extra por distancia.
         info = pricing.effective_price(
