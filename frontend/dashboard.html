@@ -1683,6 +1683,30 @@ let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="comp
 let BLOCKED=new Set();   // fechas 'YYYY-MM-DD' que el artista bloqueó (vacaciones/enfermedad)
 const MXN = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n||0);
 const MXN2 = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
+/* ---- Cifras de público -------------------------------------------------
+   David (2026-08-16): "no dar números exactos sino rangos, en lugar de decir
+   227pax decir entre 223-232, o aproximadamente 227pax". Tiene razón: nadie
+   cuenta cabezas al terminar un show, y un número al centavo le da al dato una
+   autoridad que no tiene. Todo lo que sea gente se muestra con "≈", y los
+   totales grandes se redondean: sumar diez estimaciones no las vuelve exactas.
+   El número tal como se capturó sigue estando en el globo de ayuda y en el
+   Excel, que es donde alguien va a querer revisarlo. */
+const paxNum = n => {
+  // Redondear a centenas por debajo de 10 mil empataba renglones distintos
+  // (1,444 y 1,368 salían los dos como 1,400) y la tabla va ordenada por esta
+  // columna: el lector veía un empate que no existe.
+  const a=Math.abs(n);
+  if(a>=10000) return Math.round(n/100)*100;  // 25,577 -> 25,600
+  if(a>=100)   return Math.round(n/10)*10;    // 1,444  -> 1,440
+  return Math.round(n);
+};
+const pax  = n => n==null?'—':'≈ '+Math.round(n).toLocaleString('es-MX');
+const paxT = n => n==null?'—':'≈ '+paxNum(n).toLocaleString('es-MX');
+const paxExacto = n => n==null?'':`Capturado: ${Math.round(n).toLocaleString('es-MX')} personas`;
+const paxRango = r => (r&&r.length===2&&r[0]!=null)
+  ? r[0].toLocaleString('es-MX')+'–'+r[1].toLocaleString('es-MX') : null;
+const pctRango = r => (r&&r.length===2&&r[0]!=null)
+  ? r[0].toFixed(0)+'%–'+r[1].toFixed(0)+'%' : null;
 const CATCOL = {"Musica":"#382ca1","Shows":"#f59e0b","Fotografia y Video":"#3b82f6","Produccion":"#10b981"};
 const palette=["#382ca1","#3b82f6","#10b981","#f59e0b","#06b6d4","#ef4444"];
 const stars = n => n? '★'.repeat(n):'—';
@@ -5886,10 +5910,16 @@ function audPintarTabla(){
   const cuerpo=pagina.map((f,i)=>{
     const idx=filas.indexOf(f), k=audKey(f), fu=f.fuera||{};
     const refTxt=fu.publicable
-      ? `Su promedio en otras propiedades: ${fu.convocatoria_pct!=null?pc(fu.convocatoria_pct)+' de llenado ('+n1(fu.convocatoria)+' personas por noche)':n1(fu.convocatoria)+' personas por noche'} y ${pc(fu.retencion)} de retención, sobre ${fu.noches} noches en ${fu.propiedades} propiedades.`
+      ? `Su promedio en otras propiedades: ${fu.convocatoria_pct!=null?pc(fu.convocatoria_pct)+' de llenado ('+pax(fu.convocatoria)+' personas por noche)':pax(fu.convocatoria)+' personas por noche'} y ${pc(fu.retencion)} de retención, sobre ${fu.noches} noches en ${fu.propiedades} propiedades.`
       : (fu.noches
           ? `Sin referencia publicable: sólo ${fu.noches} ${fu.noches===1?'noche':'noches'} en ${fu.propiedades} ${fu.propiedades===1?'propiedad':'propiedades'} fuera de aquí.`
           : 'Sin historia fuera de esta propiedad.');
+    // Rango real de las noches que hay detrás: dice si el promedio es firme o
+    // si viene de noches muy distintas entre sí.
+    const dispTxt=(paxRango(f.rango_gente)||pctRango(f.rango_llenado))
+      ? ` Entre sus ${f.noches} noches aquí fue de ${paxRango(f.rango_gente)||'—'} personas`
+        +(pctRango(f.rango_llenado)?` (${pctRango(f.rango_llenado)} del aforo).`:'.')
+      : '';
     const catTxt=f.categoria_noches
       ? `Contra el resto de "${f.categoria}" en esta propiedad (${f.categoria_noches} ${f.categoria_noches===1?'noche':'noches'}), sin contarse a sí mismo.`
       : 'Es el único de su género aquí: no hay contra qué compararlo.';
@@ -5902,9 +5932,9 @@ function audPintarTabla(){
       <td><span class="gpill" style="${audColorCat(f.categoria)}">${esc(f.categoria)}</span></td>
       <td class="num"><b>${esc(String(f.noches))}</b>${f.propiedades>1?`<span class="sub">en ${f.propiedades} propiedades</span>`:''}</td>
       <td class="num" title="${esc(refTxt)}"><b>${pc(f.retencion)}</b><span class="sub">${chip(f.vs_fuera_retencion,' pts')}</span></td>
-      <td class="num" title="${esc(refTxt)}">${f.convocatoria_pct==null
-          ? `<b>${n1(f.convocatoria)}</b><span class="sub">personas · sin aforo capturado</span>`
-          : `<b>${pc(f.convocatoria_pct)}</b><span class="sub">${chip(f.vs_fuera_convocatoria,' pts')} · ${n1(f.convocatoria)} pers./noche</span>`}</td>
+      <td class="num" title="${esc(refTxt+dispTxt)}">${f.convocatoria_pct==null
+          ? `<b>${pax(f.convocatoria)}</b><span class="sub">personas por noche · sin aforo capturado</span>`
+          : `<b>${pc(f.convocatoria_pct)}</b><span class="sub">${chip(f.vs_fuera_convocatoria,' pts')} · ${pax(f.convocatoria)} pers./noche</span>`}</td>
       <td class="num" title="${esc(catTxt)}"><b>${f.costo_persona==null?'—':MXN2(f.costo_persona)}</b><span class="sub">${chip(f.vs_categoria_costo,'%',true)}</span></td>
       <td>${audVeredicto(f.marca_fuera,refTxt)}</td>
       <td>${audVeredicto(f.marca_categoria,catTxt)}</td>
@@ -5957,6 +5987,8 @@ function audPintarTabla(){
         en el mismo periodo. Convocatoria y retención son porcentajes y se comparan en puntos; cuando las dos no apuntan al mismo lado dice "Mixto",
         porque llenar más pero retener menos no es un empate.
         La convocatoria va en % del aforo a propósito: en personas por noche, un salón de 200 lleno siempre perdería contra uno de 600 a media entrada.
+        Las cifras de personas llevan "≈": son lo capturado esa noche, no un conteo exacto. En el globo de cada renglón está entre qué números se movió
+        de una noche a otra, y el valor tal como se registró.
         "Vs. promedio segmento" lo compara contra los demás proveedores de su mismo género en esta propiedad, sin contarse a sí mismo.<br>
         Sólo se muestra la referencia externa cuando hay al menos ${reglas.min_propiedades_fuera} propiedades y ${reglas.min_noches_fuera} noches detrás.
         Con una sola propiedad, ese "promedio" sería el dato de ese hotel con nombre y apellido, y eso no se enseña.
@@ -5990,8 +6022,8 @@ function audDetalle(i){
       <td>${esc(fecha(n.fecha))}</td>
       <td>${esc(n.venue)}${n.capacidad?`<span class="sub">cap. ${n.capacidad}</span>`:''}</td>
       <td>${esc(n.show)}</td>
-      <td class="num">${esc(String(n.gente))}</td>
-      <td class="num">${n.se_quedaron==null?'—':esc(String(n.se_quedaron))}</td>
+      <td class="num" title="${esc(paxExacto(n.gente))}">${pax(n.gente)}</td>
+      <td class="num" title="${esc(paxExacto(n.se_quedaron))}">${n.se_quedaron==null?'—':pax(n.se_quedaron)}</td>
       <td class="num"${n.retencion>100?' title="Se contó más gente al terminar que al empezar: el público creció durante el show. Se muestra tal cual, no se recorta a 100%."':''}>${pc(n.retencion)}${n.retencion>100?'<span class="sub">el público creció</span>':''}</td>
       <td class="num">${n.atraccion==null?'—':pc(n.atraccion)}</td>
       <td class="num">${n.precio==null?'—':MXN(n.precio)}</td>
@@ -6007,8 +6039,9 @@ function audDetalle(i){
     <div class="mb">
       <div class="rr">
         <div><span>Actuaciones</span><b>${esc(String(f.noches))}</b></div>
-        <div><span>Convocatoria</span><b>${f.convocatoria_pct==null?n1(f.convocatoria):pc(f.convocatoria_pct)}</b>
-          <span class="sub">${f.convocatoria_pct==null?'personas por noche · sin aforo':n1(f.convocatoria)+' personas por noche'}</span></div>
+        <div><span>Convocatoria</span><b>${f.convocatoria_pct==null?pax(f.convocatoria):pc(f.convocatoria_pct)}</b>
+          <span class="sub">${f.convocatoria_pct==null?'personas por noche · sin aforo':pax(f.convocatoria)+' personas por noche'}${
+            paxRango(f.rango_gente)?'<br>entre '+paxRango(f.rango_gente)+' según la noche':''}</span></div>
         <div><span>Retención</span><b>${pc(f.retencion)}</b></div>
         <div><span>Costo/persona</span><b>${f.costo_persona==null?'—':MXN2(f.costo_persona)}</b></div>
       </div>
@@ -6020,7 +6053,7 @@ function audDetalle(i){
                  ${linea('Convocatoria (llenado)',f.vs_fuera_convocatoria,' pts')}
                  ${linea('Retención',f.vs_fuera_retencion,' pts')}
                </ul>
-               <div class="hint" style="margin:6px 0 0">Su promedio afuera: ${fu.convocatoria_pct!=null?pc(fu.convocatoria_pct)+' de llenado ('+n1(fu.convocatoria)+' personas por noche)':n1(fu.convocatoria)+' personas por noche'} y ${pc(fu.retencion)} de retención,
+               <div class="hint" style="margin:6px 0 0">Su promedio afuera: ${fu.convocatoria_pct!=null?pc(fu.convocatoria_pct)+' de llenado ('+pax(fu.convocatoria)+' personas por noche)':pax(fu.convocatoria)+' personas por noche'} y ${pc(fu.retencion)} de retención,
                  sobre ${fu.noches} noches en ${fu.propiedades} propiedades. Sin nombres y sin precios.</div>`
             : `<div class="hint" style="margin:0">Todavía no se puede comparar: ${fu.noches?`sólo ${fu.noches} ${fu.noches===1?'noche':'noches'} en ${fu.propiedades} ${fu.propiedades===1?'propiedad':'propiedades'}`:'no tiene historia'} fuera de aquí.
                  Hacen falta al menos ${AUD_DES.reglas.min_propiedades_fuera} propiedades y ${AUD_DES.reglas.min_noches_fuera} noches: con una sola, ese promedio sería el dato de ese hotel.</div>`}
@@ -6042,6 +6075,9 @@ function audDetalle(i){
         <th>Fecha</th><th>Salón</th><th>Show</th><th class="num">Llegaron</th><th class="num">Se quedaron</th>
         <th class="num">Retención</th><th class="num">Llenado</th><th class="num">Costo</th><th class="num">Por persona</th>
       </tr></thead><tbody>${noches}</tbody></table></div>
+      <div class="hint" style="margin:10px 0 0">Las cifras de público van con "≈" porque nadie cuenta cabezas al terminar un show:
+        son lo que se capturó esa noche, no un conteo fino. Los porcentajes salen de esas mismas cifras.
+        Pasando el cursor sobre cada número se ve el valor tal como se registró.</div>
       ${f.artist_id?`<div style="margin-top:14px"><button class="btn ghost mini" onclick="this.closest('.mov').remove();openArtistProfile(${f.artist_id})">Ver perfil del proveedor</button></div>`:''}
     </div></div>`;
   document.body.appendChild(ov);
@@ -6055,14 +6091,18 @@ function audDesCSV(){
   const marcadas=base.filter(f=>AUD_SEL.has(audKey(f)));
   const salida=marcadas.length?marcadas:base;
   const col=['Proveedor','Género','Actuaciones','Propiedades','Gente','Convocatoria (% del aforo)',
-             'Convocatoria (pers/noche)','Noches con aforo','Retención %',
+             'Convocatoria (pers/noche)','Gente mínima en una noche','Gente máxima en una noche',
+             'Llenado mínimo %','Llenado máximo %','Noches con aforo','Retención %',
              'Costo por persona','Vs otras propiedades (convocatoria pts)','Vs otras propiedades (retención pts)',
              'Veredicto vs su promedio','Vs su género aquí (convocatoria pts)','Vs su género aquí (retención pts)',
              'Vs su género aquí (costo %)','Veredicto vs su género','Propiedades fuera','Noches fuera'];
   const celda=v=>{ if(v===null||v===undefined) return '';
     const s=String(v); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
   const filas=salida.map(f=>[f.nombre,f.categoria,f.noches,f.propiedades,f.gente,f.convocatoria_pct,
-    f.convocatoria,f.noches_con_aforo,f.retencion,
+    f.convocatoria,
+    f.rango_gente?f.rango_gente[0]:null, f.rango_gente?f.rango_gente[1]:null,
+    f.rango_llenado?f.rango_llenado[0]:null, f.rango_llenado?f.rango_llenado[1]:null,
+    f.noches_con_aforo,f.retencion,
     f.costo_persona,f.vs_fuera_convocatoria,f.vs_fuera_retencion,f.marca_fuera,
     f.vs_categoria_convocatoria,f.vs_categoria_retencion,f.vs_categoria_costo,f.marca_categoria,
     f.fuera.propiedades,f.fuera.noches].map(celda).join(','));
@@ -6460,7 +6500,7 @@ const RENDER = {
       <div style="overflow-x:auto"><table><thead><tr><th>${col1}</th><th class="num">Noches</th><th class="num">Gente</th>
         <th class="num">Atracción</th><th class="num">Se quedó</th><th class="num">Costo/persona</th></tr></thead><tbody>
       ${filas.map(f=>`<tr><td><b>${esc(f.nombre)}</b>${f.capacidad?`<span class="hint" style="margin:0;display:block">aforo ${num(f.capacidad)}</span>`:''}</td>
-        <td class="num">${f.actuaciones}</td><td class="num">${num(f.asistentes)}</td>
+        <td class="num">${f.actuaciones}</td><td class="num" title="${esc(paxExacto(f.asistentes))}">${paxT(f.asistentes)}</td>
         <td class="num">${pct(f.atraccion)}</td><td class="num">${pct(f.retencion)}</td>
         <td class="num"><b>${cpp(f.costo_persona)}</b></td></tr>`).join('')}
       </tbody></table></div></div>`;
@@ -6468,12 +6508,12 @@ const RENDER = {
     const meses=d.por_mes||[];
     const maxMes=Math.max(1,...meses.map(m=>m.asistentes));
     const barras=meses.length>1?`<div class="box"><div class="bhead"><h3 style="margin:0">Mes a mes</h3><span class="hint" style="margin:0">Gente que asistió</span></div>
-      <div class="barchart" style="height:170px">${meses.map(m=>`<div class="bc" title="${esc(m.nombre)}: ${num(m.asistentes)} personas · ${cpp(m.costo_persona)} por persona">
+      <div class="barchart" style="height:170px">${meses.map(m=>`<div class="bc" title="${esc(m.nombre)}: ${paxT(m.asistentes)} personas · ${cpp(m.costo_persona)} por persona">
         <div class="bb"><i style="height:${Math.round(m.asistentes/maxMes*140)}px;background:var(--acc)"></i></div><small>${esc(m.nombre.split(' ')[0])}</small></div>`).join('')}</div></div>`:'';
 
     const rank=(filas,titulo,sub,cls)=>filas.length?`<div class="box"><div class="bhead"><h3 style="margin:0">${titulo}</h3><span class="hint" style="margin:0">${sub}</span></div>
       ${filas.map((f,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(f.nombre)}</b>
-        <span>${f.actuaciones} noches · ${num(f.asistentes)} personas</span></div><b style="color:${cls}">${cpp(f.costo_persona)}</b></div>`).join('')}</div>`:'';
+        <span>${f.actuaciones} noches · ${paxT(f.asistentes)} personas</span></div><b style="color:${cls}">${cpp(f.costo_persona)}</b></div>`).join('')}</div>`:'';
 
     box.innerHTML=audTabs('resumen')+`
       <div class="box" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:13px 16px;margin-bottom:16px">
@@ -6483,10 +6523,10 @@ const RENDER = {
       </div>
       ${aviso}
       <div class="kpis">
-        <div class="kpi"><div class="kh"><div><div class="k">Gente que asistió</div><div class="v">${num(r.asistentes)}</div>
-          <div class="d">en ${r.actuaciones} ${r.actuaciones===1?'noche':'noches'}</div></div><div class="kc blue">👥</div></div></div>
+        <div class="kpi" title="${esc(paxExacto(r.asistentes))}"><div class="kh"><div><div class="k">Gente que asistió</div><div class="v">${paxT(r.asistentes)}</div>
+          <div class="d">en ${r.actuaciones} ${r.actuaciones===1?'noche':'noches'} · cifra aproximada</div></div><div class="kc blue">👥</div></div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Costo por persona</div><div class="v">${cpp(r.costo_persona)}</div>
-          <div class="d">${MXN(r.gasto)} entre ${num(r.asistentes)} personas</div></div><div class="kc violet">💵</div></div></div>
+          <div class="d">${MXN(r.gasto)} entre ${paxT(r.asistentes)} personas</div></div><div class="kc violet">💵</div></div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Atracción</div><div class="v">${pct(r.atraccion)}</div>
           <div class="d">${r.noches_con_aforo<r.actuaciones
             ? `del aforo · medido en ${r.noches_con_aforo} de ${r.actuaciones} noches`

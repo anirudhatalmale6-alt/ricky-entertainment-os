@@ -305,11 +305,20 @@ class _Medida:
         self.aforo = 0
         self.gente_con_aforo = 0
         self.noches_con_aforo = 0
+        # Dispersion real: entre que noche y que noche se movio. David
+        # (2026-08-16): "no dar numeros exactos sino rangos". Un promedio de 227
+        # que sale de noches de 190 y 260 no es lo mismo que uno que sale de
+        # noches de 225 y 229, y el promedio solo no lo dice.
+        self.gente_noches: list[int] = []
+        self.llenado_noches: list[float] = []
         self.propiedades: set[int] = set()
 
     def suma(self, b, asistentes: int, precio: float | None, capacidad: int | None = None):
         self.noches += 1
         self.gente += asistentes
+        self.gente_noches.append(asistentes)
+        if capacidad:
+            self.llenado_noches.append(round(asistentes / capacidad * 100, 1))
         self.se_quedaron += b.headcount_end if b.headcount_end is not None else asistentes
         if precio is not None:
             self.gasto += precio
@@ -342,6 +351,19 @@ class _Medida:
     @property
     def retencion(self) -> float | None:
         return _pct(self.se_quedaron, self.gente)
+
+    @property
+    def rango_gente(self) -> tuple[int, int] | None:
+        """De cuanta a cuanta gente. Con una sola noche no hay rango que dar."""
+        if len(self.gente_noches) < 2:
+            return None
+        return (min(self.gente_noches), max(self.gente_noches))
+
+    @property
+    def rango_llenado(self) -> tuple[float, float] | None:
+        if len(self.llenado_noches) < 2:
+            return None
+        return (min(self.llenado_noches), max(self.llenado_noches))
 
 
 def _delta_pct(mio: float | None, otro: float | None) -> float | None:
@@ -608,6 +630,11 @@ async def desempeno(
             "convocatoria_pct": m.convocatoria_pct,
             "noches_con_aforo": m.noches_con_aforo,
             "convocatoria": m.convocatoria,
+            # De cuanta a cuanta gente y de que llenado a que llenado se movio.
+            # Es dispersion medida, no una tolerancia inventada alrededor del
+            # promedio: sale de las noches que ya estan en el detalle.
+            "rango_gente": m.rango_gente,
+            "rango_llenado": m.rango_llenado,
             "retencion": m.retencion,
             "costo_persona": costo,
             "gasto": round(m.gasto, 2),
