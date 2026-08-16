@@ -3255,7 +3255,14 @@ function updateBudgetKpi(){
   const ahorroPct=budget>0?Math.round(ahorro/budget*100):0;
   const set=(id,html)=>{const e=document.getElementById(id); if(e) e.innerHTML=html;};
   usadoV.textContent=MXN(usado);
-  set('kUsadoD', budget>0?'de '+MXN(budget):'sin presupuesto cargado');
+  // El número grande SIEMPRE es lo gastado + comprometido, nunca el presupuesto.
+  // Con el título fijo en "Presupuesto mensual" y sin presupuesto cargado, la
+  // tarjeta decía "$439,100 / sin presupuesto cargado" y se leía como si ése
+  // fuera el presupuesto (David, 16/08). El título tiene que decir qué es el
+  // número que está debajo.
+  set('kUsadoK', budget>0?'Presupuesto mensual':'Gasto del mes');
+  set('kUsadoD', budget>0?'de '+MXN(budget)
+    :'sin presupuesto cargado · cárgalo en Presupuesto para ver el % y el ahorro');
   set('kUsadoBar', budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto del mes</div>`:'');
   set('kAhorroV', budget>0?MXN(Math.abs(ahorro)):'—');
   set('kAhorroD', budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—');
@@ -6302,7 +6309,7 @@ const RENDER = {
       <div class="kpis">
         <div class="kpi"><div class="kh"><div><div class="k">Actuaciones esta semana</div><div class="v" id="kpiWeekVal">0</div></div><div class="kc violet">🗓️</div></div>
           <div class="kbreak" id="kpiWeekBreak"></div></div>
-        <div class="kpi"><div class="kh"><div><div class="k">Presupuesto mensual</div><div class="v" id="kUsadoV">${MXN(usado)}</div><div class="d" id="kUsadoD">${budget>0?'de '+MXN(budget):'sin presupuesto cargado'}</div></div><div class="kc green">💲</div></div>
+        <div class="kpi"><div class="kh"><div><div class="k" id="kUsadoK">${budget>0?'Presupuesto mensual':'Gasto del mes'}</div><div class="v" id="kUsadoV">${MXN(usado)}</div><div class="d" id="kUsadoD">${budget>0?'de '+MXN(budget):'sin presupuesto cargado · cárgalo en Presupuesto para ver el % y el ahorro'}</div></div><div class="kc green">💲</div></div>
           <div id="kUsadoBar">${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto del mes</div>`:''}</div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Satisfacción media</div><div class="v">${sat5!=null?sat5.toFixed(1)+' / 5':'—'}</div></div><div class="kc blue">🙂</div></div>
           <div class="kstars">${sat5!=null?starRow(sat5):'☆☆☆☆☆'}<small>según asistencia real</small></div></div>
