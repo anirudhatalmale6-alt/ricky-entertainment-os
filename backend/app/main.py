@@ -148,7 +148,7 @@ def _abs_url(path: str | None) -> str | None:
         return None
     if path.startswith("http://") or path.startswith("https://"):
         return path
-    return f"{settings.PUBLIC_BASE_URL.rstrip('/')}{settings.ROOT_PATH}{path}"
+    return f"{settings.public_root}{path}"
 
 
 def _meta(data: dict, url: str) -> str:
@@ -214,7 +214,7 @@ async def tarjeta_publica(slug: str, db: DbSession):
     f = _first_existing(_TARJETA_CANDIDATES)
     if f is None:
         return HTMLResponse("<h1>Tarjeta no disponible</h1>", status_code=500)
-    url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}{settings.ROOT_PATH}/p/{slug}"
+    url = f"{settings.public_root}/p/{slug}"
     html = f.read_text(encoding="utf-8")
     # Los datos van EMBEBIDOS, no se piden con un fetch: la tarjeta se abre en
     # el celular de alguien que quiza esta en el lobby con mala senal, y una

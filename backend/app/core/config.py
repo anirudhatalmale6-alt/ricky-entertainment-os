@@ -84,6 +84,22 @@ class Settings(BaseSettings):
     NOTIFY_EMAIL: bool = True
 
     @property
+    def public_root(self) -> str:
+        """La raiz publica de la app, SIN barra final. Ej. https://showma.mx o
+        https://showma.mx/demo.
+
+        No es PUBLIC_BASE_URL + ROOT_PATH a secas: en la demo el
+        PUBLIC_BASE_URL ya venia con /demo dentro y concatenar los dos daba
+        https://showma.mx/demo/demo/p/... (visto el 27/08 al publicar la
+        primera tarjeta). Se pega el ROOT_PATH solo si no esta ya puesto.
+        """
+        base = self.PUBLIC_BASE_URL.rstrip("/")
+        raiz = self.ROOT_PATH.rstrip("/")
+        if raiz and not base.endswith(raiz):
+            base += raiz
+        return base
+
+    @property
     def mail_from(self) -> str:
         return self.SMTP_FROM or self.SMTP_USER
 

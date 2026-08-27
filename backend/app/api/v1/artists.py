@@ -194,7 +194,7 @@ async def tarjeta_publica(artist_id: int, payload: TarjetaIn, db: DbSession):
         # La liga completa la arma el servidor: el navegador no sabe si la app
         # vive en la raiz o colgada de /demo.
         "url": (
-            f"{settings.PUBLIC_BASE_URL}{settings.ROOT_PATH}/p/{artist.public_slug}"
+            f"{settings.public_root}/p/{artist.public_slug}"
             if artist.public_slug else None
         ),
     }
