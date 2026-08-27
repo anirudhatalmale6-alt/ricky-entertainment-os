@@ -9,7 +9,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
+from app.api.v1.public import tarjeta_data
 from app.api.v1.router import api_router
+from app.api.deps import DbSession
 from app.core.config import settings
 from app.core.storage import ensure_upload_dir
 from app.db.session import init_db
@@ -130,3 +132,105 @@ async def registro():
         _first_existing(_REGISTRO_CANDIDATES),
         "<h1>Registro de artista</h1><p>Formulario no disponible.</p>",
     )
+
+
+# --- Tarjeta de presentacion publica ---------------------------------------
+_TARJETA_CANDIDATES = [
+    _HERE.parent.parent / "static" / "tarjeta.html",
+    _HERE.parent.parent.parent / "frontend" / "publico" / "tarjeta.html",
+]
+
+
+def _abs_url(path: str | None) -> str | None:
+    """Una imagen '/uploads/x.jpg' no le sirve a WhatsApp: necesita la
+    direccion completa, con dominio."""
+    if not path:
+        return None
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    return f"{settings.PUBLIC_BASE_URL.rstrip('/')}{settings.ROOT_PATH}{path}"
+
+
+def _meta(data: dict, url: str) -> str:
+    """Las etiquetas Open Graph, ARMADAS EN EL SERVIDOR.
+
+    Esto no es un adorno: WhatsApp, Facebook y LinkedIn piden la pagina con un
+    robot que NO ejecuta JavaScript. Si el titulo y la foto los pusiera el
+    script al cargar, la liga pegada en un chat saldria como un renglon gris
+    sin imagen — justo donde mas se va a usar esta tarjeta. Y og:title es el
+    unico titulo que lee una red social: el <title> de la pagina no lo mira.
+    """
+    nombre = data.get("nombre") or "SHOWMA"
+    genero = " · ".join(x for x in [
+        (data["shows"][0].get("subcategoria") or data.get("categoria")) if data.get("shows") else data.get("categoria"),
+        data.get("ciudad"),
+    ] if x)
+    titulo = f"{nombre} — {genero}" if genero else nombre
+    desc = (data.get("bio") or "").strip()
+    if not desc and data.get("shows"):
+        s = data["shows"][0]
+        desc = (s.get("descripcion") or f"{s.get('nombre')} · {s.get('categoria') or ''}").strip()
+    if not desc:
+        desc = "Perfil de proveedor de entretenimiento en SHOWMA."
+    if len(desc) > 200:
+        desc = desc[:197].rstrip() + "…"
+    img = _abs_url(data.get("portada"))
+
+    def e(s: str) -> str:
+        return (s.replace("&", "&amp;").replace("<", "&lt;")
+                 .replace(">", "&gt;").replace('"', "&quot;"))
+
+    tags = [
+        f"<title>{e(titulo)} | SHOWMA</title>",
+        f'<meta name="description" content="{e(desc)}">',
+        f'<meta property="og:title" content="{e(titulo)}">',
+        f'<meta property="og:description" content="{e(desc)}">',
+        f'<meta property="og:type" content="profile">',
+        f'<meta property="og:site_name" content="SHOWMA">',
+        f'<meta property="og:url" content="{e(url)}">',
+        f'<meta name="twitter:card" content="{"summary_large_image" if img else "summary"}">',
+        f'<meta name="twitter:title" content="{e(titulo)}">',
+        f'<meta name="twitter:description" content="{e(desc)}">',
+    ]
+    if img:
+        tags.append(f'<meta property="og:image" content="{e(img)}">')
+        tags.append(f'<meta name="twitter:image" content="{e(img)}">')
+    return "\n".join(tags)
+
+
+@app.get("/p/{slug}", include_in_schema=False)
+async def tarjeta_publica(slug: str, db: DbSession):
+    """La tarjeta de un proveedor: pagina publica, sin cuenta y sin sesion."""
+    data = await tarjeta_data(db, slug)
+    if data is None:
+        return HTMLResponse(
+            "<div style=\"font-family:system-ui;text-align:center;padding:80px 20px;color:#697089\">"
+            "<h1 style=\"color:#1b1f2e;font-size:20px\">Esta tarjeta no está disponible</h1>"
+            "<p style=\"margin-top:8px\">La liga puede haber cambiado o el perfil ya no está publicado.</p>"
+            f"<p style=\"margin-top:22px\"><a href=\"{settings.ROOT_PATH}/\" "
+            "style=\"color:#382ca1;font-weight:600\">Ir a SHOWMA</a></p></div>",
+            status_code=404, headers=_NO_CACHE,
+        )
+    f = _first_existing(_TARJETA_CANDIDATES)
+    if f is None:
+        return HTMLResponse("<h1>Tarjeta no disponible</h1>", status_code=500)
+    url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}{settings.ROOT_PATH}/p/{slug}"
+    html = f.read_text(encoding="utf-8")
+    # Los datos van EMBEBIDOS, no se piden con un fetch: la tarjeta se abre en
+    # el celular de alguien que quiza esta en el lobby con mala senal, y una
+    # pantalla en blanco mientras carga es una tarjeta que no se ensena.
+    # El "</" escapado evita que un texto con una etiqueta dentro corte el
+    # bloque <script> a la mitad.
+    blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+    inject = (
+        _meta(data, url)
+        + f"\n<script>window.RICKY_API={json.dumps(settings.ROOT_PATH)};"
+        + f"window.TARJETA={blob};window.TARJETA_URL={json.dumps(url)};</script>"
+    )
+    if "<!--OG-->" in html:
+        html = html.replace("<!--OG-->", inject, 1)
+    elif "</head>" in html:
+        html = html.replace("</head>", inject + "</head>", 1)
+    else:
+        html = inject + html
+    return HTMLResponse(html, headers=_NO_CACHE)

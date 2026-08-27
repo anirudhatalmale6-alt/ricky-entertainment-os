@@ -71,6 +71,11 @@ _SQLITE_ADDED_COLUMNS = [
     # Afluencia y retención de público: las dos preguntas del "Calificar"
     ("reviews", "afluencia", "VARCHAR(10)"),
     ("reviews", "retencion", "VARCHAR(10)"),
+    # Tarjeta pública del proveedor. Apagada para TODOS los que ya existen: el
+    # DEFAULT 0 es lo que hace que publicar la función no publique de golpe los
+    # perfiles que llevan meses cargados.
+    ("artists", "is_public", "BOOLEAN DEFAULT 0"),
+    ("artists", "public_slug", "VARCHAR(80)"),
 ]
 
 

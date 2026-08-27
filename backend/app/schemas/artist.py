@@ -143,11 +143,22 @@ class ArtistUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class TarjetaIn(BaseModel):
+    """Prender/apagar la tarjeta publica. El slug NO viaja aqui: lo pone el
+    servidor, para que nadie aparte el nombre de otro."""
+    model_config = ConfigDict(extra="forbid")
+
+    publicar: bool
+
+
 class ArtistOut(ArtistBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
     is_verified: bool
     is_active: bool
+    # Estado de la tarjeta publica (para pintar el interruptor y la liga).
+    is_public: bool = False
+    public_slug: str | None = None
     rating: float | None = None
     shows: list[ShowOut] = []
     documents: list[ArtistDocumentOut] = []

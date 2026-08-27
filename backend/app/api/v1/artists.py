@@ -1,15 +1,19 @@
 """Artist (profile) endpoints: profile CRUD with nested shows + documents."""
+import re
+import unicodedata
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, require_permission
+from app.core.config import settings
 from app.models.artist import Artist
 from app.models.enums import ARTIST_CATEGORIES
 from app.models.media import ArtistDocument, ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
-from app.schemas.artist import ArtistCreate, ArtistOut, ArtistUpdate
+from app.schemas.artist import ArtistCreate, ArtistOut, ArtistUpdate, TarjetaIn
 
 router = APIRouter(prefix="/artists", tags=["artists"])
 
@@ -127,3 +131,70 @@ async def delete_artist(artist_id: int, db: DbSession):
     artist = await _get_artist_or_404(db, artist_id)
     await db.delete(artist)
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# TARJETA PUBLICA (perfil compartible fuera de la plataforma)
+# ---------------------------------------------------------------------------
+# El slug lo genera SIEMPRE el servidor a partir del nombre artistico. No se
+# acepta uno del cliente: si se pudiera elegir, el primero en pedirlo se
+# quedaria con "dj-nova" y el DJ Nova de verdad tendria que llamarse otra cosa.
+_SLUG_MAX = 60
+
+
+def _slugify(texto: str) -> str:
+    # "Mariachi Sol de México" -> "mariachi-sol-de-mexico". Se quitan los
+    # acentos a proposito: una URL con % en medio no se puede dictar por
+    # telefono ni se ve bien pegada en WhatsApp.
+    plano = unicodedata.normalize("NFKD", texto or "")
+    plano = "".join(c for c in plano if not unicodedata.combining(c))
+    plano = re.sub(r"[^a-zA-Z0-9]+", "-", plano).strip("-").lower()
+    return plano[:_SLUG_MAX].strip("-")
+
+
+async def _slug_libre(db: DbSession, base: str, artist_id: int) -> str:
+    """El primer slug que no tenga dueno. Si "dj-nova" ya es de otro, el
+    siguiente es "dj-nova-2" y no se le pisa la tarjeta a nadie."""
+    if not base:
+        base = f"proveedor-{artist_id}"
+    candidato, n = base, 1
+    while True:
+        res = await db.execute(
+            select(Artist.id).where(
+                Artist.public_slug == candidato, Artist.id != artist_id
+            )
+        )
+        if res.scalar_one_or_none() is None:
+            return candidato
+        n += 1
+        candidato = f"{base[:_SLUG_MAX - 3]}-{n}"
+
+
+@router.post(
+    "/{artist_id}/tarjeta",
+    dependencies=[Depends(require_permission("artist.manage"))],
+)
+async def tarjeta_publica(artist_id: int, payload: TarjetaIn, db: DbSession):
+    """Prende o apaga la tarjeta publica de un proveedor.
+
+    Apagarla NO borra el slug: si manana se vuelve a publicar, la liga que ya
+    circula por WhatsApp sigue siendo la misma. Borrarlo convertiria cada
+    apagon temporal en una liga rota para siempre.
+    """
+    artist = await _get_artist_or_404(db, artist_id)
+    if payload.publicar and not artist.public_slug:
+        artist.public_slug = await _slug_libre(db, _slugify(artist.stage_name), artist_id)
+    artist.is_public = payload.publicar
+    await db.commit()
+    await db.refresh(artist)
+    return {
+        "id": artist.id,
+        "is_public": artist.is_public,
+        "public_slug": artist.public_slug,
+        # La liga completa la arma el servidor: el navegador no sabe si la app
+        # vive en la raiz o colgada de /demo.
+        "url": (
+            f"{settings.PUBLIC_BASE_URL}{settings.ROOT_PATH}/p/{artist.public_slug}"
+            if artist.public_slug else None
+        ),
+    }

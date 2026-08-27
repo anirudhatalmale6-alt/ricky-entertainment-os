@@ -110,6 +110,14 @@ class Artist(Base, TimestampMixin):
     country: Mapped[str] = mapped_column(String(80), default="Mexico")
     postal_code: Mapped[str | None] = mapped_column(String(10))
 
+    # --- Tarjeta publica (el perfil visto desde FUERA de la plataforma) ----
+    # Apagada por omision. Publicar el perfil de alguien en internet es una
+    # decision que se toma a proposito, no un efecto secundario de darlo de
+    # alta: quien no lo pidio no aparece. El slug lo genera el servidor al
+    # publicar (nunca lo elige el cliente) para que nadie aparte nombres.
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    public_slug: Mapped[str | None] = mapped_column(String(80), index=True)
+
     # Status / verification
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

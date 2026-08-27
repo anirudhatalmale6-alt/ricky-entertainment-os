@@ -3972,6 +3972,7 @@ async function openArtistProfile(artistId, showId){
         ? apShowsHTML(shows.filter(s=>s.id!==sel.id),tray,'Otros shows del proveedor')
         : apShowsHTML(shows,tray)}
       ${apReviewsHTML(rev)}
+      ${apTarjetaHTML(a)}
     </div>
     <div class="af"><button class="btn ghost" onclick="apClose()">Cerrar</button>
       ${apPickerAbierto(sel)?`<button class="btn ghost" onclick="apMessage(${artistId})">Mandar mensaje</button>
@@ -3979,6 +3980,54 @@ async function openArtistProfile(artistId, showId){
        : `<button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button>`}</div>
   </div>`;
 }
+/* ---- Tarjeta de presentación pública -------------------------------------
+   La liga que se le pasa a un hotel por WhatsApp: el perfil del proveedor
+   visto desde fuera, sin cuenta. Sólo la ve el administrador porque publicar
+   el perfil de alguien en internet no es una preferencia de pantalla, es una
+   decisión sobre datos de otra persona. Empieza APAGADA para todos. */
+function apTarjetaHTML(a){
+  if(!ME || !ME.is_admin || !a || !a.id) return '';
+  const on=!!a.is_public;
+  const url=a.public_slug ? location.origin+(window.RICKY_API||'')+'/p/'+a.public_slug : '';
+  return `<div class="apsec" id="apTj">
+    <h4>Tarjeta de presentación pública</h4>
+    <div class="muted" style="font-size:12.5px;margin-bottom:10px">
+      Una página abierta con su foto, su show y sus videos, para mandarla por WhatsApp.
+      No enseña precios, ni teléfono, ni correo, ni datos fiscales.</div>
+    ${on&&url
+      ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+           <input id="apTjUrl" value="${esc(url)}" readonly
+             style="flex:1;min-width:200px;border:1px solid var(--line);background:var(--inp);
+                    border-radius:9px;padding:8px 10px;font-size:12.5px;color:var(--mut)">
+           <button class="btn ghost" onclick="apTjCopiar()">Copiar liga</button>
+           <a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">Ver</a>
+           <button class="btn ghost" onclick="apTjPublicar(${a.id},false)">Quitar de internet</button>
+         </div>`
+      : `<button class="btn" onclick="apTjPublicar(${a.id},true)">Publicar su tarjeta</button>`}
+  </div>`;
+}
+async function apTjPublicar(artistId, publicar){
+  const box=document.getElementById('apTj'); if(box) box.style.opacity='.5';
+  try{
+    await post('/artists/'+artistId+'/tarjeta',{publicar});
+    toast(publicar?'Tarjeta publicada ✓':'Tarjeta retirada de internet.');
+    // Se vuelve a pintar el perfil entero para no dejar el interruptor
+    // diciendo una cosa y el servidor otra.
+    openArtistProfile(artistId,null);
+  }catch(e){ toast('No se pudo cambiar la tarjeta.',true); if(box) box.style.opacity=''; }
+}
+function apTjCopiar(){
+  const i=document.getElementById('apTjUrl'); if(!i) return;
+  i.select(); i.setSelectionRange(0,99999);
+  if(navigator.clipboard && location.protocol==='https:'){
+    navigator.clipboard.writeText(i.value).then(()=>toast('Liga copiada ✓'),()=>toast('Copia la liga a mano.',true));
+  }else{
+    try{ document.execCommand('copy'); toast('Liga copiada ✓'); }
+    catch(e){ toast('Copia la liga a mano.',true); }
+  }
+}
+window.apTjPublicar=apTjPublicar; window.apTjCopiar=apTjCopiar;
+
 /* Si el perfil se abrió desde el buscador de "Agregar actuación", el que decide
    ya está decidiendo: puede elegir ahí mismo y no tiene que cerrar, buscar otra
    vez la tarjeta y volver a dar clic (David, 2026-08-15). */
