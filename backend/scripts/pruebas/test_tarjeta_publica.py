@@ -23,7 +23,7 @@ import json
 import urllib.error
 import urllib.request
 
-BASE = "http://localhost:8456"
+BASE = "http://localhost:8457"
 API = BASE + "/api/v1"
 ADMIN = ("admin@ricky.os", "Prueba2026!")   # copia local, nunca la de producción
 fallos = []
@@ -50,10 +50,12 @@ def get(path, token=None):
 
 def existe(path) -> int:
     """Solo el codigo. `get` decodifica el cuerpo como texto y un JPEG lo
-    revienta: aqui no nos importa el contenido, solo si esta."""
+    revienta: aqui no nos importa el contenido, solo si esta.
+
+    Con GET, no con HEAD: las fotos las sirve una ruta @app.get y un HEAD
+    contra ella responde 405, que se leeria como 'la foto no esta'."""
     try:
-        return urllib.request.urlopen(
-            urllib.request.Request(BASE + path, method="HEAD")).status
+        return urllib.request.urlopen(BASE + path).status
     except urllib.error.HTTPError as e:
         return e.code
 

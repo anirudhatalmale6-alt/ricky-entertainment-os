@@ -3,10 +3,9 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse
 
 from app import __version__
 from app.api.v1.public import tarjeta_data
@@ -82,7 +81,29 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 # User-uploaded media (show photos). Served straight from disk; immutable unique
 # filenames so edge caching is fine (no no-store here).
-app.mount("/uploads", StaticFiles(directory=str(ensure_upload_dir())), name="uploads")
+#
+# Es una RUTA, no un app.mount(StaticFiles). Un Mount debajo de una app con
+# root_path se rompe: Starlette le pasa al hijo root_path="/demo/uploads" pero
+# el camino sigue siendo "/uploads/x.jpg", que no empieza por ese prefijo, asi
+# que no le recorta nada y StaticFiles termina buscando
+# static/uploads/uploads/x.jpg. Resultado: en la demo (ROOT_PATH=/demo) NINGUNA
+# foto subida se servia nunca, y en produccion (ROOT_PATH="") todas si — el
+# defecto solo aparece en la instancia donde nadie mira. Una ruta normal se
+# comporta igual en las dos.
+_UPLOADS = ensure_upload_dir()
+
+
+@app.get("/uploads/{nombre}", include_in_schema=False)
+async def upload(nombre: str):
+    # El nombre viene de la URL, o sea de fuera. Se comprueba que el archivo
+    # que se acaba abriendo este DENTRO de la carpeta de subidas y no dos
+    # niveles mas arriba, en el .env.
+    destino = (_UPLOADS / nombre).resolve()
+    if _UPLOADS.resolve() not in destino.parents or not destino.is_file():
+        raise HTTPException(status_code=404, detail="No existe")
+    # El nombre lleva un uuid, asi que el contenido de una direccion nunca
+    # cambia: se puede guardar en cache todo lo que quiera el navegador.
+    return FileResponse(destino, headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @app.get("/health", tags=["system"])
