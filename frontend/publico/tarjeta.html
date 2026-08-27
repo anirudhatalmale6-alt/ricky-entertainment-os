@@ -68,6 +68,56 @@
     margin:22px 0 10px}
   .bio{color:#39405a;white-space:pre-line}
 
+  /* --- El bloque de datos: lo que Instagram no puede dar ---------------
+     Va ARRIBA del todo, pegado a la portada. Es la razon de ser de la
+     tarjeta: un perfil de Instagram no puede demostrar nada, y esto son
+     numeros que el proveedor no escribio. */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:14px}
+  .stats div{background:#fff;padding:12px 6px;text-align:center}
+  .stats b{display:block;font-size:21px;font-weight:800;letter-spacing:-.6px;color:var(--acc);line-height:1.1}
+  .stats b i{font-style:normal;font-size:13px}
+  .stats span{display:block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+    color:var(--mut2);margin-top:3px}
+  .stats .est{color:var(--warn)}
+
+  .meds{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .med{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#7a5a10;
+    background:linear-gradient(135deg,#fff4d9,#ffe6ab);border:1px solid #f2d489;border-radius:10px;padding:6px 10px}
+
+  /* Cada barra lleva SU muestra escrita al lado. Un 100% sobre 3 actuaciones
+     y uno sobre 300 no son el mismo dato, y quien lo lee tiene derecho a
+     saber cual esta viendo. */
+  .bars{border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:14px}
+  .bar{margin-bottom:12px}
+  .bar:last-child{margin-bottom:0}
+  .bar .t{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;margin-bottom:5px}
+  .bar .t b{font-weight:700;font-size:13.5px}
+  .bar .t u{text-decoration:none;color:var(--acc);font-weight:800;font-size:15px}
+  .bar .mu{color:var(--mut2);font-size:11px;margin-top:5px}
+  .bar .tr{height:6px;border-radius:6px;background:#eef0f7;overflow:hidden}
+  .bar .fi{height:100%;border-radius:6px;background:var(--grad)}
+
+  .hots{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
+  .hot{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:10px;
+    padding:6px 10px 6px 6px;font-size:12.5px;font-weight:600}
+  .hot i{width:24px;height:24px;border-radius:6px;background:#eef0f7 center/cover;display:grid;place-items:center;
+    font-style:normal;font-size:10px;font-weight:800;color:var(--mut2);flex:none}
+  .hot em{font-style:normal;color:var(--mut2);font-weight:600;font-size:11.5px}
+
+  .rev{border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:9px}
+  .rev .hd{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .rev .hd i{width:28px;height:28px;border-radius:7px;background:#eef0f7 center/cover;flex:none}
+  .rev .hd b{font-size:13px;font-weight:700}
+  .rev .hd span{font-size:11px;color:var(--mut2);display:block}
+  .rev .st{color:#f6b73c;font-size:13px;letter-spacing:1px;margin-left:auto}
+  .rev p{font-size:13.5px;color:#39405a}
+  .rev .fe{font-size:11px;color:var(--mut2);margin-top:6px}
+
+  .nuevo{border:1px dashed var(--line);border-radius:14px;padding:13px;margin-bottom:14px;
+    font-size:12.5px;color:var(--mut)}
+  .nuevo b{color:var(--txt)}
+
   .show{border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px;display:flex;gap:12px}
   .show .th{width:74px;height:74px;border-radius:10px;flex:none;background-size:cover;background-position:center}
   .show .th .ini{width:100%;height:100%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:20px;opacity:.5}
@@ -164,6 +214,106 @@ const iniciales = n => ((n||'').split(/\s+/).filter(w=>w && /[a-záéíóúñ0-9
 const pretty = s => ({'Musica':'Música','Produccion':'Producción',
   'Fotografia y Video':'Fotografía y Video'})[s] || s || '';
 
+/* ---- Lo que la plataforma DEMUESTRA --------------------------------------
+   El motivo de que esta tarjeta exista: un perfil de Instagram enseña fotos y
+   seguidores, pero no puede demostrar que alguien cumplió 11 de 11
+   actuaciones. Ni un número de aquí lo escribió el proveedor.
+
+   Las dos reglas de honestidad vienen del servidor y aquí sólo se respetan:
+   cada porcentaje se pinta CON SU MUESTRA al lado, y si el proveedor todavía
+   no tiene historia suficiente (`nuevo`) no se pinta ni un porcentaje — se
+   dice que es nuevo. Un "100% de cumplimiento" con una sola actuación es
+   verdad y a la vez es mentira, y el día que un hotel contrate por un número
+   de aquí y le salga mal, se acabó la credibilidad de todas las tarjetas. */
+function datosHTML(t){
+  if(!t) return '';
+  const h=[];
+  const anio = t.desde ? t.desde.slice(0,4) : null;
+  const cal = t.calificacion;
+
+  const celdas=[];
+  if(t.actuaciones) celdas.push(`<div><b>${t.actuaciones}</b><span>Actuaciones</span></div>`);
+  if(t.hoteles)     celdas.push(`<div><b>${t.hoteles}</b><span>${t.hoteles>1?'Hoteles':'Hotel'}</span></div>`);
+  if(cal && cal.promedio!=null)
+    celdas.push(`<div><b>${cal.promedio}<i>★</i></b><span>${cal.total} reseña${cal.total>1?'s':''}</span></div>`);
+  if(anio)          celdas.push(`<div><b>${esc(anio)}</b><span>Desde</span></div>`);
+  if(celdas.length){
+    h.push(`<h2>Comprobado por SHOWMA</h2>`);
+    // Con menos de cuatro datos la rejilla de cuatro deja huecos: se ajusta.
+    h.push(`<div class="stats" style="grid-template-columns:repeat(${celdas.length},1fr)">${celdas.join('')}</div>`);
+  }
+
+  const meds=(t.distinciones||[]).map(d=>`<span class="med" title="${esc(d.detalle||'')}">🏅 ${esc(d.texto)}</span>`);
+  if(meds.length) h.push(`<div class="meds">${meds.join('')}</div>`);
+
+  if(t.nuevo){
+    h.push(`<div class="nuevo"><b>Nuevo en SHOWMA.</b> Todavía no tiene actuaciones suficientes
+      para publicar porcentajes. Lo que se ve arriba sí está comprobado por la plataforma.</div>`);
+  }else{
+    const barras=[];
+    const bar=(etq,pct,muestra,nota)=>barras.push(`<div class="bar">
+      <div class="t"><b>${esc(etq)}</b><u>${pct}%</u></div>
+      <div class="tr"><div class="fi" style="width:${Math.max(0,Math.min(100,pct))}%"></div></div>
+      <div class="mu">${esc(muestra)}${nota?' · '+esc(nota):''}</div>
+    </div>`);
+    const c=t.cumplimiento;
+    if(c && c.pct!=null) bar('Cumplió lo que aceptó', c.pct, `sobre ${c.muestra} actuaciones`);
+    const r=t.recontratacion;
+    if(r && r.pct!=null) bar('Hoteles que lo repitieron', r.pct,
+      `${r.hoteles_que_repitieron} de ${r.hoteles_totales} hoteles`);
+    const p=t.publico;
+    if(p && p.retencion_pct!=null) bar('El público se quedó', p.retencion_pct,
+      `sobre ${p.muestra_retencion} actuaciones`, p.estimado?'estimado':'');
+    if(p && p.ocupacion_pct!=null) bar('Qué tan lleno estuvo', p.ocupacion_pct,
+      `sobre ${p.muestra_aforo} actuaciones`, p.estimado?'estimado':'');
+    if(barras.length) h.push(`<div class="bars">${barras.join('')}</div>`);
+    const resp=t.respuesta;
+    if(resp && resp.horas!=null && resp.horas>0)
+      h.push(`<div class="chips" style="margin-bottom:14px"><span class="chip">⏱️ Contesta en
+        <b>${resp.horas<1?Math.round(resp.horas*60)+' min':resp.horas+' h'}</b>
+        (mediana de ${resp.muestra})</span></div>`);
+  }
+
+  const hs=t.hoteles_detalle||[];
+  if(hs.length){
+    h.push('<h2>Dónde ha tocado</h2><div class="hots">');
+    hs.slice(0,10).forEach(x=>{
+      const ic=x.logo_url
+        ? `<i style="background-image:url('${esc(x.logo_url)}')"></i>`
+        : `<i>${esc(iniciales(x.nombre))}</i>`;
+      h.push(`<span class="hot">${ic}${esc(x.nombre)} <em>· ${x.actuaciones}</em></span>`);
+    });
+    h.push('</div>');
+  }
+  return h.join('');
+}
+
+/* Los comentarios. Sale el hotel y el CARGO de quien firma, nunca su nombre
+   propio: esa opinión se escribió dentro de una plataforma cerrada. */
+function resenasHTML(rs){
+  if(!rs || !rs.length) return '';
+  const h=['<h2>Lo que dicen los hoteles</h2>'];
+  rs.forEach(r=>{
+    const ic=r.logo?`<i style="background-image:url('${esc(r.logo)}')"></i>`:`<i></i>`;
+    h.push(`<div class="rev">
+      <div class="hd">${ic}<div><b>${esc(r.hotel||'Hotel')}</b>
+        ${r.cargo?`<span>${esc(r.cargo)}</span>`:''}</div>
+        <div class="st">${'★'.repeat(r.estrellas||0)}</div></div>
+      ${r.comentario?`<p>${esc(r.comentario)}</p>`:''}
+      ${r.fecha?`<div class="fe">${esc(mesAnio(r.fecha))}</div>`:''}
+    </div>`);
+  });
+  return h.join('');
+}
+const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+  'septiembre','octubre','noviembre','diciembre'];
+/* La fecha se parte a mano. `new Date('2026-08-08')` la lee como UTC y en
+   México la pinta un día antes, que en el cambio de mes es un mes antes. */
+function mesAnio(iso){
+  const p=(iso||'').split('-');
+  return p.length>=2 ? MESES[+p[1]-1]+' de '+p[0] : iso;
+}
+
 function pintar(){
   if(!T){ document.body.innerHTML = '<p style="padding:60px;text-align:center;color:#697089">Tarjeta no disponible.</p>'; return; }
   document.getElementById('flink').href = (window.RICKY_API||'') + '/';
@@ -196,6 +346,8 @@ function pintar(){
   if(T.experiencia)     chips.push(`<span class="chip">🎬 <b>${esc(T.experiencia)}</b> de experiencia</span>`);
   if((T.idiomas||[]).length) chips.push(`<span class="chip">🗣️ ${esc(T.idiomas.join(', '))}</span>`);
   if(chips.length) h.push(`<div class="chips">${chips.join('')}</div>`);
+
+  h.push(datosHTML(T.trayectoria));
 
   if(T.bio) h.push(`<h2>Quiénes son</h2><div class="bio">${esc(T.bio)}</div>`);
 
@@ -242,6 +394,8 @@ function pintar(){
     gal.forEach(u=>h.push(`<a href="${esc(u)}" target="_blank" rel="noopener" style="background-image:url('${esc(u)}')"></a>`));
     h.push('</div>');
   }
+
+  h.push(resenasHTML(T.resenas));
 
   document.getElementById('body').innerHTML = h.join('');
 }

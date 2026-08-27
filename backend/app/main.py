@@ -151,6 +151,16 @@ def _abs_url(path: str | None) -> str | None:
     return f"{settings.public_root}{path}"
 
 
+# Las categorias se guardan sin acentos en la base; para un texto que va a leer
+# una persona se pintan bien escritas.
+_ACENTOS = {"Musica": "Música", "Produccion": "Producción",
+            "Fotografia y Video": "Fotografía y Video"}
+
+
+def _pretty(s: str | None) -> str:
+    return _ACENTOS.get(s or "", s or "")
+
+
 def _meta(data: dict, url: str) -> str:
     """Las etiquetas Open Graph, ARMADAS EN EL SERVIDOR.
 
@@ -166,10 +176,29 @@ def _meta(data: dict, url: str) -> str:
         data.get("ciudad"),
     ] if x)
     titulo = f"{nombre} — {genero}" if genero else nombre
+    # La descripcion ARRANCA con los numeros, no con la biografia. En la vista
+    # previa de WhatsApp o de Instagram se leen dos renglones y ya: "12
+    # actuaciones en 2 hoteles" es justo lo que un perfil de Instagram no puede
+    # decir, y es la razon de que esta liga exista. La biografia va detras, si
+    # cabe. (David, 27/08: "instagram... no da datos".)
+    t = data.get("trayectoria") or {}
+    cifras = []
+    if t.get("actuaciones"):
+        cifras.append(f"{t['actuaciones']} actuaciones")
+    if t.get("hoteles"):
+        cifras.append(f"{t['hoteles']} hotel" + ("es" if t["hoteles"] > 1 else ""))
+    cal = t.get("calificacion") or {}
+    if cal.get("promedio") is not None:
+        n = cal.get("total") or 0
+        cifras.append(f"{cal['promedio']}★ ({n} reseña" + ("s" if n != 1 else "") + ")")
+    cabeza = " · ".join(cifras)
+
     desc = (data.get("bio") or "").strip()
     if not desc and data.get("shows"):
         s = data["shows"][0]
-        desc = (s.get("descripcion") or f"{s.get('nombre')} · {s.get('categoria') or ''}").strip()
+        desc = (s.get("descripcion")
+                or f"{s.get('nombre')} · {_pretty(s.get('categoria'))}").strip(" ·")
+    desc = f"{cabeza}. {desc}".strip() if cabeza else desc
     if not desc:
         desc = "Perfil de proveedor de entretenimiento en SHOWMA."
     if len(desc) > 200:

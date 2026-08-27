@@ -92,6 +92,41 @@ def _youtube(social_links) -> str | None:
     return "https://youtube.com/" + v.lstrip("@")
 
 
+async def _resenas_publicas(db: AsyncSession, artist_id: int, limite: int = 8):
+    """Las resenas con su hotel y la fecha de la actuacion que las origino.
+
+    Se piden en tres consultas y no con joins para no arrastrar los modelos
+    enteros: de la empresa solo se usan nombre y logo.
+    """
+    filas = list((await db.execute(
+        select(Review).where(Review.artist_id == artist_id)
+        .order_by(Review.created_at.desc()).limit(limite)
+    )).scalars().all())
+    if not filas:
+        return []
+
+    empresas: dict[int, Company] = {}
+    ids = {r.company_id for r in filas if r.company_id}
+    if ids:
+        for c in (await db.execute(
+            select(Company).where(Company.id.in_(ids))
+        )).scalars().all():
+            empresas[c.id] = c
+
+    fechas: dict[int, object] = {}
+    bids = {r.booking_id for r in filas if r.booking_id}
+    if bids:
+        for bid, inicio in (await db.execute(
+            select(Booking.id, Booking.starts_at).where(Booking.id.in_(bids))
+        )).all():
+            fechas[bid] = inicio
+
+    return [
+        (r, empresas.get(r.company_id or 0), fechas.get(r.booking_id))
+        for r in filas
+    ]
+
+
 async def tarjeta_data(db: AsyncSession, slug: str) -> dict | None:
     """Los datos publicos de un proveedor, o None si no hay tarjeta que ensenar.
 
@@ -131,6 +166,56 @@ async def tarjeta_data(db: AsyncSession, slug: str) -> dict | None:
             "fotos": fotos,
         })
 
+    # --- Lo que la plataforma puede DEMOSTRAR --------------------------
+    # David, 27/08: "instagram es lo que mas estan usando para presentarse,
+    # pero no da datos... casi como una tarjeta de pokemon". Esta es la parte
+    # que Instagram no puede dar y que el musico no se puede inventar: sale
+    # entera de sus actuaciones dentro de SHOWMA.
+    #
+    # Se reusa `trayectoria.de_artista` TAL CUAL, no una copia. El dia que
+    # "cumplida" signifique una cosa en el perfil de dentro y otra en la
+    # tarjeta publica, el musico ensena un numero y el hotel ve otro, y ahi se
+    # acaba el unico argumento de esto. Sus dos reglas de honestidad viajan
+    # con el: cada porcentaje trae su muestra, y por debajo del minimo no se
+    # publica porcentaje ninguno (`nuevo`).
+    from app.services import distinciones as _dist, trayectoria as _tray
+
+    t = await _tray.de_artista(db, a)
+    tray = {
+        "desde": t.get("desde"),
+        "actuaciones": t.get("actuaciones"),
+        "hoteles": t.get("hoteles"),
+        "nuevo": t.get("nuevo"),
+        "calificacion": t.get("calificacion"),
+        "recontratacion": t.get("recontratacion"),
+        "cumplimiento": t.get("cumplimiento"),
+        "respuesta": t.get("respuesta"),
+        "publico": t.get("publico"),
+        # El company_id no sale: es un identificador interno y aqui no le sirve
+        # a nadie mas que a quien quiera enumerar la cartera de clientes.
+        "hoteles_detalle": [
+            {k: v for k, v in h.items() if k != "company_id"}
+            for h in (t.get("hoteles_detalle") or [])
+        ],
+        "distinciones": await _dist.de_artista(db, a.id),
+    }
+
+    # --- Los comentarios de los hoteles --------------------------------
+    # Va el NOMBRE DEL HOTEL y el CARGO de quien firma, nunca su nombre propio:
+    # la persona escribio esa opinion dentro de una plataforma cerrada, no para
+    # que su nombre apareciera en una pagina abierta de internet. El cargo da
+    # la misma credibilidad sin publicar a nadie.
+    resenas = []
+    for r, empresa, fecha in await _resenas_publicas(db, a.id):
+        resenas.append({
+            "estrellas": r.rating,
+            "comentario": r.comment,
+            "hotel": empresa.name if empresa is not None else None,
+            "logo": empresa.logo_url if empresa is not None else None,
+            "cargo": r.author_position,
+            "fecha": fecha.date().isoformat() if fecha else None,
+        })
+
     # La portada: su foto de perfil y, si no tiene, la primera de sus shows.
     # Si no hay ninguna, va None y la tarjeta pinta las iniciales sobre el
     # degradado de su categoria, igual que el catalogo de dentro.
@@ -153,6 +238,8 @@ async def tarjeta_data(db: AsyncSession, slug: str) -> dict | None:
         "categoria": shows[0]["categoria"] if shows else None,
         "shows": shows,
         "galeria": galeria[:12],
+        "trayectoria": tray,
+        "resenas": resenas,
     }
 
 

@@ -23,7 +23,7 @@ import json
 import urllib.error
 import urllib.request
 
-BASE = "http://localhost:8451"
+BASE = "http://localhost:8454"
 API = BASE + "/api/v1"
 ADMIN = ("admin@ricky.os", "Prueba2026!")   # copia local, nunca la de producción
 fallos = []
@@ -57,6 +57,13 @@ def post(path, cuerpo, token=None):
 
 
 tok = json.loads(post("/auth/login", {"email": ADMIN[0], "password": ADMIN[1]})[0])["access_token"]
+
+# La prueba deja la base como se la encontró en lo que a tarjetas se refiere:
+# apaga las que va a usar ANTES de empezar. Sin esto la segunda corrida falla
+# sola —el punto 1 esperaba un 404 y encontraba la tarjeta que publicó la
+# corrida anterior— y una prueba que sólo pasa la primera vez no sirve de nada.
+for _aid in (4, 5, 7, 13):
+    post(f"/artists/{_aid}/tarjeta", {"publicar": False}, tok)
 
 print("1. Apagada por omisión: publicar la función no publica a nadie")
 cuerpo, code = get("/api/v1/public/artist/dj-nova")
@@ -124,6 +131,61 @@ ok("window.TARJETA=" in html, "y los datos vienen embebidos: se ve sin esperar a
 # Un precio no puede haberse colado en el HTML por otra vía.
 ok("base_price" not in html and "price_hotel" not in html,
    "ni un precio dentro del HTML de la página")
+
+print("7. Las cifras que Instagram no puede dar")
+# David, 27/08: "instagram es lo que mas estan usando para presentarse, pero no
+# da datos... casi como una tarjeta de pokemon". Estas cifras son el motivo de
+# que la tarjeta exista, y NINGUNA la escribe el proveedor.
+json.loads(post("/artists/7/tarjeta", {"publicar": True}, tok)[0])   # DJ Nova
+crudo, code = get("/api/v1/public/artist/dj-nova")
+dn = json.loads(crudo)
+t = dn.get("trayectoria") or {}
+ok(code == 200 and t, "la tarjeta trae su trayectoria", str(code))
+ok(t.get("actuaciones", 0) > 0 and t.get("hoteles", 0) > 0,
+   "actuaciones y hoteles", f"{t.get('actuaciones')} en {t.get('hoteles')}")
+# Que salgan del MISMO servicio que el perfil de dentro, no de una copia: si
+# alguna vez divergen, el musico ensena un numero y el hotel ve otro.
+dentro = json.loads(get("/api/v1/artists/7/trayectoria", tok)[0])
+ok(t.get("actuaciones") == dentro.get("actuaciones")
+   and t.get("hoteles") == dentro.get("hoteles"),
+   "y coinciden EXACTAMENTE con las del perfil de dentro",
+   f"fuera {t.get('actuaciones')}/{t.get('hoteles')} · dentro {dentro.get('actuaciones')}/{dentro.get('hoteles')}")
+
+print("8. Cada porcentaje viaja con su muestra")
+for clave, campo in (("cumplimiento", "muestra"), ("publico", "muestra")):
+    b = t.get(clave)
+    if b:
+        ok(b.get(campo) is not None,
+           f"{clave} dice sobre cuantas actuaciones esta medido", str(b.get(campo)))
+r = t.get("recontratacion")
+if r:
+    ok(r.get("hoteles_totales") is not None,
+       "recontratacion dice de cuantos hoteles", str(r))
+
+print("9. Los comentarios no publican a la persona que los firmo")
+res = dn.get("resenas") or []
+ok(res, "llegan las resenas", str(len(res)))
+if res:
+    ok(res[0].get("hotel"), "con el nombre del hotel", str(res[0].get("hotel")))
+    ok("cargo" in res[0], "y el cargo de quien firma", str(res[0].get("cargo")))
+# El nombre propio de quien escribio NO puede salir. Control: se lee del
+# perfil de dentro, donde si esta, y se busca en la salida publica.
+adentro = json.loads(get("/api/v1/reviews/artists/7", tok)[0])
+firmantes = [i.get("author_name") for i in adentro.get("items", []) if i.get("author_name")]
+ok(bool(firmantes), "control: adentro SI se guarda quien firmo", str(firmantes[:2]))
+fugados = [f for f in firmantes if f and f.lower() in crudo.lower()]
+ok(not fugados, "y ninguno de esos nombres sale en la tarjeta publica", str(fugados))
+
+print("10. La vista previa arranca con las cifras")
+html7, _ = get("/p/dj-nova")
+import re as _re
+m = _re.search(r'property="og:description" content="([^"]*)"', html7)
+ok(bool(m), "hay og:description")
+if m:
+    ok(_re.match(r"^\d+ actuaciones", m.group(1)),
+       "y empieza por los numeros, no por la biografia", m.group(1)[:70])
+    ok("(1 reseñas)" not in m.group(1),
+       "y con el plural bien puesto: '1 reseña', no '1 reseñas'", m.group(1)[:70])
 
 print()
 print("TODO BIEN" if not fallos else f"{len(fallos)} FALLAS: " + "; ".join(fallos))
