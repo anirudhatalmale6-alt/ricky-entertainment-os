@@ -23,6 +23,7 @@ from app.models.booking import Booking
 from app.models.company import Company
 from app.models.enums import BookingStatus
 from app.models.review import Review
+from app.core.storage import UPLOAD_DIR
 from app.models.show import Show
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -77,6 +78,26 @@ async def public_stats(db: DbSession) -> dict:
 def _lista(v) -> list:
     """Las columnas JSON pueden traer None en filas viejas."""
     return [x for x in (v or []) if x]
+
+
+def _viva(url: str | None) -> str | None:
+    """La misma direccion si el archivo existe de verdad; None si no.
+
+    En una pantalla de dentro una imagen rota es una molestia; en la tarjeta
+    publica es la primera impresion que se lleva un hotel, y ademas es la que
+    se pega en WhatsApp. La base guarda rutas que pueden haber quedado
+    huerfanas —ya paso en este proyecto con un prefijo /ricky/ de un despliegue
+    viejo—, asi que antes de publicar una foto se comprueba que este ahi.
+
+    Solo se revisan las que servimos nosotros. Una direccion externa no se
+    puede comprobar sin salir a la red, y eso no se hace al pintar una pagina.
+    """
+    if not url:
+        return None
+    if not url.startswith("/uploads/"):
+        return url
+    nombre = url[len("/uploads/"):].split("?")[0].split("/")[-1]
+    return url if (UPLOAD_DIR / nombre).is_file() else None
 
 
 def _youtube(social_links) -> str | None:
@@ -149,7 +170,7 @@ async def tarjeta_data(db: AsyncSession, slug: str) -> dict | None:
     for s in sorted(a.shows, key=lambda s: s.show_name or ""):
         if not s.is_active:
             continue
-        fotos = [im.url for im in s.images if im.url]
+        fotos = [f for f in (_viva(im.url) for im in s.images) if f]
         galeria.extend(fotos)
         shows.append({
             "nombre": s.show_name,
@@ -194,7 +215,8 @@ async def tarjeta_data(db: AsyncSession, slug: str) -> dict | None:
         # El company_id no sale: es un identificador interno y aqui no le sirve
         # a nadie mas que a quien quiera enumerar la cartera de clientes.
         "hoteles_detalle": [
-            {k: v for k, v in h.items() if k != "company_id"}
+            {**{k: v for k, v in h.items() if k != "company_id"},
+             "logo_url": _viva(h.get("logo_url"))}
             for h in (t.get("hoteles_detalle") or [])
         ],
         "distinciones": await _dist.de_artista(db, a.id),
@@ -211,7 +233,7 @@ async def tarjeta_data(db: AsyncSession, slug: str) -> dict | None:
             "estrellas": r.rating,
             "comentario": r.comment,
             "hotel": empresa.name if empresa is not None else None,
-            "logo": empresa.logo_url if empresa is not None else None,
+            "logo": _viva(empresa.logo_url) if empresa is not None else None,
             "cargo": r.author_position,
             "fecha": fecha.date().isoformat() if fecha else None,
         })
@@ -219,7 +241,7 @@ async def tarjeta_data(db: AsyncSession, slug: str) -> dict | None:
     # La portada: su foto de perfil y, si no tiene, la primera de sus shows.
     # Si no hay ninguna, va None y la tarjeta pinta las iniciales sobre el
     # degradado de su categoria, igual que el catalogo de dentro.
-    portada = a.profile_image_url or (galeria[0] if galeria else None)
+    portada = _viva(a.profile_image_url) or (galeria[0] if galeria else None)
 
     return {
         "slug": a.public_slug,

@@ -23,7 +23,7 @@ import json
 import urllib.error
 import urllib.request
 
-BASE = "http://localhost:8454"
+BASE = "http://localhost:8455"
 API = BASE + "/api/v1"
 ADMIN = ("admin@ricky.os", "Prueba2026!")   # copia local, nunca la de producción
 fallos = []
@@ -46,6 +46,16 @@ def _pide(req):
 def get(path, token=None):
     h = {"Authorization": "Bearer " + token} if token else {}
     return _pide(urllib.request.Request(BASE + path, headers=h))
+
+
+def existe(path) -> int:
+    """Solo el codigo. `get` decodifica el cuerpo como texto y un JPEG lo
+    revienta: aqui no nos importa el contenido, solo si esta."""
+    try:
+        return urllib.request.urlopen(
+            urllib.request.Request(BASE + path, method="HEAD")).status
+    except urllib.error.HTTPError as e:
+        return e.code
 
 
 def post(path, cuerpo, token=None):
@@ -186,6 +196,30 @@ if m:
        "y empieza por los numeros, no por la biografia", m.group(1)[:70])
     ok("(1 reseñas)" not in m.group(1),
        "y con el plural bien puesto: '1 reseña', no '1 reseñas'", m.group(1)[:70])
+
+print("11. Ninguna imagen rota")
+# En la tarjeta publica una foto rota es la primera impresion de un hotel, y
+# la que se pega en WhatsApp. La base puede guardar rutas huerfanas: ya paso
+# en este proyecto con un prefijo /ricky/ de un despliegue viejo. El servidor
+# comprueba que el archivo exista antes de publicarlo.
+urls = set()
+for dd in (d, dn):
+    if dd.get("portada"):
+        urls.add(dd["portada"])
+    urls.update(dd.get("galeria") or [])
+    for sh in dd.get("shows") or []:
+        urls.update(sh.get("fotos") or [])
+    for h in (dd.get("trayectoria") or {}).get("hoteles_detalle") or []:
+        if h.get("logo_url"):
+            urls.add(h["logo_url"])
+    for rr in dd.get("resenas") or []:
+        if rr.get("logo"):
+            urls.add(rr["logo"])
+rotas = [u for u in urls if u.startswith("/uploads/") and existe(u) != 200]
+ok(not rotas, f"las {len(urls)} imagenes publicadas existen todas", str(rotas[:3]))
+# Control: si el filtro no hiciera nada, esta ruta inventada se colaria.
+ok(existe("/uploads/no-existe-esta-foto.jpg") == 404,
+   "control: una ruta inventada sí da 404, o sea que la comprobacion vale")
 
 print()
 print("TODO BIEN" if not fallos else f"{len(fallos)} FALLAS: " + "; ".join(fallos))
