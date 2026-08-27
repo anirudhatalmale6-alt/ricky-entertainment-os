@@ -23,6 +23,7 @@ from app.models.booking import Booking
 from app.models.company import Company
 from app.models.enums import BookingStatus
 from app.models.review import Review
+from app.core.config import settings
 from app.core.storage import UPLOAD_DIR
 from app.models.show import Show
 
@@ -94,10 +95,20 @@ def _viva(url: str | None) -> str | None:
     """
     if not url:
         return None
-    if not url.startswith("/uploads/"):
+    if url.startswith("http://") or url.startswith("https://"):
+        return url          # externa: no se puede comprobar sin salir a la red
+    if "/uploads/" not in url:
         return url
-    nombre = url[len("/uploads/"):].split("?")[0].split("/")[-1]
-    return url if (UPLOAD_DIR / nombre).is_file() else None
+    # Se busca "/uploads/" EN CUALQUIER PARTE, no solo al principio: la base
+    # guarda valores con el tramo de la app metido dentro
+    # ("/demo/uploads/x.jpg", y en su dia "/ricky/uploads/x.jpg"), asi que
+    # comparar contra el principio de la cadena dejaba pasar justo los rotos.
+    nombre = url.split("/uploads/", 1)[1].split("?")[0].split("/")[-1]
+    if not (UPLOAD_DIR / nombre).is_file():
+        return None
+    # Y se devuelve la ruta CANONICA, no la guardada: asi un prefijo viejo
+    # dentro del dato no puede volver a producir una direccion que no abre.
+    return f"{settings.ROOT_PATH}/uploads/{nombre}"
 
 
 def _youtube(social_links) -> str | None:

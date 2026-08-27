@@ -148,7 +148,9 @@ def _abs_url(path: str | None) -> str | None:
         return None
     if path.startswith("http://") or path.startswith("https://"):
         return path
-    return f"{settings.public_root}{path}"
+    # La ruta ya trae el tramo de la app dentro (la normaliza _viva), asi que
+    # aqui solo se le pone el dominio; pegarle public_root lo duplicaria.
+    return f"{settings.public_origin}{path}"
 
 
 # Las categorias se guardan sin acentos en la base; para un texto que va a leer

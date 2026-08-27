@@ -100,6 +100,14 @@ class Settings(BaseSettings):
         return base
 
     @property
+    def public_origin(self) -> str:
+        """Solo esquema y dominio, sin el tramo de la app. Es lo que hay que
+        pegarle a una ruta que YA trae el ROOT_PATH dentro."""
+        base = self.public_root
+        raiz = self.ROOT_PATH.rstrip("/")
+        return base[: -len(raiz)] if raiz and base.endswith(raiz) else base
+
+    @property
     def mail_from(self) -> str:
         return self.SMTP_FROM or self.SMTP_USER
 

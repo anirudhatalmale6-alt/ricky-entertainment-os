@@ -23,7 +23,7 @@ import json
 import urllib.error
 import urllib.request
 
-BASE = "http://localhost:8455"
+BASE = "http://localhost:8456"
 API = BASE + "/api/v1"
 ADMIN = ("admin@ricky.os", "Prueba2026!")   # copia local, nunca la de producción
 fallos = []
@@ -215,8 +215,13 @@ for dd in (d, dn):
     for rr in dd.get("resenas") or []:
         if rr.get("logo"):
             urls.add(rr["logo"])
-rotas = [u for u in urls if u.startswith("/uploads/") and existe(u) != 200]
+rotas = [u for u in urls if u.startswith("/") and existe(u) != 200]
 ok(not rotas, f"las {len(urls)} imagenes publicadas existen todas", str(rotas[:3]))
+# Un prefijo viejo guardado DENTRO del dato ("/ricky/uploads/…") no puede
+# volver a salir publicado: la ruta se reescribe canonica.
+sucias = [u for u in urls if u.startswith("/") and "/uploads/" in u
+          and not u.startswith("/uploads/")]
+ok(not sucias, "y ninguna arrastra un prefijo viejo dentro", str(sucias[:3]))
 # Control: si el filtro no hiciera nada, esta ruta inventada se colaria.
 ok(existe("/uploads/no-existe-esta-foto.jpg") == 404,
    "control: una ruta inventada sí da 404, o sea que la comprobacion vale")
