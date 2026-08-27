@@ -270,8 +270,7 @@ function datosHTML(t){
     const resp=t.respuesta;
     if(resp && resp.horas!=null && resp.horas>0)
       h.push(`<div class="chips" style="margin-bottom:14px"><span class="chip">⏱️ Contesta en
-        <b>${resp.horas<1?Math.round(resp.horas*60)+' min':resp.horas+' h'}</b>
-        (mediana de ${resp.muestra})</span></div>`);
+        <b>${duracion(resp.horas)}</b> (mediana de ${resp.muestra})</span></div>`);
   }
 
   const hs=t.hoteles_detalle||[];
@@ -286,6 +285,15 @@ function datosHTML(t){
     h.push('</div>');
   }
   return h.join('');
+}
+
+/* "168 h" no lo lee nadie: son siete días y hay que decirlo así. El servidor
+   manda siempre horas, y la unidad se elige al pintar. */
+function duracion(horas){
+  if(horas < 1)  return Math.round(horas*60)+' min';
+  if(horas < 48) return (Math.round(horas*10)/10)+' h';
+  const d = Math.round(horas/24);
+  return d+(d===1?' día':' días');
 }
 
 /* Los comentarios. Sale el hotel y el CARGO de quien firma, nunca su nombre
