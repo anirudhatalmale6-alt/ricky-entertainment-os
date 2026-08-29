@@ -32,6 +32,24 @@ class Artist(Base, TimestampMixin):
     # A profile may (optionally) have a login account.
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), unique=True)
 
+    # --- Productora / roster -------------------------------------------
+    # El musico que trabaja DENTRO de una productora es una ficha propia que
+    # cuelga de la de la empresa (David 28/08: una empresa con mas de 100
+    # musicos). Es una ficha completa, no un contacto: por eso tiene su cuenta,
+    # su calendario, sus fechas bloqueadas y su historial, que es justo lo que
+    # la empresa no le puede llevar a mano a 100 personas.
+    #
+    # No se anida mas de un nivel a proposito. Una productora dentro de otra
+    # productora no existe en el negocio y en cambio convierte cada consulta de
+    # alcance en un recorrido de arbol.
+    #
+    # ondelete SET NULL, nunca CASCADE: si se da de baja la productora, sus
+    # musicos NO se borran. Quedan sueltos, con su cuenta y su historial
+    # intactos, que es lo que se les prometio al darlos de alta.
+    parent_id: Mapped[int | None] = mapped_column(
+        ForeignKey("artists.id", ondelete="SET NULL"), index=True
+    )
+
     # --- Who they are --------------------------------------------------
     stage_name: Mapped[str] = mapped_column(String(255), index=True)   # Nombre artistico / proveedor
     first_name: Mapped[str | None] = mapped_column(String(120))

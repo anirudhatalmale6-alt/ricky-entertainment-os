@@ -29,8 +29,10 @@ from app.models.property_group import PropertyGroup
 from app.models.tax_figure import TaxFigure
 from app.models.cfdi import Cfdi
 from app.models.venue import Venue
+from app.models.user import Role, User
+from app.core import security
 from app.services.facturama import FacturamaError, get_facturama
-from app.services import facturacion, periodos, rfc as rfc_svc
+from app.services import facturacion, mailer, passwords, periodos, rfc as rfc_svc
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
     ContractAcceptance,
@@ -78,6 +80,24 @@ async def _require_artist(scope: CurrentScope) -> int:
     return scope.artist_id
 
 
+async def _require_cobra(scope: CurrentScope) -> int:
+    """El artist_id de quien factura por su cuenta.
+
+    Un músico que trabaja dentro de una productora no cobra por SHOWMA: la
+    plataforma le factura y le paga a la EMPRESA, y ellos se liquidan por fuera
+    (David, 28/08). Así que todo lo que huele a dinero -pagos, CFDI, CSD,
+    tarifas por cliente- se le cierra AQUÍ, en el servidor, y no sólo
+    escondiendo el botón: una pantalla oculta se sigue pudiendo llamar a mano.
+    """
+    artist_id = await _require_artist(scope)
+    if scope.parent_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tus pagos los lleva la empresa a la que perteneces, no SHOWMA.",
+        )
+    return artist_id
+
+
 async def _load_artist(db: DbSession, artist_id: int) -> Artist:
     res = await db.execute(
         select(Artist).options(*_ARTIST_RELS).where(Artist.id == artist_id)
@@ -106,9 +126,33 @@ async def _own_show_or_404(db: DbSession, artist_id: int, show_id: int) -> Show:
 
 # --- Profile --------------------------------------------------------------
 
+# Lo que es "facturación" en una ficha. El músico que trabaja dentro de una
+# productora no lleva nada de esto: SHOWMA le factura y le paga a la EMPRESA, y
+# la empresa liquida a los suyos fuera de la plataforma (David, 28/08). Sus
+# datos fiscales son asunto entre ellos dos, no de aquí.
+_FISCALES = (
+    "rfc", "cfdi_use", "tax_regime", "legal_name", "fiscal_postal_code",
+    "bank_name", "bank_account", "bank_account_holder", "bank_clabe",
+)
+
+
+def _sin_facturacion(artist: Artist) -> ArtistOut:
+    """La ficha tal cual, y vacía de datos fiscales si cuelga de una productora.
+
+    Se vacía sobre el ArtistOut ya construido y NO sobre el objeto de la base:
+    tocarle los campos al objeto vivo dejaría a SQLAlchemy con el borrado
+    pendiente, y el primer commit que pasara por ahí guardaría los blancos de
+    verdad. Esto esconde un dato; no lo borra.
+    """
+    out = ArtistOut.model_validate(artist)
+    if artist.parent_id:
+        return out.model_copy(update={k: None for k in _FISCALES})
+    return out
+
+
 @router.get("/artist", response_model=ArtistOut)
 async def get_my_profile(scope: CurrentScope, db: DbSession):
-    return await _load_artist(db, await _require_artist(scope))
+    return _sin_facturacion(await _load_artist(db, await _require_artist(scope)))
 
 
 @router.patch("/artist", response_model=ArtistOut)
@@ -118,10 +162,17 @@ async def update_my_profile(payload: ArtistUpdate, scope: CurrentScope, db: DbSe
     data = payload.model_dump(exclude_unset=True)
     for field in _PROTECTED:
         data.pop(field, None)
+    # Esconder la sección en la pantalla no basta: el que cuelga de una
+    # productora tampoco puede ESCRIBIR sus datos fiscales, o bastaría con
+    # mandar el PATCH a mano para meter un RFC que luego nadie sabría de dónde
+    # salió y que no le corresponde cobrar.
+    if artist.parent_id:
+        for field in _FISCALES:
+            data.pop(field, None)
     for field, value in data.items():
         setattr(artist, field, value)
     await db.commit()
-    return await _load_artist(db, artist_id)
+    return _sin_facturacion(await _load_artist(db, artist_id))
 
 
 # --- Facturación / pagos del artista (desglose fiscal) --------------------
@@ -140,7 +191,7 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
     se restan las retenciones de IVA e ISR para llegar al total a recibir. Se
     agrupa por hotel y mes, igual que la facturación del hotel. Los porcentajes
     salen de la figura fiscal del talento (catálogo Impuestos)."""
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_cobra(scope)
     artist = await db.get(Artist, artist_id)
 
     # Figura fiscal del talento (o la predeterminada del catálogo).
@@ -282,7 +333,7 @@ class PayoutMarkIn(BaseModel):
 async def mark_payout(payload: PayoutMarkIn, scope: CurrentScope, db: DbSession):
     """El artista marca su recibo (hotel + mes) como cobrado o revierte el marcado:
     pone payout_paid en sus actuaciones de ese hotel y periodo."""
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_cobra(scope)
     rows = (
         await db.execute(
             select(Booking).where(
@@ -522,7 +573,7 @@ class FiscalDataIn(BaseModel):
 @router.get("/fiscal")
 async def get_my_fiscal(scope: CurrentScope, db: DbSession):
     """Datos fiscales del músico + estado de su CSD para facturación."""
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_cobra(scope)
     artist = await _load_artist(db, artist_id)
     return _fiscal_out(artist)
 
@@ -530,7 +581,7 @@ async def get_my_fiscal(scope: CurrentScope, db: DbSession):
 @router.post("/fiscal")
 async def save_my_fiscal(payload: FiscalDataIn, scope: CurrentScope, db: DbSession):
     """Guarda los datos fiscales (RFC, razón social, régimen, CP, uso CFDI)."""
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_cobra(scope)
     artist = await _load_artist(db, artist_id)
     if payload.rfc is not None:
         chk = rfc_svc.check(payload.rfc)
@@ -568,7 +619,7 @@ async def upload_csd(
     de la llave sea correcta; si algo no cuadra, devuelve el motivo y no se
     marca como listo. En éxito, el RFC queda habilitado para timbrar a su nombre.
     """
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_cobra(scope)
     artist = await _load_artist(db, artist_id)
 
     rfc = (rfc or "").strip().upper()
@@ -636,7 +687,7 @@ def _cfdi_out(c: Cfdi) -> dict:
 @router.get("/cfdis")
 async def my_cfdis(scope: CurrentScope, db: DbSession):
     """Lista los CFDI emitidos a nombre del músico (timbrados y con error)."""
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_cobra(scope)
     rows = (
         await db.execute(
             select(Cfdi).where(Cfdi.artist_id == artist_id).order_by(Cfdi.id.desc())
@@ -650,7 +701,7 @@ async def download_cfdi(cfdi_id: int, fmt: str, scope: CurrentScope, db: DbSessi
     """Descarga el PDF o XML de un CFDI timbrado del músico."""
     from fastapi.responses import Response
 
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_cobra(scope)
     cfdi = await db.get(Cfdi, cfdi_id)
     if cfdi is None or cfdi.artist_id != artist_id:
         raise HTTPException(status_code=404, detail="CFDI no encontrado.")
@@ -927,7 +978,7 @@ async def my_clients(scope: CurrentScope, db: DbSession):
 
 @router.get("/artist/client-rates")
 async def list_client_rates(scope: CurrentScope, db: DbSession):
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_cobra(scope)
     rates = (await db.execute(
         select(ArtistClientRate).where(ArtistClientRate.artist_id == artist_id)
     )).scalars().all()
@@ -942,7 +993,7 @@ async def list_client_rates(scope: CurrentScope, db: DbSession):
 
 @router.post("/artist/client-rates", status_code=status.HTTP_201_CREATED)
 async def add_client_rate(payload: ClientRateIn, scope: CurrentScope, db: DbSession):
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_cobra(scope)
     if not payload.company_id and not payload.group_id:
         raise HTTPException(status_code=400, detail="Elige un hotel o una cadena.")
     if payload.company_id and payload.group_id:
@@ -969,7 +1020,173 @@ async def add_client_rate(payload: ClientRateIn, scope: CurrentScope, db: DbSess
 
 @router.delete("/artist/client-rates/{rate_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_client_rate(rate_id: int, scope: CurrentScope, db: DbSession):
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_cobra(scope)
     await db.execute(sa_delete(ArtistClientRate).where(
         ArtistClientRate.id == rate_id, ArtistClientRate.artist_id == artist_id))
+    await db.commit()
+
+
+# --- Mis músicos (productoras) --------------------------------------------
+#
+# Una productora con 100 músicos no puede llevarles la agenda a mano (David,
+# 28/08). La salida no es meterlos como contactos sueltos dentro de la ficha de
+# la empresa: es que cada uno sea una FICHA de verdad, colgada de la suya. Así
+# heredan gratis lo que ya está construido y va por artist_id -bloquear fechas,
+# desaparecer del catálogo ese día, no admitir doble agenda, historial propio- y
+# el aviso de contratación le llega a él y no sólo a la empresa.
+#
+# Quien cobra sigue siendo la empresa: por eso estas fichas no llevan
+# facturación (ver _require_cobra y _FISCALES).
+
+
+class MusicoIn(BaseModel):
+    stage_name: str
+    email: str
+    phone: str | None = None
+    artist_type: str | None = None
+
+
+def _musico_out(a: Artist, tiene_cuenta: bool) -> dict:
+    return {
+        "id": a.id,
+        "stage_name": a.stage_name,
+        "email": a.email,
+        "phone": a.phone,
+        "artist_type": a.artist_type,
+        "profile_image_url": a.profile_image_url,
+        "is_active": a.is_active,
+        # Que EXISTA la cuenta, que es lo único que se puede afirmar: no
+        # guardamos el último acceso, así que no hay forma de saber si ya entró
+        # a poner su contraseña. Por eso el botón de reenviar la invitación se
+        # ofrece siempre, en vez de inventar un "pendiente" que no sabemos.
+        "tiene_cuenta": tiene_cuenta,
+    }
+
+
+async def _mi_musico(db: DbSession, productora_id: int, musico_id: int) -> Artist:
+    """El músico que cuelga de MI ficha, o 404.
+
+    404 y no 403 a propósito: si contestara "existe pero no es tuyo", una
+    productora podría ir probando números para averiguar quién más está dado de
+    alta en SHOWMA.
+    """
+    a = await db.get(Artist, musico_id)
+    if a is None or a.parent_id != productora_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Ese músico no está en tu equipo")
+    return a
+
+
+@router.get("/musicos")
+async def list_my_musicians(scope: CurrentScope, db: DbSession):
+    productora_id = await _require_artist(scope)
+    filas = (await db.execute(
+        select(Artist).where(Artist.parent_id == productora_id)
+        .order_by(Artist.stage_name)
+    )).scalars().all()
+    return [_musico_out(a, bool(a.user_id)) for a in filas]
+
+
+@router.post("/musicos", status_code=status.HTTP_201_CREATED)
+async def add_my_musician(payload: MusicoIn, scope: CurrentScope, db: DbSession):
+    """Da de alta a un músico del equipo y le manda su invitación.
+
+    La productora NO elige la contraseña. Se crea la cuenta con una al azar que
+    nadie llega a saber y se le manda al músico el enlace para que ponga la
+    suya. Si la empresa la supiera podría entrar como él y aceptar o cancelar
+    contrataciones en su nombre, y entonces lo de que el músico maneja su propia
+    disponibilidad sería mentira.
+    """
+    productora_id = await _require_artist(scope)
+    yo = await db.get(Artist, productora_id)
+    # Un solo nivel: un músico que ya cuelga de una empresa no puede tener
+    # equipo propio. Anidar productoras no existe en el negocio y convertiría
+    # cada consulta de alcance en un recorrido de árbol.
+    if yo is not None and yo.parent_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Perteneces a una empresa, así que no puedes tener equipo propio.",
+        )
+
+    correo = (payload.email or "").strip().lower()
+    if not correo:
+        raise HTTPException(status_code=422, detail="Hace falta el correo del músico.")
+    ya = (await db.execute(select(User).where(User.email == correo))).scalar_one_or_none()
+    if ya is not None:
+        # Si ya tiene cuenta en SHOWMA no se le crea otra ni se le engancha por
+        # las malas: ese perfil es suyo y tiene su propio historial. Lo correcto
+        # es que él acepte unirse, y eso todavía no está construido.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ese correo ya tiene cuenta en SHOWMA. Pídele que se una desde su perfil.",
+        )
+
+    role = (await db.execute(select(Role).where(Role.name == "artist"))).scalar_one_or_none()
+    user = User(
+        email=correo,
+        full_name=payload.stage_name,
+        hashed_password=security.hash_password(passwords.temp_password(24)),
+        role_id=role.id if role else None,
+    )
+    db.add(user)
+    await db.flush()
+
+    musico = Artist(
+        user_id=user.id,
+        parent_id=productora_id,
+        stage_name=payload.stage_name,
+        artist_type=payload.artist_type,
+        phone=payload.phone,
+        email=correo,
+    )
+    db.add(musico)
+    await db.commit()
+    await db.refresh(musico)
+
+    enviado = await _invitar(db, user)
+    return {**_musico_out(musico, True), "invitacion_enviada": enviado}
+
+
+async def _invitar(db: DbSession, user: User) -> bool:
+    """Le manda al músico el enlace para poner su contraseña.
+
+    Devuelve si salió el correo. Que falle NO tumba el alta: la ficha ya existe
+    y la empresa puede reintentar la invitación. Al revés -perder el alta porque
+    el SMTP está caído- sería mucho peor.
+    """
+    if not mailer.is_configured():
+        return False
+    try:
+        raw, _ = await passwords.issue_token(db, user, requested_by="productora")
+        asunto, texto, html = mailer.reset_email(
+            user.full_name, passwords.reset_link(raw), settings.RESET_TOKEN_MINUTES
+        )
+        return await mailer.send(user.email, asunto, texto, html)
+    except Exception:  # noqa: BLE001 - la invitación es reintentable, el alta no
+        return False
+
+
+@router.post("/musicos/{musico_id}/invitar")
+async def reinvite_my_musician(musico_id: int, scope: CurrentScope, db: DbSession):
+    productora_id = await _require_artist(scope)
+    musico = await _mi_musico(db, productora_id, musico_id)
+    if not musico.user_id:
+        raise HTTPException(status_code=409, detail="Ese músico no tiene cuenta.")
+    user = await db.get(User, musico.user_id)
+    if user is None:
+        raise HTTPException(status_code=409, detail="Ese músico no tiene cuenta.")
+    return {"invitacion_enviada": await _invitar(db, user)}
+
+
+@router.delete("/musicos/{musico_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def unlink_my_musician(musico_id: int, scope: CurrentScope, db: DbSession):
+    """Saca al músico del equipo. NO lo borra.
+
+    Se queda con su cuenta, su ficha y su historial, que es justo lo que se le
+    prometió al darlo de alta. Borrarlo se llevaría por delante las actuaciones
+    que sí ocurrieron y las reseñas que los hoteles le escribieron.
+    """
+    productora_id = await _require_artist(scope)
+    musico = await _mi_musico(db, productora_id, musico_id)
+    musico.parent_id = None
     await db.commit()

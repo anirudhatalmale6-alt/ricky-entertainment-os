@@ -76,6 +76,10 @@ _SQLITE_ADDED_COLUMNS = [
     # perfiles que llevan meses cargados.
     ("artists", "is_public", "BOOLEAN DEFAULT 0"),
     ("artists", "public_slug", "VARCHAR(80)"),
+    # Productora a la que pertenece el musico. NULL = trabaja por su cuenta, que
+    # es lo que son todos los que ya existen: nadie queda dentro de una empresa
+    # por el hecho de agregar la columna.
+    ("artists", "parent_id", "INTEGER"),
 ]
 
 

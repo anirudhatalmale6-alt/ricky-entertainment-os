@@ -159,6 +159,9 @@ class ArtistOut(ArtistBase):
     # Estado de la tarjeta publica (para pintar el interruptor y la liga).
     is_public: bool = False
     public_slug: str | None = None
+    # Productora de la que cuelga. Sale para que la pantalla sepa que a esta
+    # ficha no le toca seccion de facturacion: quien cobra es la empresa.
+    parent_id: int | None = None
     rating: float | None = None
     shows: list[ShowOut] = []
     documents: list[ArtistDocumentOut] = []
