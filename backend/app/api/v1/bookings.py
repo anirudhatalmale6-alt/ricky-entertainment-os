@@ -83,6 +83,22 @@ def _decorate(
     })
 
 
+def _sin_importes(out: BookingOut, scope) -> BookingOut:
+    """La actuación completa, sin dinero, si quien mira es músico de productora.
+
+    Ve día, hora, hotel, salón y show -que es lo que necesita para organizarse-
+    pero no el precio ni la comisión: quien cobra es su empresa, y ellos se
+    liquidan fuera de SHOWMA (David, 02/09). El precio del hotel es el margen de
+    su propia empresa, y ese no es dato nuestro que dar.
+
+    Se recorta en el servidor y no ocultando la columna: la pantalla se puede
+    saltar pidiendo la API a mano.
+    """
+    if scope.is_artist and scope.parent_id:
+        return out.model_copy(update={"agreed_price": None, "commission_pct": None})
+    return out
+
+
 async def _check_blocked_day(db: DbSession, artist_id: int | None, starts_at: datetime):
     """Reject if the artist marked that day as unavailable (vacaciones, etc.)."""
     if not artist_id:
@@ -292,7 +308,13 @@ async def my_bookings(
     companies = {c.id: c for c in (
         (await db.execute(select(Company).where(Company.id.in_(cids)))).scalars().all() if cids else []
     )}
-    return [_decorate(b, venues.get(b.venue_id), shows.get(b.show_id), companies.get(b.company_id)) for b in bookings]
+    return [
+        _sin_importes(
+            _decorate(b, venues.get(b.venue_id), shows.get(b.show_id), companies.get(b.company_id)),
+            scope,
+        )
+        for b in bookings
+    ]
 
 
 @router.get("/alerts")
@@ -508,13 +530,23 @@ async def artist_cancel_booking(
     await db.refresh(booking)
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
     show = await db.get(Show, booking.show_id) if booking.show_id else None
-    return _decorate(booking, venue, show)
+    return _sin_importes(_decorate(booking, venue, show), scope)
 
 
-@router.get("/{booking_id}/replacements")
+@router.get(
+    "/{booking_id}/replacements",
+    dependencies=[Depends(require_permission("booking.manage"))],
+)
 async def booking_replacements(booking_id: int, scope: CurrentScope, db: DbSession):
     """Artistas disponibles para cubrir una actuación (misma categoría, libres a esa
-    hora). Se usa para reemplazar de inmediato cuando un músico cancela."""
+    hora). Se usa para reemplazar de inmediato cuando un músico cancela.
+
+    Es una herramienta del HOTEL y por eso pide booking.manage. Sin ese candado
+    devuelve el catálogo entero con el precio de cada quien a cualquiera con
+    sesión, o sea la lista de precios de la competencia a otro proveedor. Importa
+    más ahora: cada músico de una productora tiene su propia cuenta, así que una
+    empresa de 200 son 200 sesiones nuevas que podrían pedirlo.
+    """
     booking = await _get_or_404(db, booking_id)
     orig_show = await db.get(Show, booking.show_id) if booking.show_id else None
     category = orig_show.category if orig_show else None
@@ -604,7 +636,7 @@ async def artist_respond(
     await db.commit()
     avisos.despachar(bg, correos)
     await db.refresh(booking)
-    return _decorate(booking, venue, show)
+    return _sin_importes(_decorate(booking, venue, show), scope)
 
 
 @router.post(
@@ -732,8 +764,13 @@ async def notify_artists(payload: NotifyIn, db: DbSession, bg: BackgroundTasks):
                 venue=venue_name,
                 hotel=company.name if company else "",
                 cuando=st,
-                importe=(f"${booking.agreed_price:,.2f} {booking.currency or 'MXN'}"
-                         if booking.agreed_price else ""),
+                # Sin importe si el artista cuelga de una productora: el aviso le
+                # llega a ÉL para que sepa que lo agendaron, pero el precio es
+                # entre el hotel y su empresa. De nada sirve recortarlo en la
+                # pantalla si el correo lo lleva escrito.
+                importe=("" if (artist and artist.parent_id) else
+                         (f"${booking.agreed_price:,.2f} {booking.currency or 'MXN'}"
+                          if booking.agreed_price else "")),
             )
             pendientes.append((aviso, destino, asunto, texto, html))
             emails += 1

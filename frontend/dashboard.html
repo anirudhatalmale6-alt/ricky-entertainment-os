@@ -2374,7 +2374,12 @@ function applyRole(){
   // Sidebar promo card
   paintNavIcons();
   const promo=document.getElementById('sidePromo');
-  if(isArtist){
+  if(isArtist && ME.parent_id){
+    // Ni "publica más shows" ni "completa tu perfil": ninguna de las dos las
+    // puede hacer, las hace su productora. Se le dice lo único que sí le toca.
+    promo.style.display=''; promo.innerHTML='<div class="pi">'+PROMOICON.crown+'</div><b>Tu disponibilidad</b>'
+      +'<p>Bloquea en el calendario los días que no puedes trabajar. Los hoteles dejan de verte disponible y nadie te agenda encima.</p>';
+  } else if(isArtist){
     promo.style.display=''; promo.innerHTML='<div class="pi">'+PROMOICON.crown+'</div><b>Top Performer</b>'
       +'<p>Publica más shows y mantén tu perfil completo para subir en las búsquedas.</p>'
       +'<button onclick="topPerformerInfo()">Ver beneficios</button>';
@@ -2414,6 +2419,18 @@ function applyRole(){
   const cobraSolo = isArtist && !ME.parent_id;
   show('bill', cobraSolo || canPartner);                // facturación (artist self / hotel)
   show('profile', isArtist);                            // artist-only self-service
+  // El músico de una productora entra "solo para bloquear fechas o consultar
+  // actuaciones" (David, 02/09). Le quedan el Dashboard -donde está su
+  // calendario- y Mis actuaciones. Las propuestas y el chat con hoteles son
+  // trato comercial, y ese lo lleva la empresa que lo representa.
+  ES_MUSICO = isArtist && !!ME.parent_id;
+  show('reqs', !ES_MUSICO);
+  show('chat', !ES_MUSICO);
+  if(ES_MUSICO){
+    // "Tus datos, tarifas y publicaciones" prometía tres cosas que él no toca.
+    TITLES.profile = ["Mi Perfil","Cómo te ven los hoteles · lo gestiona tu productora"];
+    TITLES.cal = ["Mis actuaciones","Dónde y cuándo tocas"];
+  }
   // Mis músicos: sólo la ficha que el administrador marcó como productora.
   show('team', isArtist && !!ME.es_productora);
   show('leads', ME.is_admin);                            // Prospectos: solo el administrador (master); oculto para hoteles/artistas
@@ -4263,7 +4280,10 @@ function renderAgenda(fromRange){
     : `${r.length} de ${bk.length} ${noun(bk.length)}`;
   const body=document.getElementById('ag_body'); if(!body) return;
   const isArtist=!!(ME&&ME.artist_id);
-  const cols=isArtist?8:7;
+  // Una columna menos para el músico de productora: el precio no es suyo, lo
+  // cobra su empresa. El servidor ya lo manda vacío; aquí se quita la columna
+  // para que no le quede un "—" que parezca un dato que falta.
+  const cols=(isArtist?8:7)-(ES_MUSICO?1:0);
   const actionCell=b=>{ if(!isArtist){
       // Ya pasó y no se canceló: lo que toca es calificarla. Es el único momento
       // en que el hotel tiene fresco cómo estuvo el show.
@@ -4286,7 +4306,7 @@ function renderAgenda(fromRange){
       return `<td><div class="agact"><button class="mini" onclick="notifyStatus(${b.id},'on_way')">🚗 En camino</button><button class="mini ok" onclick="notifyStatus(${b.id},'arrived')">📍 Llegué</button><button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></div></td>`;
     return `<td><span class="muted">—</span></td>`; };
   body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDateAg(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
-      ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}${isArtist?mapsLink(b):''}</td><td>${MXN(b.agreed_price)}</td>
+      ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}${isArtist?mapsLink(b):''}</td>${ES_MUSICO?'':`<td>${MXN(b.agreed_price)}</td>`}
       <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
     : `<tr><td colspan="${cols}" class="muted" style="text-align:center;padding:22px">Sin actuaciones para este filtro.</td></tr>`;
 }
@@ -6724,7 +6744,11 @@ const RENDER = {
     const pend = ME.artist_id ? bk.filter(b=>b.status==='pending').length : 0;
     box.innerHTML=`<div class="box"><h3>🗓️ Agenda de actuaciones</h3>
       <div class="hint" id="ag_scope">${bk.length} actuaciones · ${scopeTxt}</div>
-      ${pend?`<div class="pendbar">🔔 Tienes ${pend} ${pend===1?'actuación pendiente':'actuaciones pendientes'} por aceptar o rechazar. ¿Quieres que se confirmen solas? Actívalo en Mi Perfil → Confirmación de actuaciones.</div>`:''}
+      ${pend?`<div class="pendbar">🔔 Tienes ${pend} ${pend===1?'actuación pendiente':'actuaciones pendientes'} por aceptar o rechazar.${
+        // Al músico de una productora no se le manda a un interruptor que no
+        // tiene: esa preferencia la pone su empresa desde Mis músicos.
+        ES_MUSICO?' Si no puedes esa fecha, recházala o bloquea el día en tu calendario.'
+                 :' ¿Quieres que se confirmen solas? Actívalo en Mi Perfil → Confirmación de actuaciones.'}</div>`:''}
       <div class="filters" style="margin:14px 0 6px"><div class="agfilt">
         <div class="field"><label>Mes</label><select id="ag_month" onchange="agendaMonthPick()"><option value="">Todos los meses</option>${months.map(k=>`<option value="${k}">${mlabel(k)}</option>`).join('')}</select></div>
         <div class="field"><label>Desde</label><input type="date" id="ag_from" onchange="renderAgenda(true)"></div>
@@ -6732,7 +6756,7 @@ const RENDER = {
         <div class="field"><label>Estado</label><select id="ag_status" onchange="renderAgenda()"><option value="">Todos</option><option value="pending">Pendiente</option><option value="confirmed">Confirmada</option><option value="completed">Realizada</option><option value="cancelled">Cancelada</option></select></div>
         <button class="btn ghost" onclick="agendaReset()">Limpiar</button>
       </div></div>
-      <table><thead><tr><th class="ordag" id="ag_th_fecha" onclick="agendaSort()">Fecha <span id="ag_arrow">▼</span></th><th>Show</th>${ME.artist_id?'<th>Hotel</th>':''}<th>Venue</th><th>Precio</th><th>Aforo</th><th>Estado</th><th>Acción</th></tr></thead>
+      <table><thead><tr><th class="ordag" id="ag_th_fecha" onclick="agendaSort()">Fecha <span id="ag_arrow">▼</span></th><th>Show</th>${ME.artist_id?'<th>Hotel</th>':''}<th>Venue</th>${ES_MUSICO?'':'<th>Precio</th>'}<th>Aforo</th><th>Estado</th><th>Acción</th></tr></thead>
       <tbody id="ag_body"></tbody></table></div>`;
     renderAgenda();
   },
@@ -6821,6 +6845,13 @@ const RENDER = {
     // sesión guardada, para que un dato viejo en memoria no le pinte una sección
     // de facturación que el servidor le va a rechazar.
     COBRA_SOLO = !p.parent_id;
+    // El músico de una productora no edita su ficha: la gestiona, la ve y la
+    // cobra la empresa (David, 02/09). Se le pinta otra pantalla entera en vez
+    // de deshabilitar campos uno por uno, porque un input deshabilitado que se
+    // puede volver a habilitar desde el navegador invita a intentarlo, y porque
+    // media pantalla apagada se lee como que algo está roto.
+    ES_MUSICO = !!p.parent_id;
+    if(ES_MUSICO){ box.innerHTML = musicoProfile(p); return; }
     box.innerHTML=`
       <div style="margin-bottom:16px">${partner}</div>
       <div class="box" style="margin-bottom:16px">
@@ -7115,6 +7146,47 @@ const RENDER = {
 let TEAM = [], TEAM_LOTE = [], TEAM_MALOS = [], TEAM_REPORTE = null;
 // Si el proveedor factura por su cuenta. Falso = cuelga de una productora.
 let COBRA_SOLO = true;
+// Si esta sesión es la de un músico dentro de una productora.
+let ES_MUSICO = false;
+
+/* La ficha en modo lectura, para el músico de una productora.
+
+   Lo que sí puede hacer -bloquear fechas y ver su agenda- vive en Dashboard y
+   en Mis actuaciones. Aquí sólo ve cómo lo ven los hoteles, y a quién pedirle
+   un cambio, que es la pregunta que le va a surgir al abrir esta pantalla. */
+function musicoProfile(p){
+  const pfUrl = p.profile_image_url||null;
+  const ini = esc((p.stage_name||'A').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase());
+  const empresa = esc(p.parent_name||'tu productora');
+  const dato = (et,v) => `<div class="field"><label>${et}</label><div style="padding:9px 0;font-size:14px">${esc(v||'—')}</div></div>`;
+  const shows = (p.shows||[]);
+  return `
+    <div class="box" style="margin-bottom:16px">
+      <h3>🎻 Tu ficha la gestiona ${empresa}</h3>
+      <div class="hint" style="margin:0">Tu cuenta de SHOWMA es para dos cosas: bloquear los días que no estás
+        disponible, desde el calendario del Dashboard, y ver tus actuaciones. Así el sistema nunca te agenda un día
+        que ya tienes comprometido.<br><br>
+        Los datos de esta ficha, tus shows y el cobro los lleva ${empresa}. Si algo de aquí está mal —tu nombre,
+        tu foto, tu teléfono— pídeselo a ellos y lo cambian al momento.</div>
+    </div>
+    <div class="box" style="margin-bottom:16px">
+      <h3>👤 Así te ven los hoteles</h3>
+      <div class="pfimg-row">
+        <div class="pfimg-av" style="${pfUrl?`background-image:url('${esc(pfUrl)}')`:''}">${pfUrl?'':ini}</div>
+        <div style="flex:1;min-width:200px">
+          <div class="fgrid">${dato('Nombre artístico', p.stage_name)}${dato('Ciudad base', p.base_city)}</div>
+          <div class="fgrid">${dato('Teléfono', p.phone)}${dato('Correo de contacto', p.email)}</div>
+        </div>
+      </div>
+      ${p.bio?`<div class="field"><label>Descripción</label><div style="padding:9px 0;font-size:14px;line-height:1.5">${esc(p.bio)}</div></div>`:''}
+    </div>
+    <div class="box">
+      <h3>🎭 Tus shows en el catálogo</h3>
+      <div class="hint">${shows.length?'Los publica y edita '+empresa+'.':'Todavía no hay shows publicados en tu ficha.'}</div>
+      ${shows.map(s=>`<div class="showcard"><div class="hh"><div style="font-weight:650">${esc(s.show_name||'Show')}</div>
+        <div class="tag2">${esc(s.category||'')}${s.subcategory?' · '+esc(s.subcategory):''}</div></div></div>`).join('')}
+    </div>`;
+}
 
 const teamIni = n => (n||'?').split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase();
 
@@ -7168,11 +7240,169 @@ function teamTabla(eq){
     <td>${esc(m.phone||'—')}</td>
     <td>${esc(m.artist_type||'—')}</td>
     <td style="text-align:right;white-space:nowrap">
+      <button class="btn mini" onclick="teamEditar(${m.id})">Editar ficha</button>
       <button class="btn ghost mini" onclick="teamInvitar(${m.id},this)">Reenviar invitación</button>
       <button class="btn danger mini" onclick="teamSacar(${m.id})">Sacar del equipo</button>
     </td></tr>`).join('')}
   </tbody></table>`;
 }
+
+/* ---- La productora edita la ficha y los shows de uno de los suyos --------
+   "El perfil sería gestionado, visto y cobrado por la productora" (David,
+   02/09). Y no es sólo comodidad: la empresa NO conoce la contraseña de sus
+   músicos -eso es a propósito, para que no pueda aceptar contrataciones en su
+   nombre-, así que si no pudiera editar desde aquí, armar un catálogo de 200
+   perfiles no habría forma de hacerlo. */
+let TM_EDIT = null;
+// El árbol categoría -> subcategorías, tal cual lo valida el servidor. Los
+// desplegables se arman con él y no a mano: la subcategoría tiene que existir
+// DENTRO de su categoría o el alta del show se rechaza con un 422.
+let TM_TAX = {};
+
+function teamMov(){
+  let ov=document.getElementById('tmMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='tmMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) teamCerrar(); }); }
+  return ov;
+}
+function teamCerrar(){ const ov=document.getElementById('tmMov'); if(ov) ov.style.display='none'; TM_EDIT=null; }
+window.teamCerrar=teamCerrar;
+
+async function teamEditar(id){
+  const ov=teamMov();
+  ov.innerHTML=`<div class="amod" style="max-width:720px"><div class="ah"><b>Cargando…</b></div></div>`;
+  ov.style.display='flex';
+  let p=null, shows=[], agenda=[];
+  // La ficha COMPLETA, no la fila de la tabla: si el formulario se abriera con
+  // los campos que la lista no trae -bio, ciudad- en blanco, al guardar los
+  // guardaría en blanco y le borraría datos buenos a alguien.
+  try{ p = await api('/me/musicos/'+id); }catch(e){}
+  if(!p){ toast('No se pudo abrir la ficha',true); teamCerrar(); return; }
+  try{ shows = await api(`/me/musicos/${id}/shows`); }catch(e){}
+  try{ agenda = await api(`/me/musicos/${id}/agenda`); }catch(e){}
+  if(!Object.keys(TM_TAX).length){ try{ TM_TAX = await api('/artists/taxonomy'); }catch(e){ TM_TAX = {}; } }
+  TM_EDIT = {id, shows};
+  const f=(et,idc,v,ph='')=>`<div class="field"><label>${et}</label><input id="${idc}" value="${esc(v||'')}" placeholder="${esc(ph)}"></div>`;
+  ov.innerHTML=`<div class="amod" style="max-width:720px;position:relative">
+    <button class="ax" onclick="teamCerrar()" aria-label="Cerrar">✕</button>
+    <div class="ah" style="padding:18px 20px 4px"><b>${esc(p.stage_name||'Músico')}</b>
+      <span class="as">Su cuenta sólo bloquea fechas y consulta actuaciones. Todo lo demás se edita aquí.</span></div>
+    <div class="rqbody" style="padding:12px 20px;max-height:64vh;overflow:auto">
+      <div class="fgrid">${f('Nombre artístico','tmeName',p.stage_name)}${f('Tipo','tmeTipo',p.artist_type,'Saxofonista, Solista…')}</div>
+      <div class="fgrid">${f('Teléfono','tmeTel',p.phone)}${f('Correo de contacto','tmeMail',p.email)}</div>
+      <div class="fgrid">${f('Ciudad base','tmeCity',p.base_city)}
+        <div class="field"><label>Confirmación de actuaciones</label>
+          <select id="tmeAuto"><option value="0"${p.auto_confirm_bookings?'':' selected'}>Las apruebas tú (quedan pendientes)</option>
+            <option value="1"${p.auto_confirm_bookings?' selected':''}>Se confirman solas</option></select></div>
+      </div>
+      <div class="field"><label>Descripción / bio</label><textarea id="tmeBio" placeholder="Cómo lo ven los hoteles en el catálogo…">${esc(p.bio||'')}</textarea></div>
+      <div class="saverow"><button class="btn" onclick="teamGuardarFicha(${id},this)">Guardar ficha</button></div>
+
+      <div style="border-top:1px dashed var(--line);margin:16px 0 12px;padding-top:14px">
+        <b style="font-size:13.5px">🎭 Sus shows en el catálogo</b>
+        <div class="hint" style="margin:2px 0 10px">El hotel lo busca por su show. Sin al menos uno, no aparece como contratable.</div>
+        <div id="tmeShows">${teamShowsHtml(shows)}</div>
+        <div class="fgrid fg3" style="margin-top:10px">
+          <div class="field"><label>Nombre del show</label><input id="tmsName" placeholder="Sax lounge"></div>
+          <div class="field"><label>Categoría</label><select id="tmsCat" onchange="teamSubs()">${
+            Object.keys(TM_TAX).map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
+          <div class="field"><label>Subcategoría</label><select id="tmsSub"></select></div>
+        </div>
+        <div class="fgrid">
+          <div class="field"><label>Precio para hotel (MXN)</label><input id="tmsPrice" type="number" min="0" step="100" placeholder="8000"></div>
+          <div class="field" style="display:flex;align-items:flex-end"><button class="btn" onclick="teamAgregarShow(${id},this)">Publicar show</button></div>
+        </div>
+      </div>
+
+      <div style="border-top:1px dashed var(--line);margin:16px 0 0;padding-top:14px">
+        <b style="font-size:13.5px">🗓️ Sus actuaciones</b>
+        <div class="hint" style="margin:2px 0 10px">Con importes, porque el cobro lo llevas tú. Él las ve sin dinero.</div>
+        ${agenda.length?`<table><thead><tr><th>Fecha</th><th>Hotel</th><th>Show</th><th>Importe</th><th>Estado</th></tr></thead><tbody>
+          ${agenda.map(a=>`<tr><td>${fmtDate(a.starts_at)}</td><td>${esc(a.hotel||'—')}</td><td class="muted">${esc(a.show||'—')}</td>
+            <td>${a.agreed_price!=null?MXN(a.agreed_price):'—'}</td><td>${chip(a.status)}</td></tr>`).join('')}
+        </tbody></table>`:`<div class="hint" style="margin:0">Todavía no tiene actuaciones.</div>`}
+      </div>
+    </div>
+    <div class="af" style="justify-content:flex-end"><button class="btn ghost" onclick="teamCerrar()">Cerrar</button></div>
+  </div>`;
+  teamSubs();
+}
+window.teamEditar=teamEditar;
+
+/* Rellena las subcategorías válidas de la categoría elegida. */
+function teamSubs(){
+  const c=document.getElementById('tmsCat'), s=document.getElementById('tmsSub');
+  if(!c||!s) return;
+  const subs = TM_TAX[c.value] || [];
+  s.innerHTML = '<option value="">— Sin subcategoría —</option>'
+    + subs.map(x=>`<option>${esc(x)}</option>`).join('');
+}
+window.teamSubs=teamSubs;
+
+function teamShowsHtml(shows){
+  if(!shows.length) return '<div class="hint" style="margin:0">Todavía no tiene shows publicados.</div>';
+  return shows.map(s=>`<div class="showcard" style="margin-bottom:8px"><div class="hh">
+    <div style="font-weight:650">${esc(s.show_name||'Show')}</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="tag2">${esc(s.category||'')}${s.subcategory?' · '+esc(s.subcategory):''}</span>
+      <span class="muted" style="font-size:12px">${s.price_hotel!=null?MXN(s.price_hotel):'Precio a convenir'}</span>
+      <button class="btn danger mini" onclick="teamQuitarShow(${s.id},this)">Quitar</button>
+    </div></div></div>`).join('');
+}
+
+async function teamGuardarFicha(id, btn){
+  const auto = document.getElementById('tmeAuto').value === '1';
+  const cuerpo = {
+    stage_name: val('tmeName'), artist_type: val('tmeTipo'), phone: val('tmeTel'),
+    email: val('tmeMail'), base_city: val('tmeCity'), bio: val('tmeBio'),
+    auto_confirm_bookings: auto,
+  };
+  if(!cuerpo.stage_name){ toast('El nombre no puede quedar vacío',true); return; }
+  btn.disabled=true;
+  try{
+    await patch('/me/musicos/'+id, cuerpo);
+    toast('Ficha guardada ✓');
+    TEAM = await api('/me/musicos');   // la tabla de atrás tiene que reflejarlo
+    show('team', true);
+  }catch(e){ toast('No se pudo guardar: '+(e.message||''),true); }
+  finally{ btn.disabled=false; }
+}
+window.teamGuardarFicha=teamGuardarFicha;
+
+async function teamAgregarShow(id, btn){
+  const nombre = val('tmsName');
+  if(!nombre){ toast('Ponle nombre al show',true); return; }
+  const precio = parseFloat(val('tmsPrice'));
+  btn.disabled=true;
+  try{
+    await post(`/me/musicos/${id}/shows`, {
+      show_name: nombre,
+      category: document.getElementById('tmsCat').value,
+      subcategory: document.getElementById('tmsSub').value || null,
+      price_hotel: isNaN(precio)? null : precio,
+    });
+    const shows = await api(`/me/musicos/${id}/shows`);
+    document.getElementById('tmeShows').innerHTML = teamShowsHtml(shows);
+    document.getElementById('tmsName').value='';
+    document.getElementById('tmsPrice').value='';
+    toast('Show publicado ✓');
+  }catch(e){ toast('No se pudo publicar: '+(e.message||''),true); }
+  finally{ btn.disabled=false; }
+}
+window.teamAgregarShow=teamAgregarShow;
+
+async function teamQuitarShow(showId, btn){
+  if(!TM_EDIT) return;
+  if(!confirm('¿Quitar este show del catálogo?')) return;
+  btn.disabled=true;
+  try{
+    await del(`/me/musicos/${TM_EDIT.id}/shows/${showId}`);
+    const shows = await api(`/me/musicos/${TM_EDIT.id}/shows`);
+    document.getElementById('tmeShows').innerHTML = teamShowsHtml(shows);
+    toast('Show quitado');
+  }catch(e){ toast('No se pudo quitar: '+(e.message||''),true); btn.disabled=false; }
+}
+window.teamQuitarShow=teamQuitarShow;
 
 function teamTab(cual){
   const c = document.getElementById('teamForm');
@@ -7530,7 +7760,9 @@ async function artistHome(box){
       <div class="kpi"><div class="k">🗓️ Próxima actuación</div>
         ${next?`<div class="v" style="font-size:15.5px;margin-top:9px">${esc(next.company_name||next.show_name||'Actuación')}</div><div class="d">${fmtDate(next.starts_at)}</div><div style="margin-top:8px">${chip(next.status)}</div>`
         :`<div class="v" style="font-size:15.5px;margin-top:9px">—</div><div class="d">Sin actuaciones próximas</div>`}</div>
-      <div class="kpi"><div class="orb"></div><div class="k">💰 Ganancias este mes</div><div class="v">${MXN(monthRev)}</div><div class="d" style="text-transform:capitalize">${now.toLocaleDateString('es-MX',{month:'long'})}</div></div>
+      ${ES_MUSICO
+        ? `<div class="kpi"><div class="orb"></div><div class="k">🚫 Días bloqueados</div><div class="v">${BLOCKED.size}</div><div class="d">Toca un día del calendario para bloquearlo o liberarlo</div></div>`
+        : `<div class="kpi"><div class="orb"></div><div class="k">💰 Ganancias este mes</div><div class="v">${MXN(monthRev)}</div><div class="d" style="text-transform:capitalize">${now.toLocaleDateString('es-MX',{month:'long'})}</div></div>`}
       <div class="kpi"><div class="orb"></div><div class="k">🎭 Actuaciones</div>
         <div style="display:flex;gap:26px;margin-top:11px">
           <div><div style="font-size:23px;font-weight:750">${done.length}</div><div class="d">Realizadas</div></div>
@@ -7540,10 +7772,11 @@ async function artistHome(box){
     <div class="grid2">
       <div class="box"><h3 style="text-transform:capitalize">🗓️ Calendario — ${calRef.toLocaleDateString('es-MX',{month:'long',year:'numeric'})}</h3><div class="hint">Toca un día para bloquearlo (vacaciones/enfermedad) o ver sus actuaciones · cambia de mes arriba a la derecha</div>${artistCal(bk,calRef)}</div>
       <div style="display:flex;flex-direction:column;gap:16px">
-        <div class="box"><h3>📣 Novedades</h3><div class="hint">Oportunidades y mensajes</div>
-          <div class="srow"><div class="ic2">✨</div><div class="lb">Nuevas oportunidades<s>solicitudes abiertas</s></div><div class="nb">${openReqs.length}</div></div>
-          <div class="srow"><div class="ic2">💬</div><div class="lb">Mensajes sin leer<s>de hoteles</s></div><div class="nb">${unread}</div></div>
+        <div class="box"><h3>📣 Novedades</h3><div class="hint">${ES_MUSICO?'Tu semana':'Oportunidades y mensajes'}</div>
+          ${ES_MUSICO?'':`<div class="srow"><div class="ic2">✨</div><div class="lb">Nuevas oportunidades<s>solicitudes abiertas</s></div><div class="nb">${openReqs.length}</div></div>
+          <div class="srow"><div class="ic2">💬</div><div class="lb">Mensajes sin leer<s>de hoteles</s></div><div class="nb">${unread}</div></div>`}
           <div class="srow"><div class="ic2">🎭</div><div class="lb">Actuaciones próximas<s>confirmadas o pendientes</s></div><div class="nb">${upcoming.length}</div></div>
+          ${ES_MUSICO?`<div class="srow"><div class="ic2">🚫</div><div class="lb">Días bloqueados<s>no te agendan en ellos</s></div><div class="nb">${BLOCKED.size}</div></div>`:''}
         </div>
         <div class="box"><h3>🏅 Mis distinciones</h3>
           <div class="hint">${distinciones.length?'Lo que la plataforma puede demostrar de ti. Los hoteles las ven en tu perfil y en las búsquedas.'
@@ -7553,8 +7786,9 @@ async function artistHome(box){
                Un "Top 10%" necesita al menos 5 actuaciones tuyas dentro de un grupo con 8 proveedores comparables;
                las de constancia y cumplimiento salen antes, con tu propia historia. Llevas ${done.length}
                ${done.length===1?'actuación realizada':'actuaciones realizadas'}.</div>`}
-          <div class="srow" style="cursor:pointer" onclick="topPerformerInfo()"><div class="ic2">⭐</div><div class="lb">Ver beneficios<s>visibilidad, oportunidades y herramientas premium</s></div><div class="nb">›</div></div>
-          <div class="srow"><div class="ic2">🎭</div><div class="lb">Shows publicados<s>completa tu catálogo para destacar</s></div><div class="nb">${(p.shows||[]).length}</div></div>
+          ${ES_MUSICO?`<div class="srow"><div class="ic2">🎭</div><div class="lb">Shows en tu ficha<s>los publica tu productora</s></div><div class="nb">${(p.shows||[]).length}</div></div>`
+          :`<div class="srow" style="cursor:pointer" onclick="topPerformerInfo()"><div class="ic2">⭐</div><div class="lb">Ver beneficios<s>visibilidad, oportunidades y herramientas premium</s></div><div class="nb">›</div></div>
+          <div class="srow"><div class="ic2">🎭</div><div class="lb">Shows publicados<s>completa tu catálogo para destacar</s></div><div class="nb">${(p.shows||[]).length}</div></div>`}
         </div>
       </div>
     </div>
@@ -7574,18 +7808,18 @@ async function artistHome(box){
            Es a propósito que no se puedan dejar de otra forma: una calificación que nace de una actuación real
            es la única que un hotel no puede inventar, ni a tu favor ni en tu contra.</div>`}
     </div>
-    <div class="grid2" style="margin-top:16px">
+    ${ES_MUSICO ? '' : `<div class="grid2" style="margin-top:16px">
       <div class="box"><h3>📊 Rendimiento (6 meses)</h3><div class="hint">Ingresos por mes · ${MXN(totalRev)} acumulado</div>
         ${bars(monthRows.map(m=>({lbl:m.lbl,pct:Math.round(m.v/maxM*100),val:MXN(m.v)})))}</div>
       <div class="box"><h3>🧾 Últimos pagos</h3><div class="hint">Facturación reciente</div>
         <table><tbody>${recent.length?recent.map(b=>`<tr><td><div style="font-weight:600">${esc(b.company_name||'—')}</div><div class="muted" style="font-size:11px">${fmtDate(b.starts_at)}</div></td>
           <td style="text-align:right"><div style="font-weight:650">${MXN(b.agreed_price)}</div>${b.status==='completed'?'<span class="chip c-completed">Pagada</span>':'<span class="chip c-pending">Pendiente</span>'}</td></tr>`).join("")
           :'<tr><td class="muted">Sin pagos aún</td></tr>'}</tbody></table></div>
-    </div>
+    </div>`}
     <div class="box" style="margin-top:16px"><h3>🗓️ Próximas actuaciones</h3><div class="hint">Tu agenda inmediata</div>
-      <table><thead><tr><th>Fecha</th><th>Hotel</th><th>Show</th><th>Monto</th><th>Estado</th></tr></thead><tbody>
-      ${upcoming.length?upcoming.slice(0,8).map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.company_name||'—')}</td><td class="muted">${esc(showLabel(b))}</td><td>${MXN(b.agreed_price)}</td><td>${chip(b.status)}</td></tr>`).join("")
-        :'<tr><td colspan="5" class="muted">No tienes actuaciones próximas. Revisa el tablero de Solicitudes para conseguir nuevas.</td></tr>'}
+      <table><thead><tr><th>Fecha</th><th>Hotel</th><th>Show</th>${ES_MUSICO?'':'<th>Monto</th>'}<th>Estado</th></tr></thead><tbody>
+      ${upcoming.length?upcoming.slice(0,8).map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.company_name||'—')}</td><td class="muted">${esc(showLabel(b))}</td>${ES_MUSICO?'':`<td>${MXN(b.agreed_price)}</td>`}<td>${chip(b.status)}</td></tr>`).join("")
+        :`<tr><td colspan="${ES_MUSICO?4:5}" class="muted">${ES_MUSICO?'No tienes actuaciones próximas.':'No tienes actuaciones próximas. Revisa el tablero de Solicitudes para conseguir nuevas.'}</td></tr>`}
       </tbody></table></div>`;
 }
 

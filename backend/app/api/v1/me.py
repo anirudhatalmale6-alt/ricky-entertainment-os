@@ -106,6 +106,28 @@ async def _require_cobra(scope: CurrentScope) -> int:
     return artist_id
 
 
+async def _require_ficha_propia(scope: CurrentScope) -> int:
+    """El artist_id de quien manda sobre su PROPIA ficha.
+
+    La cuenta del músico de una productora existe para una sola cosa: bloquear
+    fechas y consultar sus actuaciones, para que SHOWMA no le confirme un día que
+    él ya tiene comprometido por fuera. La ficha la gestiona, la ve y la cobra la
+    empresa (David, 02/09).
+
+    Se cierra aquí y no sólo quitando el botón: si dos manos pudieran editar la
+    misma ficha, la empresa que armó el catálogo de 200 perfiles no tendría forma
+    de saber por qué uno cambió de nombre o de foto un martes.
+    """
+    artist_id = await _require_artist(scope)
+    if scope.parent_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu ficha la gestiona la empresa a la que perteneces. "
+                   "Tu cuenta es para bloquear fechas y ver tus actuaciones.",
+        )
+    return artist_id
+
+
 async def _load_artist(db: DbSession, artist_id: int) -> Artist:
     res = await db.execute(
         select(Artist).options(*_ARTIST_RELS).where(Artist.id == artist_id)
@@ -158,29 +180,50 @@ def _sin_facturacion(artist: Artist) -> ArtistOut:
     return out
 
 
+async def _ficha_out(db: DbSession, artist: Artist) -> ArtistOut:
+    """La ficha para la pantalla: sin facturación ajena y con el nombre de la
+    productora resuelto, para poder decirle al músico a quién pedirle un cambio."""
+    out = _sin_facturacion(artist)
+    if artist.parent_id:
+        madre = await db.get(Artist, artist.parent_id)
+        if madre is not None:
+            return out.model_copy(update={"parent_name": madre.stage_name})
+    return out
+
+
 @router.get("/artist", response_model=ArtistOut)
 async def get_my_profile(scope: CurrentScope, db: DbSession):
-    return _sin_facturacion(await _load_artist(db, await _require_artist(scope)))
+    return await _ficha_out(db, await _load_artist(db, await _require_artist(scope)))
 
 
-@router.patch("/artist", response_model=ArtistOut)
-async def update_my_profile(payload: ArtistUpdate, scope: CurrentScope, db: DbSession):
-    artist_id = await _require_artist(scope)
-    artist = await _load_artist(db, artist_id)
+def _aplicar_ficha(artist: Artist, payload: ArtistUpdate) -> None:
+    """Vuelca el formulario sobre la ficha, quitando lo que no se puede escribir.
+
+    Lo comparten el artista que edita la suya y la productora que edita la de uno
+    de los suyos, a propósito: si cada uno filtrara por su lado, el día que se
+    agregue un campo delicado habría que acordarse de las dos listas.
+    """
     data = payload.model_dump(exclude_unset=True)
     for field in _PROTECTED:
         data.pop(field, None)
-    # Esconder la sección en la pantalla no basta: el que cuelga de una
-    # productora tampoco puede ESCRIBIR sus datos fiscales, o bastaría con
-    # mandar el PATCH a mano para meter un RFC que luego nadie sabría de dónde
-    # salió y que no le corresponde cobrar.
+    # Esconder la sección en la pantalla no basta: en la ficha de un músico de
+    # productora tampoco se ESCRIBEN datos fiscales, ni por él ni por la empresa.
+    # Quien cobra es la empresa con SU RFC; un RFC aquí sería un dato que nadie
+    # sabría de dónde salió y que no le corresponde cobrar.
     if artist.parent_id:
         for field in _FISCALES:
             data.pop(field, None)
     for field, value in data.items():
         setattr(artist, field, value)
+
+
+@router.patch("/artist", response_model=ArtistOut)
+async def update_my_profile(payload: ArtistUpdate, scope: CurrentScope, db: DbSession):
+    artist_id = await _require_ficha_propia(scope)
+    artist = await _load_artist(db, artist_id)
+    _aplicar_ficha(artist, payload)
     await db.commit()
-    return _sin_facturacion(await _load_artist(db, artist_id))
+    return await _ficha_out(db, await _load_artist(db, artist_id))
 
 
 # --- Facturación / pagos del artista (desglose fiscal) --------------------
@@ -476,10 +519,13 @@ async def upload_document(
 ):
     """Sube (o reemplaza) un documento legal del artista.
 
+    Cerrado al músico de una productora: identificación, constancia del SAT y
+    contrato son de quien tiene la relación con SHOWMA, y esa es la empresa.
+
     Un solo archivo por tipo: si ya existe uno de ese `doc_type` se reemplaza,
     para que el registro y /MASTER siempre muestren el vigente.
     """
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_ficha_propia(scope)
     if doc_type not in _DOC_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de documento no válido.")
     ext = _ALLOWED_DOC_TYPES.get((file.content_type or "").lower())
@@ -742,23 +788,16 @@ async def list_my_shows(scope: CurrentScope, db: DbSession):
     return list(res.scalars().unique().all())
 
 
-@router.post("/artist/shows", response_model=ShowOut, status_code=status.HTTP_201_CREATED)
-async def add_my_show(payload: ShowCreate, scope: CurrentScope, db: DbSession):
-    artist_id = await _require_artist(scope)
+def _nuevo_show(artist_id: int, payload: ShowCreate) -> Show:
     show = Show(artist_id=artist_id, **payload.model_dump(exclude={"seasonal_rates", "images"}))
     for rate in payload.seasonal_rates:
         show.seasonal_rates.append(ShowSeasonalRate(**rate.model_dump()))
     for img in payload.images:
         show.images.append(ShowImage(**img.model_dump()))
-    db.add(show)
-    await db.commit()
-    return await _load_show(db, show.id)
+    return show
 
 
-@router.patch("/artist/shows/{show_id}", response_model=ShowOut)
-async def update_my_show(show_id: int, payload: ShowUpdate, scope: CurrentScope, db: DbSession):
-    artist_id = await _require_artist(scope)
-    show = await _own_show_or_404(db, artist_id, show_id)
+def _aplicar_show(show: Show, payload: ShowUpdate) -> None:
     data = payload.model_dump(exclude_unset=True)
     rates = data.pop("seasonal_rates", None)
     images = data.pop("images", None)
@@ -774,13 +813,27 @@ async def update_my_show(show_id: int, payload: ShowUpdate, scope: CurrentScope,
         show.images.clear()
         for img in images:
             show.images.append(ShowImage(**img))
+
+
+@router.post("/artist/shows", response_model=ShowOut, status_code=status.HTTP_201_CREATED)
+async def add_my_show(payload: ShowCreate, scope: CurrentScope, db: DbSession):
+    show = _nuevo_show(await _require_ficha_propia(scope), payload)
+    db.add(show)
+    await db.commit()
+    return await _load_show(db, show.id)
+
+
+@router.patch("/artist/shows/{show_id}", response_model=ShowOut)
+async def update_my_show(show_id: int, payload: ShowUpdate, scope: CurrentScope, db: DbSession):
+    artist_id = await _require_ficha_propia(scope)
+    _aplicar_show(await _own_show_or_404(db, artist_id, show_id), payload)
     await db.commit()
     return await _load_show(db, show_id)
 
 
 @router.delete("/artist/shows/{show_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_my_show(show_id: int, scope: CurrentScope, db: DbSession):
-    artist_id = await _require_artist(scope)
+    artist_id = await _require_ficha_propia(scope)
     show = await _own_show_or_404(db, artist_id, show_id)
     await db.delete(show)
     await db.commit()
@@ -1280,3 +1333,124 @@ async def unlink_my_musician(musico_id: int, scope: CurrentScope, db: DbSession)
     musico = await _mi_musico(db, productora_id, musico_id)
     musico.parent_id = None
     await db.commit()
+
+
+# --- La productora gestiona la ficha y los shows de los suyos -------------
+#
+# "El perfil sería gestionado, visto y cobrado por la productora" (David,
+# 02/09). No es comodidad: la empresa NO conoce la contraseña de sus músicos -
+# eso es a propósito, para que no pueda aceptar contrataciones en su nombre-, así
+# que si no pudiera editar desde aquí, armar un catálogo de 200 perfiles sería
+# imposible. La cuenta del músico queda para bloquear fechas y ver su agenda.
+
+
+@router.get("/musicos/{musico_id}", response_model=ArtistOut)
+async def get_my_musician(musico_id: int, scope: CurrentScope, db: DbSession):
+    """La ficha COMPLETA de uno de los suyos, para poder editarla.
+
+    Hace falta aparte de la lista: la lista trae lo justo para pintar la tabla, y
+    un formulario cargado con la mitad de los campos vacíos GUARDA esos vacíos y
+    le borra la bio y la ciudad a alguien que sí las tenía.
+    """
+    productora_id = await _require_productora(scope, db)
+    await _mi_musico(db, productora_id, musico_id)
+    return await _ficha_out(db, await _load_artist(db, musico_id))
+
+
+@router.patch("/musicos/{musico_id}", response_model=ArtistOut)
+async def update_my_musician(
+    musico_id: int, payload: ArtistUpdate, scope: CurrentScope, db: DbSession
+):
+    productora_id = await _require_productora(scope, db)
+    await _mi_musico(db, productora_id, musico_id)
+    artist = await _load_artist(db, musico_id)
+    # Mismo filtro que la ficha propia: ni el sello de verificado, ni el permiso
+    # de productora, ni el plan Partner, ni datos fiscales. Que sea la empresa
+    # quien escribe no agranda lo que se puede escribir.
+    _aplicar_ficha(artist, payload)
+    await db.commit()
+    return await _ficha_out(db, await _load_artist(db, musico_id))
+
+
+@router.get("/musicos/{musico_id}/shows", response_model=list[ShowOut])
+async def list_my_musician_shows(musico_id: int, scope: CurrentScope, db: DbSession):
+    productora_id = await _require_productora(scope, db)
+    await _mi_musico(db, productora_id, musico_id)
+    res = await db.execute(
+        select(Show).options(*_SHOW_RELS).where(Show.artist_id == musico_id).order_by(Show.show_name)
+    )
+    return list(res.scalars().unique().all())
+
+
+@router.post("/musicos/{musico_id}/shows", response_model=ShowOut,
+             status_code=status.HTTP_201_CREATED)
+async def add_my_musician_show(
+    musico_id: int, payload: ShowCreate, scope: CurrentScope, db: DbSession
+):
+    productora_id = await _require_productora(scope, db)
+    await _mi_musico(db, productora_id, musico_id)
+    show = _nuevo_show(musico_id, payload)
+    db.add(show)
+    await db.commit()
+    return await _load_show(db, show.id)
+
+
+@router.patch("/musicos/{musico_id}/shows/{show_id}", response_model=ShowOut)
+async def update_my_musician_show(
+    musico_id: int, show_id: int, payload: ShowUpdate, scope: CurrentScope, db: DbSession
+):
+    productora_id = await _require_productora(scope, db)
+    await _mi_musico(db, productora_id, musico_id)
+    # El show tiene que ser de ESE músico, no de cualquiera del equipo: si sólo
+    # comprobara el músico, mandando otro show_id se editaría el de un tercero.
+    _aplicar_show(await _own_show_or_404(db, musico_id, show_id), payload)
+    await db.commit()
+    return await _load_show(db, show_id)
+
+
+@router.delete("/musicos/{musico_id}/shows/{show_id}",
+               status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_musician_show(
+    musico_id: int, show_id: int, scope: CurrentScope, db: DbSession
+):
+    productora_id = await _require_productora(scope, db)
+    await _mi_musico(db, productora_id, musico_id)
+    show = await _own_show_or_404(db, musico_id, show_id)
+    await db.delete(show)
+    await db.commit()
+
+
+@router.get("/musicos/{musico_id}/agenda")
+async def my_musician_agenda(musico_id: int, scope: CurrentScope, db: DbSession):
+    """Las actuaciones del músico, para la productora. CON importes.
+
+    Al revés que la vista del músico: aquí sí van los montos, porque la empresa
+    es la que cobra y necesita cuadrar lo suyo.
+    """
+    productora_id = await _require_productora(scope, db)
+    await _mi_musico(db, productora_id, musico_id)
+    filas = (await db.execute(
+        select(Booking).where(
+            Booking.artist_id == musico_id,
+            Booking.notified_at.isnot(None),
+        ).order_by(Booking.starts_at)
+    )).scalars().all()
+    cids = {b.company_id for b in filas if b.company_id}
+    sids = {b.show_id for b in filas if b.show_id}
+    companies = {c.id: c.name for c in (
+        (await db.execute(select(Company).where(Company.id.in_(cids)))).scalars().all()
+        if cids else []
+    )}
+    shows = {s.id: s.show_name for s in (
+        (await db.execute(select(Show).where(Show.id.in_(sids)))).scalars().all()
+        if sids else []
+    )}
+    return [{
+        "id": b.id,
+        "starts_at": b.starts_at.isoformat() if b.starts_at else None,
+        "status": b.status.value if hasattr(b.status, "value") else b.status,
+        "hotel": companies.get(b.company_id),
+        "show": shows.get(b.show_id),
+        "agreed_price": float(b.agreed_price) if b.agreed_price is not None else None,
+        "currency": b.currency,
+    } for b in filas]

@@ -264,14 +264,23 @@ ok(json.loads(get("/me/artist", INDIE)[0]).get("rfc") == "XEXX010101000",
    "CONTROL: el artista independiente sí recibe su propio RFC")
 
 
-print("\n5. El músico tampoco puede ESCRIBIR datos fiscales")
+print("\n5. Nadie le escribe datos fiscales a esa ficha, ni él ni la empresa")
+# Quien cobra es la productora, con SU RFC. Un RFC en la ficha del músico sería
+# un dato que nadie sabría de dónde salió y que no le toca cobrar.
 _, code = patch("/me/artist", {"rfc": "AAAA010101AAA", "bank_clabe": "999"}, MUSICO)
 tras = sql("SELECT rfc, bank_clabe FROM artists WHERE id=?", (MUS_ID,))[0]
 ok(tras[0] == "XAXX010101000" and tras[1] == "032180000118359719",
    "el PATCH a mano no le cambió el RFC ni la CLABE", f"{code} {tras}")
-_, code = patch("/me/artist", {"bio": "toco el saxo"}, MUSICO)
-ok(code == 200 and sql("SELECT bio FROM artists WHERE id=?", (MUS_ID,))[0][0] == "toco el saxo",
-   "CONTROL: lo que NO es fiscal sí lo puede editar", str(code))
+# CONTROL invertido: el filtro tiene que quitar SÓLO lo fiscal. Va por la vía de
+# la productora porque desde el 02/09 el músico ya no edita su propia ficha (ver
+# sección 12), así que si se probara con su token no se distinguiría "filtró el
+# RFC" de "rechazó la petición entera".
+_, code = patch(f"/me/musicos/{MUS_ID}",
+                {"rfc": "AAAA010101AAA", "bio": "toco el saxo"}, PROD)
+tras2 = sql("SELECT rfc, bio FROM artists WHERE id=?", (MUS_ID,))[0]
+ok(code == 200 and tras2[1] == "toco el saxo" and tras2[0] == "XAXX010101000",
+   "CONTROL: en la misma petición se guarda la bio y se descarta el RFC",
+   f"{code} {tras2}")
 
 
 print("\n6. Las puertas del dinero, cerradas para él y abiertas para el indie")
@@ -401,7 +410,146 @@ ok(json.loads(get("/auth/me", INDIE)[0]).get("is_partner") is False,
    "el menú de las pantallas de pago no se le abre")
 
 
-print("\n12. Sacarlo del equipo no lo borra")
+print("\n12. La ficha del músico la manda la EMPRESA, no él")
+# David, 02/09: "El perfil sería gestionado, visto y cobrado por la productora".
+# Su cuenta es para bloquear fechas y consultar actuaciones, nada más. Se cierra
+# en el servidor: esconder el formulario no sirve, la API se llama a mano.
+antes_ficha = sql("SELECT stage_name, bio FROM artists WHERE id=?", (MUS_ID,))[0]
+cuerpo, code = patch("/me/artist", {"stage_name": "Me cambio el nombre",
+                                    "bio": "y me escribo la bio"}, MUSICO)
+ok(code == 403, "el músico no puede editar su propia ficha", f"{code} {cuerpo[:120]}")
+despues_ficha = sql("SELECT stage_name, bio FROM artists WHERE id=?", (MUS_ID,))[0]
+ok(tuple(antes_ficha) == tuple(despues_ficha),
+   "y nada cambió en la base", f"{antes_ficha} -> {despues_ficha}")
+_, c_show = post("/me/artist/shows", {"show_name": "Mi show", "category": "Musica",
+                                      "subcategory": "Solista"}, MUSICO)
+ok(c_show == 403, "tampoco publica shows por su cuenta", str(c_show))
+_, c_doc = multipart("/me/artist/documents", MUSICO,
+                     {"doc_type": "identificacion"}, {"file": ("id.pdf", "%PDF-1.4")})
+ok(c_doc == 403, "ni sube documentos legales", str(c_doc))
+# CONTROL invertido: el independiente SÍ tiene que poder hacer las tres. Sin
+# esto, romper el login o el router entero también daría 403 y pasaría.
+_, ci1 = patch("/me/artist", {"bio": "sigo mandando en lo mío"}, INDIE)
+_, ci2 = post("/me/artist/shows", {"show_name": f"Show indie {sello}",
+                                   "category": "Musica", "subcategory": "Solista"}, INDIE)
+ok(ci1 == 200 and ci2 in (200, 201),
+   "CONTROL: el artista independiente sí edita su ficha y sí publica",
+   f"perfil={ci1} show={ci2}")
+
+
+print("\n13. La productora sí edita la ficha de los suyos")
+cuerpo, code = get(f"/me/musicos/{MUS_ID}", PROD)
+ok(code == 200, "puede abrir la ficha completa de su músico", str(code))
+ficha = json.loads(cuerpo) if code == 200 else {}
+# La ficha COMPLETA y no la fila de la tabla: si el formulario se abriera sin
+# bio ni ciudad, al guardar guardaría esos blancos y borraría datos buenos.
+ok("bio" in ficha and "base_city" in ficha,
+   "y viene completa (bio y ciudad incluidas), no sólo lo de la tabla")
+ok(ficha.get("parent_name") == f"Productora {sello}",
+   "trae el nombre de la productora, para poder decirle a quién pedirle un cambio",
+   str(ficha.get("parent_name")))
+_, code = patch(f"/me/musicos/{MUS_ID}", {
+    "stage_name": f"Saxofonista {sello}", "bio": "20 años tocando en la Riviera",
+    "base_city": "Playa del Carmen", "auto_confirm_bookings": True,
+}, PROD)
+ok(code == 200, "y guarda los cambios", str(code))
+fila = sql("SELECT stage_name, bio, base_city, auto_confirm_bookings "
+           "FROM artists WHERE id=?", (MUS_ID,))[0]
+ok(fila[0] == f"Saxofonista {sello}" and fila[2] == "Playa del Carmen" and fila[3] == 1,
+   "los cambios están en la base", str(fila))
+# Que escriba la EMPRESA no agranda lo que se puede escribir.
+antes_p = sql("SELECT is_partner, is_verified, is_productora, rfc FROM artists WHERE id=?",
+              (MUS_ID,))[0]
+patch(f"/me/musicos/{MUS_ID}", {"is_partner": True, "is_verified": True,
+                                "is_productora": True, "rfc": "XAXX010101000"}, PROD)
+despues_p = sql("SELECT is_partner, is_verified, is_productora, rfc FROM artists WHERE id=?",
+                (MUS_ID,))[0]
+ok(tuple(antes_p) == tuple(despues_p),
+   "ni la empresa le regala el sello, el plan de pago ni un RFC",
+   f"{antes_p} -> {despues_p}")
+# Y sólo los suyos: el independiente no cuelga de ella.
+_, code = patch(f"/me/musicos/{INDIE_ID}", {"bio": "no deberia entrar"}, PROD)
+ok(code == 404, "la ficha de un artista ajeno no se toca (404, no 403)", str(code))
+ok(json.loads(get("/me/artist", INDIE)[0]).get("bio") != "no deberia entrar",
+   "y la bio del independiente sigue intacta")
+
+
+print("\n14. Los shows del músico los publica la empresa")
+# El hotel lo busca por su show: sin al menos uno no aparece como contratable, y
+# la empresa NO conoce la contraseña de sus músicos -es a propósito-, así que si
+# no pudiera publicar desde aquí, un catálogo de 200 no habría forma de armarlo.
+cuerpo, code = post(f"/me/musicos/{MUS_ID}/shows", {
+    "show_name": f"Sax lounge {sello}", "category": "Musica",
+    "subcategory": "Solista", "price_hotel": 8000,
+}, PROD)
+ok(code == 201, "publica un show en la ficha de su músico", f"{code} {cuerpo[:150]}")
+SHOW_ID = json.loads(cuerpo)["id"] if code == 201 else None
+duenyo = sql("SELECT artist_id FROM shows WHERE id=?", (SHOW_ID,))[0][0] if SHOW_ID else None
+ok(duenyo == MUS_ID, "y queda colgado del MÚSICO, no de la empresa", str(duenyo))
+lista, code = get(f"/me/musicos/{MUS_ID}/shows", PROD)
+ok(code == 200 and any(s["id"] == SHOW_ID for s in json.loads(lista)),
+   "sale en la lista de sus shows")
+# La subcategoría tiene que existir DENTRO de su categoría o el servidor la
+# rechaza: por eso los desplegables se arman con la taxonomía y no a mano.
+_, code = post(f"/me/musicos/{MUS_ID}/shows", {
+    "show_name": "Categoria mal", "category": "Musica", "subcategory": "Danza"}, PROD)
+ok(code == 422, "una subcategoría que no es de esa categoría se rechaza", str(code))
+# El show tiene que ser de ESE músico: si sólo se comprobara el músico, mandando
+# otro show_id se editaría el de un tercero.
+ajeno = sql("SELECT id FROM shows WHERE artist_id=?", (INDIE_ID,))
+if ajeno:
+    _, code = patch(f"/me/musicos/{MUS_ID}/shows/{ajeno[0][0]}", {"show_name": "robado"}, PROD)
+    ok(code == 404, "no se edita el show de otro pasándolo por la ruta del suyo", str(code))
+    ok(sql("SELECT show_name FROM shows WHERE id=?", (ajeno[0][0],))[0][0] != "robado",
+       "y el show ajeno sigue con su nombre")
+if SHOW_ID:
+    _, code = delete(f"/me/musicos/{MUS_ID}/shows/{SHOW_ID}", PROD)
+    ok(code == 204, "y puede quitarlo del catálogo", str(code))
+    ok(not sql("SELECT id FROM shows WHERE id=?", (SHOW_ID,)), "el show ya no está")
+
+
+print("\n15. El músico ve la actuación completa, pero SIN importes")
+# "Gestionado, visto y cobrado por la productora" (David, 02/09). El precio del
+# hotel es el margen de su propia empresa: no es dato nuestro que dar.
+comp = sql("SELECT id FROM companies LIMIT 1")[0][0]
+ven = sql("SELECT id FROM venues WHERE company_id=? LIMIT 1", (comp,))
+ven = ven[0][0] if ven else sql("SELECT id FROM venues LIMIT 1")[0][0]
+sql("INSERT INTO bookings (artist_id, company_id, venue_id, starts_at, status, "
+    "agreed_price, currency, commission_pct, notified_at, created_at, "
+    "invoice_paid, payout_paid) VALUES (?,?,?,?,?,?,?,?,?,?,0,0)",
+    (MUS_ID, comp, ven, "2026-12-20 21:00:00", "confirmed", 8000, "MXN", 15,
+     "2026-09-02 10:00:00", "2026-09-02 10:00:00"))
+BK_ID = sql("SELECT id FROM bookings WHERE artist_id=? ORDER BY id DESC LIMIT 1",
+            (MUS_ID,))[0][0]
+cuerpo, code = get("/bookings/mine", MUSICO)
+mias = [b for b in json.loads(cuerpo)] if code == 200 else []
+suya = next((b for b in mias if b["id"] == BK_ID), None)
+ok(suya is not None, "el músico ve su actuación", str(code))
+if suya:
+    ok(suya.get("agreed_price") is None and suya.get("commission_pct") is None,
+       "sin precio y sin comisión", f"{suya.get('agreed_price')} / {suya.get('commission_pct')}")
+    # Control: tiene que seguir viendo LO QUE SÍ necesita, o "sin importes" se
+    # habría conseguido rompiendo el endpoint entero.
+    ok(suya.get("starts_at") and suya.get("company_name"),
+       "pero sí el día y el hotel, que es para lo que entra",
+       f"{suya.get('starts_at')} · {suya.get('company_name')}")
+ok(sql("SELECT agreed_price FROM bookings WHERE id=?", (BK_ID,))[0][0] == 8000,
+   "y el precio sigue guardado en la base: se esconde, no se borra")
+# La empresa SÍ lo ve, porque es la que cobra.
+cuerpo, code = get(f"/me/musicos/{MUS_ID}/agenda", PROD)
+ag = json.loads(cuerpo) if code == 200 else []
+fila_ag = next((a for a in ag if a["id"] == BK_ID), None)
+ok(fila_ag is not None and fila_ag.get("agreed_price") == 8000,
+   "CONTROL: la productora sí ve el importe de esa misma actuación",
+   str(fila_ag.get("agreed_price") if fila_ag else None))
+# Y el catálogo con precios de la competencia no es para un proveedor.
+_, code = get(f"/bookings/{BK_ID}/replacements", MUSICO)
+ok(code == 403, "un proveedor no puede pedir la lista de reemplazos con precios",
+   str(code))
+sql("DELETE FROM bookings WHERE id=?", (BK_ID,))
+
+
+print("\n16. Sacarlo del equipo no lo borra")
 _, code = delete(f"/me/musicos/{MUS_ID}", PROD)
 ok(code == 204, "la productora lo desvincula", str(code))
 fila = sql("SELECT parent_id, user_id, is_active FROM artists WHERE id=?", (MUS_ID,))
@@ -421,6 +569,11 @@ ids = [PROD_ID, INDIE_ID, MUS_ID, *EXTRA]
 marcas = ",".join("?" * len(ids))
 usuarios = [r[0] for r in sql(f"SELECT user_id FROM artists WHERE id IN ({marcas})", ids) if r[0]]
 sql(f"DELETE FROM artist_blocked_dates WHERE artist_id IN ({marcas})", ids)
+# Los shows también. SQLite reutiliza los id de las fichas borradas, así que un
+# show huérfano reaparece colgado de OTRO artista en la siguiente corrida y hace
+# perder el rato buscando un fallo que no existe.
+sql(f"DELETE FROM shows WHERE artist_id IN ({marcas})", ids)
+sql(f"DELETE FROM bookings WHERE artist_id IN ({marcas})", ids)
 sql(f"DELETE FROM artists WHERE id IN ({marcas})", ids)
 if usuarios:
     m2 = ",".join("?" * len(usuarios))

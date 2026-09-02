@@ -165,6 +165,10 @@ class ArtistOut(ArtistBase):
     # Productora de la que cuelga. Sale para que la pantalla sepa que a esta
     # ficha no le toca seccion de facturacion: quien cobra es la empresa.
     parent_id: int | None = None
+    # El nombre de esa productora. Lo llena el endpoint, no la relacion: al
+    # musico hay que decirle a QUIEN pedirle un cambio de su ficha, y un id no
+    # le sirve de nada.
+    parent_name: str | None = None
     # Si esta ficha puede tener musicos colgando. Lo prende el administrador.
     is_productora: bool = False
     rating: float | None = None
