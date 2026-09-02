@@ -141,6 +141,9 @@ class ArtistUpdate(BaseModel):
     postal_code: str | None = None
     is_verified: bool | None = None
     is_active: bool | None = None
+    # Sólo el administrador llega a este campo: el PATCH de "mi perfil" filtra
+    # lo que no le toca al proveedor (ver update_my_profile en api/v1/me.py).
+    is_productora: bool | None = None
 
 
 class TarjetaIn(BaseModel):
@@ -162,6 +165,8 @@ class ArtistOut(ArtistBase):
     # Productora de la que cuelga. Sale para que la pantalla sepa que a esta
     # ficha no le toca seccion de facturacion: quien cobra es la empresa.
     parent_id: int | None = None
+    # Si esta ficha puede tener musicos colgando. Lo prende el administrador.
+    is_productora: bool = False
     rating: float | None = None
     shows: list[ShowOut] = []
     documents: list[ArtistDocumentOut] = []

@@ -68,7 +68,15 @@ _SHOW_RELS = (
 
 # Fields an artist may NOT flip on themselves - trust/verification is set by the
 # platform, never self-granted.
-_PROTECTED = {"is_verified"}
+# Campos que el proveedor NO se puede poner a sí mismo por mucho que viajen en
+# el mismo formulario. Los tres los otorga SHOWMA, no el que llena la ficha:
+#   is_verified    - el sello de verificado.
+#   is_productora  - poder dar de alta musicos, o sea CREAR cuentas y MANDAR
+#                    correos desde el dominio de SHOWMA.
+#   is_partner /   - el plan de pago que abre Market Intelligence, Tendencias y
+#   partner_...      Noticias. Sin esto, cualquiera se regala el add-on con un
+#                    PATCH a mano y deja de pagarlo.
+_PROTECTED = {"is_verified", "is_productora", "is_partner", "partner_monthly_fee"}
 
 
 async def _require_artist(scope: CurrentScope) -> int:
@@ -1063,6 +1071,33 @@ def _musico_out(a: Artist, tiene_cuenta: bool) -> dict:
     }
 
 
+async def _require_productora(scope: CurrentScope, db: DbSession) -> int:
+    """El artist_id de quien SÍ puede dar de alta músicos.
+
+    Dar de alta crea una cuenta en SHOWMA y manda un correo a la dirección que
+    escriban. Eso no puede quedar abierto a cualquier proveedor con sesión: sería
+    una forma de mandar correo desde el dominio de SHOWMA a quien sea. El permiso
+    lo prende el administrador en la ficha, uno por uno.
+
+    Y un solo nivel: el que ya cuelga de una empresa no arma equipo propio.
+    Productoras dentro de productoras no existen en el negocio y convertirían
+    cada consulta de alcance en un recorrido de árbol.
+    """
+    artist_id = await _require_artist(scope)
+    yo = await db.get(Artist, artist_id)
+    if yo is not None and yo.parent_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Perteneces a una empresa, así que no puedes tener equipo propio.",
+        )
+    if yo is None or not yo.is_productora:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu ficha no está dada de alta como productora. Pídeselo a SHOWMA.",
+        )
+    return artist_id
+
+
 async def _mi_musico(db: DbSession, productora_id: int, musico_id: int) -> Artist:
     """El músico que cuelga de MI ficha, o 404.
 
@@ -1097,17 +1132,23 @@ async def add_my_musician(payload: MusicoIn, scope: CurrentScope, db: DbSession)
     contrataciones en su nombre, y entonces lo de que el músico maneja su propia
     disponibilidad sería mentira.
     """
-    productora_id = await _require_artist(scope)
-    yo = await db.get(Artist, productora_id)
-    # Un solo nivel: un músico que ya cuelga de una empresa no puede tener
-    # equipo propio. Anidar productoras no existe en el negocio y convertiría
-    # cada consulta de alcance en un recorrido de árbol.
-    if yo is not None and yo.parent_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Perteneces a una empresa, así que no puedes tener equipo propio.",
-        )
+    productora_id = await _require_productora(scope, db)
+    musico, user = await _crear_musico(db, productora_id, payload)
+    await db.commit()
+    await db.refresh(musico)
+    enviado = await _invitar(db, user)
+    return {**_musico_out(musico, True), "invitacion_enviada": enviado}
 
+
+async def _crear_musico(
+    db: DbSession, productora_id: int, payload: MusicoIn
+) -> tuple[Artist, User]:
+    """Crea la cuenta y la ficha del músico. NO hace commit ni manda el correo.
+
+    Sin commit a propósito: el alta por lista mete muchos de un golpe y quien
+    llama decide dónde cierra. Y sin correo, porque mandar 200 invitaciones
+    dentro de una sola petición la tumbaría por tiempo.
+    """
     correo = (payload.email or "").strip().lower()
     if not correo:
         raise HTTPException(status_code=422, detail="Hace falta el correo del músico.")
@@ -1140,11 +1181,60 @@ async def add_my_musician(payload: MusicoIn, scope: CurrentScope, db: DbSession)
         email=correo,
     )
     db.add(musico)
-    await db.commit()
-    await db.refresh(musico)
+    await db.flush()
+    return musico, user
 
-    enviado = await _invitar(db, user)
-    return {**_musico_out(musico, True), "invitacion_enviada": enviado}
+
+class LoteIn(BaseModel):
+    """Lista pegada de un jalón. Tope de 500 por petición."""
+    musicos: list[MusicoIn]
+
+
+@router.post("/musicos/lote")
+async def add_my_musicians_bulk(payload: LoteIn, scope: CurrentScope, db: DbSession):
+    """Da de alta una lista completa de músicos, SIN mandar las invitaciones.
+
+    Son dos pasos y no uno por una razón práctica: 200 correos dentro de una
+    misma petición se tardarían minutos y el navegador cortaría a la mitad, sin
+    que nadie supiera cuántos alcanzaron a salir. Aquí se crean las cuentas, que
+    es lo rápido y lo que no se puede perder, y las invitaciones salen después de
+    una en una, con su avance a la vista y pudiendo reintentar las que fallen.
+
+    Cada renglón se cierra por su cuenta: uno con el correo repetido no tumba a
+    los otros 199, sale en la lista de rechazados con su motivo. Un `rollback`
+    general obligaría a la empresa a depurar 200 renglones a ciegas para volver
+    a intentarlo.
+    """
+    productora_id = await _require_productora(scope, db)
+    if len(payload.musicos) > 500:
+        raise HTTPException(
+            status_code=422,
+            detail="Máximo 500 por lista. Pártela en varias.",
+        )
+
+    creados: list[dict] = []
+    rechazados: list[dict] = []
+    # El repetido DENTRO de la propia lista sí lo caza la consulta -cada alta
+    # hace flush y la siguiente ya lo ve-, pero contestaría "ese correo ya tiene
+    # cuenta en SHOWMA, pídele que se una", que manda a la empresa a buscar un
+    # perfil ajeno que no existe. Lo que pasó es que lo escribieron dos veces.
+    vistos: set[str] = set()
+    for fila in payload.musicos:
+        correo = (fila.email or "").strip().lower()
+        if correo in vistos:
+            rechazados.append({"stage_name": fila.stage_name, "email": correo,
+                               "motivo": "Ese correo viene repetido en tu lista."})
+            continue
+        try:
+            musico, _ = await _crear_musico(db, productora_id, fila)
+        except HTTPException as e:
+            rechazados.append({"stage_name": fila.stage_name, "email": correo,
+                               "motivo": str(e.detail)})
+            continue
+        vistos.add(correo)
+        creados.append(_musico_out(musico, True))
+    await db.commit()
+    return {"creados": creados, "rechazados": rechazados}
 
 
 async def _invitar(db: DbSession, user: User) -> bool:

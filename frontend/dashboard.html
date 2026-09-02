@@ -1630,6 +1630,7 @@
     <div class="nav" data-p="aud" style="display:none"><span class="ic">👥</span> Audiencia</div>
     <div class="nav" data-p="reports" style="display:none"><span class="ic">📊</span> Reportes</div>
     <div class="nav" data-p="profile" style="display:none"><span class="ic">👤</span> Mi Perfil</div>
+    <div class="nav" data-p="team" style="display:none"><span class="ic">🎻</span> Mis músicos</div>
     <div class="navlbl">Inteligencia · Partner</div>
     <div class="nav" data-p="market"><span class="ic">📈</span> Market Intelligence <span class="pro">PRO</span></div>
     <div class="nav" data-p="demand"><span class="ic">🔥</span> Tendencias <span class="pro">PRO</span></div>
@@ -1675,6 +1676,7 @@
       <div class="panel" id="panel-aud"></div>
       <div class="panel" id="panel-reports"></div>
       <div class="panel" id="panel-profile"></div>
+      <div class="panel" id="panel-team"></div>
       <div class="panel" id="panel-market"></div>
       <div class="panel" id="panel-demand"></div>
       <div class="panel" id="panel-news"></div>
@@ -1847,6 +1849,7 @@ const NAVICON={
   reports:SVG+'<path d="M4 20h16"/><rect x="5.4" y="11" width="3.2" height="7" rx="1"/><rect x="10.4" y="6" width="3.2" height="12" rx="1"/><rect x="15.4" y="13.5" width="3.2" height="4.5" rx="1"/></svg>',
   aud:SVG+'<circle cx="9" cy="8" r="3.2"/><path d="M3.4 19.5a5.6 5.6 0 0 1 11.2 0"/><path d="M16.6 5.4a3 3 0 0 1 0 5.9"/><path d="M20.6 19.5a5 5 0 0 0-3.4-4.7"/></svg>',
   profile:SVG+'<circle cx="12" cy="8" r="3.6"/><path d="M5.5 20c0-3.4 2.9-5.8 6.5-5.8S18.5 16.6 18.5 20"/></svg>',
+  team:SVG+'<circle cx="8.5" cy="8" r="3.1"/><path d="M3 19.5c0-3.1 2.5-5.2 5.5-5.2s5.5 2.1 5.5 5.2"/><circle cx="16.8" cy="7.2" r="2.5"/><path d="M15 12.4c2.8-.5 5 1.6 5 4.3"/></svg>',
   market:SVG+'<path d="M4 5v14h16"/><path d="M7.5 15l3.3-3.8 3 2.1 4.4-5.8"/></svg>',
   demand:SVG+'<path d="M12 3.5c.6 2.6 2.3 3.7 3.5 5.3A5.6 5.6 0 1 1 7 12.6c0-1.1.4-1.9.9-2.5.3.8 1 1.3 1.8 1.3-1-2.3.3-5.4 2.3-7.9Z"/></svg>',
   news:SVG+'<path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H16v13.5a1.5 1.5 0 0 0 1.5 1.5H6a2 2 0 0 1-2-2V6.5Z"/><path d="M16 8.5h2.5A1.5 1.5 0 0 1 20 10v8a2 2 0 0 1-2 2"/><path d="M7 9h6M7 12h6M7 15h4"/></svg>',
@@ -2404,8 +2407,15 @@ function applyRole(){
   // Audiencia: la ve cualquier contratante, incluido el hotel de una sola
   // propiedad. Es justo lo que pidió David: que cada hotel vea LO SUYO.
   show('aud', isHotel);
-  show('bill', isArtist || canPartner);                 // facturación (artist self / hotel)
+  // Facturación: el músico que cuelga de una productora NO cobra por SHOWMA
+  // (David, 28/08: se liquidan fuera de la plataforma), así que no le sale.
+  // Esto sólo quita el menú; quien cierra la puerta de verdad es el servidor,
+  // porque una pantalla escondida se sigue pudiendo pedir a mano.
+  const cobraSolo = isArtist && !ME.parent_id;
+  show('bill', cobraSolo || canPartner);                // facturación (artist self / hotel)
   show('profile', isArtist);                            // artist-only self-service
+  // Mis músicos: sólo la ficha que el administrador marcó como productora.
+  show('team', isArtist && !!ME.es_productora);
   show('leads', ME.is_admin);                            // Prospectos: solo el administrador (master); oculto para hoteles/artistas
   show('master', false);                                 // Master: vive solo en su página privada (/master), fuera de este menú
   show('cal', true);                                     // actuaciones / historial de agenda
@@ -2521,6 +2531,7 @@ const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Ac
   aud:["Audiencia","Cuánta gente atrajo cada show y cuánto costó cada persona"],
   reports:["Reportes","Indicadores clave de tu operación"],
   profile:["Mi Perfil","Tus datos, tarifas y publicaciones"],
+  team:["Mis músicos","Tu equipo: cada uno con su cuenta y su propio calendario"],
   market:["Market Intelligence","Estudio de mercado por destino"],
   demand:["Tendencias de demanda","Lo que más se está pidiendo"],news:["Noticias","Novedades del entretenimiento"]};
 
@@ -6804,6 +6815,12 @@ const RENDER = {
       : `<div class="partner"><div class="cr">🚀</div><div style="flex:1"><b>Conviértete en Partner</b><p>Conecta con otros artistas y empresas, subcontrata talento de la plataforma, desbloquea Market Intelligence, obtén prioridad en solicitudes y la insignia Partner Verificado que ven los hoteles.</p></div><button class="btn" onclick="becomePartner()">Activar Partner</button></div>`;
     const gal=[]; (p.shows||[]).forEach(s=>(s.images||[]).forEach(im=>{ if(im.url && !gal.includes(im.url)) gal.push(im.url); }));
     const pfUrl=p.profile_image_url||null;
+    // ¿Cobra por su cuenta? El músico que cuelga de una productora NO: SHOWMA le
+    // factura y le paga a la EMPRESA, y ellos se liquidan por fuera (David,
+    // 28/08). Se lee de la ficha que acaba de contestar el servidor y no de la
+    // sesión guardada, para que un dato viejo en memoria no le pinte una sección
+    // de facturación que el servidor le va a rechazar.
+    COBRA_SOLO = !p.parent_id;
     box.innerHTML=`
       <div style="margin-bottom:16px">${partner}</div>
       <div class="box" style="margin-bottom:16px">
@@ -6841,6 +6858,11 @@ const RENDER = {
         <div class="field"><label>YouTube (opcional)</label><input id="pf_yt" value="${esc(sl.youtube||'')}" placeholder="Enlace o usuario de tu canal de YouTube"></div>
         <div class="saverow"><button class="btn" onclick="saveProfile(this)">Guardar cambios</button><span class="saved" id="pf_saved">Guardado ✓</span></div>
       </div>
+      ${!COBRA_SOLO?`<div class="box" style="margin-bottom:16px">
+        <h3>🧾 Facturación</h3>
+        <div class="hint" style="margin:0">Tus pagos los lleva la empresa a la que perteneces, no SHOWMA,
+          así que aquí no hay datos fiscales ni bancarios que llenar. Cualquier duda del pago se ve directamente con ella.</div>
+      </div>`:`
       <div class="box" style="margin-bottom:16px">
         <h3>🧾 Datos fiscales y bancarios</h3><div class="hint">Para emitir CFDI y liquidar tus pagos. Solo tú y la administración los ven.</div>
         <div class="fgrid">
@@ -6875,8 +6897,8 @@ const RENDER = {
           <div class="field"><label>CLABE interbancaria</label><input id="pf_clabe" value="${esc(p.bank_clabe||'')}" placeholder="18 dígitos" inputmode="numeric"></div>
         </div>
         <div class="saverow"><button class="btn" onclick="saveFiscal(this)">Guardar datos fiscales</button><span class="saved" id="pf_fsaved">Guardado ✓</span></div>
-      </div>
-      <div class="box" style="margin-bottom:16px">
+      </div>`}
+      ${!COBRA_SOLO?'':`<div class="box" style="margin-bottom:16px">
         <h3>🏷️ Tarifas especiales por cliente</h3><div class="hint">Fija un precio o descuento especial para un hotel o una cadena concreta, sin cambiar tu precio público. Solo se aplica cuando ese cliente te contrata.</div>
         <div id="pf_rates" style="margin-top:8px"><div class="muted" style="padding:8px 0">Cargando…</div></div>
         <div style="border-top:1px dashed var(--line);padding-top:14px;margin-top:12px">
@@ -6889,7 +6911,7 @@ const RENDER = {
             <div class="field" style="display:flex;align-items:flex-end"><button class="btn" onclick="addClientRate(this)">Agregar tarifa</button></div>
           </div>
         </div>
-      </div>
+      </div>`}
       <div class="box">
         <h3>🎭 Mis publicaciones</h3><div class="hint">Tus shows en el catálogo · edita tarifas y descripciones, o publica uno nuevo</div>
         <div id="shows">${p.shows.map(showEditor).join("")||'<div class="muted" style="margin-bottom:14px">Todavía no tienes shows publicados.</div>'}</div>
@@ -6902,8 +6924,10 @@ const RENDER = {
         </div>
       </div>`;
     initShowForms(p.shows);
-    loadClientRates();
-    loadFiscalStatus();
+    // El músico de una productora no cobra por SHOWMA, así que estas dos ni se
+    // piden: darían 403 y dejarían "Cargando…" colgado para siempre en una
+    // sección que además ya no existe en su pantalla.
+    if(COBRA_SOLO){ loadClientRates(); loadFiscalStatus(); }
   },
 
   async market(box){
@@ -7037,6 +7061,21 @@ const RENDER = {
     CACHE.convs=convs; openConv(convs[0].id);
   },
 
+  /* ---- Mis músicos: el equipo de una productora ------------------------
+     David, 28/08 y 02/09: va a cerrar con una empresa de más de 200 músicos y
+     con otras dos productoras. Cada músico es una FICHA propia colgada de la
+     empresa, con su cuenta y su calendario, que es lo que le quita el trabajo
+     a la empresa: ella no puede llevarle la agenda a 200 personas a mano.
+
+     Por eso hay alta por LISTA y no sólo de uno en uno. Capturar 200 fichas a
+     mano son varios días de trabajo, y ahí se cae justo la ventaja que se les
+     está prometiendo. */
+  async team(box){
+    const eq = await api('/me/musicos');
+    TEAM = eq;
+    box.innerHTML = teamShell(eq);
+  },
+
   async news(box){
     let data;
     try{ data = await loadNewsFeed(); }
@@ -7071,6 +7110,243 @@ const RENDER = {
         <div class="newslist">${cards}</div></div>`;
   }
 };
+
+/* ================= Mis músicos (productora) =========================== */
+let TEAM = [], TEAM_LOTE = [], TEAM_MALOS = [], TEAM_REPORTE = null;
+// Si el proveedor factura por su cuenta. Falso = cuelga de una productora.
+let COBRA_SOLO = true;
+
+const teamIni = n => (n||'?').split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase();
+
+function teamShell(eq){
+  const conCuenta = eq.filter(m=>m.tiene_cuenta).length;
+  return `
+  <div class="box">
+    <h3>🎻 Tu equipo <span class="chip" style="background:var(--ov2);color:var(--mut)">${eq.length}</span></h3>
+    <div class="hint">Cada músico entra con su propio usuario y contraseña, bloquea sus fechas
+      y recibe el aviso cuando lo contratan. Tú los ves a todos desde aquí.
+      Los pagos entre tu empresa y ellos van por fuera de SHOWMA, así que su ficha no lleva facturación.</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn" onclick="teamTab('uno')">＋ Agregar un músico</button>
+      <button class="btn ghost" onclick="teamTab('lista')">📋 Pegar una lista</button>
+      ${eq.length?`<button class="btn ghost" onclick="teamInvitarTodos()">✉️ Reenviar invitación a todos</button>`:''}
+    </div>
+    <div id="teamForm"></div>
+    <div id="teamProg" style="${TEAM_REPORTE?'':'display:none;'}margin-bottom:14px">${TEAM_REPORTE?teamReporte(TEAM_REPORTE):''}</div>
+    ${eq.length?teamTabla(eq):`<div class="hint" style="margin:0">Todavía no has dado de alta a nadie.</div>`}
+    ${eq.length?`<div class="hint" style="margin:14px 0 0">${conCuenta} de ${eq.length} tienen cuenta creada.
+      No podemos saber quién ya entró a poner su contraseña, así que si alguno te dice que no le llegó,
+      usa "Reenviar invitación".</div>`:''}
+  </div>`;
+}
+
+/* El resumen del alta por lista SOBREVIVE al refresco de la tabla.
+   Antes se pintaba y desaparecía al recargar la lista, así que la empresa que
+   acaba de subir 200 renglones perdía justo lo que necesitaba leer: quiénes se
+   quedaron fuera y a cuántos no les salió la invitación. */
+function teamReporte(r){
+  const env = r.envio || {};
+  return `<div class="box" style="background:var(--ov);box-shadow:none">
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <div style="flex:1">
+        <b>${r.creados} dado${r.creados===1?'':'s'} de alta</b>${r.rechazados.length?` · ${r.rechazados.length} se quedaron fuera`:''}
+        ${r.rechazados.length?`<div style="margin-top:8px">${r.rechazados.map(x=>`<div class="hint" style="margin:2px 0">· ${esc(x.stage_name||x.email||'—')} — ${esc(x.motivo)}</div>`).join('')}</div>`:''}
+        <div id="tmEnvio" class="hint" style="margin:10px 0 0">${
+          env.mal ? `${env.bien} invitaciones enviadas y ${env.mal} no salieron. A esos les puedes reenviar desde la lista.`
+                  : `${env.bien||0} invitaciones enviadas.`}</div>
+      </div>
+      <button class="btn ghost mini" onclick="TEAM_REPORTE=null;show('team',true)">Ocultar</button>
+    </div></div>`;
+}
+
+function teamTabla(eq){
+  return `<table><thead><tr><th></th><th>Músico</th><th>Correo</th><th>Teléfono</th><th>Tipo</th><th></th></tr></thead><tbody>
+  ${eq.map(m=>`<tr>
+    <td style="width:38px"><div class="ava" style="width:32px;height:32px;font-size:11px">${esc(teamIni(m.stage_name))}</div></td>
+    <td><b>${esc(m.stage_name)}</b></td>
+    <td>${esc(m.email||'—')}</td>
+    <td>${esc(m.phone||'—')}</td>
+    <td>${esc(m.artist_type||'—')}</td>
+    <td style="text-align:right;white-space:nowrap">
+      <button class="btn ghost mini" onclick="teamInvitar(${m.id},this)">Reenviar invitación</button>
+      <button class="btn danger mini" onclick="teamSacar(${m.id})">Sacar del equipo</button>
+    </td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+function teamTab(cual){
+  const c = document.getElementById('teamForm');
+  if(cual==='uno'){
+    c.innerHTML = `<div class="showcard">
+      <div class="fgrid fg3">
+        <div class="field"><label>Nombre del músico</label><input id="tmName" placeholder="Juan Pérez"></div>
+        <div class="field"><label>Correo</label><input id="tmMail" placeholder="juan@correo.com"></div>
+        <div class="field"><label>Teléfono / WhatsApp</label><input id="tmTel" placeholder="998 123 4567"></div>
+      </div>
+      <div class="fgrid">
+        <div class="field"><label>Tipo</label><input id="tmTipo" placeholder="Saxofonista, Solista, Cantante…"></div>
+      </div>
+      <div class="hint" style="margin:0 0 12px">Le llega un correo con su enlace para poner su contraseña.
+        Tú no la eliges ni la puedes ver: si la supieras podrías entrar como él y aceptar o cancelar sus contrataciones.</div>
+      <button class="btn" onclick="teamAltaUno(this)">Dar de alta e invitar</button>
+    </div>`;
+  } else {
+    c.innerHTML = `<div class="showcard">
+      <div class="field"><label>Pega aquí tu lista — un músico por renglón</label>
+        <textarea id="tmLista" style="min-height:150px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px"
+          placeholder="Juan Pérez, juan@correo.com, 9981234567, Saxofonista&#10;Ana Ruiz, ana@correo.com, 9987654321, Cantante"></textarea></div>
+      <div class="hint" style="margin:0 0 12px">Sirve tal cual copiado de Excel. Separa con comas o con tabuladores,
+        y no importa el orden de las columnas: el correo se reconoce por la arroba y el teléfono por ser números.</div>
+      <button class="btn ghost" onclick="teamRevisar()">Revisar la lista</button>
+      <div id="tmPrev" style="margin-top:14px"></div>
+    </div>`;
+  }
+}
+
+/* Lee un renglón sin exigirle un orden de columnas. Una productora pega lo que
+   tiene en su Excel, y ahí el correo puede venir en la primera columna o en la
+   tercera. El correo se reconoce por la arroba y el teléfono por ser casi puros
+   números; lo que queda es nombre y tipo, en ese orden. */
+function teamParseLinea(linea){
+  const cols = linea.split(/\t|;|,/).map(s=>s.trim()).filter(s=>s!=='');
+  if(!cols.length) return null;
+  const fila = {stage_name:'', email:'', phone:'', artist_type:''};
+  const resto = [];
+  for(const c of cols){
+    if(!fila.email && c.includes('@')) fila.email = c.toLowerCase();
+    else if(!fila.phone && /^[+\d][\d\s()\-]{6,}$/.test(c)) fila.phone = c;
+    else resto.push(c);
+  }
+  fila.stage_name = resto.shift() || '';
+  fila.artist_type = resto.shift() || '';
+  return fila;
+}
+
+function teamRevisar(){
+  const txt = (document.getElementById('tmLista').value||'').trim();
+  const cont = document.getElementById('tmPrev');
+  if(!txt){ cont.innerHTML='<div class="hint" style="margin:0">La lista está vacía.</div>'; return; }
+  const vistos = new Set(), filas = [];
+  for(const linea of txt.split(/\r?\n/)){
+    if(!linea.trim()) continue;
+    const f = teamParseLinea(linea);
+    if(!f) continue;
+    // Se revisa ANTES de crear nada. Con 200 renglones, enterarse del error
+    // después de haber dado de alta 200 cuentas no sirve de nada.
+    if(!f.stage_name) f.problema = 'Falta el nombre';
+    // Sin arroba no hay forma de saber cuál de las columnas quería ser el
+    // correo, así que no se adivina: se nombran las DOS causas posibles. Un
+    // "esto-no-es-correo" mal escrito se queda en la columna de Tipo, y decir
+    // sólo "falta el correo" mandaría a la empresa a buscar una columna que sí
+    // escribió.
+    else if(!f.email) f.problema = 'Falta el correo, o está escrito sin arroba';
+    else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) f.problema = 'El correo no se ve bien';
+    else if(vistos.has(f.email)) f.problema = 'Ese correo ya viene en un renglón de arriba';
+    else vistos.add(f.email);
+    filas.push(f);
+  }
+  TEAM_LOTE = filas.filter(f=>!f.problema);
+  const malos = filas.filter(f=>f.problema);
+  // Los que se saltan aquí NO llegan al servidor, así que su respuesta no los
+  // menciona. Se guardan para que el resumen final los siga nombrando: si no,
+  // de 200 renglones se leería "197 dados de alta" y nadie sabría qué pasó con
+  // los otros tres.
+  TEAM_MALOS = malos.map(f=>({stage_name:f.stage_name, email:f.email, motivo:f.problema}));
+  cont.innerHTML = `
+    <table><thead><tr><th>Músico</th><th>Correo</th><th>Teléfono</th><th>Tipo</th><th></th></tr></thead><tbody>
+    ${filas.map(f=>`<tr${f.problema?' style="background:#f871710d"':''}>
+      <td>${esc(f.stage_name||'—')}</td><td>${esc(f.email||'—')}</td>
+      <td>${esc(f.phone||'—')}</td><td>${esc(f.artist_type||'—')}</td>
+      <td style="text-align:right">${f.problema?`<span class="chip" style="background:#f871711a;color:var(--bad)">${esc(f.problema)}</span>`:'<span class="chip" style="background:#10b9811a;color:var(--ok)">Listo</span>'}</td>
+    </tr>`).join('')}</tbody></table>
+    <div class="hint" style="margin:12px 0">${TEAM_LOTE.length} se van a dar de alta${malos.length?` · ${malos.length} tienen un problema y se van a saltar`:''}.</div>
+    ${TEAM_LOTE.length?`<button class="btn" onclick="teamAltaLote(this)">Dar de alta ${TEAM_LOTE.length} músico${TEAM_LOTE.length===1?'':'s'}</button>`:''}`;
+}
+
+async function teamAltaUno(btn){
+  const cuerpo = {
+    stage_name: val('tmName'), email: val('tmMail'),
+    phone: val('tmTel')||null, artist_type: val('tmTipo')||null,
+  };
+  if(!cuerpo.stage_name || !cuerpo.email){ toast('Falta el nombre o el correo.',true); return; }
+  btn.disabled=true; btn.textContent='Dando de alta…';
+  try{
+    const r = await post('/me/musicos', cuerpo);
+    toast(r.invitacion_enviada ? 'Alta hecha, ya le llegó su invitación.'
+                               : 'Alta hecha, pero el correo no salió. Usa "Reenviar invitación".',
+          !r.invitacion_enviada);
+    await show('team', true);
+  }catch(e){ toast(e.message||'No se pudo dar de alta.',true); btn.disabled=false; btn.textContent='Dar de alta e invitar'; }
+}
+
+async function teamAltaLote(btn){
+  if(!TEAM_LOTE.length) return;
+  btn.disabled=true; btn.textContent='Dando de alta…';
+  let r;
+  try{ r = await post('/me/musicos/lote',{musicos:TEAM_LOTE}); }
+  catch(e){ toast(e.message||'No se pudo dar de alta la lista.',true);
+            btn.disabled=false; btn.textContent='Reintentar'; return; }
+  TEAM_REPORTE = {creados:r.creados.length,
+                  rechazados:[...TEAM_MALOS, ...r.rechazados], envio:{bien:0,mal:0}};
+  const prog = document.getElementById('teamProg');
+  prog.style.display='';
+  prog.innerHTML = teamReporte(TEAM_REPORTE);
+  document.getElementById('tmEnvio').textContent='Mandando las invitaciones…';
+  // Las invitaciones salen de una en una y con su avance a la vista. 200 correos
+  // dentro de una sola petición se tardarían minutos, el navegador cortaría a la
+  // mitad y nadie sabría cuántos alcanzaron a salir.
+  TEAM_REPORTE.envio = await teamEnviarInvitaciones(r.creados.map(m=>m.id),
+                                                    document.getElementById('tmEnvio'));
+  await show('team', true);
+}
+
+async function teamEnviarInvitaciones(ids, dest){
+  let bien=0, mal=0;
+  for(let i=0;i<ids.length;i++){
+    try{
+      const r = await post(`/me/musicos/${ids[i]}/invitar`,{});
+      r.invitacion_enviada ? bien++ : mal++;
+    }catch(e){ mal++; }
+    if(dest) dest.textContent = `Invitaciones: ${bien} enviadas${mal?`, ${mal} no salieron`:''} · ${i+1} de ${ids.length}`;
+    // Un respiro entre correo y correo: 200 de golpe es justo lo que un
+    // servidor de correo marca como spam, y el músico que no recibe su enlace
+    // no entra.
+    if(i < ids.length-1) await new Promise(res=>setTimeout(res,250));
+  }
+  if(dest) dest.textContent = mal
+    ? `${bien} invitaciones enviadas y ${mal} no salieron. A esos les puedes reenviar desde la lista.`
+    : `${bien} invitaciones enviadas.`;
+  return {bien, mal};
+}
+
+async function teamInvitar(id, btn){
+  const t = btn.textContent; btn.disabled=true; btn.textContent='Enviando…';
+  try{
+    const r = await post(`/me/musicos/${id}/invitar`,{});
+    toast(r.invitacion_enviada?'Invitación enviada.':'El correo no salió. Revísalo con SHOWMA.', !r.invitacion_enviada);
+  }catch(e){ toast(e.message||'No se pudo enviar.',true); }
+  btn.disabled=false; btn.textContent=t;
+}
+
+async function teamInvitarTodos(){
+  if(!TEAM.length) return;
+  const prog = document.getElementById('teamProg');
+  prog.style.display='';
+  prog.innerHTML = '<div class="box" style="background:var(--ov);box-shadow:none"><div id="tmEnvio2" class="hint" style="margin:0">Mandando…</div></div>';
+  await teamEnviarInvitaciones(TEAM.map(m=>m.id), document.getElementById('tmEnvio2'));
+}
+
+async function teamSacar(id){
+  // El nombre se busca aquí y no viaja dentro del onclick: un apellido con
+  // apóstrofo (O'Connor) rompería la comilla del atributo y el botón dejaría de
+  // funcionar justo para esa persona.
+  const nombre = (TEAM.find(m=>m.id===id)||{}).stage_name || 'este músico';
+  // "Sacar", no "borrar", y el texto lo dice: la ficha, la cuenta y el historial
+  // son del músico. Se le prometió eso al darlo de alta.
+  if(!confirm(`¿Sacar a ${nombre} de tu equipo?\n\nNo se borra nada: conserva su cuenta, su perfil y su historial, y queda como proveedor independiente.`)) return;
+  try{ await del(`/me/musicos/${id}`); toast('Listo, ya no está en tu equipo.'); await show('team', true); }
+  catch(e){ toast(e.message||'No se pudo.',true); }
+}
 
 // --- Quincenas en el frontend (mismo cálculo que backend/services/periodos.py) ---
 const QMES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -7645,10 +7921,17 @@ async function addShow(btn){
   try{ await post('/me/artist/shows',body); SHOW_IMGS['new']=[]; toast('Show publicado ✓'); show('profile',true); }
   catch(e){ alert('No se pudo publicar: '+e.message); btn.disabled=false; }
 }
-async function becomePartner(){
-  if(!confirm('¿Activar tu plan Partner? Conecta con otros artistas y empresas, subcontrata talento, obtén tu insignia Partner Verificado y desbloquea Market Intelligence.'))return;
-  try{ CACHE.profile=await patch('/me/artist',{is_partner:true}); refreshIdentity(); applyRole(); show('profile',true); }
-  catch(e){ alert('No se pudo activar: '+e.message); }
+// Partner es el plan de PAGO que abre Market Intelligence, Tendencias y
+// Noticias. Este botón se activaba solo: mandaba `is_partner:true` en el PATCH
+// del propio perfil, así que cualquier proveedor se lo regalaba con un clic. El
+// servidor ya no lo acepta (ver _PROTECTED en api/v1/me.py), y por eso el botón
+// tampoco puede seguir fingiendo que lo activa: ahora lo PIDE.
+//
+// Quién lo cobra y cómo se activa lo decide SHOWMA; aquí no se inventa un cobro
+// que no existe.
+function becomePartner(){
+  alert('El plan Partner lo activa SHOWMA.\n\nEscríbenos con el botón de Ayuda y te lo activamos en tu perfil.');
+  if(typeof openHelp === 'function') openHelp();
 }
 // ---- Régimen fiscal SAT (para Mi Perfil) ----
 const REGIMENES_SAT=[

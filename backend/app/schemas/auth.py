@@ -48,6 +48,11 @@ class MeOut(BaseModel):
     artist_name: str | None = None
     company_name: str | None = None
     is_partner: bool = False
+    # Productora / roster. `es_productora` decide si sale el menú "Mis músicos",
+    # y `parent_id` si esta ficha cuelga de una empresa (y por tanto no le toca
+    # la sección de facturación: quien cobra es la empresa).
+    es_productora: bool = False
+    parent_id: int | None = None
 
 
 class LoginRequest(BaseModel):

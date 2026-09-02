@@ -80,6 +80,9 @@ _SQLITE_ADDED_COLUMNS = [
     # es lo que son todos los que ya existen: nadie queda dentro de una empresa
     # por el hecho de agregar la columna.
     ("artists", "parent_id", "INTEGER"),
+    # Permiso para dar de alta musicos. 0 para todos los que ya existen: nadie
+    # se convierte en productora por el hecho de agregar la columna.
+    ("artists", "is_productora", "INTEGER DEFAULT 0"),
 ]
 
 

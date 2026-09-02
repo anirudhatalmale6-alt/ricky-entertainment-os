@@ -21,7 +21,10 @@ equivocado:
     NO dan 403 al artista independiente. Sin la segunda mitad, romper el login
     entero haría pasar la prueba.
 
-Corre contra un SERVIDOR DE VERDAD con una COPIA de la base de producción.
+Corre contra un SERVIDOR DE VERDAD, sobre una COPIA de una base con datos
+(la del repositorio sirve; una copia de producción es mejor porque trae fichas
+viejas y ahí se nota si la columna nueva movió a alguien de sitio). Nunca sobre
+producción: la prueba escribe.
 
 Correr:
     cp /ruta/ricky.db /tmp/copia.db
@@ -157,6 +160,28 @@ sueltos = sql("SELECT COUNT(*) FROM artists WHERE parent_id IS NOT NULL "
 ok(sueltos == 0,
    "ningún perfil que ya existía quedó colgado de una productora",
    f"{sueltos} con parent_id")
+
+
+print("\n1b. Dar de alta músicos NO está abierto a cualquier proveedor")
+# Dar de alta CREA una cuenta y MANDA un correo a la dirección que escriban. Si
+# eso quedara abierto a cualquiera con sesión, SHOWMA sería una forma de mandar
+# correo desde su propio dominio a quien fuera. El permiso lo prende el
+# administrador en la ficha, uno por uno.
+cuerpo, code = post("/me/musicos", {
+    "stage_name": "No deberia existir", "email": f"x{uuid.uuid4().hex[:8]}@prueba.mx",
+}, PROD)
+ok(code == 403, "sin el permiso de productora, el alta responde 403", f"{code} {cuerpo[:120]}")
+colados = sql("SELECT COUNT(*) FROM artists WHERE stage_name='No deberia existir'")[0][0]
+# Lo que importa no es el número de la respuesta, es que no se haya creado nada:
+# un 403 devuelto DESPUÉS de haber dado de alta la ficha sería igual de inútil.
+ok(colados == 0, "y no se creó ninguna ficha ni cuenta", f"{colados} coladas")
+
+cuerpo, code = post("/me/musicos/lote", {"musicos": [
+    {"stage_name": "Lote sin permiso", "email": f"y{uuid.uuid4().hex[:8]}@prueba.mx"}]}, PROD)
+ok(code == 403, "el alta por lista también está cerrada", f"{code} {cuerpo[:120]}")
+
+sql("UPDATE artists SET is_productora=1 WHERE id=?", (PROD_ID,))
+print("  (el administrador le prende el permiso a la productora)")
 
 
 print("\n2. La productora da de alta a un músico")
@@ -316,7 +341,67 @@ delindie = [d["date"] for d in json.loads(get("/me/blocked-dates", INDIE)[0])]
 ok(DIA not in delindie, "y a un tercero tampoco")
 
 
-print("\n10. Sacarlo del equipo no lo borra")
+print("\n10. El alta por lista: 200 músicos no se capturan de uno en uno")
+repetido = f"r{uuid.uuid4().hex[:10]}@prueba.mx"
+lote = [
+    {"stage_name": f"Lote A {sello}", "email": f"a{uuid.uuid4().hex[:10]}@prueba.mx"},
+    {"stage_name": f"Lote B {sello}", "email": repetido},
+    {"stage_name": f"Lote C {sello}", "email": repetido},          # repetido en la lista
+    {"stage_name": f"Lote D {sello}", "email": indie_mail},        # ya tiene cuenta
+    {"stage_name": f"Lote E {sello}", "email": "  "},              # sin correo
+]
+cuerpo, code = post("/me/musicos/lote", {"musicos": lote}, PROD)
+ok(code == 200, "el alta por lista responde 200", f"{code} {cuerpo[:160]}")
+res = json.loads(cuerpo) if code == 200 else {"creados": [], "rechazados": []}
+EXTRA = [m["id"] for m in res.get("creados", [])]
+ok(len(EXTRA) == 2, "entran los buenos", f"{len(EXTRA)} creados")
+ok(len(res.get("rechazados", [])) == 3, "y salen los tres malos con su motivo",
+   json.dumps(res.get("rechazados", []), ensure_ascii=False)[:200])
+# Lo que de verdad se está probando: que un renglón malo NO tumbe a los buenos.
+# Un rollback general obligaría a la empresa a depurar 200 renglones a ciegas.
+vivos = sql("SELECT COUNT(*) FROM artists WHERE parent_id=? AND stage_name LIKE ?",
+            (PROD_ID, f"Lote%{sello}"))[0][0]
+ok(vivos == 2, "los buenos quedaron guardados de verdad, no sólo en la respuesta",
+   f"{vivos} en la base")
+motivos = " ".join(r["motivo"] for r in res.get("rechazados", []))
+ok("repetido en tu lista" in motivos,
+   "al correo escrito dos veces se le dice que está repetido, no que sea de otro")
+# Sin correo: la ficha NO se crea. Si se creara, la empresa tendría un músico
+# que jamás podría entrar y nadie sabría por qué.
+sin_correo = sql("SELECT COUNT(*) FROM artists WHERE stage_name=?",
+                 (f"Lote E {sello}",))[0][0]
+ok(sin_correo == 0, "el renglón sin correo no dejó ficha muerta", str(sin_correo))
+# El tope existe para que una lista pegada por error no dé de alta 50 mil.
+_, code = post("/me/musicos/lote", {"musicos": [
+    {"stage_name": "X", "email": f"z{i}@prueba.mx"} for i in range(501)]}, PROD)
+ok(code == 422, "una lista de más de 500 se rechaza entera", str(code))
+
+
+print("\n11. Nadie se regala a sí mismo un permiso que otorga SHOWMA")
+# Estos tres los da SHOWMA, no el que llena su ficha. is_partner además es el
+# add-on de PAGO (Market Intelligence, Tendencias, Noticias): si un proveedor se
+# lo pone solo con un PATCH, deja de pagarlo y la pantalla no se entera.
+antes = sql("SELECT is_verified, is_partner, is_productora FROM artists WHERE id=?",
+            (INDIE_ID,))[0]
+cuerpo, code = patch("/me/artist", {
+    "is_verified": True, "is_partner": True, "is_productora": True,
+    "partner_monthly_fee": 0, "bio": "toco de todo",
+}, INDIE)
+ok(code == 200, "el PATCH pasa (no se le grita por intentarlo)", str(code))
+despues = sql("SELECT is_verified, is_partner, is_productora FROM artists WHERE id=?",
+              (INDIE_ID,))[0]
+ok(tuple(despues) == tuple(antes),
+   "ni verificado, ni productora, ni partner: los tres siguen igual",
+   f"{antes} -> {despues}")
+# Control: el mismo PATCH SÍ tenía que guardar lo que sí es suyo. Sin esto, un
+# endpoint roto que ignorara el cuerpo entero también pasaría esta prueba.
+ok(json.loads(get("/me/artist", INDIE)[0]).get("bio") == "toco de todo",
+   "y lo que sí es suyo sí se guardó (la biografía)")
+ok(json.loads(get("/auth/me", INDIE)[0]).get("is_partner") is False,
+   "el menú de las pantallas de pago no se le abre")
+
+
+print("\n12. Sacarlo del equipo no lo borra")
 _, code = delete(f"/me/musicos/{MUS_ID}", PROD)
 ok(code == 204, "la productora lo desvincula", str(code))
 fila = sql("SELECT parent_id, user_id, is_active FROM artists WHERE id=?", (MUS_ID,))
@@ -332,7 +417,7 @@ ok(get("/me/payouts", login(mus_mail, CLAVE))[1] != 403,
 
 
 print("\nLimpiando lo que sembró la prueba")
-ids = [PROD_ID, INDIE_ID, MUS_ID]
+ids = [PROD_ID, INDIE_ID, MUS_ID, *EXTRA]
 marcas = ",".join("?" * len(ids))
 usuarios = [r[0] for r in sql(f"SELECT user_id FROM artists WHERE id IN ({marcas})", ids) if r[0]]
 sql(f"DELETE FROM artist_blocked_dates WHERE artist_id IN ({marcas})", ids)

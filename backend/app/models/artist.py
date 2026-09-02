@@ -49,6 +49,15 @@ class Artist(Base, TimestampMixin):
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey("artists.id", ondelete="SET NULL"), index=True
     )
+    # Quien puede dar de alta musicos. Lo prende el ADMINISTRADOR en la ficha,
+    # igual que la tarjeta publica, y no se prende solo al registrarse.
+    #
+    # No es cosmetico ni es para esconder un menu: dar de alta un musico CREA
+    # una cuenta en SHOWMA y MANDA un correo a la direccion que le escriban. Si
+    # cualquier proveedor con sesion abierta pudiera hacerlo, tendriamos una
+    # forma de mandar correo desde el dominio de SHOWMA a quien sea, y de llenar
+    # la base de cuentas que nadie pidio.
+    is_productora: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # --- Who they are --------------------------------------------------
     stage_name: Mapped[str] = mapped_column(String(255), index=True)   # Nombre artistico / proveedor

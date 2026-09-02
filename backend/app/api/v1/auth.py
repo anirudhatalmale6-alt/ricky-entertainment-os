@@ -141,10 +141,14 @@ async def me(scope: CurrentScope, db: DbSession):
     perms = [p.code for p in user.role.permissions] if user.role else []
     artist_name = None
     is_partner = False
+    es_productora = False
+    parent_id = None
     if scope.artist_id:
         a = await db.get(Artist, scope.artist_id)
         artist_name = a.stage_name if a else None
         is_partner = bool(a.is_partner) if a else False
+        es_productora = bool(a.is_productora) if a else False
+        parent_id = a.parent_id if a else None
     company_name = None
     if scope.company_id:
         c = await db.get(Company, scope.company_id)
@@ -162,6 +166,8 @@ async def me(scope: CurrentScope, db: DbSession):
         artist_name=artist_name,
         company_name=company_name,
         is_partner=is_partner,
+        es_productora=es_productora,
+        parent_id=parent_id,
     )
 
 
