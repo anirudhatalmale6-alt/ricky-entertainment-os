@@ -595,11 +595,28 @@ async def artist_respond(
     This is the manual-approval path (Artist.auto_confirm_bookings = False): a new
     actuacion arrives 'pendiente' and the artist decides. Rejecting a pending
     request is not the same as cancelling a confirmed show, so the 2h cut-off does
-    not apply here."""
+    not apply here.
+
+    La productora también responde por los suyos. David, 03/09: "Eventualmente la
+    productora, pero seria configurable como los musicos independientes". Así que
+    pueden los dos: la empresa lleva la relación comercial, y el músico conserva
+    el botón porque poder decir "ese día no puedo" ES su disponibilidad, que es
+    justo para lo que le dimos cuenta.
+    """
     if scope.artist_id is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo artistas.")
     booking = await _get_or_404(db, booking_id)
-    if booking.artist_id != scope.artist_id:
+    suya = booking.artist_id == scope.artist_id
+    por_la_empresa = False
+    if not suya and booking.artist_id is not None:
+        titular = await db.get(Artist, booking.artist_id)
+        yo = await db.get(Artist, scope.artist_id)
+        # Sólo la productora de ESE músico, y sólo si tiene el permiso puesto.
+        por_la_empresa = bool(
+            titular is not None and yo is not None
+            and titular.parent_id == scope.artist_id and yo.is_productora
+        )
+    if not suya and not por_la_empresa:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
     if booking.status != BookingStatus.PENDING:
         raise HTTPException(status_code=409, detail="Esta actuacion ya no esta pendiente.")
@@ -609,7 +626,13 @@ async def artist_respond(
     else:
         booking.status = BookingStatus.CANCELLED
         booking.cancelled_at = _now()
-        booking.cancellation_reason = "Rechazada por el artista"
+        booking.cancellation_reason = (
+            "Rechazada por la productora" if por_la_empresa else "Rechazada por el artista"
+        )
+        # Sigue siendo "artist" aunque conteste la empresa: para el hotel es el
+        # lado del proveedor el que se cayó, y de ese campo cuelgan su aviso de
+        # cancelación y el historial de cumplimiento. Cambiarlo aquí falsearía
+        # las dos cosas. Quién apretó el botón queda en el motivo.
         booking.cancelled_by = "artist"
 
     # Avisar al hotel por correo: aceptó (queda cerrado) o rechazó (hay que

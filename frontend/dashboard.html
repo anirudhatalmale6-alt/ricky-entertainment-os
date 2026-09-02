@@ -7316,11 +7316,9 @@ async function teamEditar(id){
 
       <div style="border-top:1px dashed var(--line);margin:16px 0 0;padding-top:14px">
         <b style="font-size:13.5px">🗓️ Sus actuaciones</b>
-        <div class="hint" style="margin:2px 0 10px">Con importes, porque el cobro lo llevas tú. Él las ve sin dinero.</div>
-        ${agenda.length?`<table><thead><tr><th>Fecha</th><th>Hotel</th><th>Show</th><th>Importe</th><th>Estado</th></tr></thead><tbody>
-          ${agenda.map(a=>`<tr><td>${fmtDate(a.starts_at)}</td><td>${esc(a.hotel||'—')}</td><td class="muted">${esc(a.show||'—')}</td>
-            <td>${a.agreed_price!=null?MXN(a.agreed_price):'—'}</td><td>${chip(a.status)}</td></tr>`).join('')}
-        </tbody></table>`:`<div class="hint" style="margin:0">Todavía no tiene actuaciones.</div>`}
+        <div class="hint" style="margin:2px 0 10px">Con importes, porque el cobro lo llevas tú. Él las ve sin dinero.
+          Las pendientes las puedes aceptar o rechazar tú desde aquí, o dejar que las conteste él.</div>
+        <div id="tmeAgenda">${teamAgendaHtml(agenda)}</div>
       </div>
     </div>
     <div class="af" style="justify-content:flex-end"><button class="btn ghost" onclick="teamCerrar()">Cerrar</button></div>
@@ -7338,6 +7336,33 @@ function teamSubs(){
     + subs.map(x=>`<option>${esc(x)}</option>`).join('');
 }
 window.teamSubs=teamSubs;
+
+function teamAgendaHtml(agenda){
+  if(!agenda.length) return '<div class="hint" style="margin:0">Todavía no tiene actuaciones.</div>';
+  return `<table><thead><tr><th>Fecha</th><th>Hotel</th><th>Show</th><th>Importe</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${agenda.map(a=>`<tr><td>${fmtDate(a.starts_at)}</td><td>${esc(a.hotel||'—')}</td><td class="muted">${esc(a.show||'—')}</td>
+      <td>${a.agreed_price!=null?MXN(a.agreed_price):'—'}</td><td>${chip(a.status)}</td>
+      <td style="text-align:right;white-space:nowrap">${a.status==='pending'
+        ? `<button class="mini ok" onclick="teamResponder(${a.id},'accept',this)">Aceptar</button>
+           <button class="mini no" onclick="teamResponder(${a.id},'reject',this)">Rechazar</button>`
+        : '<span class="muted">—</span>'}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+/* La productora acepta o rechaza por uno de los suyos (David, 03/09). El músico
+   conserva sus botones: poder decir "ese día no puedo" ES su disponibilidad. */
+async function teamResponder(bookingId, accion, btn){
+  if(!TM_EDIT) return;
+  if(accion==='reject' && !confirm('¿Rechazar esta actuación? Se avisa al hotel y tendrá que buscar a otro.')) return;
+  btn.disabled = true;
+  try{
+    await post(`/bookings/${bookingId}/artist-respond?action=${accion}`);
+    const agenda = await api(`/me/musicos/${TM_EDIT.id}/agenda`);
+    document.getElementById('tmeAgenda').innerHTML = teamAgendaHtml(agenda);
+    toast(accion==='accept'?'Actuación confirmada ✓':'Actuación rechazada. El hotel fue avisado.');
+  }catch(e){ toast('No se pudo: '+(e.message||''),true); btn.disabled=false; }
+}
+window.teamResponder=teamResponder;
 
 function teamShowsHtml(shows){
   if(!shows.length) return '<div class="hint" style="margin:0">Todavía no tiene shows publicados.</div>';

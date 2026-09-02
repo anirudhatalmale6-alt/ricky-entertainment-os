@@ -549,6 +549,46 @@ ok(code == 403, "un proveedor no puede pedir la lista de reemplazos con precios"
 sql("DELETE FROM bookings WHERE id=?", (BK_ID,))
 
 
+print("\n15b. La productora responde por los suyos, y sólo por los suyos")
+# David, 03/09: "Eventualmente la productora, pero seria configurable como los
+# musicos independientes". Pueden los dos: la empresa lleva lo comercial y el
+# músico conserva el botón, porque poder decir "ese día no puedo" ES su
+# disponibilidad, que es para lo que se le dio cuenta.
+sql("INSERT INTO bookings (artist_id, company_id, venue_id, starts_at, status, "
+    "agreed_price, currency, commission_pct, notified_at, created_at, "
+    "invoice_paid, payout_paid) VALUES (?,?,?,?,?,?,?,?,?,?,0,0)",
+    (MUS_ID, comp, ven, "2026-12-22 21:00:00", "pending", 9000, "MXN", 15,
+     "2026-09-03 10:00:00", "2026-09-03 10:00:00"))
+PEND = sql("SELECT id FROM bookings WHERE artist_id=? AND status='pending' "
+           "ORDER BY id DESC LIMIT 1", (MUS_ID,))[0][0]
+# El artista INDEPENDIENTE no es de esta empresa: no debe poder tocarla.
+_, code = post(f"/bookings/{PEND}/artist-respond?action=accept", {}, INDIE)
+ok(code == 404, "otro proveedor no responde por un músico ajeno (404)", str(code))
+ok(sql("SELECT status FROM bookings WHERE id=?", (PEND,))[0][0] == "pending",
+   "y la actuación sigue pendiente")
+cuerpo, code = post(f"/bookings/{PEND}/artist-respond?action=accept", {}, PROD)
+ok(code == 200, "su productora sí la acepta", f"{code} {cuerpo[:120]}")
+ok(sql("SELECT status FROM bookings WHERE id=?", (PEND,))[0][0] == "confirmed",
+   "y queda confirmada en la base")
+# El motivo tiene que decir QUIÉN, pero cancelled_by sigue siendo "artist":
+# de ese campo cuelgan el aviso del hotel y el historial de cumplimiento.
+sql("INSERT INTO bookings (artist_id, company_id, venue_id, starts_at, status, "
+    "agreed_price, currency, commission_pct, notified_at, created_at, "
+    "invoice_paid, payout_paid) VALUES (?,?,?,?,?,?,?,?,?,?,0,0)",
+    (MUS_ID, comp, ven, "2026-12-29 21:00:00", "pending", 9500, "MXN", 15,
+     "2026-09-03 10:00:00", "2026-09-03 10:00:00"))
+PEND2 = sql("SELECT id FROM bookings WHERE artist_id=? AND status='pending' "
+            "ORDER BY id DESC LIMIT 1", (MUS_ID,))[0][0]
+post(f"/bookings/{PEND2}/artist-respond?action=reject", {}, PROD)
+fila = sql("SELECT status, cancelled_by, cancellation_reason FROM bookings WHERE id=?",
+           (PEND2,))[0]
+ok(fila[0] == "cancelled" and fila[1] == "artist"
+   and fila[2] == "Rechazada por la productora",
+   "al rechazar, el motivo dice que fue la empresa y cancelled_by sigue en artist",
+   str(fila))
+sql("DELETE FROM bookings WHERE id IN (?,?)", (PEND, PEND2))
+
+
 print("\n16. Sacarlo del equipo no lo borra")
 _, code = delete(f"/me/musicos/{MUS_ID}", PROD)
 ok(code == 204, "la productora lo desvincula", str(code))
