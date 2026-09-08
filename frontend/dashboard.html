@@ -1436,6 +1436,18 @@
 .mtag.ok{background:rgba(16,185,129,.14);color:#0b7a5b}
 .mtag.md{background:rgba(245,158,11,.16);color:#8a5a00}
 .mtag.lo{background:rgba(239,68,68,.13);color:#b03030}
+
+/* % de match, en grande sobre la foto de la tarjeta */
+.mbig{position:absolute;top:10px;right:10px;z-index:3;border-radius:12px;
+  padding:6px 10px 5px;text-align:center;line-height:1;backdrop-filter:blur(6px);
+  box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.mbig b{display:block;font-size:19px;font-weight:800;letter-spacing:-.5px}
+.mbig span{display:block;font-size:9px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;opacity:.85;margin-top:2px}
+.mbig.ok{background:rgba(16,185,129,.94);color:#fff}
+.mbig.md{background:rgba(56,44,161,.92);color:#fff}
+.mbig.lo{background:rgba(255,255,255,.94);color:#5b6072;border:1px solid rgba(0,0,0,.08)}
+.acard .ph, .acard3 .ac3-ph{position:relative}
 </style>
 </head>
 <body>
@@ -3156,7 +3168,6 @@ function actRender(){
     if(s.has_special_rate) tags.push('<span class="atag rate">🏷️ Tarifa especial</span>');
     if(s.travel_fee_applied) tags.push(`<span class="atag km">🚗 Incluye ${MXN(s.travel_fee_applied)} de traslado (a más de ${s.travel_fee_km_applied} km)</span>`);
     const mv = (MATCH_VENUE||{})[String(s.id)];
-    if(mv) tags.push(matchTag(mv, 'Afinidad con esta sala: marca, público y experiencia'));
     if(s.artist_partner) tags.push('<span class="atag part">✓ Partner</span>');
     if(s.offers_audition) tags.push('<span class="atag aud">🎤 Acepta audiciones</span>');
     if(s.video_url) tags.push(`<span class="atag vid" onclick="event.stopPropagation();window.open('${esc(s.video_url)}','_blank')">▶ Video</span>`);
@@ -3168,7 +3179,7 @@ function actRender(){
     const km=s.distance_km!=null?`📏 ${s.distance_km<1?'<1':Math.round(s.distance_km)} km`:'';
     const meta=[s.artist_city?`📍 ${esc(s.artist_city)}`:'',km,langs?`🗣️ ${esc(langs)}`:''].filter(Boolean).join(' · ');
     return `<div class="acard3${ADDACT.showId===s.id?' sel':''}${nd?' nodisp':''}" onclick="${nd?`actBlocked(${s.id})`:`actPick(${s.id})`}">
-      <div class="ac3-ph" ${ph}>${s.image_url?'':`<b style="font-weight:800;letter-spacing:1px;opacity:.42">${esc(inicialesProv(s.artist_name||s.show_name))}</b>`}${disp}</div>
+      <div class="ac3-ph" ${ph}>${s.image_url?'':`<b style="font-weight:800;letter-spacing:1px;opacity:.42">${esc(inicialesProv(s.artist_name||s.show_name))}</b>`}${disp}${matchEsquina(mv, 'Afinidad con esta sala: marca, público y experiencia')}</div>
       <div class="ac3-b">
         <div class="ac3-h"><b>${titulo}</b>${priceHtml}</div>
         <div class="ac3-sub">${[who,esc(cat)].filter(Boolean).join(' · ')||'—'}</div>
@@ -3698,6 +3709,18 @@ let MATCH_PROP = null;    // {show_id: {...}} contra la propiedad
 let MATCH_VENUE = null;   // {show_id: {...}} contra la sala abierta
 
 function matchClase(v){ return v>=85?'ok':(v>=70?'md':'lo'); }
+
+/* La etiqueta grande, en la esquina de la foto. David, 08/09: "con lo que nos
+   ha costado encontrar ese dato no lo quiero dejar en pequeño". Va sobre la
+   imagen y no debajo del título porque ahí es lo primero que se mira al
+   recorrer una parrilla de tarjetas. */
+function matchEsquina(m, donde){
+  if(!m || m.match==null) return '';
+  const v = Math.round(m.match);
+  const dudoso = (m.cobertura!=null && m.cobertura<1) || (m.avisos&&m.avisos.length);
+  return `<div class="mbig ${matchClase(m.match)}" title="${esc(donde||'')}">
+    <b>${v}%</b><span>match${dudoso?' *':''}</span></div>`;
+}
 function matchTag(m, donde){
   if(!m || m.match==null) return '';
   const parcial = m.cobertura!=null && m.cobertura<1 ? ' ·  ficha incompleta' : '';
@@ -3739,10 +3762,9 @@ function artistCard(i){
       <span>${esc(pretty(i.sub||i.cat||''))}</span></div>`;
   const tags=(i.sub?[pretty(i.sub)]:[]).concat((i.genres||[]).slice(0,2)).slice(0,3);
   return `<div class="acard" onclick="openArtistProfile(${i.artistId||'null'},${i.id||'null'})">
-    <div class="ph" ${ph}>${mono}${badge}<div class="play">▶</div></div>
+    <div class="ph" ${ph}>${mono}${badge}${matchEsquina((MATCH_PROP||{})[String(i.id)], 'Afinidad con tu propiedad: marca y público')}<div class="play">▶</div></div>
     <div class="ab">
       <div class="arow"><h4>${esc(i.show||i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
-      ${matchTag((MATCH_PROP||{})[String(i.id)], 'Afinidad con tu propiedad: marca y público')}
       <div class="ty">${esc(i.name)} · ${esc(pretty(i.cat))}</div>
       ${i.price?`<div class="from">${i.specialRate&&i.publicPrice&&i.publicPrice!=i.price?`Desde <s style="color:var(--mut);font-weight:400">${MXN(i.publicPrice)}</s> ${MXN(i.price)} <span class="spbadge">🏷️ Tarifa especial</span>`:`Desde ${MXN(i.price)}`}</div>`:''}
       ${i.travelFee?`<div class="tfnote">🚗 Incluye ${MXN(i.travelFee)} de traslado · el hotel está a más de ${i.travelFeeKm} km</div>`:''}
