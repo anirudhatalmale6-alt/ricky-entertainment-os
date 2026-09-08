@@ -1429,6 +1429,13 @@
   background:rgba(192,57,43,.08);color:#c0392b}
 .zsm{font-size:12px}
 .zmut{color:var(--mut)}
+
+/* Etiqueta de % de match */
+.mtag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;
+  margin:2px 0 4px;letter-spacing:.2px}
+.mtag.ok{background:rgba(16,185,129,.14);color:#0b7a5b}
+.mtag.md{background:rgba(245,158,11,.16);color:#8a5a00}
+.mtag.lo{background:rgba(239,68,68,.13);color:#b03030}
 </style>
 </head>
 <body>
@@ -2977,6 +2984,16 @@ async function myProperties(){
   CACHE.myProps=comps; return comps;
 }
 
+
+/* Los tres estilos de sala, con los nombres que usa David en pantalla. El valor
+   que viaja al servidor es el de siempre (AMBIENTE/SOCIAL/ESTELAR); lo que
+   cambia es cómo se lee. */
+const MOOD_ETIQUETA = {AMBIENTE:'Ambiental', SOCIAL:'Social', ESTELAR:'Show (Estelar)'};
+function moodOpciones(puesto){
+  return '<option value="">— sin definir —</option>' +
+    Object.entries(MOOD_ETIQUETA).map(([v,l])=>
+      `<option value="${v}"${puesto===v?' selected':''}>${esc(l)}</option>`).join('');
+}
 /* ---- "+ Añadir lugar": registrar un nuevo venue en una propiedad ---- */
 async function openAddVenue(){
   let comps=await myProperties();
@@ -2994,7 +3011,9 @@ async function openAddVenue(){
       <div class="field"><label>Nombre del lugar *</label><input id="vn_name" placeholder="p. ej. Terraza, Lobby Bar, Salón Principal"></div>
       <div class="fgrid">
         <div class="field"><label>Aforo</label><input id="vn_cap" type="number" min="0" step="10" placeholder="Personas"></div>
-        <div class="field"><label>Ambiente</label><input id="vn_amb" placeholder="p. ej. Bar, Restaurante, Salón"></div>
+        <div class="field"><label>Estilo</label>
+          <select id="vn_mood">${moodOpciones('')}</select>
+          <div class="hint" style="margin-top:4px">Qué se espera del entretenimiento aquí. Con esto SHOWMA sabe qué buscarte para esta sala.</div></div>
       </div>
       <div class="field"><label>Horario habitual</label><input id="vn_sch" placeholder="p. ej. 20:00 – 00:00"></div>
     </div>
@@ -3011,7 +3030,7 @@ async function submitVenue(btn){
   if(!name){ toast('Ponle un nombre al lugar.',true); return; }
   const body={name};
   const cap=g('vn_cap').value; if(cap!=='') body.capacity=+cap;
-  const amb=(g('vn_amb').value||'').trim(); if(amb) body.ambiance_type=amb;
+  const mood=g('vn_mood').value; if(mood) body.mood=mood;
   const sch=(g('vn_sch').value||'').trim(); if(sch) body.usual_schedule=sch;
   btn.disabled=true; btn.textContent='Guardando…';
   try{
@@ -3059,6 +3078,9 @@ async function openAddAct(venueId,dateStr){
   const bk=CACHE.homeBk||[]; const vb=bk.find(b=>(b.venue_id||0)===venueId&&b.venue_name);
   const vc=(CACHE.venues||[]).find(v=>v.id===venueId);   // cubre venues nuevos/vacíos
   ADDACT={venueId,venueName:vb?vb.venue_name:(vc?vc.name:'Venue'),date:dateStr,showId:null,price:0};
+  // El match de esta sala, para poder etiquetar cada tarjeta. Si la sala no
+  // tiene estilo todavía se queda vacío y las tarjetas salen como siempre.
+  await cargarMatchVenue(venueId);
   let ov=document.getElementById('actMov');
   if(!ov){ ov=document.createElement('div'); ov.id='actMov'; ov.className='mov'; document.body.appendChild(ov);
     ov.addEventListener('click',e=>{ if(e.target===ov) actClose(); }); }
@@ -3133,6 +3155,8 @@ function actRender(){
     if(s.has_season) tags.push(`<span class="atag seas">${(s.season_pct||0)<0?'🔻':'🔺'} ${esc(s.season_label||'Temporada')} ${(s.season_pct>0?'+':'')+(s.season_pct||0)}%</span>`);
     if(s.has_special_rate) tags.push('<span class="atag rate">🏷️ Tarifa especial</span>');
     if(s.travel_fee_applied) tags.push(`<span class="atag km">🚗 Incluye ${MXN(s.travel_fee_applied)} de traslado (a más de ${s.travel_fee_km_applied} km)</span>`);
+    const mv = (MATCH_VENUE||{})[String(s.id)];
+    if(mv) tags.push(matchTag(mv, 'Afinidad con esta sala: marca, público y experiencia'));
     if(s.artist_partner) tags.push('<span class="atag part">✓ Partner</span>');
     if(s.offers_audition) tags.push('<span class="atag aud">🎤 Acepta audiciones</span>');
     if(s.video_url) tags.push(`<span class="atag vid" onclick="event.stopPropagation();window.open('${esc(s.video_url)}','_blank')">▶ Video</span>`);
@@ -3658,6 +3682,54 @@ function inicialesProv(nombre){
   const p=(nombre||'').split(/\s+/).filter(w=>w && /[a-záéíóúñ0-9]/i.test(w[0]));
   return (p.slice(0,2).map(w=>w[0]).join('')||'?').toUpperCase();
 }
+
+/* ===== Etiqueta de match ================================================
+   Dos números distintos y a propósito, como los pidió David:
+
+   - Contra la PROPIEDAD (lista de proveedores): marca y público. "Este
+     proveedor es de tu estilo y de tu tipo de cliente."
+   - Contra el VENUE (al elegir desde el calendario): lo anterior más la
+     experiencia. "Y además aguanta esta sala."
+
+   Sólo se pinta cuando hay match calculado. Un proveedor que todavía no ha
+   contestado el cuestionario NO lleva etiqueta: poner un 0 diría "no encaja"
+   cuando lo que pasa es que nadie ha rellenado su ficha. */
+let MATCH_PROP = null;    // {show_id: {...}} contra la propiedad
+let MATCH_VENUE = null;   // {show_id: {...}} contra la sala abierta
+
+function matchClase(v){ return v>=85?'ok':(v>=70?'md':'lo'); }
+function matchTag(m, donde){
+  if(!m || m.match==null) return '';
+  const parcial = m.cobertura!=null && m.cobertura<1 ? ' ·  ficha incompleta' : '';
+  const aviso = (m.avisos&&m.avisos.length) ? ' ⚠' : '';
+  return `<span class="mtag ${matchClase(m.match)}" title="${esc(
+      (donde||'')+(parcial?' · el proveedor no ha contestado todo el cuestionario':'')+
+      (aviso?' · hay alguna respuesta muy alejada':''))}">${Math.round(m.match)}% match${aviso}</span>`;
+}
+
+async function cargarMatchPropiedad(){
+  // Sólo tiene sentido para una cuenta de hotel: el match es CONTRA una
+  // propiedad concreta, y MASTER o un director de cadena no tienen una sola.
+  if(!ME || !ME.company_id){ MATCH_PROP = {}; return; }
+  try{
+    const r = await api(`/afinidad/match/${ME.company_id}`);
+    MATCH_PROP = r.listo ? (r.shows||{}) : {};
+  }catch(e){ MATCH_PROP = {}; }
+}
+
+async function cargarMatchVenue(venueId){
+  MATCH_VENUE = {};
+  if(!venueId) return;
+  try{
+    const r = await api(`/afinidad/recomendaciones/${venueId}`);
+    (r.recomendaciones||[]).forEach(x=>{
+      MATCH_VENUE[String(x.show_id)] = {
+        match: x.media, cobertura: x.cobertura, avisos: x.avisos,
+        scores: x.scores, motivos: x.motivos};
+    });
+  }catch(e){ /* 409 = la sala aún no tiene estilo: se pinta sin etiquetas */ }
+}
+
 function artistCard(i){
   const badge=`<span class="av-badge">● Disponible</span>`;
   const ph=i.img?`style="background-image:url('${i.img}')"`:`style="background:${artGrad(i.cat)}"`;
@@ -3670,6 +3742,7 @@ function artistCard(i){
     <div class="ph" ${ph}>${mono}${badge}<div class="play">▶</div></div>
     <div class="ab">
       <div class="arow"><h4>${esc(i.show||i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
+      ${matchTag((MATCH_PROP||{})[String(i.id)], 'Afinidad con tu propiedad: marca y público')}
       <div class="ty">${esc(i.name)} · ${esc(pretty(i.cat))}</div>
       ${i.price?`<div class="from">${i.specialRate&&i.publicPrice&&i.publicPrice!=i.price?`Desde <s style="color:var(--mut);font-weight:400">${MXN(i.publicPrice)}</s> ${MXN(i.price)} <span class="spbadge">🏷️ Tarifa especial</span>`:`Desde ${MXN(i.price)}`}</div>`:''}
       ${i.travelFee?`<div class="tfnote">🚗 Incluye ${MXN(i.travelFee)} de traslado · el hotel está a más de ${i.travelFeeKm} km</div>`:''}
@@ -6485,6 +6558,7 @@ const RENDER = {
   },
 
   async artists(box){
+    await cargarMatchPropiedad();
     // Referencia para la distancia: el hotel del usuario o, si es administrador
     // (que no tiene hotel propio), el primero de la cadena.
     let refCo=null; try{ refCo=await anyCompanyId(); }catch(e){}
@@ -8736,7 +8810,7 @@ function afSalonHtml(v){
     <div class="zmoods" style="margin:0">
       ${Object.keys(AFQ.moods).map(m=>
         `<button type="button" class="btn mini${s.mood===m?'':' ghost'}"
-           onclick="afMood(${v.id},'${m}')">${esc(m)}</button>`).join('')}
+           onclick="afMood(${v.id},'${m}')">${esc(MOOD_ETIQUETA[m]||m)}</button>`).join('')}
     </div>
   </div>`;
 }

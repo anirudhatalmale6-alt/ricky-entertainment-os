@@ -16,6 +16,11 @@ class VenueCreate(BaseModel):
     name: str
     capacity: int | None = None
     ambiance_type: str | None = None
+    # Qué se espera del entretenimiento en esta sala: AMBIENTE, SOCIAL o
+    # ESTELAR. Sustituye en la práctica a `ambiance_type`, que es texto libre y
+    # hoy guarda cosas como "PLAYA", "playa" y "cool": no se puede cruzar con
+    # nada. Se valida contra app/services/afinidad.MOODS.
+    mood: str | None = None
     usual_schedule: str | None = None
     address: str | None = None
     latitude: float | None = None
@@ -28,6 +33,7 @@ class VenueUpdate(BaseModel):
     name: str | None = None
     capacity: int | None = None
     ambiance_type: str | None = None
+    mood: str | None = None
     usual_schedule: str | None = None
     address: str | None = None
     latitude: float | None = None

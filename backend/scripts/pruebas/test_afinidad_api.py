@@ -320,9 +320,65 @@ else:
     ok(True, "(no había ninguna sala sin perfil que probar)")
 
 
+print("\n11. El estilo se elige al CREAR la sala, y se valida ahí")
+# David, 08/09: el mood va donde ya se crean los venues, sustituyendo al campo
+# "Ambiente" de texto libre que hoy guarda PLAYA, playa, cool, Informal y Bar.
+cuerpo, code = post(f"/companies/{HOTEL}/venues",
+                    {"name": f"Sala estilo {sello}", "capacity": 90, "mood": "social"}, GERENTE)
+ok(code == 201, "crea la sala con estilo en minúsculas", f"{code} {cuerpo[:120]}")
+nueva_id = json.loads(cuerpo)["id"] if code == 201 else None
+if nueva_id:
+    CREADOS.setdefault("venues", []).append(nueva_id)
+    guardado = sql("SELECT mood FROM venues WHERE id=?", (nueva_id,))[0][0]
+    ok(guardado == "SOCIAL", "se guarda normalizado a mayúsculas", str(guardado))
+    # Y el estilo tiene que llegar hasta el cálculo, no quedarse en la fila.
+    cuerpo, code = get(f"/afinidad/salon/{nueva_id}", GERENTE)
+    ok(code == 200 and len(json.loads(cuerpo)["efectivas"]) == 5,
+       "el estilo elegido al crear ya rellena las respuestas de la sala",
+       f"{code} {cuerpo[:120]}")
+
+cuerpo, code = post(f"/companies/{HOTEL}/venues",
+                    {"name": f"Sala mala {sello}", "mood": "FIESTA"}, GERENTE)
+ok(code == 422, "un estilo inventado da 422", f"{code} {cuerpo[:120]}")
+colada = sql("SELECT COUNT(*) FROM venues WHERE name=?", (f"Sala mala {sello}",))[0][0]
+# Lo que importa no es el número, es que no se haya creado la sala a medias.
+ok(colada == 0, "y la sala no se crea", f"{colada} filas")
+
+# CONTROL: sin estilo tiene que seguir funcionando. Miles de salas ya existen
+# sin él, y obligarlo ahora rompería el alta para todo el mundo.
+cuerpo, code = post(f"/companies/{HOTEL}/venues",
+                    {"name": f"Sala sin estilo {sello}", "capacity": 40}, GERENTE)
+ok(code == 201, "CONTROL: crear una sala SIN estilo sigue funcionando", f"{code} {cuerpo[:120]}")
+if code == 201:
+    CREADOS.setdefault("venues", []).append(json.loads(cuerpo)["id"])
+
+
+print("\n12. El match contra la PROPIEDAD no mira ninguna sala")
+cuerpo, code = get(f"/afinidad/match/{HOTEL}", GERENTE)
+ok(code == 200, "responde 200", str(code))
+m = json.loads(cuerpo)
+ok(m["listo"] is True, "la propiedad ya contestó, así que hay match")
+ok(str(SHOWS["Piano Bar"]) in m["shows"], "el Piano Bar trae match")
+uno = m["shows"][str(SHOWS["Piano Bar"])]
+ok(sorted(uno) == ["artist_id", "avisos", "brand", "cobertura", "guest", "match"],
+   "sólo marca y público, la experiencia es de la sala", str(sorted(uno)))
+ok(str(SHOWS["Noche Mexicana"]) not in m["shows"],
+   "quien no contestó el cuestionario NO sale con un cero")
+# Y tiene que dar distinto que el match contra una sala concreta, o los dos
+# números que pidió David serían el mismo número con dos nombres.
+teatro_piano = next(r for r in teatro["recomendaciones"] if r["show_name"] == "Piano Bar")
+ok(abs(uno["match"] - teatro_piano["media"]) > 5,
+   "el match con la propiedad y con la sala son distintos",
+   f"propiedad {uno['match']} vs teatro {teatro_piano['media']}")
+cuerpo, code = get(f"/afinidad/match/{HOTEL}", AJENO)
+ok(code == 403, "y un contratante ajeno no lo puede leer", str(code))
+
+
 # --- Limpieza --------------------------------------------------------------
 # Sólo lo que creó ESTA prueba, por id. Nunca "la fila más nueva que coincida":
 # eso se come datos del cliente el día que la prueba falle a la mitad.
+for vid in CREADOS.get("venues", []):
+    sql("DELETE FROM venues WHERE id=?", (vid,))
 for uid in CREADOS["users"]:
     sql("DELETE FROM bookers WHERE user_id=?", (uid,))
     sql("DELETE FROM users WHERE id=?", (uid,))

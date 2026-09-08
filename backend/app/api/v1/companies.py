@@ -15,6 +15,7 @@ from app.models.company import Company
 from app.models.enums import BookingStatus
 from app.models.property_budget import PropertyBudget
 from app.models.venue import Venue
+from app.services import afinidad as af
 
 _ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 _MAX_IMAGE_BYTES = 6 * 1024 * 1024
@@ -145,6 +146,25 @@ async def list_venues(company_id: int, user: CurrentUser, db: DbSession):
     return list(res.scalars().all())
 
 
+def _mood_valido(valor: str | None) -> str | None:
+    """Normaliza el estilo de la sala y rechaza lo que no esté en la lista.
+
+    Se valida aquí y no sólo en el desplegable: un estilo escrito a mano que no
+    exista no cruza contra ninguna matriz, y la sala se quedaría sin perfil de
+    experiencia sin que nadie se entere de por qué no le recomienda nada.
+    """
+    if valor is None:
+        return None
+    limpio = valor.strip().upper()
+    if not limpio:
+        return None
+    if limpio not in af.MOODS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Estilo desconocido: {valor!r}. Opciones: {', '.join(af.MOODS)}")
+    return limpio
+
+
 @router.post(
     "/{company_id}/venues",
     response_model=VenueOut,
@@ -153,7 +173,9 @@ async def list_venues(company_id: int, user: CurrentUser, db: DbSession):
 async def add_venue(company_id: int, payload: VenueCreate, user: CurrentUser, db: DbSession):
     await ensure_company_access(user, company_id, db)
     await _get_company_or_404(db, company_id)
-    venue = Venue(company_id=company_id, **payload.model_dump())
+    datos = payload.model_dump()
+    datos["mood"] = _mood_valido(datos.get("mood"))
+    venue = Venue(company_id=company_id, **datos)
     db.add(venue)
     await db.commit()
     await db.refresh(venue)
@@ -167,7 +189,10 @@ async def add_venue(company_id: int, payload: VenueCreate, user: CurrentUser, db
 async def update_venue(venue_id: int, payload: VenueUpdate, user: CurrentUser, db: DbSession):
     venue = await _get_venue_or_404(db, venue_id)
     await ensure_company_access(user, venue.company_id, db)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    cambios = payload.model_dump(exclude_unset=True)
+    if "mood" in cambios:
+        cambios["mood"] = _mood_valido(cambios["mood"])
+    for field, value in cambios.items():
         setattr(venue, field, value)
     await db.commit()
     await db.refresh(venue)

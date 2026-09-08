@@ -234,6 +234,53 @@ async def guardar_show(show_id: int, payload: RespuestasIn,
     return {"show_id": show_id, "respuestas": show.afinidad}
 
 
+@router.get("/match/{company_id}")
+async def match_propiedad(company_id: int, user: CurrentUser, db: DbSession):
+    """El match de cada show con la PROPIEDAD, sin mirar ninguna sala.
+
+    Son marca y público: el hotel es de lujo en todas sus salas y su huésped es
+    el mismo en el lobby que en el teatro. La experiencia depende de la sala y
+    por eso NO entra aquí — es la diferencia entre "este proveedor es de tu
+    estilo" y "además aguanta esta sala", y son dos preguntas distintas.
+
+    Devuelve un mapa por show_id para que la lista de proveedores pueda pintar
+    la etiqueta sin pedir una llamada por fila.
+    """
+    company = await db.get(Company, company_id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+    await ensure_company_access(user, company_id, db)
+    perfil = {p: v for p, v in (company.afinidad or {}).items()
+              if p in af.PREGUNTAS_PROPIEDAD}
+    if not perfil:
+        return {"company_id": company_id, "listo": False, "shows": {}}
+
+    shows = (await db.execute(
+        select(Show, Artist)
+        .join(Artist, Artist.id == Show.artist_id)
+        .where(Show.is_active.is_(True), Artist.is_active.is_(True))
+    )).all()
+
+    salida: dict[str, dict] = {}
+    for show, artist in shows:
+        if not show.afinidad:
+            continue
+        parcial = {n: af.puntuar_score(n, perfil, show.afinidad)
+                   for n in ("brand", "guest")}
+        notas = [d["score"] for d in parcial.values() if d["score"] is not None]
+        if not notas:
+            continue
+        salida[str(show.id)] = {
+            "artist_id": artist.id,
+            "match": round(sum(notas) / len(notas), 1),
+            "brand": parcial["brand"]["score"],
+            "guest": parcial["guest"]["score"],
+            "cobertura": min(d["cobertura"] for d in parcial.values()),
+            "avisos": sorted({p for d in parcial.values() for p in d["avisos"]}),
+        }
+    return {"company_id": company_id, "listo": True, "shows": salida}
+
+
 @router.get("/recomendaciones/{venue_id}")
 async def recomendaciones(venue_id: int, user: CurrentUser, db: DbSession,
                           limite: int = Query(20, ge=1, le=100)):
