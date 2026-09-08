@@ -1410,6 +1410,25 @@
   .cgbar .cgbtn:hover{background:var(--acc2)}
   .cgbar .cgbtn:disabled{opacity:.45;cursor:not-allowed}
   @media(max-width:560px){.cgt{font-size:15px}.cgbody{padding:14px 16px}.cgh,.cgchk,.cgbar{padding-left:16px;padding-right:16px}}
+
+/* ZIGGY · laboratorio de afinidad */
+.zgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.zgrid{grid-template-columns:1fr}}
+.zmoods{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.zchips{display:flex;flex-wrap:wrap;gap:5px}
+.zchip{border:1px solid var(--line);background:var(--card);color:var(--mut);
+  border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
+.zchip:hover{border-color:var(--acc);color:var(--txt)}
+.zchip.on{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:600}
+.zscores{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+@media(max-width:700px){.zscores{grid-template-columns:1fr}}
+.zsc{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.zsck{font-size:11.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+.zscv{font-size:22px;font-weight:700;margin-top:2px}
+.zwarn{margin-top:10px;padding:8px 10px;border-radius:8px;font-size:12.5px;
+  background:rgba(192,57,43,.08);color:#c0392b}
+.zsm{font-size:12px}
+.zmut{color:var(--mut)}
 </style>
 </head>
 <body>
@@ -1635,6 +1654,7 @@
     <div class="nav" data-p="market"><span class="ic">📈</span> Market Intelligence <span class="pro">PRO</span></div>
     <div class="nav" data-p="demand"><span class="ic">🔥</span> Tendencias <span class="pro">PRO</span></div>
     <div class="nav" data-p="news"><span class="ic">📰</span> Noticias <span class="pro">PRO</span></div>
+    <div class="nav" data-p="ziggy" style="display:none"><span class="ic">🧪</span> ZIGGY · Laboratorio</div>
     <div class="promo" id="sidePromo" style="display:none"></div>
     <button class="help-btn" id="helpBtn" onclick="openHelp()">🆘 Ayuda · escríbele a MASTER</button>
     <div class="side-user">
@@ -1680,6 +1700,7 @@
       <div class="panel" id="panel-market"></div>
       <div class="panel" id="panel-demand"></div>
       <div class="panel" id="panel-news"></div>
+      <div class="panel" id="panel-ziggy"></div>
     </div>
   </div>
 </div>
@@ -1852,6 +1873,7 @@ const NAVICON={
   team:SVG+'<circle cx="8.5" cy="8" r="3.1"/><path d="M3 19.5c0-3.1 2.5-5.2 5.5-5.2s5.5 2.1 5.5 5.2"/><circle cx="16.8" cy="7.2" r="2.5"/><path d="M15 12.4c2.8-.5 5 1.6 5 4.3"/></svg>',
   market:SVG+'<path d="M4 5v14h16"/><path d="M7.5 15l3.3-3.8 3 2.1 4.4-5.8"/></svg>',
   demand:SVG+'<path d="M12 3.5c.6 2.6 2.3 3.7 3.5 5.3A5.6 5.6 0 1 1 7 12.6c0-1.1.4-1.9.9-2.5.3.8 1 1.3 1.8 1.3-1-2.3.3-5.4 2.3-7.9Z"/></svg>',
+  ziggy:SVG+'<path d="M9.5 3.5v5.2L4.8 17a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3l-4.7-8.3V3.5"/><path d="M8.5 3.5h7"/><path d="M7.4 14h9.2"/></svg>',
   news:SVG+'<path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H16v13.5a1.5 1.5 0 0 0 1.5 1.5H6a2 2 0 0 1-2-2V6.5Z"/><path d="M16 8.5h2.5A1.5 1.5 0 0 1 20 10v8a2 2 0 0 1-2 2"/><path d="M7 9h6M7 12h6M7 15h4"/></svg>',
 };
 const PROMOICON={
@@ -2412,6 +2434,9 @@ function applyRole(){
   // Audiencia: la ve cualquier contratante, incluido el hotel de una sola
   // propiedad. Es justo lo que pidió David: que cada hotel vea LO SUYO.
   show('aud', isHotel);
+  // El laboratorio de afinidad es una herramienta para AFINAR los números, no
+  // para operar: enseña la cuenta interna del cálculo. Sólo MASTER.
+  show('ziggy', !!ME.is_admin);
   // Facturación: el músico que cuelga de una productora NO cobra por SHOWMA
   // (David, 28/08: se liquidan fuera de la plataforma), así que no le sale.
   // Esto sólo quita el menú; quien cierra la puerta de verdad es el servidor,
@@ -2550,7 +2575,8 @@ const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Ac
   profile:["Mi Perfil","Tus datos, tarifas y publicaciones"],
   team:["Mis músicos","Tu equipo: cada uno con su cuenta y su propio calendario"],
   market:["Market Intelligence","Estudio de mercado por destino"],
-  demand:["Tendencias de demanda","Lo que más se está pidiendo"],news:["Noticias","Novedades del entretenimiento"]};
+  demand:["Tendencias de demanda","Lo que más se está pidiendo"],news:["Noticias","Novedades del entretenimiento"],
+  ziggy:["ZIGGY · Laboratorio de afinidad","Prueba combinaciones y mira la cuenta completa, sin guardar nada"]};
 
 document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));
@@ -8427,6 +8453,177 @@ async function exportInvoices(btn){
   }catch(e){alert('No se pudo exportar: '+e.message);}
   finally{if(btn){btn.disabled=false;btn.textContent=btn.dataset.t||'Exportar CSV';}}
 }
+
+/* ===== ZIGGY · Laboratorio de afinidad ==================================
+   David, 07/09: "quiero hacer pruebas para ver los valores de los cuadros, y
+   ver la fórmula completa cómo afecta". Esta pantalla existe para AFINAR los
+   números, no para operar: se eligen las respuestas de los dos lados a mano y
+   se ve la cuenta entera, sin guardar nada y sin necesidad de que ningún hotel
+   ni ningún artista haya contestado todavía.
+
+   Que no guarde es la gracia: se pueden forzar los casos extremos -el pianista
+   en el salón de shows, el circo en el lobby- que son justo los que enseñan si
+   un peso está flojo, y que nadie va a contestar nunca en la vida real. */
+let ZQ = null;          // el cuestionario, tal como lo sirve el servidor
+let ZH = {}, ZS = {};   // respuestas del lado hotel y del lado show
+
+function zLado(quien, preguntas){
+  const est = quien==='h' ? ZH : ZS;
+  return preguntas.map(k=>{
+    const q = ZQ.preguntas[k];
+    if(q.multiple){
+      const puestas = Array.isArray(est[k]) ? est[k] : (est[k]?[est[k]]:[]);
+      return `<div class="field"><label>${k} · ${esc(q.titulo)}
+        <span class="hint" style="font-weight:400"> hasta ${q.max}</span></label>
+        <div class="zchips">${q.opciones.map(o=>
+          `<button type="button" class="zchip${puestas.includes(o)?' on':''}"
+             onclick="zTogle('${quien}','${k}','${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`
+        ).join('')}</div></div>`;
+    }
+    return `<div class="field"><label>${k} · ${esc(q.titulo)}</label>
+      <select onchange="zSet('${quien}','${k}',this.value)">
+        <option value="">— sin contestar —</option>
+        ${q.opciones.map(o=>`<option${est[k]===o?' selected':''}>${esc(o)}</option>`).join('')}
+      </select></div>`;
+  }).join('');
+}
+
+function zSet(quien, k, v){
+  const est = quien==='h' ? ZH : ZS;
+  if(v) est[k]=v; else delete est[k];
+  zCalcular();
+}
+
+function zTogle(quien, k, o){
+  const est = quien==='h' ? ZH : ZS;
+  const max = ZQ.preguntas[k].max || 3;
+  let lista = Array.isArray(est[k]) ? est[k].slice() : (est[k]?[est[k]]:[]);
+  if(lista.includes(o)) lista = lista.filter(x=>x!==o);
+  else if(lista.length < max) lista.push(o);
+  else { toast(`En ${k} puedes marcar hasta ${max}.`, true); return; }
+  if(lista.length) est[k]=lista; else delete est[k];
+  zPintarLados(); zCalcular();
+}
+
+function zMood(nombre){
+  // Rellena el lado hotel con el mood, igual que hará el salón de verdad.
+  Object.entries(ZQ.moods[nombre]||{}).forEach(([k,v])=>{ ZH[k]=v; });
+  zPintarLados(); zCalcular();
+}
+
+function zLimpiar(quien){
+  if(quien==='h') ZH={}; else ZS={};
+  zPintarLados(); zCalcular();
+}
+
+function zPintarLados(){
+  const h=document.getElementById('zHotel'), s=document.getElementById('zShow');
+  if(h) h.innerHTML = zLado('h', Object.keys(ZQ.preguntas));
+  if(s) s.innerHTML = zLado('s', Object.keys(ZQ.preguntas));
+}
+
+/* La cuenta completa. Se enseña pregunta por pregunta con su peso y su aporte
+   porque sin el aporte no se puede decidir si un peso está flojo: un 40 en una
+   pregunta que pesa 5% no es el mismo problema que un 40 en una que pesa 30%. */
+/* Una respuesta puede ser una lista (la P6 admite hasta tres). Sin esto se
+   pinta "Parejas,High-end" pegado y cuesta leerlo. */
+function zTxt(v){
+  if(v==null || v==='' || (Array.isArray(v) && !v.length)) return '<span class="zmut">—</span>';
+  return esc(Array.isArray(v) ? v.join(' · ') : String(v));
+}
+
+function zTabla(sc){
+  const filas = sc.lineas.map(l=>{
+    const sinContestar = l.valor==null;
+    const bajo = !sinContestar && l.valor < ZQ.suelo;
+    const color = sinContestar ? 'var(--mut)' : (bajo ? '#c0392b' : (l.valor>=85?'#1e8449':'inherit'));
+    return `<tr${bajo?' style="background:rgba(192,57,43,.06)"':''}>
+      <td><b>${l.pregunta}</b> ${esc(l.titulo)}</td>
+      <td class="zsm">${zTxt(l.hotel)}</td>
+      <td class="zsm">${zTxt(l.show)}</td>
+      <td class="num" style="color:${color};font-weight:600">${sinContestar?'—':l.valor.toFixed(0)}${bajo?' ⚠':''}</td>
+      <td class="num zmut">${l.peso}%</td>
+      <td class="num">${l.aporta==null?'—':l.aporta.toFixed(1)}</td>
+    </tr>`;
+  }).join('');
+  const nota = sc.score==null ? '—' : sc.score.toFixed(1);
+  const falta = sc.cobertura<1
+    ? `<span class="zmut"> · ${Math.round(sc.cobertura*100)}% de la ficha contestada</span>` : '';
+  return `<div class="box" style="margin-bottom:14px">
+    <div class="bhead"><h3 style="margin:0">${esc(sc.titulo)}</h3>
+      <div style="font-size:26px;font-weight:700">${nota}${falta}</div></div>
+    <table><thead><tr><th>Pregunta</th><th>Hotel</th><th>Show</th>
+      <th class="num">Cruce</th><th class="num">Peso</th><th class="num">Aporta</th></tr></thead>
+      <tbody>${filas}</tbody></table>
+  </div>`;
+}
+
+async function zCalcular(){
+  const caja = document.getElementById('zRes');
+  if(!caja) return;
+  if(!Object.keys(ZH).length || !Object.keys(ZS).length){
+    caja.innerHTML = `<div class="box"><div class="hint">Elige al menos una respuesta de cada lado.
+      Puedes empezar por un mood de sala arriba a la izquierda.</div></div>`;
+    return;
+  }
+  try{
+    const r = await post('/afinidad/simular', {hotel:ZH, show:ZS});
+    const orden = ['brand','guest','experience'];
+    const avisos = [...new Set(orden.flatMap(k=>r.scores[k].avisos||[]))];
+    caja.innerHTML = `
+      <div class="box" style="margin-bottom:14px">
+        <div class="bhead"><h3 style="margin:0">Resultado</h3>
+          <div style="font-size:30px;font-weight:700">${r.media==null?'—':r.media.toFixed(1)}</div></div>
+        <div class="zscores">${orden.map(k=>{
+          const s=r.scores[k];
+          return `<div class="zsc"><div class="zsck">${esc(s.titulo)}</div>
+                  <div class="zscv">${s.score==null?'—':s.score.toFixed(1)}</div></div>`;
+        }).join('')}</div>
+        ${avisos.length?`<div class="zwarn">⚠ Por debajo de ${ZQ.suelo} en:
+           ${avisos.map(a=>esc(ZQ.preguntas[a].titulo)).join(', ')}.
+           Una nota alta puede estar escondiendo esto.</div>`:''}
+        <div class="hint" style="margin-top:8px">
+          <b>A favor:</b> ${r.motivos.favor.length?esc(r.motivos.favor.join(' · ')):'—'}<br>
+          <b>En contra:</b> ${r.motivos.contra.length?esc(r.motivos.contra.join(' · ')):'—'}
+        </div>
+      </div>
+      ${orden.map(k=>zTabla(r.scores[k])).join('')}`;
+  }catch(e){
+    caja.innerHTML = `<div class="box"><div class="hint">No se pudo calcular: ${esc(e.message||'')}</div></div>`;
+  }
+}
+
+RENDER.ziggy = async function(box){
+  if(!ZQ) ZQ = await api('/afinidad/cuestionario');
+  box.innerHTML = `
+    <div class="hint" style="margin-bottom:12px">
+      Esto no guarda nada. Cambia una respuesta de cualquiera de los dos lados y
+      abajo se recalcula la cuenta entera: qué sacó cada pregunta, cuánto pesa y
+      cuánto aporta al score. Sirve para forzar los casos extremos y ver si algún
+      número está flojo.
+    </div>
+    <div class="zgrid">
+      <div class="box">
+        <div class="bhead"><h3 style="margin:0">Lado hotel · sala</h3>
+          <a onclick="zLimpiar('h')">Limpiar</a></div>
+        <div class="zmoods">${Object.keys(ZQ.moods).map(m=>
+          `<button type="button" class="btn mini ghost" onclick="zMood('${m}')">${esc(m)}</button>`
+        ).join('')}<span class="hint" style="margin-left:6px">rellena las de sala</span></div>
+        <div id="zHotel"></div>
+      </div>
+      <div class="box">
+        <div class="bhead"><h3 style="margin:0">Lado show</h3>
+          <a onclick="zLimpiar('s')">Limpiar</a></div>
+        <div id="zShow" style="margin-top:34px"></div>
+      </div>
+    </div>
+    <div id="zRes" style="margin-top:16px"></div>`;
+  zPintarLados();
+  zCalcular();
+};
+
+window.zSet=zSet; window.zTogle=zTogle; window.zMood=zMood; window.zLimpiar=zLimpiar;
+
 window.exportInvoices=exportInvoices;
 window.chip=chip;window.fmtDate=fmtDate;window.openConv=openConv;window.sendMsg=sendMsg;window.login=login;window.reload=reload;
 window.authTab=authTab;window.regArtist=regArtist;window.regHotel=regHotel;

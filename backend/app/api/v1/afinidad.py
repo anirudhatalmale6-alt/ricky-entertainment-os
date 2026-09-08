@@ -102,6 +102,62 @@ async def cuestionario(user: CurrentUser):
     }
 
 
+class SimularIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hotel: dict[str, object]
+    show: dict[str, object]
+
+
+@router.post("/simular")
+async def simular(payload: SimularIn, user: CurrentUser):
+    """Puntúa dos fichas SIN guardarlas, y enseña la cuenta entera.
+
+    Es la herramienta para afinar los números: David quiere ver "los valores de
+    los cuadros y cómo afecta la fórmula completa", y para eso hace falta poder
+    forzar combinaciones extremas que ningún hotel real ha contestado todavía.
+    Al no escribir nada, se pueden probar cien casos sin ensuciar el catálogo.
+
+    Devuelve, por cada score, qué sacó cada pregunta, cuánto pesa y cuánto
+    aporta al total. Sin el "cuánto aporta" no se puede decidir si un peso está
+    flojo: un 40 en una pregunta que pesa el 5% no es el mismo problema que un
+    40 en una que pesa el 30%.
+    """
+    hotel = _validar(payload.hotel, list(af.PREGUNTAS))
+    show = _validar(payload.show, list(af.PREGUNTAS))
+    resultado = af.puntuar(hotel, show)
+
+    desglose = {}
+    for nombre, datos in resultado.items():
+        pesos = af.SCORES[nombre]
+        vivos = sum(pesos[p] for p in datos["detalle"])
+        desglose[nombre] = {
+            **datos,
+            "titulo": af.NOMBRES_SCORE[nombre],
+            "lineas": [
+                {
+                    "pregunta": p,
+                    "titulo": af.PREGUNTAS[p][0],
+                    "hotel": hotel.get(p),
+                    "show": show.get(p),
+                    "valor": datos["detalle"].get(p),
+                    "peso": pesos[p],
+                    # Sobre lo contestado, para que la suma de los aportes dé
+                    # exactamente el score y no un número parecido.
+                    "aporta": (round(datos["detalle"][p] * pesos[p] / vivos, 1)
+                               if p in datos["detalle"] and vivos else None),
+                }
+                for p in pesos
+            ],
+        }
+    notas = [d["score"] for d in resultado.values() if d["score"] is not None]
+    return {
+        "scores": desglose,
+        "media": round(sum(notas) / len(notas), 1) if notas else None,
+        "motivos": af.motivos(resultado),
+        "suelo": af.SUELO,
+    }
+
+
 @router.get("/propiedad/{company_id}")
 async def leer_propiedad(company_id: int, user: CurrentUser, db: DbSession):
     company = await db.get(Company, company_id)
