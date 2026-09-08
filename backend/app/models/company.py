@@ -58,6 +58,14 @@ class Company(Base, TimestampMixin):
     # parece a uno de hotel urbano. Sin este dato no se puede comparar peras
     # con peras en las distinciones.
     is_all_inclusive: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Las respuestas de la propiedad al cuestionario de afinidad (P1, P5, P6,
+    # P7, P9 y P2). Van aquí y no en el salón porque el hotel es de lujo en
+    # todas sus salas y su huésped es el mismo en el lobby que en el teatro; lo
+    # que cambia de una sala a otra vive en Venue. En JSON y no en diez columnas
+    # porque la P6 admite hasta tres respuestas y el juego de preguntas todavía
+    # se está afinando. Ver app/services/afinidad.py.
+    afinidad: Mapped[dict | None] = mapped_column(JSON)
     # Whether this property pays for the premium Market Intelligence add-on.
     # The market comparative (benchmarking) is the "Partners" paid feature.
     is_partner: Mapped[bool] = mapped_column(Boolean, default=False)

@@ -83,6 +83,14 @@ _SQLITE_ADDED_COLUMNS = [
     # Permiso para dar de alta musicos. 0 para todos los que ya existen: nadie
     # se convierte en productora por el hecho de agregar la columna.
     ("artists", "is_productora", "INTEGER DEFAULT 0"),
+    # Cuestionario de afinidad (David, 2026-09-07). Todo NULL para lo que ya
+    # existe, y NULL significa "no ha contestado", que no es lo mismo que "no
+    # encaja": el motor devuelve None y la ficha se marca incompleta en vez de
+    # puntuar cero y hundir a quien todavía no ha rellenado nada.
+    ("companies", "afinidad", "JSON"),
+    ("venues", "mood", "VARCHAR(16)"),
+    ("venues", "afinidad", "JSON"),
+    ("shows", "afinidad", "JSON"),
 ]
 
 

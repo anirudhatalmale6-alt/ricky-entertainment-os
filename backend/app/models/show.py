@@ -73,6 +73,12 @@ class Show(Base, TimestampMixin):
     travel_fee: Mapped[float | None] = mapped_column(Numeric(12, 2))
     travel_fee_km: Mapped[int] = mapped_column(Integer, default=30)
 
+    # Las diez respuestas del cuestionario de afinidad, del lado del artista.
+    # Van en el SHOW y no en el artista a propósito: David Producciones tiene
+    # Jazz & Bossa y Ballet Folklórico, y un solo juego de respuestas describiría
+    # mal a los dos. Ver app/services/afinidad.py.
+    afinidad: Mapped[dict | None] = mapped_column(JSON)
+
     offers_audition: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     rating: Mapped[float | None] = mapped_column(Numeric(3, 2))
