@@ -1644,6 +1644,7 @@
     <div class="nav" data-p="reqs"><span class="ic">📣</span> Solicitudes</div>
     <div class="nav" data-p="leads" style="display:none"><span class="ic">📇</span> Prospectos <span class="badge" id="leadsBadge" style="display:none"></span></div>
     <div class="nav" data-p="chat"><span class="ic">💬</span> Chat</div>
+    <div class="nav" data-p="afinidad" style="display:none"><span class="ic">🎯</span> Perfil de afinidad</div>
     <div class="nav" data-p="budget" style="display:none"><span class="ic">💰</span> Presupuesto</div>
     <div class="nav" data-p="bill" style="display:none"><span class="ic">🧾</span> Facturación</div>
     <div class="nav" data-p="aud" style="display:none"><span class="ic">👥</span> Audiencia</div>
@@ -1691,6 +1692,7 @@
       <div class="panel" id="panel-reqs"></div>
       <div class="panel" id="panel-leads"></div>
       <div class="panel" id="panel-chat"></div>
+      <div class="panel" id="panel-afinidad"></div>
       <div class="panel" id="panel-budget"></div>
       <div class="panel" id="panel-bill"></div>
       <div class="panel" id="panel-aud"></div>
@@ -1873,6 +1875,7 @@ const NAVICON={
   team:SVG+'<circle cx="8.5" cy="8" r="3.1"/><path d="M3 19.5c0-3.1 2.5-5.2 5.5-5.2s5.5 2.1 5.5 5.2"/><circle cx="16.8" cy="7.2" r="2.5"/><path d="M15 12.4c2.8-.5 5 1.6 5 4.3"/></svg>',
   market:SVG+'<path d="M4 5v14h16"/><path d="M7.5 15l3.3-3.8 3 2.1 4.4-5.8"/></svg>',
   demand:SVG+'<path d="M12 3.5c.6 2.6 2.3 3.7 3.5 5.3A5.6 5.6 0 1 1 7 12.6c0-1.1.4-1.9.9-2.5.3.8 1 1.3 1.8 1.3-1-2.3.3-5.4 2.3-7.9Z"/></svg>',
+  afinidad:SVG+'<circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.4"/><circle cx="12" cy="12" r="1.1"/></svg>',
   ziggy:SVG+'<path d="M9.5 3.5v5.2L4.8 17a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3l-4.7-8.3V3.5"/><path d="M8.5 3.5h7"/><path d="M7.4 14h9.2"/></svg>',
   news:SVG+'<path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H16v13.5a1.5 1.5 0 0 0 1.5 1.5H6a2 2 0 0 1-2-2V6.5Z"/><path d="M16 8.5h2.5A1.5 1.5 0 0 1 20 10v8a2 2 0 0 1-2 2"/><path d="M7 9h6M7 12h6M7 15h4"/></svg>',
 };
@@ -2437,6 +2440,9 @@ function applyRole(){
   // El laboratorio de afinidad es una herramienta para AFINAR los números, no
   // para operar: enseña la cuenta interna del cálculo. Sólo MASTER.
   show('ziggy', !!ME.is_admin);
+  // El perfil de afinidad lo contesta el hotel: es lo que SHOWMA usa para
+  // saber qué buscarle a cada una de sus salas.
+  show('afinidad', isHotel);
   // Facturación: el músico que cuelga de una productora NO cobra por SHOWMA
   // (David, 28/08: se liquidan fuera de la plataforma), así que no le sale.
   // Esto sólo quita el menú; quien cierra la puerta de verdad es el servidor,
@@ -2576,6 +2582,7 @@ const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Ac
   team:["Mis músicos","Tu equipo: cada uno con su cuenta y su propio calendario"],
   market:["Market Intelligence","Estudio de mercado por destino"],
   demand:["Tendencias de demanda","Lo que más se está pidiendo"],news:["Noticias","Novedades del entretenimiento"],
+  afinidad:["Perfil de afinidad","Qué busca tu hotel y qué se espera en cada sala"],
   ziggy:["ZIGGY · Laboratorio de afinidad","Prueba combinaciones y mira la cuenta completa, sin guardar nada"]};
 
 document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>{
@@ -7397,6 +7404,7 @@ function teamShowsHtml(shows){
     <div style="display:flex;align-items:center;gap:10px">
       <span class="tag2">${esc(s.category||'')}${s.subcategory?' · '+esc(s.subcategory):''}</span>
       <span class="muted" style="font-size:12px">${s.price_hotel!=null?MXN(s.price_hotel):'Precio a convenir'}</span>
+      <button class="btn mini ghost" onclick="afShowAbrir(${s.id},'${(s.show_name||'').replace(/'/g,"\\'")}')">🎯 Afinidad</button>
       <button class="btn danger mini" onclick="teamQuitarShow(${s.id},this)">Quitar</button>
     </div></div></div>`).join('');
 }
@@ -7879,6 +7887,7 @@ function showEditor(s){
     <div class="hh"><div style="font-weight:650">${esc(s.show_name||'Show')}</div><div class="tag2">${esc(pretty(s.category))}${s.subcategory?' · '+esc(pretty(s.subcategory)):''}</div></div>
     ${showFields(s)}
     <div class="saverow"><button class="btn" onclick="saveShow(${s.id},this)">Guardar</button>
+      <button class="btn ghost" onclick="afShowAbrir(${s.id},'${(s.show_name||'').replace(/'/g,"\\'")}')">🎯 Afinidad</button>
       <button class="btn danger" onclick="delShow(${s.id},this)">Eliminar</button>
       <span class="saved" id="sh_saved_${s.id}">Guardado ✓</span></div>
   </div>`;
@@ -8623,6 +8632,230 @@ RENDER.ziggy = async function(box){
 };
 
 window.zSet=zSet; window.zTogle=zTogle; window.zMood=zMood; window.zLimpiar=zLimpiar;
+
+
+/* ===== Perfil de afinidad del hotel =====================================
+   Las preguntas que contesta la CASA una vez (concepto, estilo, público,
+   personalidad, innovación) y el mood de cada SALA. El reparto sale del propio
+   ejemplo de David: en el mismo hotel de lujo el lobby quiere un pianista de
+   ambiente y el salón de shows quiere energía. Lo que cambia entre salas va en
+   la sala; lo que no cambia -que el hotel es de lujo y su huésped es el mismo-
+   va en la propiedad.
+
+   El mood es un desplegable y no cinco preguntas por sala a propósito: un hotel
+   con quince salas contestaría setenta y cinco preguntas, y no lo haría nadie.
+   Quien tenga una sala rara puede retocarla después. */
+let AFQ = null;      // el cuestionario, del servidor
+let AFPROP = {};     // company_id -> respuestas
+let AFSAL = {};      // venue_id  -> {mood, efectivas}
+
+function afCampo(nivel, id, k, valor){
+  const q = AFQ.preguntas[k];
+  if(q.multiple){
+    const puestas = Array.isArray(valor) ? valor : (valor?[valor]:[]);
+    return `<div class="field"><label>${esc(q.titulo)}
+      <span class="hint" style="font-weight:400"> · elige hasta ${q.max}</span></label>
+      <div class="zchips">${q.opciones.map(o=>
+        `<button type="button" class="zchip${puestas.includes(o)?' on':''}"
+           onclick="afTogle('${nivel}',${id},'${k}','${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`
+      ).join('')}</div></div>`;
+  }
+  return `<div class="field"><label>${esc(q.titulo)}</label>
+    <select onchange="afSet('${nivel}',${id},'${k}',this.value)">
+      <option value="">— sin contestar —</option>
+      ${q.opciones.map(o=>`<option${valor===o?' selected':''}>${esc(o)}</option>`).join('')}
+    </select></div>`;
+}
+
+function afEstado(nivel, id){
+  if(nivel==='prop') return AFPROP[id]=AFPROP[id]||{};
+  if(nivel==='show') return SHAF.resp;
+  return AFSAL[id].propias=AFSAL[id].propias||{};
+}
+function afGuardar(nivel, id){
+  if(nivel==='prop') return afGuardarProp(id);
+  if(nivel==='show') return afShowGuardar();
+  return afGuardarSalon(id);
+}
+function afSet(nivel, id, k, v){
+  const est = afEstado(nivel, id);
+  if(v) est[k]=v; else delete est[k];
+  afGuardar(nivel, id);
+}
+
+function afTogle(nivel, id, k, o){
+  const est = afEstado(nivel, id);
+  const max = AFQ.preguntas[k].max || 3;
+  let lista = Array.isArray(est[k]) ? est[k].slice() : (est[k]?[est[k]]:[]);
+  if(lista.includes(o)) lista = lista.filter(x=>x!==o);
+  else if(lista.length < max) lista.push(o);
+  else { toast(`Puedes elegir hasta ${max}.`, true); return; }
+  if(lista.length) est[k]=lista; else delete est[k];
+  afGuardar(nivel, id);
+  if(nivel==='prop') afPintar(); else if(nivel==='show') afShowPintar();
+}
+
+/* Se guarda solo al cambiar, sin botón. Es un formulario largo de rellenar a
+   ratos, y un "Guardar" abajo del todo se olvida: quien conteste ocho preguntas
+   y cierre la pestaña las perdería todas. */
+let AF_TIMER = null;
+function afAvisar(txt){
+  const el = document.getElementById('afEstado');
+  if(!el) return;
+  el.textContent = txt;
+  clearTimeout(AF_TIMER);
+  AF_TIMER = setTimeout(()=>{ if(el) el.textContent=''; }, 2500);
+}
+async function afGuardarProp(cid){
+  try{ await put(`/afinidad/propiedad/${cid}`, {respuestas: AFPROP[cid]||{}}); afAvisar('Guardado ✓'); }
+  catch(e){ afAvisar('No se pudo guardar: '+(e.message||'')); }
+}
+async function afGuardarSalon(vid){
+  const s = AFSAL[vid]||{};
+  try{
+    const r = await put(`/afinidad/salon/${vid}`, {mood: s.mood||null, respuestas: s.propias||{}});
+    AFSAL[vid].efectivas = r.efectivas; afAvisar('Guardado ✓');
+  }catch(e){ afAvisar('No se pudo guardar: '+(e.message||'')); }
+}
+async function afMood(vid, mood){
+  AFSAL[vid] = AFSAL[vid]||{};
+  AFSAL[vid].mood = AFSAL[vid].mood===mood ? null : mood;
+  await afGuardarSalon(vid);
+  afPintar();
+}
+
+function afSalonHtml(v){
+  const s = AFSAL[v.id] || {};
+  const puestas = Object.keys(s.efectivas||{}).length;
+  return `<div class="srow" style="align-items:flex-start">
+    <div class="lb" style="min-width:190px">
+      <b>${esc(v.name||'Salón')}</b>
+      <span class="hint">${v.capacity?v.capacity+' personas':'sin aforo'}${
+        puestas?` · ${puestas} respuestas puestas`:' · sin perfil'}</span>
+    </div>
+    <div class="zmoods" style="margin:0">
+      ${Object.keys(AFQ.moods).map(m=>
+        `<button type="button" class="btn mini${s.mood===m?'':' ghost'}"
+           onclick="afMood(${v.id},'${m}')">${esc(m)}</button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function afPintar(){
+  const box = document.getElementById('afBody');
+  if(!box) return;
+  const comps = CACHE.afComps || [];
+  box.innerHTML = comps.map(c=>{
+    const resp = AFPROP[c.id] || {};
+    const salas = (c.venues||[]).filter(v=>v.is_active!==false);
+    const faltan = AFQ.propiedad.filter(k=>!resp[k]).length;
+    return `<div class="box" style="margin-bottom:14px">
+      <div class="bhead"><h3 style="margin:0">${esc(c.name)}</h3>
+        <span class="hint">${faltan? faltan+' sin contestar' : 'completa ✓'}</span></div>
+      <div class="fgrid">${AFQ.propiedad.map(k=>afCampo('prop', c.id, k, resp[k])).join('')}</div>
+      <div style="margin-top:14px">
+        <div class="hint" style="margin-bottom:6px"><b>Sus salas.</b>
+          Elige qué se espera del entretenimiento en cada una. Vuelve a tocar el
+          botón para quitarlo.</div>
+        ${salas.length? salas.map(afSalonHtml).join('')
+          : '<div class="hint">Esta propiedad todavía no tiene salas registradas.</div>'}
+      </div>
+    </div>`;
+  }).join('') || '<div class="box"><div class="hint">No hay propiedades a tu nombre.</div></div>';
+}
+
+RENDER.afinidad = async function(box){
+  box.innerHTML = `<div class="hint">Cargando…</div>`;
+  if(!AFQ) AFQ = await api('/afinidad/cuestionario');
+  // myProperties() sólo resuelve para cadenas y administradores: un gerente de
+  // UNA propiedad recibe 403 en /companies y se quedaría con la pantalla vacía
+  // diciéndole "no hay propiedades a tu nombre" justo a quien más falta le hace
+  // rellenar esto. Su propiedad viene en la sesión.
+  let comps = (await myProperties()).map(c=>({...c}));
+  if(!comps.length && ME && ME.company_id){
+    comps = [{id: ME.company_id, name: ME.company_name || 'Mi propiedad'}];
+  }
+  for(const c of comps){
+    try{ c.venues = await api(`/companies/${c.id}/venues`) || []; }catch(e){ c.venues = []; }
+    try{ AFPROP[c.id] = (await api(`/afinidad/propiedad/${c.id}`)).respuestas || {}; }
+    catch(e){ AFPROP[c.id] = {}; }
+    for(const v of c.venues){
+      try{ const s = await api(`/afinidad/salon/${v.id}`);
+           AFSAL[v.id] = {mood:s.mood, propias:s.respuestas||{}, efectivas:s.efectivas||{}}; }
+      catch(e){ AFSAL[v.id] = {mood:null, propias:{}, efectivas:{}}; }
+    }
+  }
+  CACHE.afComps = comps;
+  box.innerHTML = `
+    <div class="hint" style="margin-bottom:12px">
+      Con esto SHOWMA sabe qué buscar para cada una de tus salas. Se guarda solo
+      según lo vas contestando, no hace falta ningún botón.
+      <span id="afEstado" style="margin-left:8px;color:var(--ok);font-weight:600"></span>
+    </div>
+    <div id="afBody"></div>`;
+  afPintar();
+};
+
+window.afSet=afSet; window.afTogle=afTogle; window.afMood=afMood;
+
+
+/* ===== Las diez preguntas de afinidad de UN SHOW ========================
+   Van en el show y no en el artista a propósito: David Producciones tiene Jazz
+   & Bossa y Ballet Folklórico, uno ambiental y el otro protagonista, y un solo
+   juego de respuestas describiría mal a los dos.
+
+   Sirve igual para el artista que gestiona el suyo y para la productora que
+   gestiona los de su equipo: el servidor decide de quién es cada show. */
+let SHAF = {id:null, resp:{}};
+
+async function afShowAbrir(showId, nombre){
+  if(!AFQ) AFQ = await api('/afinidad/cuestionario');
+  let resp = {};
+  try{ resp = (await api(`/afinidad/show/${showId}`)).respuestas || {}; }
+  catch(e){ toast('No se pudo abrir la ficha: '+(e.message||''), true); return; }
+  SHAF = {id:showId, resp};
+  let ov=document.getElementById('shafMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='shafMov'; ov.className='mov';
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) afShowCerrar(); }); }
+  ov.innerHTML=`<div class="amod rqmod" style="position:relative;max-width:720px">
+    <button class="ax" onclick="afShowCerrar()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Afinidad · ${esc(nombre||'Show')}</b>
+      <span class="as">Diez preguntas. Con esto SHOWMA sabe a qué hoteles y a qué salas encaja este show.</span></div>
+    <div class="rqbody"><div id="shafBody"></div></div>
+    <div class="af"><span class="hint" id="shafEstado" style="margin-right:auto"></span>
+      <button class="btn ghost" onclick="afShowCerrar()">Cerrar</button></div>
+  </div>`;
+  ov.style.display='flex';
+  afShowPintar();
+}
+
+function afShowPintar(){
+  const b=document.getElementById('shafBody');
+  if(!b) return;
+  const faltan = Object.keys(AFQ.preguntas).filter(k=>!SHAF.resp[k]).length;
+  b.innerHTML = `<div class="hint" style="margin-bottom:10px">
+      ${faltan? faltan+' preguntas sin contestar. Se guarda solo según las vas eligiendo.'
+              : 'Las diez contestadas ✓'}</div>
+    <div class="fgrid">${Object.keys(AFQ.preguntas)
+      .map(k=>afCampo('show', SHAF.id, k, SHAF.resp[k])).join('')}</div>`;
+}
+
+async function afShowGuardar(){
+  try{
+    await put(`/afinidad/show/${SHAF.id}`, {respuestas: SHAF.resp});
+    const el=document.getElementById('shafEstado');
+    if(el){ el.textContent='Guardado ✓'; el.style.color='var(--ok)';
+      clearTimeout(AF_TIMER); AF_TIMER=setTimeout(()=>{ if(el) el.textContent=''; },2500); }
+  }catch(e){
+    const el=document.getElementById('shafEstado');
+    if(el){ el.textContent='No se pudo guardar: '+(e.message||''); el.style.color='var(--bad)'; }
+  }
+}
+
+function afShowCerrar(){ const ov=document.getElementById('shafMov'); if(ov) ov.style.display='none'; }
+
+window.afShowAbrir=afShowAbrir; window.afShowCerrar=afShowCerrar;
 
 window.exportInvoices=exportInvoices;
 window.chip=chip;window.fmtDate=fmtDate;window.openConv=openConv;window.sendMsg=sendMsg;window.login=login;window.reload=reload;
