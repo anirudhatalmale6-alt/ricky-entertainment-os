@@ -1486,6 +1486,12 @@
 .zb-como{border:1px solid #c9bff8;background:#fff;color:#382ca1;border-radius:10px;
   padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
 .zb-como:hover{background:#f3f0ff}
+
+/* "ZIGGY destaca" sobre la mejor tarjeta */
+.zig-dest{position:absolute;top:52px;right:10px;z-index:3;display:inline-flex;align-items:center;
+  gap:5px;background:rgba(255,255,255,.95);border:1px solid #e0dafc;color:#382ca1;
+  border-radius:999px;padding:4px 10px 4px 6px;font-size:11.5px;font-weight:700;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -3860,6 +3866,18 @@ async function ctxPropiedades(){
    una lista sin porcentajes y sin explicación es justo lo que hizo perder una
    tarde el 09/09. */
 const ZIG_DESTACA = 85;   // de aquí para arriba, ZIGGY lo señala
+/* El show que ZIGGY señala en la lista: uno solo, y sólo si de verdad destaca.
+   Señalar a varios no es señalar, y señalar al mejor de un montón mediocre
+   convierte la etiqueta en decoración. */
+let ZIG_MEJOR = null;
+function ziggyMejor(visibles){
+  let mejor = null, nota = -1;
+  visibles.forEach(i=>{
+    const m=(MATCH_PROP||{})[String(i.id)];
+    if(m && m.match!=null && m.match>nota){ nota=m.match; mejor=i.id; }
+  });
+  return nota >= ZIG_DESTACA ? mejor : null;
+}
 
 function ziggyBanner(visibles){
   const notas = visibles.map(i=>{
@@ -4007,8 +4025,10 @@ function artistCard(i){
   const mono=i.img?'':`<div class="mono"><b>${esc(inicialesProv(i.name))}</b>
       <span>${esc(pretty(i.sub||i.cat||''))}</span></div>`;
   const tags=(i.sub?[pretty(i.sub)]:[]).concat((i.genres||[]).slice(0,2)).slice(0,3);
+  const zdest = ZIG_MEJOR!=null && String(i.id)===String(ZIG_MEJOR)
+    ? `<span class="zig-dest">${ziggyIcono('destacado',18)} ZIGGY destaca</span>` : '';
   return `<div class="acard" onclick="openArtistProfile(${i.artistId||'null'},${i.id||'null'})">
-    <div class="ph" ${ph}>${mono}${badge}${matchEsquina((MATCH_PROP||{})[String(i.id)], 'Afinidad con tu propiedad: marca y público')}<div class="play">▶</div></div>
+    <div class="ph" ${ph}>${mono}${badge}${zdest}${matchEsquina((MATCH_PROP||{})[String(i.id)], 'Afinidad con tu propiedad: marca y público')}<div class="play">▶</div></div>
     <div class="ab">
       <div class="arow"><h4>${esc(i.show||i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
       <div class="ty">${esc(i.name)} · ${esc(pretty(i.cat))}</div>
@@ -4052,6 +4072,7 @@ function applyArtistFilters(){
   }
   const barra=document.getElementById('ctxBar');
   if(barra && !barra.innerHTML) barra.innerHTML = ctxBarra();
+  ZIG_MEJOR = ziggyMejor(r);
   const ban=document.getElementById('zigBan');
   if(ban) ban.innerHTML = ziggyBanner(r);
   const grid=document.getElementById('af_grid'); if(grid) grid.innerHTML=r.map(artistCard).join('')||'<div class="muted" style="grid-column:1/-1;padding:34px;text-align:center">No hay proveedores que coincidan con tu búsqueda.</div>';
