@@ -1448,6 +1448,14 @@
 .mbig.md{background:rgba(56,44,161,.92);color:#fff}
 .mbig.lo{background:rgba(255,255,255,.94);color:#5b6072;border:1px solid rgba(0,0,0,.08)}
 .acard .ph, .acard3 .ac3-ph{position:relative}
+
+/* Barra de contexto del match: contra qué se está midiendo */
+.ctxbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;
+  padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);
+  font-size:13px}
+.ctxlb{color:var(--mut);font-size:12.5px}
+.ctxsel{border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px;
+  background:var(--bg2);color:var(--txt);font-family:inherit;max-width:230px}
 </style>
 </head>
 <body>
@@ -3730,15 +3738,69 @@ function matchTag(m, donde){
       (aviso?' · hay alguna respuesta muy alejada':''))}">${Math.round(m.match)}% match${aviso}</span>`;
 }
 
+/* Contra QUÉ se está midiendo. El match no existe en abstracto: es contra una
+   propiedad, y si se elige sala, además contra esa sala. Un gerente de un solo
+   hotel tiene su contexto resuelto; MASTER y un director de cadena no tienen
+   una sola propiedad, así que hay que dejarles elegir — si no, la lista les
+   sale sin un solo porcentaje y parece que la función no funciona. */
+let CTX = {company: null, venue: null, salas: []};
+
+async function ctxPropiedades(){
+  if(ME && ME.company_id) return [{id: ME.company_id, name: ME.company_name || 'Mi propiedad'}];
+  try{ return (await myProperties()).map(c=>({id:c.id, name:c.name})); }catch(e){ return []; }
+}
+
 async function cargarMatchPropiedad(){
-  // Sólo tiene sentido para una cuenta de hotel: el match es CONTRA una
-  // propiedad concreta, y MASTER o un director de cadena no tienen una sola.
-  if(!ME || !ME.company_id){ MATCH_PROP = {}; return; }
+  MATCH_PROP = {};
+  const props = await ctxPropiedades();
+  CTX.props = props;
+  if(!props.length) return;
+  if(!CTX.company || !props.some(c=>c.id===CTX.company)) CTX.company = props[0].id;
+  try{ CTX.salas = await api(`/companies/${CTX.company}/venues`) || []; }catch(e){ CTX.salas = []; }
+  if(CTX.venue && !CTX.salas.some(v=>v.id===CTX.venue)) CTX.venue = null;
   try{
-    const r = await api(`/afinidad/match/${ME.company_id}`);
-    MATCH_PROP = r.listo ? (r.shows||{}) : {};
+    if(CTX.venue){
+      // Con sala elegida el match incluye la experiencia, que es lo que cambia
+      // entre el lobby y el teatro del mismo hotel.
+      const r = await api(`/afinidad/recomendaciones/${CTX.venue}`);
+      (r.recomendaciones||[]).forEach(x=>{ MATCH_PROP[String(x.show_id)] = {
+        match:x.media, cobertura:x.cobertura, avisos:x.avisos}; });
+    }else{
+      const r = await api(`/afinidad/match/${CTX.company}`);
+      MATCH_PROP = r.listo ? (r.shows||{}) : {};
+    }
   }catch(e){ MATCH_PROP = {}; }
 }
+
+function ctxBarra(){
+  const props = CTX.props || [];
+  if(!props.length) return '';
+  const sel = (id, val, opts, oc) =>
+    `<select id="${id}" onchange="${oc}" class="ctxsel">${opts.map(o=>
+      `<option value="${o.v}"${String(o.v)===String(val)?' selected':''}>${esc(o.t)}</option>`).join('')}</select>`;
+  return `<div class="ctxbar">
+    <span class="ctxlb">Evaluando afinidad para</span>
+    ${props.length>1
+      ? sel('ctxComp', CTX.company, props.map(c=>({v:c.id,t:c.name})), "ctxSet('company',this.value)")
+      : `<b>${esc(props[0].name)}</b>`}
+    ${sel('ctxVen', CTX.venue||'', [{v:'',t:'Toda la propiedad'}].concat(
+        (CTX.salas||[]).map(v=>({v:v.id, t:v.name + (v.mood?' · '+(MOOD_ETIQUETA[v.mood]||v.mood):'')}))),
+      "ctxSet('venue',this.value)")}
+    <span class="hint" style="margin-left:auto">${CTX.venue
+      ? 'Marca, público y experiencia en esa sala'
+      : 'Marca y público de la casa'}</span>
+  </div>`;
+}
+
+async function ctxSet(campo, valor){
+  CTX[campo] = valor ? +valor : null;
+  if(campo === 'company') CTX.venue = null;
+  await cargarMatchPropiedad();
+  const barra = document.getElementById('ctxBar');
+  if(barra) barra.innerHTML = ctxBarra();
+  applyArtistFilters();
+}
+window.ctxSet = ctxSet;
 
 async function cargarMatchVenue(venueId){
   MATCH_VENUE = {};
@@ -3788,6 +3850,8 @@ function applyArtistFilters(){
     return true;
   });
   if(sort==='price') r.sort((a,b)=>(a.price||1e9)-(b.price||1e9));
+  const barra=document.getElementById('ctxBar');
+  if(barra && !barra.innerHTML) barra.innerHTML = ctxBarra();
   const grid=document.getElementById('af_grid'); if(grid) grid.innerHTML=r.map(artistCard).join('')||'<div class="muted" style="grid-column:1/-1;padding:34px;text-align:center">No hay proveedores que coincidan con tu búsqueda.</div>';
   const fuera=AF.km?items.filter(i=>i.km!=null&&i.km>AF.km).length:0;
   const sinUbi=AF.km?items.filter(i=>i.km==null).length:0;
@@ -6581,6 +6645,7 @@ const RENDER = {
 
   async artists(box){
     await cargarMatchPropiedad();
+    // La barra se inserta al final del render, cuando ya existe el grid.
     // Referencia para la distancia: el hotel del usuario o, si es administrador
     // (que no tiene hotel propio), el primero de la cadena.
     let refCo=null; try{ refCo=await anyCompanyId(); }catch(e){}
@@ -6618,6 +6683,7 @@ const RENDER = {
       </div>
       <div class="artlayout">
         <div>
+          <div id="ctxBar"></div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px"><b id="af_count"></b></div>
           <div class="agrid" id="af_grid"></div>
         </div>
