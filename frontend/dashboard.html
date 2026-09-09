@@ -1492,6 +1492,15 @@
   gap:5px;background:rgba(255,255,255,.95);border:1px solid #e0dafc;color:#382ca1;
   border-radius:999px;padding:4px 10px 4px 6px;font-size:11.5px;font-weight:700;
   box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap}
+
+/* ZIGGY en la barra lateral: el icono manda, no compite con el texto */
+.promo .pi.zig{margin-bottom:2px}
+.promo .pi.zig .zig-ic{display:inline-flex}
+.promo .pi.zig svg{width:100%;height:100%}
+
+/* Los chips y el botón van juntos a la derecha; si no cabe, bajan juntos */
+.zb-der{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
+.zb-chips{margin-left:0}
 </style>
 </head>
 <body>
@@ -2472,7 +2481,9 @@ function applyRole(){
       +'<p>Publica más shows y mantén tu perfil completo para subir en las búsquedas.</p>'
       +'<button onclick="topPerformerInfo()">Ver beneficios</button>';
   } else if(ME.is_admin || isDirector){
-    promo.style.display=''; promo.innerHTML='<div class="pi">'+PROMOICON.robot+'</div><b>IA SHOWMA</b>'
+    // David, 09/09: "podemos cambiar showma IA". Aquí vive ZIGGY en la barra,
+    // que es donde más se le ve, así que va con su icono a tamaño grande.
+    promo.style.display=''; promo.innerHTML='<div class="pi zig">'+ziggyIcono('bienvenida',64)+'</div><b>ZIGGY</b>'
       +'<p>Tu asistente para programación, sugerencias de talento y más.</p>'
       +'<button onclick="show(\'demand\')">Ver sugerencias</button>';
   } else { promo.style.display='none'; }
@@ -2746,7 +2757,7 @@ window.ziggyIcono = ziggyIcono;
 function novStrip(nov){
   if(!nov||!nov.length) return '';
   return `<div class="box" style="margin-top:16px">
-    <h3 class="zig-h">${ziggyIcono('destacado',24)} ZIGGY te destaca</h3>
+    <h3 class="zig-h">${ziggyIcono('destacado',34)} ZIGGY te destaca</h3>
     <div class="hint">Artistas y shows publicados en los últimos 7 días — dales una oportunidad aunque acaben de empezar</div>
     <div style="display:flex;gap:14px;overflow-x:auto;padding:14px 2px 4px">${nov.map(novCard).join('')}</div>
   </div>`;
@@ -3888,7 +3899,7 @@ function ziggyBanner(visibles){
     : ((CTX.props||[]).find(c=>c.id===CTX.company)||{}).name;
 
   if(!notas.length){
-    return `<div class="zigban">${ziggyIcono('neutral',44)}
+    return `<div class="zigban">${ziggyIcono('neutral',64)}
       <div class="zb-t"><b>ZIGGY todavía no puede ordenar por afinidad</b>
         <span>Ningún proveedor de esta lista ha contestado el cuestionario, así que no hay nada que cruzar con ${esc(donde||'tu propiedad')}.</span></div>
     </div>`;
@@ -3896,10 +3907,11 @@ function ziggyBanner(visibles){
   const mejor = Math.max(...notas);
   const destacan = notas.filter(v=>v>=ZIG_DESTACA).length;
   const chip = (txt) => `<span class="zb-chip">${txt}</span>`;
-  return `<div class="zigban">${ziggyIcono(destacan?'destacado':'neutral',44)}
+  return `<div class="zigban">${ziggyIcono(destacan?'destacado':'neutral',64)}
     <div class="zb-t"><b>ZIGGY encontró ${visibles.length} ${visibles.length===1?'opción':'opciones'}</b>
       <span>${notas.length} con afinidad calculada para ${esc(donde||'tu propiedad')}${
         destacan?` · ${destacan} ${destacan===1?'destaca':'destacan'}`:''}</span></div>
+    <div class="zb-der">
     <div class="zb-chips">
       ${chip(`${Math.round(mejor)}% mayor afinidad`)}
       ${(()=>{
@@ -3912,6 +3924,7 @@ function ziggyBanner(visibles){
       })()}
     </div>
     <button class="zb-como" onclick="ziggyComo()">Cómo se calcula</button>
+    </div>
   </div>`;
 }
 
@@ -3939,7 +3952,7 @@ function ziggyModal(titulo, texto){
   ov.innerHTML=`<div class="amod" style="max-width:520px;position:relative">
     <button class="ax" onclick="ziggyModalCerrar()" aria-label="Cerrar">✕</button>
     <div class="ah" style="display:flex;align-items:center;gap:10px">
-      ${ziggyIcono('neutral',30)}<b>${esc(titulo)}</b></div>
+      ${ziggyIcono('neutral',40)}<b>${esc(titulo)}</b></div>
     <div class="rqbody" style="padding:18px 22px;white-space:pre-line;font-size:13.5px;line-height:1.55">${esc(texto)}</div>
     <div class="af"><button class="btn ghost" onclick="ziggyModalCerrar()">Cerrar</button></div>
   </div>`;
@@ -4026,7 +4039,7 @@ function artistCard(i){
       <span>${esc(pretty(i.sub||i.cat||''))}</span></div>`;
   const tags=(i.sub?[pretty(i.sub)]:[]).concat((i.genres||[]).slice(0,2)).slice(0,3);
   const zdest = ZIG_MEJOR!=null && String(i.id)===String(ZIG_MEJOR)
-    ? `<span class="zig-dest">${ziggyIcono('destacado',18)} ZIGGY destaca</span>` : '';
+    ? `<span class="zig-dest">${ziggyIcono('destacado',24)} ZIGGY destaca</span>` : '';
   return `<div class="acard" onclick="openArtistProfile(${i.artistId||'null'},${i.id||'null'})">
     <div class="ph" ${ph}>${mono}${badge}${zdest}${matchEsquina((MATCH_PROP||{})[String(i.id)], 'Afinidad con tu propiedad: marca y público')}<div class="play">▶</div></div>
     <div class="ab">
@@ -6849,7 +6862,7 @@ const RENDER = {
             <button class="btn ghost" style="width:100%;margin-top:12px" onclick="show('reqs')">+ Nueva solicitud</button>
           </div>
           <div class="box">
-            <div class="bhead"><h3 style="margin:0" class="zig-h">${ziggyIcono('destacado',22)} ZIGGY te destaca</h3><a onclick="show('artists')">Ver todas</a></div>
+            <div class="bhead"><h3 style="margin:0" class="zig-h">${ziggyIcono('destacado',30)} ZIGGY te destaca</h3><a onclick="show('artists')">Ver todas</a></div>
             ${nov.length? nov.slice(0,3).map(n=>`<div class="sugg">
               <div class="sav" ${n.image_url?`style="background-image:url('${n.image_url}')"`:''}>${n.image_url?'':'🎭'}</div>
               <div class="sz"><b>${esc(n.show_name)}</b><span>${esc(n.artist_name||pretty(n.category))}</span><span style="color:var(--ok)">● Disponible${n.price_hotel?' · '+MXN(n.price_hotel):''}</span></div>
