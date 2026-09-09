@@ -32,6 +32,7 @@ from app.models.venue import Venue
 from app.models.user import Role, User
 from app.core import security
 from app.services.facturama import FacturamaError, get_facturama
+from app.services import afinidad as af
 from app.services import facturacion, mailer, passwords, periodos, rfc as rfc_svc
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
@@ -788,8 +789,34 @@ async def list_my_shows(scope: CurrentScope, db: DbSession):
     return list(res.scalars().unique().all())
 
 
+def _afinidad_valida(respuestas) -> dict | None:
+    """Filtra y comprueba las diez respuestas del cuestionario de un show.
+
+    Se valida aquí y no sólo en el formulario porque una respuesta que no está
+    en su lista no cruza contra ninguna matriz: ese show dejaría de aparecer
+    recomendado y nadie sabría por qué. Lo que no es una pregunta conocida se
+    descarta en silencio -el alta puede mandar de más-, pero una opción
+    inventada revienta.
+    """
+    if not respuestas:
+        return None
+    limpio: dict = {}
+    for pregunta, valor in respuestas.items():
+        if pregunta not in af.PREGUNTAS or valor in (None, "", []):
+            continue
+        try:
+            af._indices(pregunta, valor)
+        except af.RespuestaInvalida as e:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                detail=str(e)) from e
+        limpio[pregunta] = valor
+    return limpio or None
+
+
 def _nuevo_show(artist_id: int, payload: ShowCreate) -> Show:
-    show = Show(artist_id=artist_id, **payload.model_dump(exclude={"seasonal_rates", "images"}))
+    datos = payload.model_dump(exclude={"seasonal_rates", "images"})
+    datos["afinidad"] = _afinidad_valida(datos.get("afinidad"))
+    show = Show(artist_id=artist_id, **datos)
     for rate in payload.seasonal_rates:
         show.seasonal_rates.append(ShowSeasonalRate(**rate.model_dump()))
     for img in payload.images:
@@ -801,6 +828,8 @@ def _aplicar_show(show: Show, payload: ShowUpdate) -> None:
     data = payload.model_dump(exclude_unset=True)
     rates = data.pop("seasonal_rates", None)
     images = data.pop("images", None)
+    if "afinidad" in data:
+        data["afinidad"] = _afinidad_valida(data["afinidad"])
     for field, value in data.items():
         setattr(show, field, value)
     if rates is not None:

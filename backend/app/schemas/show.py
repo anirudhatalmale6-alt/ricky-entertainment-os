@@ -106,6 +106,11 @@ class ShowBase(BaseModel):
 class ShowCreate(ShowBase):
     seasonal_rates: list[SeasonalRateCreate] = []
     images: list[ShowImageCreate] = Field(default=[], max_length=MAX_ARTIST_IMAGES)
+    # Las diez respuestas del cuestionario de afinidad, para poder contestarlas
+    # en el mismo alta del show en vez de en una pantalla aparte (David, 08/09:
+    # "como parte de los registros, para mantener más limpia la barra de
+    # herramientas"). Se validan en el endpoint contra app/services/afinidad.
+    afinidad: dict[str, object] | None = None
 
 
 class ShowUpdate(BaseModel):
@@ -153,6 +158,7 @@ class ShowUpdate(BaseModel):
     # Igual que arriba: si viene, REEMPLAZA la galería del show. La primera con
     # is_profile=True es la portada del catálogo.
     images: list[ShowImageCreate] | None = Field(default=None, max_length=MAX_ARTIST_IMAGES)
+    afinidad: dict[str, object] | None = None
 
     @model_validator(mode="after")
     def _check_category(self):

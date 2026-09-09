@@ -374,9 +374,60 @@ cuerpo, code = get(f"/afinidad/match/{HOTEL}", AJENO)
 ok(code == 403, "y un contratante ajeno no lo puede leer", str(code))
 
 
+print("\n13. Las diez preguntas se pueden contestar EN EL ALTA del show")
+# David, 08/09: mejor dentro del registro que en una pantalla aparte. Así que el
+# alta tiene que aceptarlas y validarlas en el mismo golpe.
+correo_art = f"a{uuid.uuid4().hex[:10]}@prueba.mx"
+cuerpo, code = post("/auth/register/artist", {
+    "email": correo_art, "password": CLAVE, "full_name": f"Alta {sello}",
+    "stage_name": f"Alta {sello}", "artist_type": "Solista",
+    "phone": "9990000000", "base_city": "Cancún"})
+ok(code == 201, "se registra un proveedor de prueba", str(code))
+ART = json.loads(cuerpo)["access_token"] if code == 201 else None
+if ART:
+    art_id = json.loads(get("/me/artist", ART)[0])["id"]
+    CREADOS.setdefault("artists", []).append(art_id)
+
+    ficha = {"P1": "Lujo", "P2": "Elegancia", "P6": ["Parejas", "High-end"],
+             "P3": "Ambiental", "inventada": "x"}
+    cuerpo, code = post("/me/artist/shows", {
+        "show_name": f"Show alta {sello}", "category": "Musica",
+        "subcategory": "Solista", "price_hotel": 5000, "afinidad": ficha}, ART)
+    ok(code == 201, "crea el show con sus respuestas de afinidad", f"{code} {cuerpo[:120]}")
+    if code == 201:
+        sid = json.loads(cuerpo)["id"]
+        guardado = sql("SELECT afinidad FROM shows WHERE id=?", (sid,))[0][0]
+        guardado = json.loads(guardado) if guardado else {}
+        ok(guardado.get("P1") == "Lujo", "la respuesta simple queda guardada")
+        ok(guardado.get("P6") == ["Parejas", "High-end"], "y la múltiple también")
+        # Una clave que no es pregunta se tira sin ruido: el alta puede mandar
+        # de más y no es motivo para rechazar un registro entero.
+        ok("inventada" not in guardado, "lo que no es pregunta no se guarda",
+           str(sorted(guardado)))
+
+    cuerpo, code = post("/me/artist/shows", {
+        "show_name": f"Show malo {sello}", "category": "Musica",
+        "subcategory": "Solista", "price_hotel": 5000,
+        "afinidad": {"P1": "Palacete"}}, ART)
+    ok(code == 422, "una opción inventada da 422 en el alta", f"{code} {cuerpo[:120]}")
+    colado = sql("SELECT COUNT(*) FROM shows WHERE show_name=?", (f"Show malo {sello}",))[0][0]
+    ok(colado == 0, "y el show no se crea a medias", f"{colado} filas")
+
+    # CONTROL: sin afinidad tiene que seguir funcionando. Todos los shows que ya
+    # existen se dieron de alta sin ella.
+    cuerpo, code = post("/me/artist/shows", {
+        "show_name": f"Show simple {sello}", "category": "Musica",
+        "subcategory": "Solista", "price_hotel": 5000}, ART)
+    ok(code == 201, "CONTROL: dar de alta un show SIN afinidad sigue funcionando",
+       f"{code} {cuerpo[:120]}")
+
+
 # --- Limpieza --------------------------------------------------------------
 # Sólo lo que creó ESTA prueba, por id. Nunca "la fila más nueva que coincida":
 # eso se come datos del cliente el día que la prueba falle a la mitad.
+for aid in CREADOS.get("artists", []):
+    sql("DELETE FROM shows WHERE artist_id=?", (aid,))
+    sql("DELETE FROM artists WHERE id=?", (aid,))
 for vid in CREADOS.get("venues", []):
     sql("DELETE FROM venues WHERE id=?", (vid,))
 for uid in CREADOS["users"]:

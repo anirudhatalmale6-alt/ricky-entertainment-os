@@ -173,6 +173,12 @@ textarea{resize:vertical;min-height:70px}
 .foot-note{text-align:center;font-size:11px;color:var(--text3);margin-top:26px;display:flex;align-items:center;justify-content:center;gap:6px}
 .err{background:#fbeaea;border:1px solid #f3c6c6;color:#b42318;font-size:12.5px;font-weight:600;padding:10px 14px;border-radius:10px;margin-bottom:14px;display:none}
 .err.on{display:block}
+
+.afchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.afchip{border:1px solid var(--bd,#dcdfe8);background:#fff;color:#697089;border-radius:999px;
+  padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit}
+.afchip:hover{border-color:#382ca1;color:#1b1f2e}
+.afchip.on{background:#382ca1;color:#fff;border-color:#382ca1;font-weight:600}
 </style>
 </head>
 <body>
@@ -496,6 +502,10 @@ function showTpl(n){
         <label class="f full"><span>Requerimientos / rider</span><textarea class="in-req" placeholder="Escenario, sonido, camerino, etc."></textarea></label>
       </div>
 
+      <div class="sec-t">Afinidad · cómo encaja este show</div>
+      <div class="hint" style="margin:-6px 0 10px">Diez preguntas rápidas. Con esto SHOWMA sabe a qué hoteles y a qué salas recomendar este show, así que vale la pena contestarlas. Si prefieres, puedes dejarlas para después desde tu perfil.</div>
+      <div class="grid afgrid" data-af="${n}"></div>
+
       <div class="sec-t">Fotos y multimedia <i style="color:var(--red);font-style:normal">*</i></div>
       <div class="photos"><div class="ph add" onclick="pickPhotos(${n})">＋</div></div>
       <input type="file" class="photo-input" accept="image/*" multiple style="display:none" onchange="onPhotos(${n},this)">
@@ -540,7 +550,8 @@ function showTpl(n){
     </div>
   </div>`;
 }
-function addShow(){ showN++; document.getElementById('showList').insertAdjacentHTML('beforeend',showTpl(showN)); }
+function addShow(){ showN++; document.getElementById('showList').insertAdjacentHTML('beforeend',showTpl(showN));
+  const nueva=document.querySelector('.show[data-n="'+showN+'"] .afgrid'); if(nueva) pintarAfinidad(nueva); }
 function delShow(n){ const el=document.querySelector('.show[data-n="'+n+'"]'); if(document.querySelectorAll('.show').length>1) el.remove(); }
 function renameShow(n,v){ document.querySelector('.show[data-n="'+n+'"] .sname').textContent=v||'Nuevo show'; }
 function fillSub(n,cat){ const el=document.querySelector('.show[data-n="'+n+'"]'); el.querySelector('.in-sub').innerHTML=opts(TAX[cat]); badge(n); }
@@ -630,6 +641,57 @@ function collectProfile(){
     accepted_terms:chk('c_terms'), accepted_privacy:chk('c_privacy'), authorized_data_use:chk('c_data')
   };
 }
+
+/* ---- Las diez preguntas de afinidad, dentro de la ficha de cada show -----
+   David, 08/09: mejor dentro del registro que en una pantalla aparte, "para
+   mantener más limpia la barra de herramientas", y son datos que no cambian.
+
+   Las opciones las manda el servidor y no van copiadas aquí: una lista
+   duplicada se queda vieja el día que cambie una respuesta, y entonces se
+   guardarían textos que no cruzan contra nada. Si el cuestionario no carga, la
+   sección simplemente no aparece y el alta sigue funcionando: nunca puede
+   impedir que alguien termine de registrarse. */
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let AFQ = null;
+async function cargarAfinidad(){
+  try{ AFQ = await apiGet('/afinidad/cuestionario'); }catch(e){ AFQ = null; }
+  document.querySelectorAll('.afgrid').forEach(pintarAfinidad);
+}
+function pintarAfinidad(el){
+  if(!AFQ || !el || el.dataset.listo) return;
+  el.dataset.listo = '1';
+  el.innerHTML = Object.entries(AFQ.preguntas).map(([k,q])=>{
+    if(q.multiple){
+      return `<label class="f full"><span>${esc(q.titulo)} · elige hasta ${q.max}</span>
+        <span class="afchips" data-k="${k}">${q.opciones.map(o=>
+          `<button type="button" class="afchip" data-v="${esc(o)}" onclick="afChip(this)">${esc(o)}</button>`
+        ).join('')}</span></label>`;
+    }
+    return `<label class="f"><span>${esc(q.titulo)}</span>
+      <select class="af-q" data-k="${k}"><option value="">— sin contestar —</option>
+        ${q.opciones.map(o=>`<option>${esc(o)}</option>`).join('')}</select></label>`;
+  }).join('');
+}
+function afChip(btn){
+  const caja = btn.parentElement;
+  const max = (AFQ && AFQ.preguntas[caja.dataset.k] && AFQ.preguntas[caja.dataset.k].max) || 3;
+  const puestos = [...caja.querySelectorAll('.afchip.on')];
+  if(!btn.classList.contains('on') && puestos.length >= max) return;
+  btn.classList.toggle('on');
+}
+function collectAfinidad(el){
+  const caja = el.querySelector('.afgrid');
+  if(!caja) return null;
+  const r = {};
+  caja.querySelectorAll('select.af-q').forEach(s=>{ if(s.value) r[s.dataset.k] = s.value; });
+  caja.querySelectorAll('.afchips').forEach(c=>{
+    const v = [...c.querySelectorAll('.afchip.on')].map(b=>b.dataset.v);
+    if(v.length) r[c.dataset.k] = v;
+  });
+  return Object.keys(r).length ? r : null;
+}
+
 function collectShow(el){
   const q=s=>el.querySelector(s); const v=s=>{ const n=q(s); return n?n.value.trim():''; };
   const name=v('.in-name'); if(!name) return null;
@@ -653,7 +715,8 @@ function collectShow(el){
     price_private:numOf(v('.p-private')), price_restaurant:numOf(v('.p-restaurant')), price_festival:numOf(v('.p-festival')),
     extra_hour_price:numOf(v('.p-extrahour')), transport_from_price:numOf(v('.p-transport')), lodging_price:numOf(v('.p-lodging')),
     travel_fee:numOf(v('.p-travelfee')), travel_fee_km:intOf(v('.p-travelkm'))||30,
-    offers_audition:q('.chk-audition').checked, images:imgs, seasonal_rates:seasons
+    offers_audition:q('.chk-audition').checked, images:imgs, seasonal_rates:seasons,
+    afinidad: collectAfinidad(el)
   };
 }
 // ---- Validation: only complete, hireable & payable profiles can finish ----
@@ -742,6 +805,7 @@ async function finalizar(btn){
   fillSelect('stateAdd',ESTADOS_MX,'+ Agregar estado…');
   fillSelect('f_regime',REGIMENES_SAT,'Selecciona…');
   addShow();
+  cargarAfinidad();
   try{
     const a=await apiGet('/me/artist');
     const set=(id,val)=>{ const n=document.getElementById(id); if(n&&val) n.value=val; };
