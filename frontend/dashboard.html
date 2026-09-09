@@ -1456,6 +1456,14 @@
 .ctxlb{color:var(--mut);font-size:12.5px}
 .ctxsel{border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px;
   background:var(--bg2);color:var(--txt);font-family:inherit;max-width:230px}
+
+/* Pestañas de Reportes / Audiencia */
+.rtabs{display:flex;gap:6px;margin:0 0 14px}
+.rtab{border:1px solid var(--line);background:var(--card);color:var(--mut);
+  border-radius:9px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;
+  font-family:inherit}
+.rtab:hover{border-color:var(--acc);color:var(--txt)}
+.rtab.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 </style>
 </head>
 <body>
@@ -2463,13 +2471,20 @@ function applyRole(){
   show('reports', canPartner);                           // reportes
   // Audiencia: la ve cualquier contratante, incluido el hotel de una sola
   // propiedad. Es justo lo que pidió David: que cada hotel vea LO SUYO.
-  show('aud', isHotel);
+  // David, 09/09: "vamos a integrar Audiencia y Reportes en uno, mantenemos
+  // Reportes y eliminamos Audiencia, para limpiar la vista". La pantalla sigue
+  // existiendo entera, pero se entra por una pestaña dentro de Reportes: así no
+  // se pierde nada de lo que ya había y la barra queda con un solo sitio.
+  show('aud', false);
+  show('reports', canPartner || isHotel);
   // El laboratorio de afinidad es una herramienta para AFINAR los números, no
   // para operar: enseña la cuenta interna del cálculo. Sólo MASTER.
   show('ziggy', !!ME.is_admin);
-  // El perfil de afinidad lo contesta el hotel: es lo que SHOWMA usa para
-  // saber qué buscarle a cada una de sus salas.
-  show('afinidad', isHotel);
+  // David, 09/09: "Perfil de Afinidad podemos retirarlo, sólo necesitamos la
+  // info". Fuera de la barra del hotel, que es lo que él quiere limpio. Se
+  // queda para MASTER porque sigue siendo el único sitio donde se pueden
+  // corregir las respuestas de una propiedad ya registrada.
+  show('afinidad', !!ME.is_admin);
   // Facturación: el músico que cuelga de una productora NO cobra por SHOWMA
   // (David, 28/08: se liquidan fuera de la plataforma), así que no le sale.
   // Esto sólo quita el menú; quien cierra la puerta de verdad es el servidor,
@@ -2603,7 +2618,7 @@ const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Ac
   leads:["Prospectos","Hoteles que solicitaron acceso"],
   budget:["Presupuesto","Planifica y controla el gasto de entretenimiento"],
   bill:["Facturación","Todas tus facturas en un solo lugar"],
-  aud:["Audiencia","Cuánta gente atrajo cada show y cuánto costó cada persona"],
+  aud:["Reportes","Cuánta gente atrajo cada show y cuánto costó cada persona"],
   reports:["Reportes","Indicadores clave de tu operación"],
   profile:["Mi Perfil","Tus datos, tarifas y publicaciones"],
   team:["Mis músicos","Tu equipo: cada uno con su cuenta y su propio calendario"],
@@ -2627,7 +2642,16 @@ async function show(p,force){
   const box=document.getElementById('panel-'+p);
   if(box.dataset.loaded && !force) return;
   box.innerHTML='<div class="load">Cargando…</div>';
-  try{ await RENDER[p](box); box.dataset.loaded="1"; }
+  try{
+    await RENDER[p](box); box.dataset.loaded="1";
+    // Reportes y Audiencia se leen como una sola sección con dos pestañas
+    // (David, 09/09). Se cuelgan aquí, después de que cada pantalla haya
+    // pintado lo suyo, para no tener que tocar ninguna de las dos por dentro:
+    // así "Audiencia" sigue funcionando igual, incluidos sus propios filtros,
+    // que se repintan pasando otra vez por aquí.
+    if((p==='reports' || p==='aud') && !box.querySelector('.rtabs'))
+      box.insertAdjacentHTML('afterbegin', reptTabs(p));
+  }
   catch(e){ box.innerHTML='<div class="load">Error: '+esc(e.message)+'</div>'; }
 }
 
@@ -3151,6 +3175,16 @@ function actRender(){
   if(ACT_KM) items=items.filter(s=>s.distance_km!=null&&s.distance_km<=ACT_KM);
   const nd=items.filter(s=>s.is_available===false).length;
   items=items.filter(s=>s.is_available!==false);
+  // Ordenar ANTES de recortar: si se corta a 60 y luego se ordena, el mejor
+  // match puede quedarse fuera de la lista sin que nadie lo sepa.
+  const notaV = s => { const m=(MATCH_VENUE||{})[String(s.id)]; return m&&m.match!=null?m.match:null; };
+  items=items.slice().sort((a,b)=>{
+    const x=notaV(a), y=notaV(b);
+    if(x==null && y==null) return 0;
+    if(x==null) return 1;
+    if(y==null) return -1;
+    return y-x;
+  });
   items=items.slice(0,60);
   const ocultos=[];
   if(lejos) ocultos.push(`${lejos} fuera de los ${ACT_KM} km`);
@@ -3850,6 +3884,22 @@ function applyArtistFilters(){
     return true;
   });
   if(sort==='price') r.sort((a,b)=>(a.price||1e9)-(b.price||1e9));
+  else {
+    // "Mejor coincidencia" ordena por afinidad, de mayor a menor. Antes no
+    // ordenaba nada y la lista salía como viniera, que era justo lo que David
+    // pedía y no se cumplía. Quien no ha contestado el cuestionario NO se
+    // hunde al final por un cero inventado: va después de los que sí tienen
+    // nota, pero conservando su orden alfabético, porque "sin dato" no es
+    // "mal encaje".
+    const nota = i => { const m=(MATCH_PROP||{})[String(i.id)]; return m&&m.match!=null?m.match:null; };
+    r.sort((a,b)=>{
+      const x=nota(a), y=nota(b);
+      if(x==null && y==null) return 0;
+      if(x==null) return 1;
+      if(y==null) return -1;
+      return y-x;
+    });
+  }
   const barra=document.getElementById('ctxBar');
   if(barra && !barra.innerHTML) barra.innerHTML = ctxBarra();
   const grid=document.getElementById('af_grid'); if(grid) grid.innerHTML=r.map(artistCard).join('')||'<div class="muted" style="grid-column:1/-1;padding:34px;text-align:center">No hay proveedores que coincidan con tu búsqueda.</div>';
@@ -6057,6 +6107,24 @@ let AUD_ORD={col:'gente', dir:-1};      // orden de la tabla comparativa
 let AUD_VIS=[];                         // filas visibles (ya filtradas y ordenadas)
 let AUD_SEL=new Set();                  // renglones marcados
 let AUD_PAG={n:10, p:1};                // paginación de la tabla
+
+/* Las dos caras de Reportes. Se pintan iguales en los dos paneles para que se
+   lean como una sola sección con pestañas; por dentro siguen siendo dos
+   pantallas distintas, que es lo que hace que no haya que reescribir ninguna. */
+function hayIndicadores(){
+  // La pantalla de indicadores se construye sobre la CADENA: pide las
+  // actuaciones por group_id. Un hotel de una sola propiedad no tiene grupo, y
+  // por eso estaba reservada al director de cadena y a MASTER. Si se le enseña
+  // la pestaña, se lleva un error en la cara.
+  return !!(ME && (ME.is_admin || ME.group_id)) || !!GID;
+}
+function reptTabs(actual){
+  const t = (id, txt) => `<button class="rtab${actual===id?' on':''}" onclick="show('${id}')">${txt}</button>`;
+  const tabs = (hayIndicadores() ? t('reports','Indicadores') : '') + t('aud','Audiencia');
+  // Con una sola pestaña no hay nada que elegir: se ahorra el ruido.
+  return hayIndicadores() ? `<div class="rtabs">${tabs}</div>` : '';
+}
+
 function audFiltrar(){
   const v=id=>{const e=document.getElementById(id); return e?e.value:'';};
   AUDF.company=v('audProp');
@@ -6883,6 +6951,9 @@ const RENDER = {
   },
 
   async reports(box){
+    // Sin cadena no hay indicadores que calcular: se cae a Audiencia, que es la
+    // otra mitad de la misma sección y ésa sí funciona por propiedad.
+    if(!hayIndicadores()) return show('aud');
     const bk   = await api(`/bookings?group_id=${GID}`);
     const dash = await api(`/groups/${GID}/dashboard`);
     let AMAP={}; try{ (await api('/artists')||[]).forEach(a=>{AMAP[a.id]=a.stage_name;}); }catch(e){}
