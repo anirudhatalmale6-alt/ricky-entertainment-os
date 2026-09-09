@@ -1468,6 +1468,24 @@
 /* ZIGGY */
 .zig-h{display:flex;align-items:center;gap:7px}
 .zig-ic{flex:0 0 auto;vertical-align:middle}
+
+/* Iconos de ZIGGY: el <span> fija el tamaño y el SVG lo rellena */
+.zig-ic{display:inline-flex;flex:0 0 auto;line-height:0}
+.zig-ic svg{width:100%;height:100%;display:block}
+
+/* Banner de ZIGGY sobre la lista de proveedores */
+.zigban{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 12px;
+  padding:12px 16px;border-radius:14px;background:linear-gradient(135deg,#eeeafd,#f6f4ff);
+  border:1px solid #e0dafc}
+.zb-t{display:flex;flex-direction:column;min-width:200px}
+.zb-t b{font-size:15px;color:#1b1f2e}
+.zb-t span{font-size:12.5px;color:var(--mut);margin-top:2px}
+.zb-chips{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.zb-chip{background:#fff;border:1px solid #e0dafc;border-radius:999px;padding:6px 12px;
+  font-size:12.5px;font-weight:600;color:#382ca1;white-space:nowrap}
+.zb-como{border:1px solid #c9bff8;background:#fff;color:#382ca1;border-radius:10px;
+  padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.zb-como:hover{background:#f3f0ff}
 </style>
 </head>
 <body>
@@ -2682,40 +2700,37 @@ function novCard(n){
 }
 
 /* ===== ZIGGY: la cara del sistema ======================================
-   David, 09/09: por ahora sólo el nombre y algún icono, sin IA detrás. Empieza
-   en "Novedades", que pasa a ser "ZIGGY te destaca".
+   Los iconos son de David (09/09), cuatro estados: neutral, destacado,
+   bienvenida y todo listo. Van INCRUSTADOS y no como archivos sueltos porque
+   pesan 1 KB cada uno: así no hay una petición más por pantalla, se pintan a la
+   vez que el resto y no dependen de que la carpeta de estáticos esté bien
+   desplegada, que es de las cosas que se rompen sin avisar.
 
-   Todo el aspecto de ZIGGY sale de aquí. Cuando lleguen los iconos de David se
-   cambian en ZIGGY_ICONOS y no hay que tocar ninguna pantalla: si el icono es
-   una imagen se pone la ruta, y si no, se sigue usando el dibujo de reserva.
+   Son SVG, así que se ven nítidos a cualquier tamaño: el mismo dibujo sirve
+   para los 20 píxeles de un título y para los 56 de un banner.
 
-   El icono cambia con la hora porque lo pidió él y porque cuesta cero: la misma
-   pantalla a las nueve de la mañana y a las diez de la noche no se siente igual,
-   y ese detalle es lo que hace que un nombre parezca alguien. */
-const ZIGGY_ICONOS = {
-  // franja: {url: 'ruta/al/icono.png'} cuando David los mande.
-  manana: {},
-  tarde:  {},
-  noche:  {},
+   Todo el aspecto de ZIGGY sale de aquí. Para cambiar un icono se cambia una
+   línea y aparece en todas partes a la vez. */
+const ZIGGY_SVG = {
+  neutral:    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><g stroke="#111742" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="128" cy="221" rx="54" ry="9" fill="#DCDCF2" stroke="none" opacity=".55"/><circle cx="128" cy="151" r="61" fill="#FAFAFC"/><path d="M72 151c-17 9-24 30-17 46 5 10 15 12 24 5 9-8 14-26 11-42" fill="#FAFAFC"/><path d="M184 151c17 9 24 30 17 46-5 10-15 12-24 5-9-8-14-26-11-42" fill="#FAFAFC"/><rect x="38" y="26" width="180" height="139" rx="68" fill="#FAFAFC"/><rect x="51" y="40" width="154" height="108" rx="51" fill="#111138" stroke="#7856FF"/><path d="M70 49 58 78l13-8-10 28 25-34-13 6 12-21" fill="#FF655F" stroke="none"/><path d="M83 49 70 78l12-7-9 26 23-33-12 7 12-22" fill="#27C9F5" stroke="none"/><path d="M91 103q13-17 26 0M141 103q13-17 26 0" fill="none" stroke="#F7F4FF" stroke-width="8"/><path d="m103 157-24-12v30l24-12m50-6 24-12v30l-24-12" fill="#272057"/><circle cx="128" cy="160" r="16" fill="#6041DB"/><path d="m128 150 3 7 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#FFF" stroke="none"/></g></svg>',
+  destacado:  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><g stroke="#111742" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="128" cy="221" rx="54" ry="9" fill="#DCDCF2" stroke="none" opacity=".55"/><circle cx="128" cy="151" r="61" fill="#FAFAFC"/><path d="M78 150c-14 12-19 28-14 41 4 10 14 12 22 5 8-8 12-23 9-39m83-7c14 12 19 28 14 41-4 10-14 12-22 5-8-8-12-23-9-39" fill="#FAFAFC"/><rect x="38" y="26" width="180" height="139" rx="68" fill="#FAFAFC"/><rect x="51" y="40" width="154" height="108" rx="51" fill="#111138" stroke="#7856FF"/><path d="M70 49 58 78l13-8-10 28 25-34-13 6 12-21" fill="#FF655F" stroke="none"/><path d="M83 49 70 78l12-7-9 26 23-33-12 7 12-22" fill="#27C9F5" stroke="none"/><path d="m103 83 5 12 12 5-12 5-5 12-5-12-12-5 12-5zm52 0 5 12 12 5-12 5-5 12-5-12-12-5 12-5z" fill="#FFF" stroke="none"/><path d="m103 157-24-12v30l24-12m50-6 24-12v30l-24-12" fill="#272057"/><circle cx="128" cy="160" r="16" fill="#6041DB"/><path d="m128 150 3 7 8 3-8 3-3 8-3-8-8-3 8-3zm91-84 4 10 10 4-10 4-4 10-4-10-10-4 10-4z" fill="#FFF" stroke="#7856FF"/></g></svg>',
+  bienvenida: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><g stroke="#111742" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="128" cy="221" rx="54" ry="9" fill="#DCDCF2" stroke="none" opacity=".55"/><circle cx="128" cy="151" r="61" fill="#FAFAFC"/><path d="M73 153c-17 8-24 28-18 44 5 11 15 13 24 5 8-7 13-24 11-40" fill="#FAFAFC"/><path d="M181 151c16-9 29-23 34-40 3-10 13-13 20-7 8 7 4 20-1 29-8 17-21 31-37 39" fill="#FAFAFC"/><rect x="38" y="26" width="180" height="139" rx="68" fill="#FAFAFC"/><rect x="51" y="40" width="154" height="108" rx="51" fill="#111138" stroke="#7856FF"/><path d="M70 49 58 78l13-8-10 28 25-34-13 6 12-21" fill="#FF655F" stroke="none"/><path d="M83 49 70 78l12-7-9 26 23-33-12 7 12-22" fill="#27C9F5" stroke="none"/><path d="M88 103q15-18 30 0M139 103q15-18 30 0" fill="none" stroke="#F7F4FF" stroke-width="8"/><path d="m103 157-24-12v30l24-12m50-6 24-12v30l-24-12" fill="#272057"/><circle cx="128" cy="160" r="16" fill="#6041DB"/><path d="m128 150 3 7 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#FFF" stroke="none"/><path d="m221 83 5-10m7 18 10-3" stroke="#7856FF"/></g></svg>',
+  listo:      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><g stroke="#111742" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="119" cy="221" rx="54" ry="9" fill="#DCDCF2" stroke="none" opacity=".55"/><circle cx="119" cy="151" r="61" fill="#FAFAFC"/><path d="M68 154c-17 7-27 23-25 39 1 10 11 15 20 9 9-6 16-20 17-36" fill="#FAFAFC"/><path d="M174 155c12 7 20 19 21 31 1 10-7 16-17 12-10-5-17-17-19-32" fill="#FAFAFC"/><rect x="29" y="26" width="180" height="139" rx="68" fill="#FAFAFC"/><rect x="42" y="40" width="154" height="108" rx="51" fill="#111138" stroke="#7856FF"/><path d="M61 49 49 78l13-8-10 28 25-34-13 6 12-21" fill="#FF655F" stroke="none"/><path d="M74 49 61 78l12-7-9 26 23-33-12 7 12-22" fill="#27C9F5" stroke="none"/><path d="m82 95 22 10-22 10M132 103q13-17 26 0" fill="none" stroke="#F7F4FF" stroke-width="8"/><path d="m94 157-24-12v30l24-12m50-6 24-12v30l-24-12" fill="#272057"/><circle cx="119" cy="160" r="16" fill="#6041DB"/><path d="m119 150 3 7 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#FFF" stroke="none"/><circle cx="205" cy="181" r="35" fill="#27C87A"/><path d="m187 181 12 12 25-28" fill="none" stroke="#FFF" stroke-width="9"/></g></svg>',
 };
+function ziggyIcono(estado, tam){
+  const svg = ZIGGY_SVG[estado] || ZIGGY_SVG.neutral;
+  const px = tam || 22;
+  return `<span class="zig-ic" style="width:${px}px;height:${px}px" aria-hidden="true">${svg}</span>`;
+}
+/* El saludo por hora sigue aquí porque David lo pidió antes que los iconos.
+   Los suyos son por SITUACIÓN, no por hora, que es mejor: un icono que cambia
+   con el reloj no dice nada del momento del usuario, y uno que cambia con lo
+   que acaba de pasar sí. */
 function ziggyFranja(h){
   const hora = (h==null ? new Date().getHours() : h);
   if(hora < 12) return 'manana';
   if(hora < 19) return 'tarde';
   return 'noche';
-}
-function ziggyIcono(tam){
-  const f = ziggyFranja();
-  const px = tam || 20;
-  const puesto = ZIGGY_ICONOS[f] && ZIGGY_ICONOS[f].url;
-  if(puesto) return `<img class="zig-ic" src="${puesto}" alt="ZIGGY" width="${px}" height="${px}">`;
-  // Dibujo de reserva mientras no haya arte: una chispa que cambia de color
-  // según la franja. Sirve para ver el mecanismo funcionando, no es el diseño.
-  const col = {manana:'#f0a020', tarde:'#6d5ef0', noche:'#382ca1'}[f];
-  return `<svg class="zig-ic" viewBox="0 0 24 24" width="${px}" height="${px}" aria-hidden="true"
-    fill="none" stroke="${col}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
-    ><path d="M12 3.5l1.9 4.9 4.9 1.9-4.9 1.9L12 17.1l-1.9-4.9L5.2 10.3l4.9-1.9z"/>
-     <path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>`;
 }
 function ziggySaluda(){
   return {manana:'Buenos días', tarde:'Buenas tardes', noche:'Buenas noches'}[ziggyFranja()];
@@ -2725,7 +2740,7 @@ window.ziggyIcono = ziggyIcono;
 function novStrip(nov){
   if(!nov||!nov.length) return '';
   return `<div class="box" style="margin-top:16px">
-    <h3 class="zig-h">${ziggyIcono(22)} ZIGGY te destaca</h3>
+    <h3 class="zig-h">${ziggyIcono('destacado',24)} ZIGGY te destaca</h3>
     <div class="hint">Artistas y shows publicados en los últimos 7 días — dales una oportunidad aunque acaben de empezar</div>
     <div style="display:flex;gap:14px;overflow-x:auto;padding:14px 2px 4px">${nov.map(novCard).join('')}</div>
   </div>`;
@@ -3807,7 +3822,7 @@ function matchEsquina(m, donde){
   const v = Math.round(m.match);
   const dudoso = (m.cobertura!=null && m.cobertura<1) || (m.avisos&&m.avisos.length);
   return `<div class="mbig ${matchClase(m.match)}" title="${esc(donde||'')}">
-    <b>${v}%</b><span>match${dudoso?' *':''}</span></div>`;
+    <b>${v}%</b><span>afinidad${dudoso?' *':''}</span></div>`;
 }
 function matchTag(m, donde){
   if(!m || m.match==null) return '';
@@ -3824,11 +3839,96 @@ function matchTag(m, donde){
    una sola propiedad, así que hay que dejarles elegir — si no, la lista les
    sale sin un solo porcentaje y parece que la función no funciona. */
 let CTX = {company: null, venue: null, salas: []};
+/* Quiénes NO han contestado, dicho por el servidor. Antes se deducía por
+   ausencia y era mentira: el endpoint recortaba la lista y los recortados
+   parecían no haber contestado. */
+let SIN_CUEST = null;
 
 async function ctxPropiedades(){
   if(ME && ME.company_id) return [{id: ME.company_id, name: ME.company_name || 'Mi propiedad'}];
   try{ return (await myProperties()).map(c=>({id:c.id, name:c.name})); }catch(e){ return []; }
 }
+
+
+/* El banner de ZIGGY sobre la lista, siguiendo el diseño de David (09/09).
+   Sólo dice cosas que se pueden comprobar: cuántas opciones hay, cuántas pasan
+   el listón de afinidad y cuál es la mejor nota. Nada de "Top 10% en aforo" ni
+   "0 cancelaciones" aquí: eso es de CADA proveedor y sale de su historial, no
+   de la lista, y ponerlo en el banner sería atribuirle a todos lo de uno.
+
+   Si nadie ha contestado el cuestionario, el banner lo dice en vez de callarse:
+   una lista sin porcentajes y sin explicación es justo lo que hizo perder una
+   tarde el 09/09. */
+const ZIG_DESTACA = 85;   // de aquí para arriba, ZIGGY lo señala
+
+function ziggyBanner(visibles){
+  const notas = visibles.map(i=>{
+    const m=(MATCH_PROP||{})[String(i.id)]; return m&&m.match!=null?m.match:null;
+  }).filter(v=>v!=null);
+  const donde = CTX.venue
+    ? ((CTX.salas||[]).find(v=>v.id===CTX.venue)||{}).name
+    : ((CTX.props||[]).find(c=>c.id===CTX.company)||{}).name;
+
+  if(!notas.length){
+    return `<div class="zigban">${ziggyIcono('neutral',44)}
+      <div class="zb-t"><b>ZIGGY todavía no puede ordenar por afinidad</b>
+        <span>Ningún proveedor de esta lista ha contestado el cuestionario, así que no hay nada que cruzar con ${esc(donde||'tu propiedad')}.</span></div>
+    </div>`;
+  }
+  const mejor = Math.max(...notas);
+  const destacan = notas.filter(v=>v>=ZIG_DESTACA).length;
+  const chip = (txt) => `<span class="zb-chip">${txt}</span>`;
+  return `<div class="zigban">${ziggyIcono(destacan?'destacado':'neutral',44)}
+    <div class="zb-t"><b>ZIGGY encontró ${visibles.length} ${visibles.length===1?'opción':'opciones'}</b>
+      <span>${notas.length} con afinidad calculada para ${esc(donde||'tu propiedad')}${
+        destacan?` · ${destacan} ${destacan===1?'destaca':'destacan'}`:''}</span></div>
+    <div class="zb-chips">
+      ${chip(`${Math.round(mejor)}% mayor afinidad`)}
+      ${(()=>{
+        // Sólo se cuentan los que el servidor dice que no han contestado, y
+        // sólo entre los visibles. Restar "los que no traen nota" contaría
+        // también a quien se quedó fuera por cualquier otro motivo.
+        if(!SIN_CUEST) return '';
+        const n = visibles.filter(i=>SIN_CUEST.has(String(i.id))).length;
+        return n ? chip(`${n} sin cuestionario`) : '';
+      })()}
+    </div>
+    <button class="zb-como" onclick="ziggyComo()">Cómo se calcula</button>
+  </div>`;
+}
+
+function ziggyComo(){
+  const donde = CTX.venue ? 'la sala elegida' : 'la propiedad';
+  ziggyModal('Cómo calcula ZIGGY la afinidad', `ZIGGY cruza las diez respuestas del cuestionario de cada show con las de ${donde}.
+
+Cada pregunta tiene su propia tabla de afinidad y su peso, y de ahí salen tres notas: marca, público y experiencia. El porcentaje que ves es el promedio de las tres.
+
+Al elegir una sala concreta entra además la experiencia (protagonismo, interacción, energía y objetivo), que es lo que cambia entre el lobby y el teatro del mismo hotel.
+
+Un asterisco al lado del número quiere decir que ese proveedor no ha contestado todo el cuestionario, o que alguna respuesta queda muy lejos de lo que pides.
+
+Quien no ha contestado nada no lleva porcentaje: sin respuestas no hay nada que cruzar, y un 0% diría que no encaja, que no es lo mismo.`);
+}
+
+/* Una ventana de sólo leer, con la misma pinta que las demás del panel. Se
+   explica el cálculo con palabras y no con la fórmula: quien pregunta "cómo se
+   calcula" quiere saber si puede fiarse, no repetir la cuenta. */
+function ziggyModal(titulo, texto){
+  let ov=document.getElementById('zigMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='zigMov'; ov.className='mov';
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) ziggyModalCerrar(); }); }
+  ov.innerHTML=`<div class="amod" style="max-width:520px;position:relative">
+    <button class="ax" onclick="ziggyModalCerrar()" aria-label="Cerrar">✕</button>
+    <div class="ah" style="display:flex;align-items:center;gap:10px">
+      ${ziggyIcono('neutral',30)}<b>${esc(titulo)}</b></div>
+    <div class="rqbody" style="padding:18px 22px;white-space:pre-line;font-size:13.5px;line-height:1.55">${esc(texto)}</div>
+    <div class="af"><button class="btn ghost" onclick="ziggyModalCerrar()">Cerrar</button></div>
+  </div>`;
+  ov.style.display='flex';
+}
+function ziggyModalCerrar(){ const ov=document.getElementById('zigMov'); if(ov) ov.style.display='none'; }
+window.ziggyComo = ziggyComo; window.ziggyModalCerrar = ziggyModalCerrar;
 
 async function cargarMatchPropiedad(){
   MATCH_PROP = {};
@@ -3842,12 +3942,16 @@ async function cargarMatchPropiedad(){
     if(CTX.venue){
       // Con sala elegida el match incluye la experiencia, que es lo que cambia
       // entre el lobby y el teatro del mismo hotel.
-      const r = await api(`/afinidad/recomendaciones/${CTX.venue}`);
+      // limite=100: el endpoint recorta a 20 por defecto y los recortados
+      // parecían "sin cuestionario" cuando sí lo habían contestado.
+      const r = await api(`/afinidad/recomendaciones/${CTX.venue}?limite=100`);
       (r.recomendaciones||[]).forEach(x=>{ MATCH_PROP[String(x.show_id)] = {
         match:x.media, cobertura:x.cobertura, avisos:x.avisos}; });
+      SIN_CUEST = new Set((r.sin_cuestionario||[]).map(x=>String(x.show_id)));
     }else{
       const r = await api(`/afinidad/match/${CTX.company}`);
       MATCH_PROP = r.listo ? (r.shows||{}) : {};
+      SIN_CUEST = null;   // este endpoint no recorta ni lista los que faltan
     }
   }catch(e){ MATCH_PROP = {}; }
 }
@@ -3886,7 +3990,7 @@ async function cargarMatchVenue(venueId){
   MATCH_VENUE = {};
   if(!venueId) return;
   try{
-    const r = await api(`/afinidad/recomendaciones/${venueId}`);
+    const r = await api(`/afinidad/recomendaciones/${venueId}?limite=100`);
     (r.recomendaciones||[]).forEach(x=>{
       MATCH_VENUE[String(x.show_id)] = {
         match: x.media, cobertura: x.cobertura, avisos: x.avisos,
@@ -3948,6 +4052,8 @@ function applyArtistFilters(){
   }
   const barra=document.getElementById('ctxBar');
   if(barra && !barra.innerHTML) barra.innerHTML = ctxBarra();
+  const ban=document.getElementById('zigBan');
+  if(ban) ban.innerHTML = ziggyBanner(r);
   const grid=document.getElementById('af_grid'); if(grid) grid.innerHTML=r.map(artistCard).join('')||'<div class="muted" style="grid-column:1/-1;padding:34px;text-align:center">No hay proveedores que coincidan con tu búsqueda.</div>';
   const fuera=AF.km?items.filter(i=>i.km!=null&&i.km>AF.km).length:0;
   const sinUbi=AF.km?items.filter(i=>i.km==null).length:0;
@@ -6722,7 +6828,7 @@ const RENDER = {
             <button class="btn ghost" style="width:100%;margin-top:12px" onclick="show('reqs')">+ Nueva solicitud</button>
           </div>
           <div class="box">
-            <div class="bhead"><h3 style="margin:0" class="zig-h">${ziggyIcono(19)} ZIGGY te destaca</h3><a onclick="show('artists')">Ver todas</a></div>
+            <div class="bhead"><h3 style="margin:0" class="zig-h">${ziggyIcono('destacado',22)} ZIGGY te destaca</h3><a onclick="show('artists')">Ver todas</a></div>
             ${nov.length? nov.slice(0,3).map(n=>`<div class="sugg">
               <div class="sav" ${n.image_url?`style="background-image:url('${n.image_url}')"`:''}>${n.image_url?'':'🎭'}</div>
               <div class="sz"><b>${esc(n.show_name)}</b><span>${esc(n.artist_name||pretty(n.category))}</span><span style="color:var(--ok)">● Disponible${n.price_hotel?' · '+MXN(n.price_hotel):''}</span></div>
@@ -6797,6 +6903,7 @@ const RENDER = {
       </div>
       <div class="artlayout">
         <div>
+          <div id="zigBan"></div>
           <div id="ctxBar"></div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px"><b id="af_count"></b></div>
           <div class="agrid" id="af_grid"></div>
