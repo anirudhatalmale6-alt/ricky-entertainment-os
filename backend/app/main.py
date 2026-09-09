@@ -1,4 +1,5 @@
 """FastAPI application entrypoint."""
+import hashlib
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -46,7 +47,14 @@ def _serve_html(f: Path | None, fallback: str) -> HTMLResponse:
     if f is None:
         return HTMLResponse(fallback, headers=_NO_CACHE)
     html = f.read_text(encoding="utf-8")
-    inject = f"<script>window.RICKY_API={json.dumps(settings.ROOT_PATH)};</script>"
+    # Sello de la version servida. Las cabeceras ya dicen no-store, pero eso no
+    # ayuda cuando la pestana lleva abierta desde antes del despliegue: la app
+    # es de una sola pagina y no vuelve a pedir el HTML al navegar por dentro.
+    # Con el sello a la vista, cualquiera puede comprobar en un vistazo si tiene
+    # la version nueva en vez de adivinar si le hace falta vaciar la cache.
+    sello = hashlib.sha1(html.encode("utf-8")).hexdigest()[:7]
+    inject = (f"<script>window.RICKY_API={json.dumps(settings.ROOT_PATH)};"
+              f"window.RICKY_BUILD={json.dumps(sello)};</script>")
     if "</head>" in html:
         html = html.replace("</head>", inject + "</head>", 1)
     else:

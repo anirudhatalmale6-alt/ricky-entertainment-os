@@ -1687,7 +1687,7 @@
         <button class="su-out" onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión">↪ Salir</button>
       </div>
     </div>
-    <div class="foot">SHOWMA · v0.1</div>
+    <div class="foot">SHOWMA · v0.1 <span id="buildTag" title="Versión que tienes cargada. Si no coincide con la del servidor, recarga con Ctrl+F5."></span></div>
   </aside>
 
   <div class="main">
@@ -8952,6 +8952,17 @@ async function afShowGuardar(){
 function afShowCerrar(){ const ov=document.getElementById('shafMov'); if(ov) ov.style.display='none'; }
 
 window.afShowAbrir=afShowAbrir; window.afShowCerrar=afShowCerrar;
+
+
+/* El sello de la versión cargada, a la vista en la barra lateral. Las
+   cabeceras ya piden no cachear, pero la app es de una sola página: si la
+   pestaña lleva abierta desde antes de un despliegue, no vuelve a pedir el HTML
+   por mucho que se navegue por dentro. Con el sello se comprueba de un vistazo
+   en vez de adivinar. */
+(function(){
+  const el = document.getElementById('buildTag');
+  if(el && window.RICKY_BUILD) el.textContent = '· ' + window.RICKY_BUILD;
+})();
 
 window.exportInvoices=exportInvoices;
 window.chip=chip;window.fmtDate=fmtDate;window.openConv=openConv;window.sendMsg=sendMsg;window.login=login;window.reload=reload;
