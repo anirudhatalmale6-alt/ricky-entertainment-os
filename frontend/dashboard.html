@@ -1464,6 +1464,10 @@
   font-family:inherit}
 .rtab:hover{border-color:var(--acc);color:var(--txt)}
 .rtab.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+
+/* ZIGGY */
+.zig-h{display:flex;align-items:center;gap:7px}
+.zig-ic{flex:0 0 auto;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -2676,10 +2680,52 @@ function novCard(n){
     </div>
   </div>`;
 }
+
+/* ===== ZIGGY: la cara del sistema ======================================
+   David, 09/09: por ahora sólo el nombre y algún icono, sin IA detrás. Empieza
+   en "Novedades", que pasa a ser "ZIGGY te destaca".
+
+   Todo el aspecto de ZIGGY sale de aquí. Cuando lleguen los iconos de David se
+   cambian en ZIGGY_ICONOS y no hay que tocar ninguna pantalla: si el icono es
+   una imagen se pone la ruta, y si no, se sigue usando el dibujo de reserva.
+
+   El icono cambia con la hora porque lo pidió él y porque cuesta cero: la misma
+   pantalla a las nueve de la mañana y a las diez de la noche no se siente igual,
+   y ese detalle es lo que hace que un nombre parezca alguien. */
+const ZIGGY_ICONOS = {
+  // franja: {url: 'ruta/al/icono.png'} cuando David los mande.
+  manana: {},
+  tarde:  {},
+  noche:  {},
+};
+function ziggyFranja(h){
+  const hora = (h==null ? new Date().getHours() : h);
+  if(hora < 12) return 'manana';
+  if(hora < 19) return 'tarde';
+  return 'noche';
+}
+function ziggyIcono(tam){
+  const f = ziggyFranja();
+  const px = tam || 20;
+  const puesto = ZIGGY_ICONOS[f] && ZIGGY_ICONOS[f].url;
+  if(puesto) return `<img class="zig-ic" src="${puesto}" alt="ZIGGY" width="${px}" height="${px}">`;
+  // Dibujo de reserva mientras no haya arte: una chispa que cambia de color
+  // según la franja. Sirve para ver el mecanismo funcionando, no es el diseño.
+  const col = {manana:'#f0a020', tarde:'#6d5ef0', noche:'#382ca1'}[f];
+  return `<svg class="zig-ic" viewBox="0 0 24 24" width="${px}" height="${px}" aria-hidden="true"
+    fill="none" stroke="${col}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+    ><path d="M12 3.5l1.9 4.9 4.9 1.9-4.9 1.9L12 17.1l-1.9-4.9L5.2 10.3l4.9-1.9z"/>
+     <path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>`;
+}
+function ziggySaluda(){
+  return {manana:'Buenos días', tarde:'Buenas tardes', noche:'Buenas noches'}[ziggyFranja()];
+}
+window.ziggyIcono = ziggyIcono;
+
 function novStrip(nov){
   if(!nov||!nov.length) return '';
   return `<div class="box" style="margin-top:16px">
-    <h3>✨ Novedades</h3>
+    <h3 class="zig-h">${ziggyIcono(22)} ZIGGY te destaca</h3>
     <div class="hint">Artistas y shows publicados en los últimos 7 días — dales una oportunidad aunque acaben de empezar</div>
     <div style="display:flex;gap:14px;overflow-x:auto;padding:14px 2px 4px">${nov.map(novCard).join('')}</div>
   </div>`;
@@ -6676,7 +6722,7 @@ const RENDER = {
             <button class="btn ghost" style="width:100%;margin-top:12px" onclick="show('reqs')">+ Nueva solicitud</button>
           </div>
           <div class="box">
-            <div class="bhead"><h3 style="margin:0">Novedades</h3><a onclick="show('artists')">Ver todas</a></div>
+            <div class="bhead"><h3 style="margin:0" class="zig-h">${ziggyIcono(19)} ZIGGY te destaca</h3><a onclick="show('artists')">Ver todas</a></div>
             ${nov.length? nov.slice(0,3).map(n=>`<div class="sugg">
               <div class="sav" ${n.image_url?`style="background-image:url('${n.image_url}')"`:''}>${n.image_url?'':'🎭'}</div>
               <div class="sz"><b>${esc(n.show_name)}</b><span>${esc(n.artist_name||pretty(n.category))}</span><span style="color:var(--ok)">● Disponible${n.price_hotel?' · '+MXN(n.price_hotel):''}</span></div>
