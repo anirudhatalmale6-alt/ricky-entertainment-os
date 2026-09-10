@@ -2833,6 +2833,34 @@ function fmtNewsDate(s){ try{ const d=new Date(s); if(isNaN(d.getTime())) return
    Y ninguna regla inventa: si falta el presupuesto, ZIGGY dice que falta, no
    una desviación. Un dato que falta enseñado como alarma se descubre a la
    primera y se lleva por delante la confianza en todas las demás. */
+/* El saludo y la cuenta atrás del mes (David, 10/09).
+   Dos cuidados que parecen tonterías y no lo son:
+   - La hora es la del NAVEGADOR, no la del servidor. Un saludo tiene que
+     coincidir con la ventana de quien lo lee, no con la zona del centro de
+     datos: "buenas noches" a las once de la mañana es de lo poco que hace
+     desconfiar de un panel entero.
+   - Los días que faltan sólo se dicen si estás viendo el MES EN CURSO. El
+     Dashboard tiene selector de periodo; si estás repasando agosto, "faltan 12
+     días para que acabe el mes" es sencillamente falso. */
+// Recibe la fecha en vez de leerla dentro: así se puede comprobar el último día
+// del mes sin trucar el reloj. Trucando Date.prototype, el propio
+// `new Date(a,m,0)` que calcula el fin de mes devuelve el día trucado y la
+// prueba mide su propio parche en lugar del código. Me pasó, y salió "hoy es el
+// último día" un día 10.
+function ziggySaludo(ahora){
+  ahora = ahora || new Date();
+  const h = ahora.getHours();
+  const saludo = h < 12 ? 'Buenos días' : (h < 20 ? 'Buenas tardes' : 'Buenas noches');
+  const esteMes = ahora.getFullYear()===PERIOD.year && (ahora.getMonth()+1)===PERIOD.month;
+  const nombreMes = MESES[PERIOD.month-1] || '';
+  if(!esteMes) return `${saludo}, estás viendo ${nombreMes} de ${PERIOD.year}`;
+  const ultimo = new Date(PERIOD.year, PERIOD.month, 0).getDate();
+  const faltan = ultimo - ahora.getDate();
+  if(faltan <= 0) return `${saludo}, hoy es el último día de ${nombreMes}`;
+  if(faltan === 1) return `${saludo}, mañana se acaba ${nombreMes}`;
+  return `${saludo}, quedan ${faltan} días de ${nombreMes}`;
+}
+
 function ziggyResumen(d){
   const bk = d.bk || [];
   const enMes = b => inPeriodMonth(b.starts_at);
@@ -2904,7 +2932,7 @@ function ziggyResumen(d){
   return `<div class="zres">
     ${ziggyIcono(pend||sinCalificar||solicitudes||budget<=0 ? 'neutral' : 'listo', 92)}
     <div class="zres-b">
-      <div class="zres-k">Resumen del día</div>
+      <div class="zres-k">${esc(ziggySaludo())}</div>
       <h3>${esc(titulo)}</h3>
       ${sub?`<div class="zres-s">${esc(sub)}.</div>`:''}
       <div class="zres-chips">${chips.map(c=>
@@ -4541,6 +4569,7 @@ async function openArtistProfile(artistId, showId){
         ? apShowsHTML(shows.filter(s=>s.id!==sel.id),tray,'Otros shows del proveedor')
         : apShowsHTML(shows,tray)}
       ${apReviewsHTML(rev)}
+      ${apAfinidadHTML(a,shows)}
       ${apTarjetaHTML(a)}
     </div>
     <div class="af"><button class="btn ghost" onclick="apClose()">Cerrar</button>
@@ -4549,6 +4578,47 @@ async function openArtistProfile(artistId, showId){
        : `<button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button>`}</div>
   </div>`;
 }
+/* ---- Contestar el cuestionario de un proveedor YA REGISTRADO ---------------
+   David, 10/09: "no veo dónde se puede acceder a los ya creados para dar los
+   datos". Las diez preguntas entraron en el formulario de alta, así que sirven
+   para quien se registre a partir de ahora; los 22 proveedores que ya estaban
+   dentro no tenían por dónde. El artista sí puede desde Mi Perfil, pero David
+   necesita poder rellenarlas él mientras los llama por videollamada.
+
+   Sólo MASTER, y sólo el cuestionario. Contestar por alguien las diez preguntas
+   que deciden a qué hoteles se le recomienda ya es bastante: esta puerta no abre
+   el resto de su ficha, ni su precio, ni sus fotos. Un botón que empezara a
+   editar más cosas convertiría el atajo de una noche en un permiso permanente
+   sobre datos de otra persona. */
+function apAfinidadHTML(a, shows){
+  if(!ME || !ME.is_admin || !a || !a.id) return '';
+  if(!shows || !shows.length) return '';
+  const total = shows.length;
+  const listos = shows.filter(s=>s.afinidad && Object.keys(s.afinidad).length>=10).length;
+  const filas = shows.map(s=>{
+    const n = s.afinidad ? Object.keys(s.afinidad).length : 0;
+    const est = n>=10 ? '<span class="trck on">✓ Las diez contestadas</span>'
+              : (n ? `<span class="muted" style="font-size:12.5px">${n} de 10 contestadas</span>`
+                   : '<span class="muted" style="font-size:12.5px">Sin contestar</span>');
+    return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+                 padding:8px 0;border-top:1px solid var(--line)">
+      <b style="font-size:13px">${esc(s.show_name||'Show')}</b>
+      ${est}
+      <button class="btn mini ghost" style="margin-left:auto"
+        onclick="afShowAbrir(${s.id},'${(s.show_name||'').replace(/'/g,"\\'")}')">
+        ${n>=10?'Revisar':'Contestar'}</button>
+    </div>`;
+  }).join('');
+  return `<div class="apsec" id="apAf">
+    <h4>Cuestionario de afinidad</h4>
+    <div class="muted" style="font-size:12.5px;margin-bottom:6px">
+      Las diez preguntas de cada show. Hasta que un show no las tenga las diez,
+      no se puede calcular su match y sale en la lista de "sin cuestionario",
+      no ordenado al final con un cero. ${listos} de ${total} ${total===1?'show listo':'shows listos'}.</div>
+    ${filas}
+  </div>`;
+}
+
 /* ---- Tarjeta de presentación pública -------------------------------------
    La liga que se le pasa a un hotel por WhatsApp: el perfil del proveedor
    visto desde fuera, sin cuenta. Sólo la ve el administrador porque publicar
