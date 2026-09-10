@@ -198,7 +198,7 @@ PREGUNTAS_TEXTO: dict[str, dict[str, str]] = {
     "P6": {"hotel": "¿Cuál es el perfil predominante de huésped?",
            "show": "¿Qué perfil coincide más con tu estilo?"},
     "P7": {"hotel": "¿Qué personalidad debe tener el entretenimiento?",
-           "show": "¿Cómo calificarías tu show?"},
+           "show": "¿Cuál dirías que es la esencia de tu show?"},
     "P8": {"hotel": "¿Qué nivel de energía tiene tu propiedad?",
            "show": "¿Qué nivel de energía tiene tu propuesta?"},
     "P9": {"hotel": "¿Qué grado de innovación artística acepta la propiedad?",
@@ -277,11 +277,11 @@ OPCIONES_TEXTO: dict[str, dict[str, str]] = {
         "Tradicional": "Muy tradicional: formatos conocidos",
         "Actualizado": "Tradicional con pequeños elementos nuevos",
         "Equilibrado": "Equilibrio entre probado y novedoso",
-        # Las dos últimas están escritas desde el hotel ("buscamos", "queremos")
-        # y no se pueden leer como respuesta de un artista. Pendiente de que
-        # David les dé su redacción; mientras tanto van en neutro.
+        # Las dos últimas venían escritas desde el hotel ("buscamos",
+        # "queremos") y no se podían leer como respuesta de un artista. Ésta es
+        # la redacción de David (10/09), que sirve para los dos lados.
         "Diferente": "Propuestas diferentes",
-        "Referente": "Sorprender y marcar tendencia",
+        "Referente": "Sorprender y ser referentes",
     },
     "P10": {
         "Ambiente": "Crear ambiente — complementar el espacio",
