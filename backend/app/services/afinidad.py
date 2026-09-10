@@ -207,6 +207,94 @@ PREGUNTAS_TEXTO: dict[str, dict[str, str]] = {
             "show": "¿Qué crees que logra tu show?"},
 }
 
+
+# Cómo se LEE cada opción, del documento que mandó David (10/09). El valor que
+# se guarda y con el que se cruzan las matrices sigue siendo el corto ("Lujo",
+# "Ambiental", "Muy baja"): eso NO puede cambiar sin rehacer las tablas. Lo que
+# cambia es lo que ve quien contesta.
+#
+# Importa más de lo que parece: "Ambiental" a secas se puede entender de tres
+# maneras, y "Ambiental: acompaña sin dominar" no. Cada respuesta mal entendida
+# es una recomendación mal hecha para siempre, y nadie sabría por qué.
+OPCIONES_TEXTO: dict[str, dict[str, str]] = {
+    "P1": {
+        "Lujo": "Lujo y sofisticado · exclusividad, servicio personalizado y experiencias selectas",
+        "Lifestyle": "Lifestyle / contemporáneo",
+        "Familiar": "Familiar · diversión multigeneracional y actividades para todas las edades",
+        "Adults Only": "Adults Only / parejas · intimidad, bodas y celebraciones",
+        "Cultural": "Cultural / auténtico local",
+        "Entretenimiento": "Entretenimiento / alta energía",
+        "Wellness": "Wellness / relajación",
+        "Business": "Business / convencional",
+    },
+    "P2": {
+        "Elegancia": "Elegancia y exclusividad", "Diversion": "Diversión y energía",
+        "Relajacion": "Relajación y ambiente", "Sorpresa": "Sorpresa / impacto",
+        "Autenticidad": "Autenticidad cultural", "Romance": "Romance / intimidad",
+        "Modernidad": "Modernidad / tendencia", "Familiaridad": "Familiaridad / accesibilidad",
+    },
+    "P3": {
+        "Ambiental": "Ambiental: acompaña sin dominar",
+        "Moderado": "Moderado: visible, pero integrado",
+        "Protagonista": "Protagonista: es parte importante de la experiencia",
+        "Show": "Show: capta prácticamente toda la atención",
+    },
+    "P4": {
+        "Muy baja": "Muy baja: elegante y discreto", "Baja": "Baja: interacción puntual",
+        "Media": "Media: participación voluntaria", "Alta": "Alta: artista y público interactúan",
+        "Inmersiva": "Muy alta: experiencia participativa / inmersiva",
+    },
+    "P5": {
+        "Clasico": "Clásico / elegante", "Minimalista": "Minimalista / sofisticado",
+        "Moderno": "Moderno / urbano", "Tropical": "Tropical / resort",
+        "Bohemio": "Bohemio / natural", "Cultural": "Cultural / tradicional",
+        "Espectacular": "Espectacular / teatral", "Divertido": "Divertido / colorido",
+    },
+    "P6": {
+        "Parejas": "Parejas", "Familias": "Familias con niños", "25-40": "Adultos 25–40",
+        "40-60": "Adultos 40–60", "Senior": "Senior / 60+",
+        "Grupos": "Grupos / celebraciones", "Corporativo": "Corporativo",
+        "High-end": "Lujo / high-end",
+    },
+    "P7": {
+        "Exclusivo": "Exclusivo — refinado y aspiracional",
+        "Elegante": "Elegante — cuidado y discreto",
+        "Casual": "Casual — natural y relajado",
+        "Social": "Social — cercano y participativo",
+        "Energetico": "Energético — dinámico y estimulante",
+        "Sorprendente": "Sorprendente — creativo e inesperado",
+        "Espectacular": "Espectacular — impactante y protagonista",
+        "Divertido": "Divertido — accesible y desenfadado",
+    },
+    "P8": {
+        "Muy baja": "Muy baja — relajado / contemplativo",
+        "Baja": "Baja — tranquilo / ambiental",
+        "Media": "Media — equilibrado / dinámico",
+        "Alta": "Alta — energético / estimulante",
+        "Muy alta": "Muy alta — intenso / explosivo",
+    },
+    "P9": {
+        "Tradicional": "Muy tradicional: formatos conocidos",
+        "Actualizado": "Tradicional con pequeños elementos nuevos",
+        "Equilibrado": "Equilibrio entre probado y novedoso",
+        # Las dos últimas están escritas desde el hotel ("buscamos", "queremos")
+        # y no se pueden leer como respuesta de un artista. Pendiente de que
+        # David les dé su redacción; mientras tanto van en neutro.
+        "Diferente": "Propuestas diferentes",
+        "Referente": "Sorprender y marcar tendencia",
+    },
+    "P10": {
+        "Ambiente": "Crear ambiente — complementar el espacio",
+        "Conexion": "Generar conexión — favorecer la socialización",
+        "Entretener": "Entretener — ofrecer un buen momento",
+        "Sorprender": "Sorprender — crear algo inesperado",
+        "Recuerdos": "Crear recuerdos — generar momentos memorables",
+        "Activar": "Activar espacios — atraer huéspedes a determinadas áreas",
+        "Atractivo": "Ser un atractivo — convertirse en motivo para asistir",
+        "Marca": "Reforzar la marca — expresar el concepto del hotel",
+    },
+}
+
 PREGUNTAS: dict[str, tuple[str, list[str], list[list[int]]]] = {
     "P1": ("Concepto", P1_OPCIONES, P1_MATRIZ),
     "P2": ("Sensacion", P2_OPCIONES, P2_MATRIZ),

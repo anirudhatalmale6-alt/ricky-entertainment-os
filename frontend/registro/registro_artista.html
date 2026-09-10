@@ -695,12 +695,12 @@ function pintarAfinidad(el){
     if(q.multiple){
       return `<label class="f full"><span>${esc(texto)} · elige hasta ${q.max}</span>
         <span class="afchips" data-k="${k}">${q.opciones.map(o=>
-          `<button type="button" class="afchip" data-v="${esc(o)}" onclick="afChip(this)">${esc(o)}</button>`
+          `<button type="button" class="afchip" data-v="${esc(o)}" onclick="afChip(this)">${esc((q.etiquetas&&q.etiquetas[o])||o)}</button>`
         ).join('')}</span></label>`;
     }
     return `<label class="f"><span>${esc(texto)}</span>
       <select class="af-q" data-k="${k}"><option value="">— sin contestar —</option>
-        ${q.opciones.map(o=>`<option>${esc(o)}</option>`).join('')}</select></label>`;
+        ${q.opciones.map(o=>`<option value="${esc(o)}">${esc((q.etiquetas&&q.etiquetas[o])||o)}</option>`).join('')}</select></label>`;
   }).join('');
 }
 function afChip(btn){

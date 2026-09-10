@@ -9085,13 +9085,13 @@ function afCampo(nivel, id, k, valor){
       <span class="hint" style="font-weight:400"> · elige hasta ${q.max}</span></label>
       <div class="zchips">${q.opciones.map(o=>
         `<button type="button" class="zchip${puestas.includes(o)?' on':''}"
-           onclick="afTogle('${nivel}',${id},'${k}','${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`
+           onclick="afTogle('${nivel}',${id},'${k}','${o.replace(/'/g,"\\'")}')">${esc((q.etiquetas&&q.etiquetas[o])||o)}</button>`
       ).join('')}</div></div>`;
   }
   return `<div class="field"><label>${esc(texto)}</label>
     <select onchange="afSet('${nivel}',${id},'${k}',this.value)">
       <option value="">— sin contestar —</option>
-      ${q.opciones.map(o=>`<option${valor===o?' selected':''}>${esc(o)}</option>`).join('')}
+      ${q.opciones.map(o=>`<option value="${esc(o)}"${valor===o?' selected':''}>${esc((q.etiquetas&&q.etiquetas[o])||o)}</option>`).join('')}
     </select></div>`;
 }
 

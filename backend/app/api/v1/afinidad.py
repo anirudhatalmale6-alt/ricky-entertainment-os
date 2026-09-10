@@ -93,6 +93,11 @@ async def cuestionario(user: CurrentUser):
                 "hotel": af.PREGUNTAS_TEXTO.get(clave, {}).get("hotel", titulo),
                 "show": af.PREGUNTAS_TEXTO.get(clave, {}).get("show", titulo),
                 "opciones": opciones,
+                # Cómo se lee cada opción. El valor que se guarda sigue siendo
+                # el corto: "Ambiental" a secas se entiende de tres maneras y
+                # "Ambiental: acompaña sin dominar" de una.
+                "etiquetas": {o: af.OPCIONES_TEXTO.get(clave, {}).get(o, o)
+                              for o in opciones},
                 "multiple": clave in af.MULTIPLES,
                 "max": af.MAX_SELECCIONES if clave in af.MULTIPLES else 1,
             }
