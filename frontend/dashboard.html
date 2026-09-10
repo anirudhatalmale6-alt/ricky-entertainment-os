@@ -1503,9 +1503,13 @@
 .zb-chips{margin-left:0}
 
 /* Resumen del día de ZIGGY */
-.zres{display:flex;align-items:center;gap:18px;margin:14px 0;padding:16px 20px;
+.zres{display:flex;align-items:center;gap:18px;margin:14px 0;padding:16px 20px;flex-wrap:wrap;
   border-radius:16px;background:linear-gradient(135deg,#efeafe,#f7f5ff);border:1px solid #e0dafc}
-.zres-b{flex:1;min-width:220px}
+/* min-width:0, no 220px: con un titular de una frase entera, un mínimo fijo
+   hace que el texto empuje el banner fuera de la caja en pantallas estrechas.
+   Con 0 el bloque se encoge y la frase parte de línea, que es lo que tiene que
+   pasar. El flex-wrap deja que el botón baje en vez de aplastar el texto. */
+.zres-b{flex:1;min-width:0;overflow-wrap:anywhere}
 /* David, 10/09: los titulares hablan como una persona, así que ZIGGY ya no dice
    su propio nombre en cada frase. Firma aquí, debajo de su icono, que además es
    donde se le reconoce. */
@@ -1516,7 +1520,11 @@
    icono un 25%. */
 .zres-firma{font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--acc);opacity:.75}
 .zres-k{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)}
-.zres h3{margin:2px 0 0;font-size:22px;font-weight:750;color:#1b1f2e;line-height:1.2}
+/* El titular pasó de tres palabras a una frase entera, así que baja de 22 a 19
+   y se le da aire entre líneas: a 22px una frase hablada se lee como un cartel,
+   no como alguien hablando. */
+.zres h3{margin:3px 0 0;font-size:19px;font-weight:700;color:#1b1f2e;line-height:1.34;
+  max-width:60ch}
 .zres-s{font-size:13.5px;color:var(--mut);margin-top:4px}
 .zres-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .zres-chip{border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:650}
@@ -2909,34 +2917,34 @@ function ziggyResumen(d){
   // Un presupuesto sin cargar es un hueco; 36 actuaciones sin confirmar es un
   // riesgo de quedarte sin la fecha. Por eso el hueco ya no manda el titular:
   // sigue dicho en su chip, que es donde tiene que estar.
-  let titulo, nota, accion = null;
+  let frase, nota, accion = null;
   if(budget>0 && pct>100){
-    titulo = 'Este mes ya te pasaste del presupuesto';
+    frase = 'este mes ya te pasaste del presupuesto';
     nota = `Llevas ${MXN(usado)} sobre ${MXN(budget)} presupuestados, un ${pct-100}% por encima.`;
     accion = {t:'Ver presupuesto', f:"show('budget')"};
   } else if(pend){
-    titulo = `Tienes ${pend} ${pend===1?'actuación sin confirmar':'actuaciones sin confirmar'}`;
+    frase = `tienes ${pend} ${pend===1?'actuación sin confirmar':'actuaciones sin confirmar'}`;
     nota = 'Mientras sigan pendientes, el artista puede aceptar otra fecha y quedarte el hueco.';
     accion = {t:'Ver actuaciones', f:"show('cal')"};
   } else if(sinCalificar){
     // David, 10/09: las reseñas son "nuestra base de datos vital". Cada
     // actuación que pasa sin calificar es un dato que ya no se recupera: nadie
     // vuelve a acordarse dentro de un mes de cómo respondió el público.
-    titulo = sinCalificar===1
-      ? 'Te falta calificar una actuación'
-      : `Te faltan ${sinCalificar} actuaciones por calificar`;
+    frase = sinCalificar===1
+      ? 'te falta calificar una actuación'
+      : `te faltan ${sinCalificar} actuaciones por calificar`;
     nota = 'Son dos clics y es lo que construye el historial de cada proveedor. Pasada una semana, ya nadie se acuerda de cómo estuvo.';
     accion = {t:'Calificar', f:"show('cal')"};
   } else if(solicitudes){
-    titulo = `Tienes ${solicitudes} ${solicitudes===1?'solicitud esperando':'solicitudes esperando'} propuestas`;
+    frase = `tienes ${solicitudes} ${solicitudes===1?'solicitud esperando':'solicitudes esperando'} propuestas`;
     nota = 'Cuanto antes se cierren, más margen tienes para elegir.';
     accion = {t:'Ver solicitudes', f:"show('reqs')"};
   } else if(budget<=0){
-    titulo = 'Falta cargar el presupuesto del mes';
+    frase = 'falta cargar el presupuesto del mes';
     nota = 'Sin presupuesto del mes no hay con qué comparar el gasto. No es una desviación: es un dato que falta.';
     accion = {t:'Cargar presupuesto', f:"show('budget')"};
   } else {
-    titulo = 'Todo en orden por aquí';
+    frase = 'por aquí está todo en orden';
     nota = `Vas al ${pct}% del presupuesto del mes.`;
   }
 
@@ -2945,13 +2953,19 @@ function ziggyResumen(d){
     d.sat5!=null ? `satisfacción media de ${d.sat5.toFixed(1)}` : null,
   ].filter(Boolean).join(' · ');
 
+  // David, 10/09: el saludo va DENTRO del titular, como una frase hablada y
+  // entre comillas, no de kicker. Por eso cada regla de arriba aporta una
+  // oración en minúscula: se engancha al saludo sin que la costura se note.
+  // "Resumen del día" vuelve a su sitio, que él ya lo tenía por bueno.
+  const titulo = `“${ziggySaludo()} y ${frase}.”`;
+
   return `<div class="zres">
     <div class="zres-av">
       ${ziggyIcono(pend||sinCalificar||solicitudes||budget<=0 ? 'neutral' : 'listo', 92)}
       <span class="zres-firma">ZIGGY</span>
     </div>
     <div class="zres-b">
-      <div class="zres-k">${esc(ziggySaludo())}</div>
+      <div class="zres-k">Resumen del día</div>
       <h3>${esc(titulo)}</h3>
       ${sub?`<div class="zres-s">${esc(sub)}.</div>`:''}
       <div class="zres-chips">${chips.map(c=>
