@@ -1506,6 +1506,15 @@
 .zres{display:flex;align-items:center;gap:18px;margin:14px 0;padding:16px 20px;
   border-radius:16px;background:linear-gradient(135deg,#efeafe,#f7f5ff);border:1px solid #e0dafc}
 .zres-b{flex:1;min-width:220px}
+/* David, 10/09: los titulares hablan como una persona, así que ZIGGY ya no dice
+   su propio nombre en cada frase. Firma aquí, debajo de su icono, que además es
+   donde se le reconoce. */
+.zres-av{display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto}
+/* Clase propia, NO ".zres-av > span": el icono ya viene envuelto en un
+   <span class="zig-ic">, así que un selector por etiqueta le caía encima y le
+   ponía opacity .75. Se veía bien en la captura y aun así estaba apagando el
+   icono un 25%. */
+.zres-firma{font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--acc);opacity:.75}
 .zres-k{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)}
 .zres h3{margin:2px 0 0;font-size:22px;font-weight:750;color:#1b1f2e;line-height:1.2}
 .zres-s{font-size:13.5px;color:var(--mut);margin-top:4px}
@@ -2849,8 +2858,13 @@ function fmtNewsDate(s){ try{ const d=new Date(s); if(isNaN(d.getTime())) return
 // último día" un día 10.
 function ziggySaludo(ahora){
   ahora = ahora || new Date();
-  const h = ahora.getHours();
-  const saludo = h < 12 ? 'Buenos días' : (h < 20 ? 'Buenas tardes' : 'Buenas noches');
+  // Las franjas son las de David (10/09), al minuto: 00:00-12:00 "Buenos días",
+  // 12:01-20:00 "Hola", 20:01-00:00 "Buenas noches". Los cortes van con los
+  // minutos y no sólo con la hora porque él los escribió así: a las 12:00 en
+  // punto todavía es de mañana, y a las 12:01 ya no.
+  const minutos = ahora.getHours()*60 + ahora.getMinutes();
+  const saludo = minutos <= 12*60 ? 'Buenos días'
+               : (minutos <= 20*60 ? 'Hola' : 'Buenas noches');
   const esteMes = ahora.getFullYear()===PERIOD.year && (ahora.getMonth()+1)===PERIOD.month;
   const nombreMes = MESES[PERIOD.month-1] || '';
   if(!esteMes) return `${saludo}, estás viendo ${nombreMes} de ${PERIOD.year}`;
@@ -2897,30 +2911,32 @@ function ziggyResumen(d){
   // sigue dicho en su chip, que es donde tiene que estar.
   let titulo, nota, accion = null;
   if(budget>0 && pct>100){
-    titulo = `ZIGGY ve el presupuesto del mes excedido`;
+    titulo = 'Este mes ya te pasaste del presupuesto';
     nota = `Llevas ${MXN(usado)} sobre ${MXN(budget)} presupuestados, un ${pct-100}% por encima.`;
     accion = {t:'Ver presupuesto', f:"show('budget')"};
   } else if(pend){
-    titulo = `ZIGGY ve ${pend} ${pend===1?'actuación sin confirmar':'actuaciones sin confirmar'}`;
+    titulo = `Tienes ${pend} ${pend===1?'actuación sin confirmar':'actuaciones sin confirmar'}`;
     nota = 'Mientras sigan pendientes, el artista puede aceptar otra fecha y quedarte el hueco.';
     accion = {t:'Ver actuaciones', f:"show('cal')"};
   } else if(sinCalificar){
     // David, 10/09: las reseñas son "nuestra base de datos vital". Cada
     // actuación que pasa sin calificar es un dato que ya no se recupera: nadie
     // vuelve a acordarse dentro de un mes de cómo respondió el público.
-    titulo = `ZIGGY ve ${sinCalificar} ${sinCalificar===1?'actuación sin calificar':'actuaciones sin calificar'}`;
+    titulo = sinCalificar===1
+      ? 'Te falta calificar una actuación'
+      : `Te faltan ${sinCalificar} actuaciones por calificar`;
     nota = 'Son dos clics y es lo que construye el historial de cada proveedor. Pasada una semana, ya nadie se acuerda de cómo estuvo.';
     accion = {t:'Calificar', f:"show('cal')"};
   } else if(solicitudes){
-    titulo = `ZIGGY ve ${solicitudes} ${solicitudes===1?'solicitud esperando':'solicitudes esperando'} propuestas`;
+    titulo = `Tienes ${solicitudes} ${solicitudes===1?'solicitud esperando':'solicitudes esperando'} propuestas`;
     nota = 'Cuanto antes se cierren, más margen tienes para elegir.';
     accion = {t:'Ver solicitudes', f:"show('reqs')"};
   } else if(budget<=0){
-    titulo = 'ZIGGY todavía no puede medir el ahorro';
+    titulo = 'Falta cargar el presupuesto del mes';
     nota = 'Sin presupuesto del mes no hay con qué comparar el gasto. No es una desviación: es un dato que falta.';
     accion = {t:'Cargar presupuesto', f:"show('budget')"};
   } else {
-    titulo = 'ZIGGY tiene todo preparado';
+    titulo = 'Todo en orden por aquí';
     nota = `Vas al ${pct}% del presupuesto del mes.`;
   }
 
@@ -2930,7 +2946,10 @@ function ziggyResumen(d){
   ].filter(Boolean).join(' · ');
 
   return `<div class="zres">
-    ${ziggyIcono(pend||sinCalificar||solicitudes||budget<=0 ? 'neutral' : 'listo', 92)}
+    <div class="zres-av">
+      ${ziggyIcono(pend||sinCalificar||solicitudes||budget<=0 ? 'neutral' : 'listo', 92)}
+      <span class="zres-firma">ZIGGY</span>
+    </div>
     <div class="zres-b">
       <div class="zres-k">${esc(ziggySaludo())}</div>
       <h3>${esc(titulo)}</h3>
