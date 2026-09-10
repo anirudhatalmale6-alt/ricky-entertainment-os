@@ -181,6 +181,13 @@ async def tarjeta_publica(artist_id: int, payload: TarjetaIn, db: DbSession):
     circula por WhatsApp sigue siendo la misma. Borrarlo convertiria cada
     apagon temporal en una liga rota para siempre.
     """
+    if not settings.TARJETA_PUBLICA:
+        # Se cierra en el servidor y no solo escondiendo el boton: una pantalla
+        # escondida se sigue pudiendo llamar a mano, y esto publica el perfil de
+        # una persona en internet.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La tarjeta publica esta desactivada en esta instalacion.")
     artist = await _get_artist_or_404(db, artist_id)
     if payload.publicar and not artist.public_slug:
         artist.public_slug = await _slug_libre(db, _slugify(artist.stage_name), artist_id)

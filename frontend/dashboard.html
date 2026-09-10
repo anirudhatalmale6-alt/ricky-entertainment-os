@@ -4443,6 +4443,9 @@ async function openArtistProfile(artistId, showId){
    decisión sobre datos de otra persona. Empieza APAGADA para todos. */
 function apTarjetaHTML(a){
   if(!ME || !ME.is_admin || !a || !a.id) return '';
+  // Apagada en esta instalación: ni se menciona. Enseñar un botón que el
+  // servidor va a rechazar es peor que no tenerlo.
+  if(window.RICKY_TARJETA === false) return '';
   const on=!!a.is_public;
   const url=a.public_slug ? location.origin+(window.RICKY_API||'')+'/p/'+a.public_slug : '';
   return `<div class="apsec" id="apTj">

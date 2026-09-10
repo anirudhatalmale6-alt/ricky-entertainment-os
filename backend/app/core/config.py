@@ -32,6 +32,16 @@ class Settings(BaseSettings):
     # its API base, and FastAPI uses it as root_path for docs/openapi.
     ROOT_PATH: str = ""
 
+    # La tarjeta publica del proveedor. David la congelo mientras decide como
+    # usarla (09/09: "aun no tengo muy claro como usarla"), y el codigo va en
+    # los mismos archivos que todo lo demas, asi que no se puede dejar fuera de
+    # un despliegue sin romperlo. Con esto apagado la funcion no existe para
+    # nadie: la pagina publica responde que no esta disponible, el boton de
+    # publicar no sale y el endpoint que la enciende rechaza. Encenderla luego
+    # es cambiar una linea del .env y reiniciar; los perfiles ya publicados
+    # vuelven con su misma liga porque el slug no se borra.
+    TARJETA_PUBLICA: bool = True
+
     # Database - SQLite for dev, PostgreSQL (asyncpg) for prod
     #   postgresql+asyncpg://user:pass@host:5432/dbname
     DATABASE_URL: str = "sqlite+aiosqlite:///./ricky.db"

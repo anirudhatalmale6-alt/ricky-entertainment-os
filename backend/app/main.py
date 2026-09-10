@@ -54,7 +54,8 @@ def _serve_html(f: Path | None, fallback: str) -> HTMLResponse:
     # la version nueva en vez de adivinar si le hace falta vaciar la cache.
     sello = hashlib.sha1(html.encode("utf-8")).hexdigest()[:7]
     inject = (f"<script>window.RICKY_API={json.dumps(settings.ROOT_PATH)};"
-              f"window.RICKY_BUILD={json.dumps(sello)};</script>")
+              f"window.RICKY_BUILD={json.dumps(sello)};"
+              f"window.RICKY_TARJETA={json.dumps(bool(settings.TARJETA_PUBLICA))};</script>")
     if "</head>" in html:
         html = html.replace("</head>", inject + "</head>", 1)
     else:
@@ -261,7 +262,9 @@ def _meta(data: dict, url: str) -> str:
 @app.get("/p/{slug}", include_in_schema=False)
 async def tarjeta_publica(slug: str, db: DbSession):
     """La tarjeta de un proveedor: pagina publica, sin cuenta y sin sesion."""
-    data = await tarjeta_data(db, slug)
+    # Apagada por configuracion: se contesta lo mismo que a un slug que no
+    # existe. Decir "esta desactivada" seria confirmar que el proveedor existe.
+    data = await tarjeta_data(db, slug) if settings.TARJETA_PUBLICA else None
     if data is None:
         return HTMLResponse(
             "<div style=\"font-family:system-ui;text-align:center;padding:80px 20px;color:#697089\">"
