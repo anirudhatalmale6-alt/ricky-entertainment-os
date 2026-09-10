@@ -88,6 +88,10 @@ async def cuestionario(user: CurrentUser):
         "preguntas": {
             clave: {
                 "titulo": titulo,
+                # El texto completo, en sus dos versiones. La etiqueta corta se
+                # queda para las tablas y los avisos, donde no cabe una frase.
+                "hotel": af.PREGUNTAS_TEXTO.get(clave, {}).get("hotel", titulo),
+                "show": af.PREGUNTAS_TEXTO.get(clave, {}).get("show", titulo),
                 "opciones": opciones,
                 "multiple": clave in af.MULTIPLES,
                 "max": af.MAX_SELECCIONES if clave in af.MULTIPLES else 1,

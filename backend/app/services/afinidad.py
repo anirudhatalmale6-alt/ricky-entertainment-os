@@ -175,6 +175,38 @@ P9_MATRIZ = [
     [20, 45, 75, 95, 100],
 ]
 
+
+# El texto COMPLETO de cada pregunta, tal como lo escribió David (07/09), en sus
+# dos versiones. "Concepto" a secas no es una pregunta: es una etiqueta que sólo
+# entiende quien ya sabe de qué va. Delante de un desplegable con ocho opciones,
+# el proveedor necesita leer qué se le está preguntando.
+#
+# Y las dos versiones importan: al hotel se le pregunta qué BUSCA y al artista
+# qué OFRECE. La misma etiqueta, dos preguntas distintas — que es justamente lo
+# que hace que las respuestas se puedan cruzar.
+PREGUNTAS_TEXTO: dict[str, dict[str, str]] = {
+    "P1": {"hotel": "¿Cómo definirías el concepto de tu propiedad?",
+           "show": "¿Cómo definirías tu show?"},
+    "P2": {"hotel": "¿Qué sensación debería transmitir el entretenimiento?",
+           "show": "¿Qué sensación transmite tu propuesta?"},
+    "P3": {"hotel": "¿Qué nivel de protagonismo debe tener el entretenimiento?",
+           "show": "¿Cómo es tu show?"},
+    "P4": {"hotel": "¿Qué interacción con los huéspedes buscas en tu propiedad?",
+           "show": "¿Qué nivel de interacción demanda tu show?"},
+    "P5": {"hotel": "¿Qué estilo describe mejor tu marca?",
+           "show": "¿Qué estilo visual describe tu show?"},
+    "P6": {"hotel": "¿Cuál es el perfil predominante de huésped?",
+           "show": "¿Qué perfil coincide más con tu estilo?"},
+    "P7": {"hotel": "¿Qué personalidad debe tener el entretenimiento?",
+           "show": "¿Cómo calificarías tu show?"},
+    "P8": {"hotel": "¿Qué nivel de energía tiene tu propiedad?",
+           "show": "¿Qué nivel de energía tiene tu propuesta?"},
+    "P9": {"hotel": "¿Qué grado de innovación artística acepta la propiedad?",
+           "show": "¿Qué tan innovadora es tu propuesta?"},
+    "P10": {"hotel": "¿Qué debe conseguir el entretenimiento?",
+            "show": "¿Qué crees que logra tu show?"},
+}
+
 PREGUNTAS: dict[str, tuple[str, list[str], list[list[int]]]] = {
     "P1": ("Concepto", P1_OPCIONES, P1_MATRIZ),
     "P2": ("Sensacion", P2_OPCIONES, P2_MATRIZ),

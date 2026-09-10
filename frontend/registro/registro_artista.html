@@ -689,13 +689,16 @@ function pintarAfinidad(el){
   if(!el || el.dataset.listo === '1') return;
   el.dataset.listo = '1';
   el.innerHTML = Object.entries(AFQ.preguntas).map(([k,q])=>{
+    // La pregunta entera, no la etiqueta: quien rellena esto no ha visto nunca
+    // el cuestionario y "Concepto" delante de ocho opciones no dice nada.
+    const texto = q.show || q.titulo;
     if(q.multiple){
-      return `<label class="f full"><span>${esc(q.titulo)} · elige hasta ${q.max}</span>
+      return `<label class="f full"><span>${esc(texto)} · elige hasta ${q.max}</span>
         <span class="afchips" data-k="${k}">${q.opciones.map(o=>
           `<button type="button" class="afchip" data-v="${esc(o)}" onclick="afChip(this)">${esc(o)}</button>`
         ).join('')}</span></label>`;
     }
-    return `<label class="f"><span>${esc(q.titulo)}</span>
+    return `<label class="f"><span>${esc(texto)}</span>
       <select class="af-q" data-k="${k}"><option value="">— sin contestar —</option>
         ${q.opciones.map(o=>`<option>${esc(o)}</option>`).join('')}</select></label>`;
   }).join('');

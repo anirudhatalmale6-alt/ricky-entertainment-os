@@ -8903,16 +8903,17 @@ function zLado(quien, preguntas){
   const est = quien==='h' ? ZH : ZS;
   return preguntas.map(k=>{
     const q = ZQ.preguntas[k];
+    const texto = (quien==='s' ? q.show : q.hotel) || q.titulo;
     if(q.multiple){
       const puestas = Array.isArray(est[k]) ? est[k] : (est[k]?[est[k]]:[]);
-      return `<div class="field"><label>${k} · ${esc(q.titulo)}
+      return `<div class="field"><label>${k} · ${esc(texto)}
         <span class="hint" style="font-weight:400"> hasta ${q.max}</span></label>
         <div class="zchips">${q.opciones.map(o=>
           `<button type="button" class="zchip${puestas.includes(o)?' on':''}"
              onclick="zTogle('${quien}','${k}','${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`
         ).join('')}</div></div>`;
     }
-    return `<div class="field"><label>${k} · ${esc(q.titulo)}</label>
+    return `<div class="field"><label>${k} · ${esc(texto)}</label>
       <select onchange="zSet('${quien}','${k}',this.value)">
         <option value="">— sin contestar —</option>
         ${q.opciones.map(o=>`<option${est[k]===o?' selected':''}>${esc(o)}</option>`).join('')}
@@ -9074,16 +9075,20 @@ let AFSAL = {};      // venue_id  -> {mood, efectivas}
 
 function afCampo(nivel, id, k, valor){
   const q = AFQ.preguntas[k];
+  // Al hotel se le pregunta qué BUSCA y al artista qué OFRECE. La etiqueta
+  // corta ("Concepto") no es una pregunta: es un recordatorio para quien ya
+  // sabe de qué va, y delante de ocho opciones no dice nada.
+  const texto = (nivel==='show' ? q.show : q.hotel) || q.titulo;
   if(q.multiple){
     const puestas = Array.isArray(valor) ? valor : (valor?[valor]:[]);
-    return `<div class="field"><label>${esc(q.titulo)}
+    return `<div class="field"><label>${esc(texto)}
       <span class="hint" style="font-weight:400"> · elige hasta ${q.max}</span></label>
       <div class="zchips">${q.opciones.map(o=>
         `<button type="button" class="zchip${puestas.includes(o)?' on':''}"
            onclick="afTogle('${nivel}',${id},'${k}','${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`
       ).join('')}</div></div>`;
   }
-  return `<div class="field"><label>${esc(q.titulo)}</label>
+  return `<div class="field"><label>${esc(texto)}</label>
     <select onchange="afSet('${nivel}',${id},'${k}',this.value)">
       <option value="">— sin contestar —</option>
       ${q.opciones.map(o=>`<option${valor===o?' selected':''}>${esc(o)}</option>`).join('')}
