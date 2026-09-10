@@ -319,7 +319,13 @@ textarea{resize:vertical;min-height:70px}
       <label class="consent"><input type="checkbox" id="c_privacy"> Acepto el <a>Aviso de Privacidad</a>.</label>
       <label class="consent"><input type="checkbox" id="c_data"> Autorizo el uso de mis datos para fines de operación y promoción.</label>
     </div>
-    <div class="foot"><button class="btn prev" onclick="go(2)">← Anterior</button><button class="btn fin" onclick="finalizar(this)">Finalizar registro ✓</button></div>
+    <div class="foot"><button class="btn prev" onclick="go(2)">← Anterior</button>
+      <button class="btn" onclick="guardarParcial(this)" style="margin-right:auto">Guardar y seguir después</button>
+      <button class="btn fin" onclick="finalizar(this)">Finalizar registro ✓</button></div>
+    <div class="foot-note" id="avisoParcial" style="display:none;text-align:left;margin-top:10px">
+      Guardado. Puedes cerrar y volver cuando quieras con tu correo y contraseña:
+      encontrarás esto tal como lo dejaste. Tu perfil no aparece ante los hoteles
+      hasta que termines el registro.</div>
   </section>
 
   <div class="foot-note">🔒 Tu información está 100% segura con nosotros · SHOWMA Entertainment OS</div>
@@ -707,6 +713,7 @@ function collectShow(el){
   }).filter(Boolean);
   const hotel=numOf(v('.p-hotel'));
   return {
+    _sid: el.dataset.sid ? +el.dataset.sid : null,
     show_name:name, category:v('.in-cat'), subcategory:v('.in-sub')||null, description:v('.in-desc')||null,
     members:intOf(v('.in-members'))||1, duration_minutes:intOf(v('.in-duration')), setup_minutes:intOf(v('.in-setup')),
     teardown_minutes:intOf(v('.in-teardown')), space_required:v('.in-space')||null, power_required:v('.in-power')||null,
@@ -793,11 +800,140 @@ async function finalizar(btn){
   btn.disabled=true; const t0=btn.textContent; btn.textContent='Guardando…';
   try{
     await apiPatch('/me/artist',prof);
-    for(const s of shows){ await apiPost('/me/artist/shows',s); }
+    for(const el of document.querySelectorAll('.show')){
+      const s = collectShow(el);
+      if(s) await subirShow(el, s);
+    }
     btn.textContent='¡Listo! Entrando…';
     location.href = BASE + '/';
   }catch(e){ btn.disabled=false; btn.textContent=t0; err('No se pudo guardar: '+e.message); }
 }
+
+
+/* ---- Guardar sin haber terminado ----------------------------------------
+   David, 09/09: tiene videollamadas con candidatos y "muchos no tienen
+   material de calidad". La hoja no guardaba NADA hasta estar completa entera
+   -incluidos RFC, CLABE y tres documentos-, asi que de una llamada de media
+   hora no quedaba ni el perfil ni las diez preguntas. El servidor si acepta
+   datos parciales; el que exigia todo era este formulario.
+
+   Lo delicado de guardar dos veces es DUPLICAR shows. Por eso cada ficha
+   recuerda el id que le dio el servidor la primera vez y a partir de ahi se
+   actualiza en vez de crearse otra. Y al volver otro dia, las fichas se
+   rellenan con lo que ya hay: sin eso, la segunda visita crearia un show
+   repetido cada vez. */
+function fillShow(el, s){
+  el.dataset.sid = s.id;
+  const set=(sel,val)=>{ const n=el.querySelector(sel); if(n && val!=null && val!=='') n.value=val; };
+  set('.in-name', s.show_name);
+  const cat=el.querySelector('.in-cat');
+  if(cat && s.category){ cat.value=s.category; fillSub(+el.dataset.n, s.category); }
+  set('.in-sub', s.subcategory);
+  set('.in-desc', s.description); set('.in-members', s.members);
+  set('.in-duration', s.duration_minutes); set('.in-setup', s.setup_minutes);
+  set('.in-teardown', s.teardown_minutes); set('.in-space', s.space_required);
+  set('.in-power', s.power_required); set('.in-req', s.requirements);
+  set('.in-video', s.video_url); set('.in-audio', s.audio_url);
+  set('.p-hotel', s.price_hotel); set('.p-corp', s.price_corporate);
+  set('.p-wedding', s.price_wedding); set('.p-private', s.price_private);
+  set('.p-restaurant', s.price_restaurant); set('.p-festival', s.price_festival);
+  set('.p-extrahour', s.extra_hour_price); set('.p-transport', s.transport_from_price);
+  set('.p-lodging', s.lodging_price); set('.p-travelfee', s.travel_fee);
+  set('.p-travelkm', s.travel_fee_km);
+  const aud=el.querySelector('.chk-audition'); if(aud) aud.checked=!!s.offers_audition;
+  // Las fotos que ya subio: se pintan para que se vean y para que no parezca
+  // que hay que volver a subirlas.
+  const row=el.querySelector('.photos'), add=row?row.querySelector('.ph.add'):null;
+  (s.images||[]).forEach(img=>{
+    if(!img.url || !row) return;
+    const tile=document.createElement('div'); tile.className='ph';
+    tile.dataset.url=img.url; tile.style.backgroundImage="url('"+img.url+"')";
+    tile.innerHTML='<span class="x" onclick="delPhoto(this,'+el.dataset.n+')">×</span>';
+    row.insertBefore(tile, add);
+  });
+  if(row && photoCount(row)>=5 && add) add.style.display='none';
+  // Y las diez preguntas, si ya las contesto
+  if(s.afinidad){
+    const caja=el.querySelector('.afgrid');
+    if(caja){
+      pintarAfinidad(caja);
+      Object.entries(s.afinidad).forEach(([k,v])=>{
+        const sel=caja.querySelector(`select.af-q[data-k="${k}"]`);
+        if(sel){ sel.value = Array.isArray(v)?v[0]:v; return; }
+        const chips=caja.querySelector(`.afchips[data-k="${k}"]`);
+        if(chips) (Array.isArray(v)?v:[v]).forEach(o=>{
+          const b=[...chips.querySelectorAll('.afchip')].find(x=>x.dataset.v===o);
+          if(b) b.classList.add('on');
+        });
+      });
+    }
+  }
+  badge(+el.dataset.n);
+  renameShow(+el.dataset.n, s.show_name||'');
+}
+
+async function cargarShows(){
+  let shows=[];
+  try{ shows = await apiGet('/me/artist/shows') || []; }catch(e){ return; }
+  if(!shows.length) return;
+  // Fuera la ficha vacia que puso el arranque: sus datos los traen las de verdad.
+  document.getElementById('showList').innerHTML='';
+  showN = 0;
+  for(const s of shows){
+    showN++;
+    document.getElementById('showList').insertAdjacentHTML('beforeend', showTpl(showN));
+    const el=document.querySelector('.show[data-n="'+showN+'"]');
+    el.dataset.n = showN;
+    const caja=el.querySelector('.afgrid'); if(caja) pintarAfinidad(caja);
+    fillShow(el, s);
+  }
+}
+
+/* Manda un show al servidor: lo crea la primera vez y lo actualiza despues.
+   Al actualizar NO se mandan fotos ni temporadas vacias, porque el servidor
+   reemplaza esas listas con lo que llegue y un guardado a medias borraria las
+   fotos que ya habia subido. */
+async function subirShow(el, s){
+  const sid = s._sid;
+  const cuerpo = {...s};
+  delete cuerpo._sid;
+  if(sid){
+    if(!cuerpo.images || !cuerpo.images.length) delete cuerpo.images;
+    if(!cuerpo.seasonal_rates || !cuerpo.seasonal_rates.length) delete cuerpo.seasonal_rates;
+    // Lo mismo con las diez preguntas: mandar vacío las borraría, y un
+    // guardado a medias nunca debe destruir lo que ya estaba contestado.
+    if(!cuerpo.afinidad) delete cuerpo.afinidad;
+    await apiPatch('/me/artist/shows/'+sid, cuerpo);
+    return sid;
+  }
+  const creado = await apiPost('/me/artist/shows', cuerpo);
+  if(creado && creado.id) el.dataset.sid = creado.id;
+  return creado ? creado.id : null;
+}
+
+async function guardarParcial(btn){
+  const prof = collectProfile();
+  if(!prof.stage_name){ go(0); err('Escribe al menos tu nombre artístico para poder guardar.'); focusId('p_stage'); return; }
+  const t0 = btn.textContent; btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    await apiPatch('/me/artist', prof);
+    for(const el of document.querySelectorAll('.show')){
+      const s = collectShow(el);
+      if(!s) continue;                      // sin nombre no es un show todavia
+      if(!s.category) continue;             // el servidor exige categoria valida
+      await subirShow(el, s);
+    }
+    err('');
+    btn.textContent='Guardado ✓';
+    const av=document.getElementById('avisoParcial');
+    if(av) av.style.display='';
+    setTimeout(()=>{ btn.disabled=false; btn.textContent=t0; }, 2200);
+  }catch(e){
+    btn.disabled=false; btn.textContent=t0;
+    err('No se pudo guardar: '+e.message);
+  }
+}
+window.guardarParcial = guardarParcial;
 
 // ---- Init: prefill from the just-created profile ----
 (async function init(){
@@ -805,7 +941,12 @@ async function finalizar(btn){
   fillSelect('stateAdd',ESTADOS_MX,'+ Agregar estado…');
   fillSelect('f_regime',REGIMENES_SAT,'Selecciona…');
   addShow();
-  cargarAfinidad();
+  // El cuestionario ANTES de las fichas: cargarShows() pinta las diez preguntas
+  // de cada show y necesita las opciones ya cargadas. Sin el await, la primera
+  // vez llegaba tarde y las respuestas guardadas no se volvian a marcar; al
+  // guardar otra vez se mandaba vacio y se BORRABAN. Silencioso y caro.
+  await cargarAfinidad();
+  await cargarShows();
   try{
     const a=await apiGet('/me/artist');
     const set=(id,val)=>{ const n=document.getElementById(id); if(n&&val) n.value=val; };

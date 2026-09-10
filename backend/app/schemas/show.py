@@ -171,6 +171,10 @@ class ShowOut(ShowBase):
     id: int
     artist_id: int
     is_active: bool
+    # Sin esto, la hoja de registro no puede volver a pintar las diez
+    # respuestas al retomar el alta otro día: las pediría, no las recibiría, y
+    # al guardar de nuevo mandaría vacío y BORRARÍA lo ya contestado.
+    afinidad: dict | None = None
     rating: float | None = None
     seasonal_rates: list[SeasonalRateOut] = []
     images: list[ShowImageOut] = []
