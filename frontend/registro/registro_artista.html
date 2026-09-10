@@ -508,7 +508,7 @@ function showTpl(n){
         <label class="f full"><span>Requerimientos / rider</span><textarea class="in-req" placeholder="Escenario, sonido, camerino, etc."></textarea></label>
       </div>
 
-      <div class="sec-t">Afinidad · cómo encaja este show</div>
+      <div class="sec-t">Te ayudamos a encontrar los escenarios perfectos para ti</div>
       <div class="hint" style="margin:-6px 0 10px">Diez preguntas rápidas. Con esto SHOWMA sabe a qué hoteles y a qué salas recomendar este show, así que vale la pena contestarlas. Si prefieres, puedes dejarlas para después desde tu perfil.</div>
       <div class="grid afgrid" data-af="${n}"></div>
 
@@ -660,12 +660,33 @@ function collectProfile(){
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let AFQ = null;
+let AF_ERROR = null;
 async function cargarAfinidad(){
-  try{ AFQ = await apiGet('/afinidad/cuestionario'); }catch(e){ AFQ = null; }
+  try{ AFQ = await apiGet('/afinidad/cuestionario'); AF_ERROR = null; }
+  catch(e){ AFQ = null; AF_ERROR = e && e.message ? e.message : 'no se pudo cargar'; }
   document.querySelectorAll('.afgrid').forEach(pintarAfinidad);
 }
+/* Si el cuestionario no carga, se DICE. Antes quedaba el título con un hueco
+   debajo, que se lee como "aquí no hay nada" y no como "esto falló": se pierde
+   media hora buscando el problema en el sitio equivocado. Con el aviso, quien
+   lo vea sabe que hay que recargar y yo sé por dónde empezar a mirar. */
+function afinidadFallo(el){
+  if(!el || el.dataset.listo) return;
+  el.dataset.listo = 'error';
+  el.innerHTML = `<div class="hint" style="grid-column:1/-1">
+    No se pudieron cargar las preguntas (${esc(AF_ERROR||'sin conexión')}).
+    <a href="#" onclick="reintentarAfinidad(event)" style="color:#382ca1;font-weight:600">Reintentar</a>.
+    Puedes seguir con el registro y contestarlas después desde tu perfil.</div>`;
+}
+async function reintentarAfinidad(ev){
+  if(ev) ev.preventDefault();
+  document.querySelectorAll('.afgrid').forEach(el=>{ delete el.dataset.listo; el.innerHTML=''; });
+  await cargarAfinidad();
+}
+window.reintentarAfinidad = reintentarAfinidad;
 function pintarAfinidad(el){
-  if(!AFQ || !el || el.dataset.listo) return;
+  if(!AFQ) return afinidadFallo(el);
+  if(!el || el.dataset.listo === '1') return;
   el.dataset.listo = '1';
   el.innerHTML = Object.entries(AFQ.preguntas).map(([k,q])=>{
     if(q.multiple){
