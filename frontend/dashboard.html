@@ -2844,10 +2844,13 @@ function ziggyResumen(d){
   const pct    = budget>0 ? Math.round(usado/budget*100) : null;
 
   // --- Los tres estados, cada uno con su regla ---
+  const sinCalificar = +d.sinCalificar || 0;
   const chips = [];
   chips.push(pend
     ? {t:`${pend} sin confirmar`, c:'warn'}
     : {t:'Agenda · completa', c:'ok'});
+  if(sinCalificar) chips.push({
+    t: sinCalificar===1 ? '1 sin calificar' : `${sinCalificar} sin calificar`, c:'warn'});
   // El adjetivo también concuerda: "1 solicitud abiertas" se lee como un
   // descuido, y un panel que se lee descuidado se cree menos.
   if(solicitudes) chips.push({
@@ -2859,12 +2862,13 @@ function ziggyResumen(d){
                : {t:`Presupuesto · ${pct}% usado`, c:'ok'}));
 
   // --- El titular: manda la regla más urgente que se cumpla ---
+  // El orden es por URGENCIA REAL, no por comodidad: primero lo que cuesta
+  // dinero o se pierde hoy, y al final lo que sólo es un hueco de configuración.
+  // Un presupuesto sin cargar es un hueco; 36 actuaciones sin confirmar es un
+  // riesgo de quedarte sin la fecha. Por eso el hueco ya no manda el titular:
+  // sigue dicho en su chip, que es donde tiene que estar.
   let titulo, nota, accion = null;
-  if(budget<=0){
-    titulo = 'ZIGGY todavía no puede medir el ahorro';
-    nota = 'Sin presupuesto del mes no hay con qué comparar el gasto. No es una desviación: es un dato que falta.';
-    accion = {t:'Cargar presupuesto', f:"show('budget')"};
-  } else if(pct>100){
+  if(budget>0 && pct>100){
     titulo = `ZIGGY ve el presupuesto del mes excedido`;
     nota = `Llevas ${MXN(usado)} sobre ${MXN(budget)} presupuestados, un ${pct-100}% por encima.`;
     accion = {t:'Ver presupuesto', f:"show('budget')"};
@@ -2872,13 +2876,24 @@ function ziggyResumen(d){
     titulo = `ZIGGY ve ${pend} ${pend===1?'actuación sin confirmar':'actuaciones sin confirmar'}`;
     nota = 'Mientras sigan pendientes, el artista puede aceptar otra fecha y quedarte el hueco.';
     accion = {t:'Ver actuaciones', f:"show('cal')"};
+  } else if(sinCalificar){
+    // David, 10/09: las reseñas son "nuestra base de datos vital". Cada
+    // actuación que pasa sin calificar es un dato que ya no se recupera: nadie
+    // vuelve a acordarse dentro de un mes de cómo respondió el público.
+    titulo = `ZIGGY ve ${sinCalificar} ${sinCalificar===1?'actuación sin calificar':'actuaciones sin calificar'}`;
+    nota = 'Son dos clics y es lo que construye el historial de cada proveedor. Pasada una semana, ya nadie se acuerda de cómo estuvo.';
+    accion = {t:'Calificar', f:"show('cal')"};
   } else if(solicitudes){
     titulo = `ZIGGY ve ${solicitudes} ${solicitudes===1?'solicitud esperando':'solicitudes esperando'} propuestas`;
     nota = 'Cuanto antes se cierren, más margen tienes para elegir.';
     accion = {t:'Ver solicitudes', f:"show('reqs')"};
+  } else if(budget<=0){
+    titulo = 'ZIGGY todavía no puede medir el ahorro';
+    nota = 'Sin presupuesto del mes no hay con qué comparar el gasto. No es una desviación: es un dato que falta.';
+    accion = {t:'Cargar presupuesto', f:"show('budget')"};
   } else {
     titulo = 'ZIGGY tiene todo preparado';
-    nota = pct!=null ? `Vas al ${pct}% del presupuesto del mes.` : '';
+    nota = `Vas al ${pct}% del presupuesto del mes.`;
   }
 
   const sub = [
@@ -2887,7 +2902,7 @@ function ziggyResumen(d){
   ].filter(Boolean).join(' · ');
 
   return `<div class="zres">
-    ${ziggyIcono(pend||solicitudes||budget<=0 ? 'neutral' : 'listo', 92)}
+    ${ziggyIcono(pend||sinCalificar||solicitudes||budget<=0 ? 'neutral' : 'listo', 92)}
     <div class="zres-b">
       <div class="zres-k">Resumen del día</div>
       <h3>${esc(titulo)}</h3>
@@ -6889,6 +6904,15 @@ const RENDER = {
     // KPIs and the Calendario Maestro stay in sync — no "phantom" acts in an absent venue.
     const bk   = (await api(`/bookings?group_id=${GID}`)).filter(b=>!(b.venue_id && !b.venue_name));
     const reqs = await api(`/requests?status=open`);
+    // Cuántas actuaciones ya pasaron sin calificar. Se pide aquí y no se
+    // confía en lo que dejó la pantalla de Actuaciones: si el Dashboard es lo
+    // primero que abre el gerente, ese dato todavía no existe y el aviso no
+    // saldría justo el día que más falta hace.
+    if(!ME.artist_id){
+      try{ const pcal = await api('/reviews/pendientes');
+           CACHE.porCalificar = new Set((pcal.items||[]).map(x=>x.booking_id)); }
+      catch(e){ /* si falla, el resumen simplemente no menciona las reseñas */ }
+    }
     // El Dashboard muestra el presupuesto del MES EN CURSO únicamente (David 2026-07-18);
     // el histórico completo de todos los meses vive en la pantalla Presupuesto.
     const gb   = await loadGroupBudgets();
@@ -6943,7 +6967,8 @@ const RENDER = {
         <div class="kpi"><div class="kh"><div><div class="k">Ahorro vs presupuesto</div><div class="v" id="kAhorroV">${budget>0?MXN(Math.abs(ahorro)):'—'}</div></div><div class="kc amber">📊</div></div>
           <div class="d" style="margin-top:8px" id="kAhorroD">${budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—'}</div></div>
       </div>
-      ${ziggyResumen({bk, budget, usado, reqs:(reqs||[]).length, sat5})}
+      ${ziggyResumen({bk, budget, usado, reqs:(reqs||[]).length, sat5,
+                      sinCalificar:(CACHE.porCalificar? CACHE.porCalificar.size : 0)})}
       <div class="splitH">
         <div class="box">
           <div class="mtoolbar">
