@@ -1501,6 +1501,24 @@
 /* Los chips y el botón van juntos a la derecha; si no cabe, bajan juntos */
 .zb-der{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
 .zb-chips{margin-left:0}
+
+/* Resumen del día de ZIGGY */
+.zres{display:flex;align-items:center;gap:18px;margin:14px 0;padding:16px 20px;
+  border-radius:16px;background:linear-gradient(135deg,#efeafe,#f7f5ff);border:1px solid #e0dafc}
+.zres-b{flex:1;min-width:220px}
+.zres-k{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)}
+.zres h3{margin:2px 0 0;font-size:22px;font-weight:750;color:#1b1f2e;line-height:1.2}
+.zres-s{font-size:13.5px;color:var(--mut);margin-top:4px}
+.zres-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.zres-chip{border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:650}
+.zres-chip.ok{background:rgba(16,185,129,.14);color:#0b7a5b}
+.zres-chip.warn{background:rgba(245,158,11,.16);color:#8a5a00}
+.zres-chip.bad{background:rgba(239,68,68,.13);color:#b03030}
+.zres-n{font-size:12.5px;color:var(--mut);margin-top:10px;padding-top:9px;border-top:1px solid #e6e0fb}
+.zres-cta{flex:0 0 auto;border:0;background:var(--acc);color:#fff;border-radius:11px;
+  padding:11px 18px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit}
+.zres-cta:hover{background:#2c2280}
+@media(max-width:820px){.zres{flex-wrap:wrap}.zres-cta{width:100%}}
 </style>
 </head>
 <body>
@@ -2801,6 +2819,86 @@ async function loadNewsFeed(){
   return CACHE.news;
 }
 function fmtNewsDate(s){ try{ const d=new Date(s); if(isNaN(d.getTime())) return ""; return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'}); }catch(e){ return ""; } }
+
+
+/* ===== Resumen del día de ZIGGY ========================================
+   David, 10/09: "poner datos de fórmulas, incluso alguna regla condicional
+   para que parezca que realmente es IA".
+
+   Lo que hace que parezca inteligente no es el adorno: es que ACIERTE, y que
+   diga primero lo que de verdad importa hoy. Por eso las reglas van en orden
+   de urgencia y sólo una manda el titular. Un panel que siempre dice lo mismo
+   se deja de leer a la tercera vez.
+
+   Y ninguna regla inventa: si falta el presupuesto, ZIGGY dice que falta, no
+   una desviación. Un dato que falta enseñado como alarma se descubre a la
+   primera y se lleva por delante la confianza en todas las demás. */
+function ziggyResumen(d){
+  const bk = d.bk || [];
+  const enMes = b => inPeriodMonth(b.starts_at);
+  const pend = bk.filter(b => b.status==='pending' && enMes(b)).length;
+  const conf = bk.filter(b => (b.status==='confirmed'||b.status==='completed') && enMes(b)).length;
+  const solicitudes = d.reqs || 0;
+  const budget = +d.budget || 0;
+  const usado  = +d.usado  || 0;
+  const pct    = budget>0 ? Math.round(usado/budget*100) : null;
+
+  // --- Los tres estados, cada uno con su regla ---
+  const chips = [];
+  chips.push(pend
+    ? {t:`${pend} sin confirmar`, c:'warn'}
+    : {t:'Agenda · completa', c:'ok'});
+  // El adjetivo también concuerda: "1 solicitud abiertas" se lee como un
+  // descuido, y un panel que se lee descuidado se cree menos.
+  if(solicitudes) chips.push({
+    t: solicitudes===1 ? '1 solicitud abierta' : `${solicitudes} solicitudes abiertas`,
+    c:'warn'});
+  chips.push(budget<=0
+    ? {t:'Presupuesto · sin cargar', c:'bad'}
+    : (pct>100 ? {t:`Presupuesto · ${pct}% usado`, c:'bad'}
+               : {t:`Presupuesto · ${pct}% usado`, c:'ok'}));
+
+  // --- El titular: manda la regla más urgente que se cumpla ---
+  let titulo, nota, accion = null;
+  if(budget<=0){
+    titulo = 'ZIGGY todavía no puede medir el ahorro';
+    nota = 'Sin presupuesto del mes no hay con qué comparar el gasto. No es una desviación: es un dato que falta.';
+    accion = {t:'Cargar presupuesto', f:"show('budget')"};
+  } else if(pct>100){
+    titulo = `ZIGGY ve el presupuesto del mes excedido`;
+    nota = `Llevas ${MXN(usado)} sobre ${MXN(budget)} presupuestados, un ${pct-100}% por encima.`;
+    accion = {t:'Ver presupuesto', f:"show('budget')"};
+  } else if(pend){
+    titulo = `ZIGGY ve ${pend} ${pend===1?'actuación sin confirmar':'actuaciones sin confirmar'}`;
+    nota = 'Mientras sigan pendientes, el artista puede aceptar otra fecha y quedarte el hueco.';
+    accion = {t:'Ver actuaciones', f:"show('cal')"};
+  } else if(solicitudes){
+    titulo = `ZIGGY ve ${solicitudes} ${solicitudes===1?'solicitud esperando':'solicitudes esperando'} propuestas`;
+    nota = 'Cuanto antes se cierren, más margen tienes para elegir.';
+    accion = {t:'Ver solicitudes', f:"show('reqs')"};
+  } else {
+    titulo = 'ZIGGY tiene todo preparado';
+    nota = pct!=null ? `Vas al ${pct}% del presupuesto del mes.` : '';
+  }
+
+  const sub = [
+    conf ? `${conf} ${conf===1?'actuación confirmada':'actuaciones confirmadas'} este mes` : null,
+    d.sat5!=null ? `satisfacción media de ${d.sat5.toFixed(1)}` : null,
+  ].filter(Boolean).join(' · ');
+
+  return `<div class="zres">
+    ${ziggyIcono(pend||solicitudes||budget<=0 ? 'neutral' : 'listo', 92)}
+    <div class="zres-b">
+      <div class="zres-k">Resumen del día</div>
+      <h3>${esc(titulo)}</h3>
+      ${sub?`<div class="zres-s">${esc(sub)}.</div>`:''}
+      <div class="zres-chips">${chips.map(c=>
+        `<span class="zres-chip ${c.c}">${esc(c.t)}</span>`).join('')}</div>
+      ${nota?`<div class="zres-n">${esc(nota)}</div>`:''}
+    </div>
+    ${accion?`<button class="zres-cta" onclick="${accion.f}">${esc(accion.t)}</button>`:''}
+  </div>`;
+}
 
 /* ---- Executive hotel dashboard: Calendario Maestro (drag to reschedule) ---- */
 let MAESTRO_REF = null;   // any Date within the displayed week
@@ -6845,6 +6943,7 @@ const RENDER = {
         <div class="kpi"><div class="kh"><div><div class="k">Ahorro vs presupuesto</div><div class="v" id="kAhorroV">${budget>0?MXN(Math.abs(ahorro)):'—'}</div></div><div class="kc amber">📊</div></div>
           <div class="d" style="margin-top:8px" id="kAhorroD">${budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—'}</div></div>
       </div>
+      ${ziggyResumen({bk, budget, usado, reqs:(reqs||[]).length, sat5})}
       <div class="splitH">
         <div class="box">
           <div class="mtoolbar">
