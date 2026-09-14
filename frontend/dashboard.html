@@ -1518,6 +1518,11 @@
    <span class="zig-ic">, así que un selector por etiqueta le caía encima y le
    ponía opacity .75. Se veía bien en la captura y aun así estaba apagando el
    icono un 25%. */
+.pvbox{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.pvbox > div{flex:1;min-width:220px}
+.apprev{background:#eef9f2;border:1px solid #bfe6d0;color:#15603f;border-radius:12px;
+  padding:11px 14px;font-size:12.5px;line-height:1.5;margin-bottom:14px}
+.apprev b{color:#0d4a30}
 .zres-firma{font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--acc);opacity:.75}
 .zres-k{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)}
 /* El titular pasó de tres palabras a una frase entera, así que baja de 22 a 19
@@ -4530,7 +4535,7 @@ function apReviewsHTML(rev){
    encabezado y el proveedor va debajo — igual que en la tarjeta del catálogo
    (David, 2026-08-14). El resto de su catálogo baja a "Otros shows del
    proveedor". Sin showId (perfil abierto desde otro lado) manda el proveedor. */
-async function openArtistProfile(artistId, showId){
+async function openArtistProfile(artistId, showId, previo){
   if(!artistId){ toast('Perfil no disponible para este artista.',true); return; }
   let ov=document.getElementById('apMov');
   if(!ov){ ov=document.createElement('div'); ov.id='apMov'; ov.className='mov'; document.body.appendChild(ov);
@@ -4586,6 +4591,10 @@ async function openArtistProfile(artistId, showId){
         <div class="apchips">${chips.map(c=>`<span>${c}</span>`).join('')}</div></div>
     </div>
     <div class="rqbody apbody">
+      ${previo?`<div class="apprev">
+        <b>Así ve tu ficha un hotel.</b> Es exactamente la misma pantalla que abren los
+        contratantes desde el catálogo, con tus datos de verdad. Lo que falte aquí es lo
+        que ellos tampoco van a ver.</div>`:''}
       ${apStatsHTML(tray,a)}
       ${apDistHTML(tray&&tray.distinciones)}
       ${(tray&&tray.nuevo)
@@ -4605,12 +4614,34 @@ async function openArtistProfile(artistId, showId){
       ${apAfinidadHTML(a,shows)}
       ${apTarjetaHTML(a)}
     </div>
-    <div class="af"><button class="btn ghost" onclick="apClose()">Cerrar</button>
-      ${apPickerAbierto(sel)?`<button class="btn ghost" onclick="apMessage(${artistId})">Mandar mensaje</button>
-        <button class="ago" onclick="apSeleccionar(${sel.id})">Seleccionar este show</button>`
-       : `<button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button>`}</div>
+    <div class="af">${previo
+      ? `<span class="hint" style="margin-right:auto">Estás viendo tu propia ficha. Los hoteles ven esto mismo.</span>
+         <button class="ago" onclick="apClose()">Volver a mi perfil</button>`
+      : `<button class="btn ghost" onclick="apClose()">Cerrar</button>
+         ${apPickerAbierto(sel)?`<button class="btn ghost" onclick="apMessage(${artistId})">Mandar mensaje</button>
+           <button class="ago" onclick="apSeleccionar(${sel.id})">Seleccionar este show</button>`
+          : `<button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button>`}`}</div>
   </div>`;
 }
+/* ---- Vista previa: la ficha del proveedor vista por un hotel ---------------
+   David, 12/09: "ya se está registrando gente... que puedan ver cómo verán su
+   ficha los contratantes, porque ahora solo los registran pero no saben cómo se
+   ve".
+
+   Se abre EXACTAMENTE la misma pantalla que ven los hoteles, con los mismos
+   datos, no una maqueta parecida. Una vista previa que no es la pantalla de
+   verdad deja de coincidir con ella a la tercera semana y entonces miente justo
+   a quien la usa para decidir si le faltan fotos.
+
+   Lo que cambia es sólo el marco: un aviso arriba diciendo qué está viendo, y
+   abajo "Volver a mi perfil" en vez de "Mandar mensaje" — mandarse un mensaje a
+   uno mismo es la clase de botón que hace dudar de si de verdad es su ficha. */
+function vistaPreviaFicha(artistId){
+  if(!artistId){ toast('Tu ficha todavía no está creada.',true); return; }
+  openArtistProfile(artistId, null, true);
+}
+window.vistaPreviaFicha=vistaPreviaFicha;
+
 /* ---- Contestar el cuestionario de un proveedor YA REGISTRADO ---------------
    David, 10/09: "no veo dónde se puede acceder a los ya creados para dar los
    datos". Las diez preguntas entraron en el formulario de alta, así que sirven
@@ -7536,6 +7567,14 @@ const RENDER = {
     ES_MUSICO = !!p.parent_id;
     if(ES_MUSICO){ box.innerHTML = musicoProfile(p); return; }
     box.innerHTML=`
+      <div class="box pvbox" style="margin-bottom:16px">
+        <div>
+          <h3 style="margin:0">👀 Así te ven los hoteles</h3>
+          <div class="hint" style="margin:6px 0 0">Abre tu ficha tal y como la abre un contratante desde el
+            catálogo. Es la mejor forma de ver si te faltan fotos, videos o descripción antes de que la vean ellos.</div>
+        </div>
+        <button class="btn" onclick="vistaPreviaFicha(${p.id})">Ver mi ficha</button>
+      </div>
       <div style="margin-bottom:16px">${partner}</div>
       <div class="box" style="margin-bottom:16px">
         <h3>📸 Foto de perfil</h3><div class="hint">Es la imagen que ven los hoteles en el catálogo. Con foto tu perfil se ve mucho más profesional que solo con iniciales.</div>
@@ -7844,6 +7883,14 @@ function musicoProfile(p){
   const dato = (et,v) => `<div class="field"><label>${et}</label><div style="padding:9px 0;font-size:14px">${esc(v||'—')}</div></div>`;
   const shows = (p.shows||[]);
   return `
+    <div class="box pvbox" style="margin-bottom:16px">
+        <div>
+          <h3 style="margin:0">👀 Así te ven los hoteles</h3>
+          <div class="hint" style="margin:6px 0 0">Abre tu ficha tal y como la abre un contratante desde el
+            catálogo. Es la mejor forma de ver si te faltan fotos, videos o descripción antes de que la vean ellos.</div>
+        </div>
+        <button class="btn" onclick="vistaPreviaFicha(${p.id})">Ver mi ficha</button>
+      </div>
     <div class="box" style="margin-bottom:16px">
       <h3>🎻 Tu ficha la gestiona ${empresa}</h3>
       <div class="hint" style="margin:0">Tu cuenta de SHOWMA es para dos cosas: bloquear los días que no estás
