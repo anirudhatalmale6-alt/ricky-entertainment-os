@@ -555,8 +555,14 @@
   .mtoolbar .mbtn{border:1px solid var(--line);background:var(--card);border-radius:8px;height:30px;min-width:30px;padding:0 10px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--txt);display:inline-flex;align-items:center;justify-content:center}
   .mtoolbar .mbtn:hover{background:var(--inp)}
   .mtoolbar .mbtn.today{color:var(--acc)}
-  .maestro{overflow-x:auto;padding-bottom:4px}
-  .mgrid{display:grid;grid-template-columns:118px repeat(7,minmax(88px,1fr));gap:5px;min-width:0}
+  /* David, 17/09: "en lugar de que crezca el calendario cuando haya mas venues,
+     que ocupe todo el espacio, y segun se anadan venues estos se hagan mas
+     pequenos". Con 3 salones sobraba media pantalla abajo.
+     El alto del contenedor lo pone ajustarAltoMaestro() al pintar y al cambiar
+     el tamano de la ventana; aqui solo se dice como se reparte. */
+  .maestro{overflow:auto;padding-bottom:4px}
+  .mgrid{display:grid;grid-template-columns:118px repeat(7,minmax(88px,1fr));gap:5px;min-width:0;
+    grid-template-rows:auto;grid-auto-rows:minmax(74px,1fr);min-height:100%}
   .mhd{font-size:10.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;text-align:center;padding:4px 0}
   .mhd.today{color:#fff;background:var(--grad);border-radius:7px}
   .mhd .dn{font-size:14px;font-weight:800;display:block;color:var(--txt)}
@@ -571,7 +577,7 @@
   .vname .vx{position:absolute;top:6px;right:6px;width:17px;height:17px;border-radius:50%;border:0;background:rgba(24,28,52,.06);color:var(--mut);font-size:12px;line-height:1;cursor:pointer;display:none;place-items:center;padding:0}
   .vname:hover .vx{display:grid}
   .vname .vx:hover{background:var(--bad);color:#fff}
-  .mcell{position:relative;min-height:96px;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:6px;transition:.12s}
+  .mcell{position:relative;min-height:0;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:5px;display:flex;flex-direction:column;gap:6px;transition:.12s}
   .mcell.over{background:rgba(56,44,161,.09);border-color:var(--acc);border-style:solid}
   .mcell.past{background:repeating-linear-gradient(135deg,transparent,transparent 6px,rgba(24,28,52,.03) 6px,rgba(24,28,52,.03) 12px);border-style:solid;border-color:var(--line)}
   .mcell.past.empty{opacity:.6}
@@ -3122,9 +3128,29 @@ function renderMaestro(){
   });
   if(!venues.length) html+=`<div style="grid-column:1/-1;padding:26px;text-align:center" class="muted">Aún no hay actuaciones programadas en esta cadena.</div>`;
   grid.innerHTML=html; wireMaestroDnD(); updateWeekKpi(); updateBudgetKpi(); updateNotifyBtn();
+  ajustarAltoMaestro();
   const lbl=document.getElementById('maestroWeek');
   if(lbl){ const e=days[6]; lbl.textContent=`${mon.getDate()} ${mon.toLocaleDateString('es-MX',{month:'short'})} – ${e.getDate()} ${e.toLocaleDateString('es-MX',{month:'short'})}`; }
 }
+/* El calendario ocupa desde donde empieza hasta el borde de abajo de la
+   ventana. Se mide en vez de calcularse con una resta fija (100vh - X) porque
+   lo que hay encima cambia de alto: el titular de ZIGGY puede ser de una o dos
+   lineas, y con una resta fija el calendario se saldria justo los dias en que
+   hay mas que contar. Se reservan 64px para el texto de ayuda de debajo. */
+function ajustarAltoMaestro(){
+  const grid=document.getElementById('maestroGrid');
+  const caja=grid&&grid.parentElement;            // .maestro
+  if(!caja) return;
+  const arriba=caja.getBoundingClientRect().top;
+  // Suelo de 340px: en una ventana muy baja vale más que scrollee a que las
+  // filas queden tan aplastadas que no se lea ninguna actuación.
+  caja.style.height=Math.max(340, Math.round(window.innerHeight-arriba-64))+'px';
+}
+let _altoMaestroT=null;
+window.addEventListener('resize',()=>{
+  clearTimeout(_altoMaestroT); _altoMaestroT=setTimeout(ajustarAltoMaestro,120);
+});
+
 function maestroWeek(delta){ const r=new Date(MAESTRO_REF||new Date()); if(delta===0) MAESTRO_REF=new Date(); else { r.setDate(r.getDate()+delta*7); MAESTRO_REF=r; } renderMaestro(); }
 function wireMaestroDnD(){
   const grid=document.getElementById('maestroGrid'); if(!grid) return;
