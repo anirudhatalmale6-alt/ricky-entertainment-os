@@ -457,6 +457,8 @@
   .srow{display:flex;align-items:center;gap:11px;padding:11px 0;border-top:1px solid var(--line)}
   .srow:first-of-type{border-top:0}
   .srow .ic2{width:34px;height:34px;border-radius:9px;background:var(--ov);display:grid;place-items:center;font-size:16px;flex:none}
+  .srow.clic{cursor:pointer;border-radius:9px;margin:0 -6px;padding-left:6px;padding-right:6px}
+  .srow.clic:hover{background:var(--inp)}
   .srow .lb{font-size:12.5px}.srow .lb s{display:block;font-size:11px;color:var(--mut);text-decoration:none}
   .srow .nb{margin-left:auto;font-size:17px;font-weight:700}
 
@@ -2615,7 +2617,13 @@ function applyRole(){
   // calendario- y Mis actuaciones. Las propuestas y el chat con hoteles son
   // trato comercial, y ese lo lleva la empresa que lo representa.
   ES_MUSICO = isArtist && !!ME.parent_id;
-  show('reqs', !ES_MUSICO);
+  // David, 17/09: "Propuestas, eliminarlo del Dashboard". Fuera del menú del
+  // artista. OJO: ese tablero es su única manera de enterarse de que hay trabajo
+  // abierto, así que la opción se va del menú pero el camino NO: la fila "Nuevas
+  // oportunidades" de su Dashboard lleva al mismo sitio (ver artistHome). Quitar
+  // el menú sin dejar puerta sería dejarles el contador de oportunidades
+  // delante y ninguna forma de abrirlas.
+  show('reqs', !ES_MUSICO && !isArtist);
   show('chat', !ES_MUSICO);
   if(ES_MUSICO){
     // "Tus datos, tarifas y publicaciones" prometía tres cosas que él no toca.
@@ -8627,8 +8635,8 @@ async function artistHome(box){
       <div class="box"><h3 style="text-transform:capitalize">🗓️ Calendario — ${calRef.toLocaleDateString('es-MX',{month:'long',year:'numeric'})}</h3><div class="hint">Toca un día para bloquearlo (vacaciones/enfermedad) o ver sus actuaciones · cambia de mes arriba a la derecha</div>${artistCal(bk,calRef)}</div>
       <div style="display:flex;flex-direction:column;gap:16px">
         <div class="box"><h3>📣 Novedades</h3><div class="hint">${ES_MUSICO?'Tu semana':'Oportunidades y mensajes'}</div>
-          ${ES_MUSICO?'':`<div class="srow"><div class="ic2">✨</div><div class="lb">Nuevas oportunidades<s>solicitudes abiertas</s></div><div class="nb">${openReqs.length}</div></div>
-          <div class="srow"><div class="ic2">💬</div><div class="lb">Mensajes sin leer<s>de hoteles</s></div><div class="nb">${unread}</div></div>`}
+          ${ES_MUSICO?'':`<div class="srow clic" onclick="show('reqs')" title="Ver las solicitudes abiertas"><div class="ic2">✨</div><div class="lb">Nuevas oportunidades<s>solicitudes abiertas · toca para verlas</s></div><div class="nb">${openReqs.length}</div></div>
+          <div class="srow clic" onclick="show('chat')" title="Ir a tus chats"><div class="ic2">💬</div><div class="lb">Mensajes sin leer<s>de hoteles · toca para abrirlos</s></div><div class="nb">${unread}</div></div>`}
           <div class="srow"><div class="ic2">🎭</div><div class="lb">Actuaciones próximas<s>confirmadas o pendientes</s></div><div class="nb">${upcoming.length}</div></div>
           ${ES_MUSICO?`<div class="srow"><div class="ic2">🚫</div><div class="lb">Días bloqueados<s>no te agendan en ellos</s></div><div class="nb">${BLOCKED.size}</div></div>`:''}
         </div>
