@@ -616,7 +616,11 @@
      de abajo quedaba partida por la mitad contra el pie, que es lo que se ve
      cortado. Ahora ocupa casi toda la ventana y las columnas se calculan solas
      según el ancho: cuatro en un portátil, dos en una pantalla pequeña. */
-  .amod.actpick{max-width:min(1480px,95vw);width:95vw;max-height:94vh}
+  .amod.actpick{max-width:none;width:98vw;height:97vh;max-height:97vh}
+  /* El .mov trae 20px de relleno para todos los modales. En éste sobran: David
+     pidió que "llene toda la parte sombreada", y esos 20px son justo el marco
+     sombreado que le quedaba alrededor. */
+  #actMov{padding:1.5vh 1vw}
   /* Fila de filtros: búsqueda + ubicación (con miras a operar a nivel nacional) */
   .amod.actpick .afilters{display:flex;gap:8px;margin:14px 18px 8px;align-items:center;flex-wrap:wrap}
   .amod.actpick .afilters .asrch{margin:0;flex:1;min-width:180px}
@@ -625,11 +629,11 @@
      número de columnas sale del espacio que haya. Y el padding de abajo evita
      que la última fila quede pegada al pie, que se lee como recortada aunque
      se pueda bajar con la rueda. */
-  .artgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;padding:6px 14px 18px}
+  .artgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:12px;padding:6px 14px 18px}
   .acard3{display:flex;gap:10px;border:1.5px solid var(--line);border-radius:13px;padding:9px;cursor:pointer;transition:.12s;background:var(--card)}
   .acard3:hover{border-color:var(--acc);box-shadow:0 6px 16px rgba(56,44,161,.12)}
   .acard3.sel{border-color:var(--acc);background:#382ca10d;box-shadow:0 0 0 2px #382ca133 inset}
-  .acard3 .ac3-ph{width:74px;height:74px;border-radius:11px;flex:none;background-size:cover;background-position:center;display:grid;place-items:center;color:#fff;font-size:22px;position:relative;overflow:hidden}
+  .acard3 .ac3-ph{width:116px;height:116px;border-radius:12px;flex:none;background-size:cover;background-position:center;display:grid;place-items:center;color:#fff;font-size:22px;position:relative;overflow:hidden}
   .acard3 .ac3-disp{position:absolute;left:4px;bottom:4px;font-size:8.5px;font-weight:700;color:#fff;background:rgba(16,185,129,.92);padding:1px 5px;border-radius:10px}
   .acard3 .ac3-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
   .acard3 .ac3-h{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
@@ -679,7 +683,8 @@
      la fecha y el hotel que ya venía capturando siguen ahí. Sin esta línea las
      dos capas comparten z-index y el orden depende de quién se creó primero. */
   #apMov{z-index:70}
-  @media(max-width:560px){ .artgrid{grid-template-columns:1fr} .amod.actpick{width:98vw;max-height:96vh} }
+  @media(max-width:900px){ .acard3 .ac3-ph{width:84px;height:84px} }
+  @media(max-width:560px){ .artgrid{grid-template-columns:1fr} #actMov{padding:0} .amod.actpick{width:100vw;height:100vh;max-height:100vh;border-radius:0} }
   .amod .af{border-top:1px solid var(--line);padding:13px 18px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
   .amod .af .fld{display:flex;flex-direction:column;gap:4px}
   .amod .af .fld label{font-size:10.5px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
