@@ -125,8 +125,22 @@
   .ppthumb .ppx{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:#ef4444;color:#fff;font-size:11px;cursor:pointer;line-height:1;display:grid;place-items:center}
   .ppadd{width:66px;height:66px;border-radius:9px;border:1.5px dashed var(--line);background:var(--ov);color:var(--mut);font-size:24px;cursor:pointer}
   .ppadd:hover{border-color:var(--acc);color:var(--acc)}
-  .lbmov{position:fixed;inset:0;background:rgba(8,10,20,.85);z-index:80;display:none;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
-  .lbmov img{max-width:92vw;max-height:88vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  /* z-index alto de verdad: el visor se abre DESDE dentro de la ficha, que ya es
+     un modal. Si quedara por debajo, el clic "no haría nada" — exactamente el
+     sintoma que se estaba arreglando. */
+  .lbmov{position:fixed;inset:0;background:rgba(8,10,20,.88);z-index:200;display:none;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
+  .lbmov img{max-width:92vw;max-height:88vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);cursor:default}
+  .lbmov .lbx{position:absolute;top:18px;right:20px;width:40px;height:40px;border-radius:50%;border:0;
+    background:rgba(255,255,255,.14);color:#fff;font-size:17px;cursor:pointer;display:grid;place-items:center}
+  .lbmov .lbx:hover{background:rgba(255,255,255,.26)}
+  .lbmov .lbnav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:52px;border-radius:50%;
+    border:0;background:rgba(255,255,255,.14);color:#fff;font-size:30px;line-height:1;cursor:pointer;
+    display:grid;place-items:center;font-family:inherit}
+  .lbmov .lbnav:hover{background:rgba(255,255,255,.26)}
+  .lbmov .lbnav.prev{left:18px} .lbmov .lbnav.next{right:18px}
+  .lbmov .lbn{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;font-size:12.5px;
+    background:rgba(0,0,0,.45);border-radius:999px;padding:5px 13px}
+  @media(max-width:560px){ .lbmov .lbnav{width:42px;height:42px;font-size:24px} .lbmov .lbnav.prev{left:6px} .lbmov .lbnav.next{right:6px} }
   .bell{position:relative;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;font-size:16px;cursor:pointer;transition:.15s}
   .bell:hover{background:var(--inp)}
   .bell .dot{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--acc2);border:1.5px solid var(--card)}
@@ -859,6 +873,11 @@
   .apvid b{position:absolute;left:7px;bottom:5px;color:#fff;font-size:10px;font-weight:650;
     text-shadow:0 1px 3px rgba(0,0,0,.6);max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .apfotos{display:flex;gap:7px;flex-wrap:wrap}
+  .apfoto{cursor:zoom-in;position:relative}
+  .apfoto:hover{filter:brightness(1.07);transform:translateY(-1px)}
+  .apfoto .apmas{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,12,24,.6);
+    color:#fff;font-size:14px;font-weight:700;border-radius:8px}
+  .apsimg.zoom,.aphero.zoom{cursor:zoom-in}
   .apfoto{width:74px;height:74px;border-radius:8px;background-size:cover;background-position:center;
     background-color:var(--ov)}
   @media(max-width:720px){ .apmedia{grid-template-columns:1fr} }
@@ -4468,7 +4487,9 @@ function apShowsHTML(shows, t, titulo){
   if(!shows.length) return '';
   const st=(t&&t.shows)||{};
   return `<div class="apsec"><h4>${esc(titulo||'Shows disponibles')}</h4>${shows.map(s=>{
-    const img=(s.images&&s.images[0]&&s.images[0].url)||'';
+    const fotosShow=(s.images||[]).map(im=>im&&im.url).filter(Boolean);
+    LBGAL['sh'+s.id]=fotosShow;
+    const img=fotosShow[0]||'';
     const e=st[String(s.id)]||null;
     const meta=[pretty(s.category), s.subcategory?pretty(s.subcategory):'', s.duration_minutes?s.duration_minutes+' min':'']
       .filter(Boolean).join(' · ');
@@ -4477,7 +4498,8 @@ function apShowsHTML(shows, t, titulo){
     if(e&&e.hoteles) marcas.push(`<span>${ico('hotel')} Contratado por <b>${e.hoteles}</b> ${e.hoteles===1?'hotel':'hoteles'}</span>`);
     if(s.members) marcas.push(`<span>${ico('users')} ${esc(String(s.members))} ${s.members===1?'integrante':'integrantes'}</span>`);
     return `<div class="apshow2">
-      <div class="apsimg" ${img?`style="background-image:url('${esc(img)}')"`:''}></div>
+      <div class="apsimg${img?' zoom':''}" ${img?`style="background-image:url('${esc(img)}')"
+        onclick="lightbox(LBGAL['sh${s.id}'],0)" title="Ampliar"`:''}></div>
       <div class="apsbody">
         <div class="apstitle"><b>${esc(s.show_name||'Show')}</b>
           ${s.price_hotel?`<span class="apsprice">${MXN(s.price_hotel)}</span>`:''}</div>
@@ -4503,15 +4525,23 @@ function revFecha(iso){
    foto del show de miniatura: un enlace de texto no invita a hacer clic y el
    video es justo lo que el hotel quiere ver antes de contratar. */
 function apMediaHTML(socLinks, videos, photos){
-  if(!socLinks.length && !videos.length && photos.length<2) return '';
+  if(!socLinks.length && !videos.length && !photos.length) return '';
   const col=(titulo,html)=>html?`<div><h5>${esc(titulo)}</h5>${html}</div>`:'';
   const soc=socLinks.length?`<div class="apsoc">${socLinks.join('')}</div>`:'';
   const vid=videos.length?`<div class="apvids">${videos.slice(0,2).map(v=>
     `<a class="apvid" href="${esc(v.url)}" target="_blank" rel="noopener"
         ${v.img?`style="background-image:url('${esc(v.img)}')"`:''}>
       <span class="pl">${ico('play')}</span><b>${esc(v.name||'Ver video')}</b></a>`).join('')}</div>`:'';
-  const fot=photos.length>1?`<div class="apfotos">${photos.slice(0,6).map(u=>
-    `<div class="apfoto" style="background-image:url('${esc(u)}')"></div>`).join('')}</div>`:'';
+  // Antes se pintaban 6 y ninguna abría. Ahora se pintan hasta 12, la última
+  // avisa de cuántas quedan, y cualquiera abre el visor sobre la lista COMPLETA:
+  // las que no caben en la rejilla se ven pasando de una a otra.
+  LBGAL.perfil = photos;
+  const VIS = 12;
+  const fot=photos.length?`<div class="apfotos">${photos.slice(0,VIS).map((u,i)=>
+    `<div class="apfoto" style="background-image:url('${esc(u)}')"
+       onclick="lightbox(LBGAL.perfil,${i})" title="Ampliar">${
+       (i===VIS-1 && photos.length>VIS) ? `<span class="apmas">+${photos.length-VIS}</span>` : ''}</div>`
+    ).join('')}</div>`:'';
   return `<div class="apmedia">${col('Redes y enlaces',soc)}${col('Videos destacados',vid)}${col('Galería de fotos',fot)}</div>`;
 }
 function apReviewsHTML(rev){
@@ -4551,6 +4581,9 @@ async function openArtistProfile(artistId, showId, previo){
   const videos=shows.filter(s=>s.video_url).map(s=>({
     name:s.show_name, url:s.video_url, img:(s.images&&s.images[0]&&s.images[0].url)||null}));
   const cover=a.profile_image_url||photos[0]||null;
+  // La portada abre TODA la galería, con ella primero: quien pincha la foto
+  // grande espera ver las demás, no una sola suelta.
+  LBGAL.perfilTodo=[cover, ...photos.filter(u=>u!==cover)].filter(Boolean);
   const langs=a.languages_spoken||[];
   const sl=a.social_links||{};
   // Solo dejamos YouTube (y las fotos/videos); se quitaron el resto de redes y las páginas web propias.
@@ -4580,7 +4613,8 @@ async function openArtistProfile(artistId, showId, previo){
 
   ov.innerHTML=`<div class="amod apmod" style="position:relative">
     <button class="ax" onclick="apClose()" aria-label="Cerrar">✕</button>
-    <div class="aphero" ${cover?`style="background-image:url('${cover}')"`:''}>
+    <div class="aphero${cover?' zoom':''}" ${cover?`style="background-image:url('${cover}')"
+      onclick="lightbox(LBGAL.perfilTodo,0)" title="Ampliar"`:''}>
       <div class="aphscrim"></div>
       ${verificado?`<div class="apvbadge">${ico('medal')}<div>Perfil verificado por<b>SHOWMA</b></div></div>`:''}
       <div class="aphttl">
@@ -4873,12 +4907,56 @@ async function addPropImg(input){
   catch(e){ toast('No se pudo subir: '+(e.message||''),true); }
 }
 function rmPropImg(i){ PROP_IMGS.splice(i,1); renderPropImgs(); }
-function lightbox(url){
+/* El visor de fotos. Acepta una sola foto (como siempre) o la galería entera con
+   la posición en la que se hizo clic, y entonces deja pasar de una a otra.
+
+   Las URLs NO viajan dentro de un onclick: se guarda la galería en LBGAL y el
+   atributo sólo lleva la clave y el índice. Una URL con comilla dentro de un
+   atributo entre comillas parte el HTML y el clic deja de existir, sin ningún
+   error en consola — que es justo el fallo que se estaba arreglando. */
+const LBGAL = {};
+let LBFOTOS = [], LBI = 0;
+
+function lightbox(a, i){
+  LBFOTOS = Array.isArray(a) ? a.filter(Boolean) : (a ? [a] : []);
+  if(!LBFOTOS.length) return;
+  LBI = Math.min(Math.max(+i||0, 0), LBFOTOS.length-1);
   let ov=document.getElementById('lbMov');
   if(!ov){ ov=document.createElement('div'); ov.id='lbMov'; ov.className='lbmov'; document.body.appendChild(ov);
-    ov.addEventListener('click',()=>{ ov.style.display='none'; }); }
-  ov.innerHTML=`<img src="${esc(url)}" alt="">`; ov.style.display='flex';
+    // Cierra al pulsar el fondo, no al pulsar la foto ni las flechas.
+    ov.addEventListener('click',e=>{ if(e.target===ov) lbCerrar(); });
+    document.addEventListener('keydown',e=>{
+      const v=document.getElementById('lbMov');
+      if(!v || v.style.display!=='flex') return;
+      if(e.key==='Escape') lbCerrar();
+      if(e.key==='ArrowRight') lbMover(1);
+      if(e.key==='ArrowLeft') lbMover(-1);
+    });
+  }
+  ov.style.display='flex';
+  lbPintar();
 }
+
+function lbPintar(){
+  const ov=document.getElementById('lbMov'); if(!ov) return;
+  const varias = LBFOTOS.length>1;
+  ov.innerHTML = `
+    <button class="lbx" onclick="lbCerrar()" aria-label="Cerrar">✕</button>
+    ${varias?`<button class="lbnav prev" onclick="lbMover(-1)" aria-label="Anterior">‹</button>`:''}
+    <img src="${esc(LBFOTOS[LBI])}" alt="">
+    ${varias?`<button class="lbnav next" onclick="lbMover(1)" aria-label="Siguiente">›</button>`:''}
+    ${varias?`<div class="lbn">${LBI+1} de ${LBFOTOS.length}</div>`:''}`;
+}
+function lbMover(d){
+  if(LBFOTOS.length<2) return;
+  LBI = (LBI + d + LBFOTOS.length) % LBFOTOS.length;
+  lbPintar();
+}
+function lbCerrar(){
+  const ov=document.getElementById('lbMov');
+  if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+}
+window.lbMover=lbMover; window.lbCerrar=lbCerrar; window.LBGAL=LBGAL;
 window.addPropImg=addPropImg;window.rmPropImg=rmPropImg;window.lightbox=lightbox;
 async function submitProposal(reqId){
   const price=document.getElementById('pp_price').value;
