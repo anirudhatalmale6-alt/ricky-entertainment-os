@@ -33,7 +33,7 @@ from app.models.user import Role, User
 from app.core import security
 from app.services.facturama import FacturamaError, get_facturama
 from app.services import afinidad as af
-from app.services import facturacion, mailer, passwords, periodos, rfc as rfc_svc
+from app.services import facturacion, figura_fiscal, mailer, passwords, periodos, rfc as rfc_svc
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
     ContractAcceptance,
@@ -223,6 +223,10 @@ async def update_my_profile(payload: ArtistUpdate, scope: CurrentScope, db: DbSe
     artist_id = await _require_ficha_propia(scope)
     artist = await _load_artist(db, artist_id)
     _aplicar_ficha(artist, payload)
+    # Del régimen sale la figura fiscal, y de la figura salen las retenciones.
+    # Sin esto el formulario queda completo y el IVA/ISR sigue calculándose con
+    # la figura por defecto: un RESICO retendría 10% de ISR en vez de 1.25%.
+    await figura_fiscal.asignar_figura(db, artist)
     await db.commit()
     return await _ficha_out(db, await _load_artist(db, artist_id))
 
@@ -654,6 +658,7 @@ async def save_my_fiscal(payload: FiscalDataIn, scope: CurrentScope, db: DbSessi
         artist.cfdi_use = payload.cfdi_use.strip() or None
     if payload.fiscal_postal_code is not None:
         artist.fiscal_postal_code = payload.fiscal_postal_code.strip() or None
+    await figura_fiscal.asignar_figura(db, artist)
     await db.commit()
     await db.refresh(artist)
     return _fiscal_out(artist)

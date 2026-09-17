@@ -117,6 +117,21 @@ class Artist(Base, TimestampMixin):
     tax_figure_id: Mapped[int | None] = mapped_column(Integer, default=None)
     legal_name: Mapped[str | None] = mapped_column(String(255))
     fiscal_postal_code: Mapped[str | None] = mapped_column(String(10))
+    # Cómo factura este proveedor (David, 2026-09-18). Tres caminos:
+    #   showma   = SHOWMA timbra por él (necesita su CSD en Facturama)
+    #   propia   = factura él o su contador y SUBE el CFDI de cada periodo
+    #   tercero  = factura por él una productora / pagadora / representante
+    # NULL = todavía no ha elegido, que es el estado de los 34 que ya existen.
+    # No se les pone "showma" por defecto a propósito: sólo 1 de los 34 tiene
+    # sello subido, así que marcarlos como automáticos diría que pueden facturar
+    # cuando en realidad el timbrado les falla por falta de CSD.
+    facturacion_modo: Mapped[str | None] = mapped_column(String(16))
+    # Quién factura por él cuando el modo es "tercero". El RFC se valida igual
+    # que el suyo: es el que va a aparecer como emisor en el CFDI.
+    tercero_rfc: Mapped[str | None] = mapped_column(String(20))
+    tercero_legal_name: Mapped[str | None] = mapped_column(String(255))
+    # productora | pagadora | representante — para saber a quién se le paga.
+    tercero_relacion: Mapped[str | None] = mapped_column(String(20))
     # CSD / facturación electrónica (Facturama Multiemisor). El músico sube su
     # Certificado de Sello Digital UNA vez; a partir de ahí SHOWMA timbra a su
     # nombre automáticamente. Aquí sólo guardamos el estado — el certificado en

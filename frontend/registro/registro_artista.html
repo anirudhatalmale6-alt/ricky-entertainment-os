@@ -53,6 +53,19 @@ body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif;b
 .card .sub{font-size:12.5px;color:var(--text2);margin-bottom:18px}
 
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+/* Las tres formas de facturar */
+.modos{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.modo{border:2px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;transition:.14s;background:#fff}
+.modo:hover{border-color:#bdb4f2}
+.modo.sel{border-color:var(--acc);background:#f6f4ff;box-shadow:0 4px 14px rgba(56,44,161,.12)}
+.modo .mh{display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:750}
+.modo .mi{width:32px;height:32px;border-radius:9px;background:#ece7fb;display:grid;place-items:center;font-size:16px;flex:none}
+.modo .ms{font-size:12px;color:var(--mut);margin:5px 0 9px}
+.modo ul{margin:0;padding-left:17px}
+.modo li{font-size:12px;color:var(--mut);line-height:1.6}
+.modo.sel li{color:#333}
+.aviso{margin-top:12px;background:#fff8e6;border:1px solid #f0d89a;color:#7a5a00;
+  border-radius:11px;padding:10px 13px;font-size:12.5px;line-height:1.55}
 .grid.three{grid-template-columns:1fr 1fr 1fr}
 .full{grid-column:1/-1}
 @media(max-width:720px){.grid,.grid.three{grid-template-columns:1fr}}
@@ -192,6 +205,9 @@ textarea{resize:vertical;min-height:70px}
   </div>
 
   <div class="err" id="err"></div>
+  <div id="guardadoNota" style="display:none;background:#e8f7ee;border:1px solid #b6e3c6;color:#14603c;
+    border-radius:11px;padding:10px 13px;font-size:13px;margin:0 0 14px">
+    Guardado. Puedes cerrar y volver cuando quieras con tu correo y contraseña: lo encontrarás tal como lo dejaste.</div>
 
   <div class="steps" id="steps">
     <div class="step active" data-s="0"><div class="num">1</div><div class="lbl"><b>Perfil</b><span>Quién eres</span></div></div>
@@ -243,7 +259,7 @@ textarea{resize:vertical;min-height:70px}
       </div>
       <label class="f full" style="margin-top:14px"><span>Canal de YouTube</span><input id="s_youtube" placeholder="https://youtube.com/@tucanal"></label>
     </div>
-    <div class="foot"><span></span><button class="btn next" onclick="go(1)">Siguiente →</button></div>
+    <div class="foot"><button class="btn" onclick="guardarParcial(this)" style="margin-right:auto">Guardar y seguir después</button><button class="btn next" onclick="avanzar(1)">Siguiente →</button></div>
   </section>
 
   <!-- STEP 2: SHOWS -->
@@ -254,7 +270,7 @@ textarea{resize:vertical;min-height:70px}
       <div id="showList"></div>
       <button class="addshow" onclick="addShow()">＋ Añadir otro show</button>
     </div>
-    <div class="foot"><button class="btn prev" onclick="go(0)">← Anterior</button><button class="btn next" onclick="go(2)">Siguiente →</button></div>
+    <div class="foot"><button class="btn prev" onclick="go(0)">← Anterior</button><button class="btn" onclick="guardarParcial(this)" style="margin-right:auto">Guardar y seguir después</button><button class="btn next" onclick="avanzar(2)">Siguiente →</button></div>
   </section>
 
   <!-- STEP 3: PLAN DE COBRO + FISCAL -->
@@ -270,15 +286,51 @@ textarea{resize:vertical;min-height:70px}
       </div>
     </div>
 
+    <!-- David, 18/09: tres formas de facturar, elegidas aquí. Hay gente que ya
+         emite sus facturas o tiene contador, y pedirles el sello digital era el
+         muro donde se paraban: de 34 proveedores sólo 1 lo tiene subido. -->
+    <div class="card">
+      <h2><span class="ic">🧾</span> ¿Cómo quieres gestionar tus facturas?</h2>
+      <div class="sub">Elige la opción que mejor se adapte a ti. Puedes cambiarla después.</div>
+      <div class="modos" id="modos">
+        <div class="modo" data-modo="showma" onclick="pickModo(this)">
+          <div class="mh"><span class="mi">⚡</span><b>Factura con SHOWMA</b></div>
+          <div class="ms">Nosotros emitimos el CFDI por ti</div>
+          <ul><li>Emisión automática</li><li>No tienes que hacer nada cada mes</li>
+              <li>Necesitas subir tu sello digital (.cer y .key)</li></ul>
+        </div>
+        <div class="modo" data-modo="propia" onclick="pickModo(this)">
+          <div class="mh"><span class="mi">📄</span><b>Yo emito mis facturas</b></div>
+          <div class="ms">Con tu contador o el SAT</div>
+          <ul><li>Usas tu propio sistema</li><li>Subes tu CFDI de cada periodo</li>
+              <li>Sin factura no hay pago</li></ul>
+        </div>
+        <div class="modo" data-modo="tercero" onclick="pickModo(this)">
+          <div class="mh"><span class="mi">👥</span><b>Factura mediante tercero</b></div>
+          <div class="ms">Productora, pagadora o representante</div>
+          <ul><li>Factura una empresa por ti</li><li>Registras sus datos fiscales</li>
+              <li>Sin factura no hay pago</li></ul>
+        </div>
+      </div>
+      <div class="grid" id="terceroBox" style="display:none;margin-top:14px">
+        <label class="f"><span>RFC de quien factura por ti <i>*</i></span><input id="f_trfc" placeholder="ABC180429TM6"></label>
+        <label class="f"><span>Razón social de quien factura <i>*</i></span><input id="f_tlegal" placeholder="Productora S.A. de C.V."></label>
+        <label class="f"><span>Qué es para ti <i>*</i></span><select id="f_trel">
+          <option value="">Selecciona…</option><option value="productora">Mi productora</option>
+          <option value="pagadora">Empresa pagadora</option><option value="representante">Mi representante</option></select></label>
+      </div>
+      <div class="aviso" id="modoAviso" style="display:none"></div>
+    </div>
+
     <div class="card">
       <h2><span class="ic">🧾</span> Información fiscal</h2>
       <div class="sub">Para emitir CFDI y liquidar tus pagos. Estos datos son obligatorios: sin ellos no podemos facturar ni pagarte.</div>
       <div class="grid">
         <label class="f"><span>RFC <i>*</i></span><input id="f_rfc" placeholder="XAXX010101000"></label>
         <label class="f"><span>Uso CFDI</span><select id="f_cfdi"><option value="G03">G03 - Gastos en general</option><option value="P01">P01 - Por definir</option></select></label>
-        <label class="f"><span>Razón social</span><input id="f_legal" placeholder="Nombre o razón social"></label>
-        <label class="f"><span>Régimen fiscal</span><select id="f_regime"></select></label>
-        <label class="f"><span>Código postal fiscal</span><input id="f_cp" placeholder="77500"></label>
+        <label class="f"><span>Razón social <i>*</i></span><input id="f_legal" placeholder="Nombre o razón social"></label>
+        <label class="f"><span>Régimen fiscal <i>*</i></span><select id="f_regime" onchange="avisoRegimen()"></select></label>
+        <label class="f"><span>Código postal fiscal <i>*</i></span><input id="f_cp" placeholder="77500" inputmode="numeric"></label>
       </div>
       <div class="sec-t">Información bancaria · para tus pagos</div>
       <div class="grid">
@@ -289,7 +341,7 @@ textarea{resize:vertical;min-height:70px}
         <label class="f"><span>Moneda preferida</span><select id="f_currency"><option>MXN</option><option>USD</option></select></label>
       </div>
     </div>
-    <div class="foot"><button class="btn prev" onclick="go(1)">← Anterior</button><button class="btn next" onclick="go(3)">Siguiente →</button></div>
+    <div class="foot"><button class="btn prev" onclick="go(1)">← Anterior</button><button class="btn" onclick="guardarParcial(this)" style="margin-right:auto">Guardar y seguir después</button><button class="btn next" onclick="avanzar(3)">Siguiente →</button></div>
   </section>
 
   <!-- STEP 4: DOCS -->
@@ -465,9 +517,51 @@ function go(n){
   document.querySelectorAll('.step').forEach(s=>{ const i=+s.dataset.s; s.classList.toggle('active',i===n); s.classList.toggle('done',i<n); });
   window.scrollTo({top:0,behavior:'smooth'});
 }
-document.querySelectorAll('.step').forEach(s=>s.onclick=()=>go(+s.dataset.s));
+// Hacia atrás, libre: revisar para RETROCEDER dejaría a alguien encerrado en
+// una página que no puede completar todavía. Hacia delante, se revisa.
+document.querySelectorAll('.step').forEach(s=>s.onclick=()=>{
+  const destino=+s.dataset.s, actual=+((document.querySelector('.step.active')||{dataset:{s:0}}).dataset.s);
+  if(destino<=actual) go(destino); else avanzar(destino);
+});
 let PAYOUT='mensual';
 function pick(el){ el.parentNode.querySelectorAll('.plan').forEach(p=>p.classList.remove('sel')); el.classList.add('sel'); PAYOUT=el.dataset.payout; }
+
+/* ---- Las tres formas de facturar (David, 18/09) -------------------------
+   MODO arranca vacío, no en "showma". Que el formulario venga con una opción
+   marcada de antemano hace que la mayoría la deje puesta sin leerla, y la de
+   SHOWMA es justamente la que exige subir el sello digital: es la elección que
+   menos se puede dar por supuesta. */
+let MODO = null;
+function pickModo(el){
+  document.querySelectorAll('#modos .modo').forEach(m=>m.classList.remove('sel'));
+  el.classList.add('sel');
+  MODO = el.dataset.modo;
+  const box = document.getElementById('terceroBox');
+  if(box) box.style.display = (MODO==='tercero') ? 'grid' : 'none';
+  avisoModo();
+}
+function avisoModo(){
+  const a = document.getElementById('modoAviso'); if(!a) return;
+  const txt = {
+    showma:  'Para que podamos facturar por ti hace falta tu sello digital (.cer y .key con su contraseña). Lo subes en el último paso. Si todavía no lo tienes a mano, elige otra opción ahora y cámbiala cuando lo consigas.',
+    propia:  'Cada periodo te diremos exactamente qué facturar: a qué hotel, con qué RFC y por cuánto. Tú subes el PDF y el XML, y con eso se libera tu pago. Sin factura no hay pago.',
+    tercero: 'Quien facture por ti tiene que estar registrado aquí abajo, porque su RFC es el que va a aparecer como emisor. Sin factura no hay pago.'
+  }[MODO];
+  a.style.display = txt ? 'block' : 'none';
+  if(txt) a.textContent = txt;
+}
+/* Regímenes cuyas retenciones no están en el catálogo: se avisa en vez de
+   callarse, porque si no el pago saldría con las retenciones por defecto. */
+const REGIMENES_SIN_FIGURA = ['605','606','607','608','611','614','615','616','621','622','625'];
+function avisoRegimen(){
+  const v = (document.getElementById('f_regime')||{}).value || '';
+  const cod = (v.match(/^\s*(\d{3})/)||[])[1];
+  const a = document.getElementById('modoAviso'); if(!a) return;
+  if(cod && REGIMENES_SIN_FIGURA.includes(cod)){
+    a.style.display='block';
+    a.textContent = 'Tu régimen no es uno de los cuatro habituales, así que revisaremos contigo qué retenciones te aplican antes de tu primer pago. Puedes seguir con el registro con normalidad.';
+  } else { avisoModo(); }
+}
 
 // ---- Chips (languages / states) ----
 function delChip(b){ b.parentNode.remove(); }
@@ -641,6 +735,10 @@ function collectProfile(){
     work_radius_km:intOf(v('p_radius')), states_worked:chipValues('stateChips'),
     available_to_travel:chk('t_travel'), own_vehicle:chk('t_vehicle'), valid_passport:chk('t_passport'), usa_visa:chk('t_visa'),
     payout_speed:PAYOUT, is_partner:chk('t_partner'), partner_monthly_fee:chk('t_partner')?499:null,
+    facturacion_modo:MODO||null,
+    tercero_rfc:(MODO==='tercero'? (v('f_trfc')||null) : null),
+    tercero_legal_name:(MODO==='tercero'? (v('f_tlegal')||null) : null),
+    tercero_relacion:(MODO==='tercero'? (v('f_trel')||null) : null),
     rfc:v('f_rfc')||null, cfdi_use:v('f_cfdi')||null, legal_name:v('f_legal')||null, tax_regime:v('f_regime')||null,
     fiscal_postal_code:v('f_cp')||null, bank_name:v('f_bank')||null, bank_account:v('f_account')||null,
     bank_account_holder:v('f_holder')||null, bank_clabe:v('f_clabe')||null, preferred_currency:v('f_currency')||'MXN',
@@ -781,35 +879,88 @@ function rfcCheck(v){
 }
 function focusId(id){ const n=document.getElementById(id); if(n) setTimeout(()=>{ try{ n.focus(); }catch(e){} },320); }
 function openShow(el){ el.classList.add('open'); el.scrollIntoView({behavior:'smooth',block:'center'}); }
-function validate(prof){
-  // --- Perfil profesional ---
-  if(!prof.stage_name){ go(0); err('Escribe tu nombre artístico o de proveedor.'); focusId('p_stage'); return false; }
-  if(!prof.phone){ go(0); err('El teléfono es obligatorio para poder contactarte.'); focusId('p_phone'); return false; }
-  if(!prof.email || !/.+@.+\..+/.test(prof.email)){ go(0); err('Escribe un correo electrónico válido.'); focusId('p_email'); return false; }
-  if(!prof.region){ go(0); err('Indica el estado donde estás basado.'); focusId('p_state'); return false; }
-  if(!prof.base_city){ go(0); err('Indica tu ciudad base.'); focusId('p_city'); return false; }
-  if(!prof.bio || prof.bio.length<20){ go(0); err('Agrega una biografía breve (mínimo 20 caracteres) para tu perfil profesional.'); focusId('p_bio'); return false; }
-  // --- Al menos un show contratable (nombre + precio + foto) ---
+/* Las reglas viven UNA vez, por página, y las usan los dos caminos: el botón
+   "Siguiente" (David, 18/09: "vamos a bloquear el acceso a la siguiente página
+   si no se han completado todos los datos de la actual") y el "Finalizar" de
+   siempre. Tener dos listas de reglas acaba con un formulario que te deja
+   avanzar y luego te rechaza al final, que es peor que bloquear.
+
+   Devuelven null si la página está bien, o el primer problema encontrado. */
+function revisaPerfil(prof){
+  if(!prof.stage_name) return {msg:'Escribe tu nombre artístico o de proveedor.', foco:'p_stage'};
+  if(!prof.phone) return {msg:'El teléfono es obligatorio para poder contactarte.', foco:'p_phone'};
+  if(!prof.email || !/.+@.+\..+/.test(prof.email)) return {msg:'Escribe un correo electrónico válido.', foco:'p_email'};
+  if(!prof.region) return {msg:'Indica el estado donde estás basado.', foco:'p_state'};
+  if(!prof.base_city) return {msg:'Indica tu ciudad base.', foco:'p_city'};
+  if(!prof.bio || prof.bio.length<20) return {msg:'Agrega una biografía breve (mínimo 20 caracteres) para tu perfil profesional.', foco:'p_bio'};
+  return null;
+}
+function revisaShows(){
   let anyShow=false;
   for(const el of document.querySelectorAll('.show')){
     const val=s=>{ const n=el.querySelector(s); return n?n.value.trim():''; };
     const name=val('.in-name'); if(!name) continue;
-    if(numOf(val('.p-hotel'))==null){ go(1); openShow(el); err('El show "'+name+'" necesita un precio para hotel; sin precio no se puede contratar.'); return false; }
-    if(el.querySelectorAll('.ph[data-url]').length===0){ go(1); openShow(el); err('Sube al menos una foto del show "'+name+'".'); return false; }
+    if(numOf(val('.p-hotel'))==null) return {msg:'El show "'+name+'" necesita un precio para hotel; sin precio no se puede contratar.', abrir:el};
+    if(el.querySelectorAll('.ph[data-url]').length===0) return {msg:'Sube al menos una foto del show "'+name+'".', abrir:el};
     anyShow=true;
   }
-  if(!anyShow){ go(1); err('Registra al menos un show con nombre, precio y foto.'); return false; }
-  // --- Datos fiscales y bancarios (para poder pagarte) ---
-  if(!prof.rfc){ go(2); err('El RFC es obligatorio para poder facturar y pagarte.'); focusId('f_rfc'); return false; }
+  if(!anyShow) return {msg:'Registra al menos un show con nombre, precio y foto.'};
+  return null;
+}
+function revisaFiscal(prof){
+  // El modo primero: de él depende qué más se pide.
+  if(!MODO) return {msg:'Elige cómo quieres gestionar tus facturas. Son tres opciones y puedes cambiarla después.'};
+  if(!prof.rfc) return {msg:'El RFC es obligatorio para poder facturar y pagarte.', foco:'f_rfc'};
   const cRfc=rfcCheck(prof.rfc);
-  if(!cRfc.ok){ go(2); err(cRfc.msg); focusId('f_rfc'); return false; }
+  if(!cRfc.ok) return {msg:cRfc.msg, foco:'f_rfc'};
   // El dígito verificador sólo advierte: se puede continuar, pero avisados.
-  if(!cRfc.digito && !confirm(cRfc.msg+'\n\n¿Continuar de todos modos?')){ go(2); focusId('f_rfc'); return false; }
+  if(!cRfc.digito && !confirm(cRfc.msg+'\n\n¿Continuar de todos modos?')) return {msg:'', foco:'f_rfc'};
   prof.rfc=cRfc.rfc;
   const elRfc=document.getElementById('f_rfc'); if(elRfc) elRfc.value=cRfc.rfc;
-  if(!prof.bank_name){ go(2); err('Indica tu banco para recibir pagos.'); focusId('f_bank'); return false; }
-  if(!prof.bank_account_holder){ go(2); err('Indica el titular de la cuenta bancaria.'); focusId('f_holder'); return false; }
-  if(digitsOf(prof.bank_clabe).length!==18){ go(2); err('La CLABE interbancaria debe tener 18 dígitos; es la que usamos para pagarte.'); focusId('f_clabe'); return false; }
+  if(!prof.legal_name) return {msg:'Escribe tu nombre o razón social tal como aparece en tu constancia fiscal.', foco:'f_legal'};
+  if(!prof.tax_regime) return {msg:'Elige tu régimen fiscal; de él dependen las retenciones de tu pago.', foco:'f_regime'};
+  if(digitsOf(prof.fiscal_postal_code).length!==5) return {msg:'El código postal fiscal son 5 dígitos y hace falta para el CFDI 4.0.', foco:'f_cp'};
+  if(MODO==='tercero'){
+    const tr=rfcCheck(prof.tercero_rfc);
+    if(!prof.tercero_rfc) return {msg:'Escribe el RFC de quien factura por ti.', foco:'f_trfc'};
+    if(!tr.ok) return {msg:'El RFC de quien factura por ti no tiene la forma correcta.', foco:'f_trfc'};
+    if(!prof.tercero_legal_name) return {msg:'Escribe la razón social de quien factura por ti.', foco:'f_tlegal'};
+    if(!prof.tercero_relacion) return {msg:'Indica qué es para ti quien factura: productora, pagadora o representante.', foco:'f_trel'};
+  }
+  if(!prof.bank_name) return {msg:'Indica tu banco para recibir pagos.', foco:'f_bank'};
+  if(!prof.bank_account_holder) return {msg:'Indica el titular de la cuenta bancaria.', foco:'f_holder'};
+  if(digitsOf(prof.bank_clabe).length!==18) return {msg:'La CLABE interbancaria debe tener 18 dígitos; es la que usamos para pagarte.', foco:'f_clabe'};
+  return null;
+}
+const REVISORES = [ p=>revisaPerfil(p), ()=>revisaShows(), p=>revisaFiscal(p) ];
+
+function muestraFallo(paso, f){
+  go(paso);
+  if(f.abrir) openShow(f.abrir);
+  if(f.msg) err(f.msg);
+  if(f.foco) focusId(f.foco);
+}
+
+/* Avanzar a la página n: se revisan TODAS las anteriores, no sólo la actual.
+   Con sólo la actual, quien llega al paso 3 por el stepper se salta el 1 y el 2
+   y vuelve a terminar con huecos, que es lo que se quería evitar. */
+function avanzar(n){
+  err('');
+  const prof = collectProfile();
+  for(let i=0; i<n && i<REVISORES.length; i++){
+    const f = REVISORES[i](prof);
+    if(f){ muestraFallo(i, f); return false; }
+  }
+  go(n);
+  return true;
+}
+window.avanzar=avanzar;
+
+function validate(prof){
+  for(let i=0;i<REVISORES.length;i++){
+    const f = REVISORES[i](prof);
+    if(f){ muestraFallo(i, f); return false; }
+  }
   return true;
 }
 async function finalizar(btn){
@@ -951,6 +1102,12 @@ async function guardarParcial(btn){
     btn.textContent='Guardado ✓';
     const av=document.getElementById('avisoParcial');
     if(av) av.style.display='';
+    // Se puede guardar desde cualquier página, así que el aviso se dice también
+    // arriba: el cartel de abajo pertenece al último paso y no se vería.
+    err('');
+    const nota=document.getElementById('guardadoNota');
+    if(nota){ nota.style.display='block';
+      setTimeout(()=>{ nota.style.display='none'; }, 6000); }
     setTimeout(()=>{ btn.disabled=false; btn.textContent=t0; }, 2200);
   }catch(e){
     btn.disabled=false; btn.textContent=t0;
@@ -977,6 +1134,20 @@ window.guardarParcial = guardarParcial;
     set('p_stage',a.stage_name); set('p_email',a.email); set('p_phone',a.phone); set('p_city',a.base_city);
     if(a.first_name) set('p_first',a.first_name); if(a.last_name) set('p_last',a.last_name);
     if(a.region) set('p_state',a.region); if(a.tax_regime) set('f_regime',a.tax_regime);
+    // Se restaura TODO lo fiscal y bancario, no sólo el régimen. Antes no se
+    // hacía y no se notaba porque se podía avanzar con huecos; ahora que el
+    // paso se bloquea, quien vuelve a su registro a medias se encontraría
+    // frenado por campos que en realidad ya tiene guardados.
+    set('f_rfc',a.rfc); set('f_legal',a.legal_name); set('f_cp',a.fiscal_postal_code);
+    set('f_cfdi',a.cfdi_use); set('f_bank',a.bank_name); set('f_account',a.bank_account);
+    set('f_holder',a.bank_account_holder); set('f_clabe',a.bank_clabe);
+    set('f_currency',a.preferred_currency);
+    set('f_trfc',a.tercero_rfc); set('f_tlegal',a.tercero_legal_name); set('f_trel',a.tercero_relacion);
+    if(a.facturacion_modo){
+      const tarjeta=document.querySelector('#modos .modo[data-modo="'+a.facturacion_modo+'"]');
+      if(tarjeta) pickModo(tarjeta);
+    }
+    avisoRegimen();
     // Marca los documentos ya subidos (registro retomado)
     try{
       const docs=await apiGet('/me/artist/documents');

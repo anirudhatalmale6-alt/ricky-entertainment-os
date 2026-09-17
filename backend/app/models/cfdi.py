@@ -52,7 +52,19 @@ class Cfdi(Base, TimestampMixin):
     total: Mapped[float | None] = mapped_column(Numeric(12, 2))
 
     stamped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    error: Mapped[str | None] = mapped_column(Text)               # motivo si falló
+    error: Mapped[str | None] = mapped_column(Text)
+    # De dónde salió esta factura (David, 2026-09-18):
+    #   showma  = la timbramos nosotros por el proveedor
+    #   propia  = la subió el proveedor (la emitió él o su contador)
+    #   tercero = la subió por cuenta de un tercero que factura por él
+    # Las que ya existen son todas "showma": es lo único que había.
+    origen: Mapped[str] = mapped_column(String(12), default="showma")
+    # Sólo para las SUBIDAS: el PDF y el XML tal como llegaron. Las que timbramos
+    # nosotros no los guardan, se bajan de Facturama con facturama_id.
+    pdf_url: Mapped[str | None] = mapped_column(String(500))
+    xml_url: Mapped[str | None] = mapped_column(String(500))
+    uploaded_by: Mapped[int | None] = mapped_column(Integer)
+    uploaded_at: Mapped[datetime | None] = mapped_column(DateTime)               # motivo si falló
 
     booking: Mapped["Booking | None"] = relationship()   # noqa: F821
     artist: Mapped["Artist | None"] = relationship()     # noqa: F821

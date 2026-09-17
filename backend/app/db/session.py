@@ -1,4 +1,5 @@
 """Async database engine, session factory and FastAPI dependency."""
+import logging
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -91,6 +92,29 @@ _SQLITE_ADDED_COLUMNS = [
     ("venues", "mood", "VARCHAR(16)"),
     ("venues", "afinidad", "JSON"),
     ("shows", "afinidad", "JSON"),
+    # Tres formas de facturar (David, 2026-09-18). facturacion_modo se queda NULL
+    # para los 34 que ya existen: "no ha elegido" es la verdad, y ponerles
+    # "showma" diría que pueden facturar en automático cuando sólo 1 tiene sello.
+    ("artists", "facturacion_modo", "VARCHAR(16)"),
+    ("artists", "tercero_rfc", "VARCHAR(20)"),
+    ("artists", "tercero_legal_name", "VARCHAR(255)"),
+    ("artists", "tercero_relacion", "VARCHAR(20)"),
+    # Facturas subidas por el proveedor o su tercero, en la MISMA tabla que las
+    # que timbramos nosotros (David: "se puede subir en la misma tabla?"). Las
+    # que ya existen son "showma" porque es lo único que había.
+    ("cfdis", "origen", "VARCHAR(12) DEFAULT 'showma'"),
+    ("cfdis", "pdf_url", "VARCHAR(500)"),
+    ("cfdis", "xml_url", "VARCHAR(500)"),
+    ("cfdis", "uploaded_by", "INTEGER"),
+    ("cfdis", "uploaded_at", "DATETIME"),
+]
+
+# Índices que hay que crear aparte: no son columnas.
+# El UUID único es lo que impide pagar dos veces la misma factura. Se crea con
+# IF NOT EXISTS y en SQLite un índice único admite varios NULL, así que los CFDI
+# que quedaron en error (sin UUID) no chocan entre ellos.
+_SQLITE_ADDED_INDEXES = [
+    ("ux_cfdis_uuid", "CREATE UNIQUE INDEX IF NOT EXISTS ux_cfdis_uuid ON cfdis(uuid)"),
 ]
 
 
@@ -111,6 +135,16 @@ def _apply_additive_columns(sync_conn) -> None:
                     "UPDATE bookings SET notified_at = COALESCE(confirmed_at, created_at) "
                     "WHERE notified_at IS NULL"
                 )
+
+    for nombre, ddl in _SQLITE_ADDED_INDEXES:
+        try:
+            sync_conn.exec_driver_sql(ddl)
+        except Exception:
+            # Un único duplicado existente tumbaría el arranque entero. Se avisa
+            # y se sigue: es mejor arrancar sin el índice y revisarlo a mano que
+            # dejar la plataforma caída por dos facturas repetidas.
+            logging.getLogger("showma.db").warning(
+                "No se pudo crear el índice %s (¿hay duplicados?)", nombre)
 
 
 async def init_db() -> None:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, computed_field
 
@@ -11,6 +12,13 @@ from app.schemas.show import ShowCreate, ShowOut
 
 
 # --- Documents (profile level) --------------------------------------------
+
+# Lista cerrada a propósito. Si entra un modo que nadie reconoce, el sistema no
+# sabe si tiene que timbrar por él o esperar a que suba su factura, y el
+# proveedor se queda sin cobrar sin que nadie vea un error.
+FacturacionModo = Literal["showma", "propia", "tercero"] | None
+TerceroRelacion = Literal["productora", "pagadora", "representante"] | None
+
 
 class ArtistDocumentCreate(BaseModel):
     doc_type: str
@@ -75,6 +83,11 @@ class ArtistBase(BaseModel):
     bank_account_holder: str | None = None
     bank_clabe: str | None = None
     preferred_currency: str = "MXN"
+    # Cómo factura (David, 2026-09-18): showma | propia | tercero.
+    facturacion_modo: FacturacionModo = None
+    tercero_rfc: Rfc = None
+    tercero_legal_name: str | None = None
+    tercero_relacion: TerceroRelacion = None
 
     # location
     city: str | None = None
@@ -135,6 +148,11 @@ class ArtistUpdate(BaseModel):
     bank_account_holder: str | None = None
     bank_clabe: str | None = None
     preferred_currency: str | None = None
+    # Cómo factura (David, 2026-09-18): showma | propia | tercero.
+    facturacion_modo: FacturacionModo = None
+    tercero_rfc: Rfc = None
+    tercero_legal_name: str | None = None
+    tercero_relacion: TerceroRelacion = None
     city: str | None = None
     region: str | None = None
     country: str | None = None
