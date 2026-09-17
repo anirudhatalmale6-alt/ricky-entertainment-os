@@ -992,7 +992,10 @@
   .bellitem .bi-t{font-size:10.5px;color:var(--mut2);margin-top:3px;display:block}
   .bellempty{padding:26px 16px;text-align:center;color:var(--mut);font-size:12.5px}
   /* split: maestro (wide) + right column */
-  .splitH{display:grid;grid-template-columns:2.7fr 1fr;gap:16px;align-items:start}
+  /* La columna derecha ya sólo lleva tarjetas compactas, así que puede ceder
+     ancho al calendario: 2.7fr -> 3.3fr. El minmax evita que se estreche tanto
+     que el resumen empiece a partir palabras. */
+  .splitH{display:grid;grid-template-columns:3.3fr minmax(255px,1fr);gap:16px;align-items:start}
   @media(max-width:1100px){.splitH{grid-template-columns:1fr}}
   .rcol{display:flex;flex-direction:column;gap:16px}
   /* sugerencias de IA */
@@ -1564,6 +1567,26 @@
 .apprev{background:#eef9f2;border:1px solid #bfe6d0;color:#15603f;border-radius:12px;
   padding:11px 14px;font-size:12.5px;line-height:1.5;margin-bottom:14px}
 .apprev b{color:#0d4a30}
+/* Versión de columna: el icono y la firma arriba, el resto debajo. */
+.zres-col{flex-direction:column;align-items:flex-start;gap:10px;margin:0;padding:14px 16px}
+.zres-col .zres-av{flex-direction:row;gap:8px;align-items:center}
+.zres-col .zres-av .zig-ic{width:44px!important;height:44px!important}
+.zres-col h3{font-size:15px;line-height:1.35;max-width:none}
+.zres-col .zres-s{font-size:12px}
+.zres-col .zres-cta{width:100%;margin-top:2px}
+.zres-col .zres-chip{font-size:11.5px;padding:4px 10px}
+
+/* Los cuatro números, apilados en la columna */
+.minik{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.mk{display:flex;gap:11px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.mk:first-child{border-top:0;padding-top:4px}
+.mki{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:15px;flex:none}
+.mki.violet{background:#ece7fb}.mki.green{background:#e3f5e9}.mki.blue{background:#e5eefc}.mki.amber{background:#fdefd6}
+.mk b{display:block;font-size:17px;font-weight:750;line-height:1.2}
+.mk s{display:block;font-size:11.5px;color:var(--mut);text-decoration:none;margin-top:1px}
+.mk .mkb{display:block;font-size:11px;color:var(--mut);font-style:normal;margin-top:4px}
+.mk .mkb .kbar{margin-bottom:3px}
+
 .zres-firma{font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--acc);opacity:.75}
 .zres-k{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)}
 /* El titular pasó de tres palabras a una frase entera, así que baja de 22 a 19
@@ -2617,13 +2640,11 @@ function applyRole(){
   // calendario- y Mis actuaciones. Las propuestas y el chat con hoteles son
   // trato comercial, y ese lo lleva la empresa que lo representa.
   ES_MUSICO = isArtist && !!ME.parent_id;
-  // David, 17/09: "Propuestas, eliminarlo del Dashboard". Fuera del menú del
-  // artista. OJO: ese tablero es su única manera de enterarse de que hay trabajo
-  // abierto, así que la opción se va del menú pero el camino NO: la fila "Nuevas
-  // oportunidades" de su Dashboard lleva al mismo sitio (ver artistHome). Quitar
-  // el menú sin dejar puerta sería dejarles el contador de oportunidades
-  // delante y ninguna forma de abrirlas.
-  show('reqs', !ES_MUSICO && !isArtist);
+  // "Propuestas" del menú del artista SE QUEDA (David, 17/09: "perdón, me
+  // expliqué muy mal"). Lo que él quería quitar era la caja de Solicitudes del
+  // Dashboard del HOTEL, que es otra cosa. Lo quité un rato por error y lo
+  // devolví: es el único sitio donde un músico ve que hay trabajo abierto.
+  show('reqs', !ES_MUSICO);
   show('chat', !ES_MUSICO);
   if(ES_MUSICO){
     // "Tus datos, tarifas y publicaciones" prometía tres cosas que él no toca.
@@ -2935,7 +2956,7 @@ function ziggySaludo(ahora){
   return `${saludo}, quedan ${faltan} días de ${nombreMes}`;
 }
 
-function ziggyResumen(d){
+function ziggyResumen(d, compacto){
   const bk = d.bk || [];
   const enMes = b => inPeriodMonth(b.starts_at);
   const pend = bk.filter(b => b.status==='pending' && enMes(b)).length;
@@ -3011,7 +3032,9 @@ function ziggyResumen(d){
   // "Resumen del día" vuelve a su sitio, que él ya lo tenía por bueno.
   const titulo = `“${ziggySaludo()} y ${frase}.”`;
 
-  return `<div class="zres">
+  // En la columna no cabe en horizontal, pero el CONTENIDO es el mismo: mismo
+  // titular, mismos chips, misma nota y mismo botón. Sólo cambia cómo se apila.
+  return `<div class="zres${compacto?' zres-col':''}">
     <div class="zres-av">
       ${ziggyIcono(pend||sinCalificar||solicitudes||budget<=0 ? 'neutral' : 'listo', 92)}
       <span class="zres-firma">ZIGGY</span>
@@ -7197,18 +7220,12 @@ const RENDER = {
       .map(v=>({id:v.id,name:v.name,capacity:(v.capacity!=null?v.capacity:null),company_id:c.id,company_name:c.name})));
     CACHE.homeBk = bk; CACHE.homeBudget = budget; if(!MAESTRO_REF) MAESTRO_REF = bestW? new Date(bestW+'T00:00:00') : new Date();
     box.innerHTML=`
-      <div class="kpis">
-        <div class="kpi"><div class="kh"><div><div class="k">Actuaciones esta semana</div><div class="v" id="kpiWeekVal">0</div></div><div class="kc violet">🗓️</div></div>
-          <div class="kbreak" id="kpiWeekBreak"></div></div>
-        <div class="kpi"><div class="kh"><div><div class="k" id="kUsadoK">${budget>0?'Presupuesto mensual':'Gasto del mes'}</div><div class="v" id="kUsadoV">${MXN(usado)}</div><div class="d" id="kUsadoD">${budget>0?'de '+MXN(budget):'sin presupuesto cargado · cárgalo en Presupuesto para ver el % y el ahorro'}</div></div><div class="kc green">💲</div></div>
-          <div id="kUsadoBar">${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto del mes</div>`:''}</div></div>
-        <div class="kpi"><div class="kh"><div><div class="k">Satisfacción media</div><div class="v">${sat5!=null?sat5.toFixed(1)+' / 5':'—'}</div></div><div class="kc blue">🙂</div></div>
-          <div class="kstars">${sat5!=null?starRow(sat5):'☆☆☆☆☆'}<small>según asistencia real</small></div></div>
-        <div class="kpi"><div class="kh"><div><div class="k">Ahorro vs presupuesto</div><div class="v" id="kAhorroV">${budget>0?MXN(Math.abs(ahorro)):'—'}</div></div><div class="kc amber">📊</div></div>
-          <div class="d" style="margin-top:8px" id="kAhorroD">${budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—'}</div></div>
-      </div>
-      ${ziggyResumen({bk, budget, usado, reqs:(reqs||[]).length, sat5,
-                      sinCalificar:(CACHE.porCalificar? CACHE.porCalificar.size : 0)})}
+      <!-- David, 17/09: "eliminar solicitudes del dashboard de los hoteles, y
+           usar ese espacio para reacomodar ziggy y la info general de
+           actuaciones, presupuestos... eso nos da para crecer el calendario".
+           Los 4 indicadores y el banner ancho de ZIGGY ya no van arriba: bajan a
+           la columna de la derecha, que es la que se estaba desaprovechando. El
+           calendario arranca ahora en lo alto de la pantalla. -->
       <div class="splitH">
         <div class="box">
           <div class="mtoolbar">
@@ -7223,11 +7240,28 @@ const RENDER = {
           <div class="hint" style="margin:10px 0 0">Arrastra una actuación a otro día o venue para reprogramarla, o usa la "X" / el "+" de cada tarjeta. Cuando termines de acomodar la semana, pulsa "Guardar y notificar" para avisar a los artistas afectados de su fecha, hora y venue.</div>
         </div>
         <div class="rcol">
+          <!-- Resumen de la semana: los mismos cuatro números de antes, en la
+               columna que estaba medio vacía. Los ids se conservan tal cual
+               porque updateBudgetKpi() y el calendario los siguen refrescando
+               al arrastrar una actuación; renombrarlos habria dejado los
+               numeros congelados sin dar ningun error. -->
           <div class="box">
-            <div class="bhead"><h3 style="margin:0">Solicitudes</h3><a onclick="show('reqs')">Ver todas</a></div>
-            ${reqs.length? reqs.slice(0,3).map(r=>`<div class="listrow"><div class="lz"><b>${esc(r.title)}</b><span>${esc(r.company_name||'—')} · ${esc(pretty(r.category)||'—')}</span></div><span class="chip c-pending">Pendiente</span></div>`).join('') : '<div class="muted" style="padding:6px 0">Sin solicitudes abiertas.</div>'}
-            <button class="btn ghost" style="width:100%;margin-top:12px" onclick="show('reqs')">+ Nueva solicitud</button>
+            <div class="bhead"><h3 style="margin:0">Resumen de la semana</h3>
+              <a onclick="show('reports')">Ver reportes</a></div>
+            <div class="minik">
+              <div class="mk"><span class="mki violet">🗓️</span><div><b id="kpiWeekVal">0</b>
+                <s>Actuaciones</s><div class="kbreak" id="kpiWeekBreak" style="margin-top:5px"></div></div></div>
+              <div class="mk"><span class="mki green">💲</span><div><b id="kUsadoV">${MXN(usado)}</b>
+                <s id="kUsadoD">${budget>0?'de '+MXN(budget):'sin presupuesto cargado'}</s>
+                <div class="mkb" id="kUsadoBar">${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div>${usadoPct}% usado`:''}</div></div></div>
+              <div class="mk"><span class="mki blue">🙂</span><div><b>${sat5!=null?sat5.toFixed(1)+' / 5':'—'}</b>
+                <s>Satisfacción media</s><div class="mkb">${sat5!=null?starRow(sat5):''}</div></div></div>
+              <div class="mk"><span class="mki amber">📊</span><div><b id="kAhorroV">${budget>0?MXN(Math.abs(ahorro)):'—'}</b>
+                <s>Ahorro vs presupuesto</s><div class="mkb" id="kAhorroD">${budget>0?(ahorro>=0?`▲ ${ahorroPct}% dentro`:`▼ ${Math.abs(ahorroPct)}% excedido`):'—'}</div></div></div>
+            </div>
           </div>
+          ${ziggyResumen({bk, budget, usado, reqs:(reqs||[]).length, sat5,
+                          sinCalificar:(CACHE.porCalificar? CACHE.porCalificar.size : 0)}, true)}
           <div class="box">
             <div class="bhead"><h3 style="margin:0" class="zig-h">${ziggyIcono('destacado',30)} ZIGGY te destaca</h3><a onclick="show('artists')">Ver todas</a></div>
             ${nov.length? nov.slice(0,3).map(n=>`<div class="sugg">
