@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, select, update
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import CurrentScope, DbSession
+from app.api.deps import CurrentUser, CurrentScope, DbSession
 from app.core.config import settings
 from app.core.storage import ensure_upload_dir
 from app.models.artist import Artist
@@ -616,6 +616,7 @@ def _fiscal_out(a: Artist) -> dict:
         # fallaría más adelante y es mejor verlo aquí.
         "rfc_aviso": rfc_svc.check(a.rfc)["mensaje"],
         "ready": ready,
+        "tax_figure_id": a.tax_figure_id,
         "regimes": _SAT_REGIMES,
         "cfdi_uses": _SAT_CFDI_USES,
     }
@@ -627,6 +628,33 @@ class FiscalDataIn(BaseModel):
     tax_regime: str | None = None        # código SAT (p.ej. "612")
     cfdi_use: str | None = None
     fiscal_postal_code: str | None = None
+
+
+@router.get("/figuras-fiscales")
+async def figuras_fiscales(_: CurrentUser, db: DbSession):
+    """El catálogo de figuras fiscales, para que el proveedor elija la suya.
+
+    David, 18/09: eligen la figura y de ahí salen solos los porcentajes. Se
+    manda lo que hay en el catálogo y NO una lista copiada en el formulario: el
+    día que el contador cambie una retención, el registro se actualiza sin que
+    nadie toque el HTML.
+
+    Se devuelven también los porcentajes para poder enseñarle al proveedor qué
+    le van a retener antes de que elija. Son públicos para quien esté dentro: es
+    su propio dinero.
+    """
+    figuras = (await db.execute(
+        select(TaxFigure).order_by(TaxFigure.id))).scalars().all()
+    return [{
+        "id": f.id,
+        "nombre": f.name,
+        "comision_pct": float(f.commission_pct or 0),
+        "iva_traslado_pct": float(f.iva_traslado_pct or 0),
+        "iva_ret_pct": float(f.iva_ret_pct or 0),
+        "isr_ret_pct": float(f.isr_ret_pct or 0),
+        "isr_variable": bool(f.isr_variable),
+        "notas": f.notes,
+    } for f in figuras if getattr(f, "active", True)]
 
 
 @router.get("/fiscal")

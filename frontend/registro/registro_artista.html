@@ -312,6 +312,10 @@ textarea{resize:vertical;min-height:70px}
               <li>Sin factura no hay pago</li></ul>
         </div>
       </div>
+      <div class="grid" id="figuraBox" style="margin-top:14px">
+        <label class="f"><span>Tu figura fiscal <i>*</i></span><select id="f_figura" onchange="avisoFigura()"><option value="">Selecciona…</option></select></label>
+        <div class="f" id="figuraDetalle" style="align-self:end;font-size:12px;color:var(--mut)"></div>
+      </div>
       <div class="grid" id="terceroBox" style="display:none;margin-top:14px">
         <label class="f"><span>RFC de quien factura por ti <i>*</i></span><input id="f_trfc" placeholder="ABC180429TM6"></label>
         <label class="f"><span>Razón social de quien factura <i>*</i></span><input id="f_tlegal" placeholder="Productora S.A. de C.V."></label>
@@ -323,16 +327,19 @@ textarea{resize:vertical;min-height:70px}
     </div>
 
     <div class="card">
-      <h2><span class="ic">🧾</span> Información fiscal</h2>
-      <div class="sub">Para emitir CFDI y liquidar tus pagos. Estos datos son obligatorios: sin ellos no podemos facturar ni pagarte.</div>
-      <div class="grid">
-        <label class="f"><span>RFC <i>*</i></span><input id="f_rfc" placeholder="XAXX010101000"></label>
-        <label class="f"><span>Uso CFDI</span><select id="f_cfdi"><option value="G03">G03 - Gastos en general</option><option value="P01">P01 - Por definir</option></select></label>
-        <label class="f"><span>Razón social <i>*</i></span><input id="f_legal" placeholder="Nombre o razón social"></label>
-        <label class="f"><span>Régimen fiscal <i>*</i></span><select id="f_regime" onchange="avisoRegimen()"></select></label>
-        <label class="f"><span>Código postal fiscal <i>*</i></span><input id="f_cp" placeholder="77500" inputmode="numeric"></label>
+      <div id="fiscalCard">
+        <h2><span class="ic">🧾</span> Información fiscal</h2>
+        <div class="sub" id="fiscalSub">Hacen falta para que podamos timbrar tu CFDI a tu nombre.</div>
+        <div class="grid">
+          <label class="f"><span>RFC <i>*</i></span><input id="f_rfc" placeholder="XAXX010101000"></label>
+          <label class="f"><span>Uso CFDI</span><select id="f_cfdi"><option value="G03">G03 - Gastos en general</option><option value="P01">P01 - Por definir</option></select></label>
+          <label class="f"><span>Razón social <i>*</i></span><input id="f_legal" placeholder="Nombre o razón social"></label>
+          <label class="f"><span>Régimen fiscal del SAT <i>*</i></span><select id="f_regime"></select></label>
+          <label class="f"><span>Código postal fiscal <i>*</i></span><input id="f_cp" placeholder="77500" inputmode="numeric"></label>
+        </div>
       </div>
       <div class="sec-t">Información bancaria · para tus pagos</div>
+      <div class="hint" style="margin:-6px 0 10px">Aquí se deposita tu dinero, elijas la forma de facturar que elijas.</div>
       <div class="grid">
         <label class="f"><span>Banco <i>*</i></span><input id="f_bank" placeholder="BBVA"></label>
         <label class="f"><span>Número de cuenta</span><input id="f_account" placeholder="1234 5678 9012"></label>
@@ -536,9 +543,43 @@ function pickModo(el){
   document.querySelectorAll('#modos .modo').forEach(m=>m.classList.remove('sel'));
   el.classList.add('sel');
   MODO = el.dataset.modo;
+  aplicaModo();
+  avisoModo();
+}
+/* El catálogo de figuras lo manda el servidor. No se copia aquí: el día que el
+   contador cambie una retención, el registro se actualiza solo. */
+let FIGURAS = [];
+async function cargarFiguras(){
+  try{
+    FIGURAS = await apiGet('/me/figuras-fiscales') || [];
+    const s = document.getElementById('f_figura'); if(!s) return;
+    s.innerHTML = '<option value="">Selecciona…</option>' +
+      FIGURAS.map(f=>`<option value="${f.id}">${f.nombre}</option>`).join('');
+  }catch(e){ /* sin catálogo el registro sigue: nunca puede bloquear un alta */ }
+}
+function avisoFigura(){
+  const d = document.getElementById('figuraDetalle'); if(!d) return;
+  const id = +(document.getElementById('f_figura')||{}).value || 0;
+  const f = FIGURAS.find(x=>x.id===id);
+  if(!f){ d.textContent=''; return; }
+  // Se le enseña lo que le van a retener ANTES de elegir: es su dinero, y así
+  // se detecta solo si marcó la figura equivocada.
+  const partes = [`Comisión SHOWMA ${f.comision_pct}%`, `IVA ${f.iva_traslado_pct}%`];
+  if(f.iva_ret_pct) partes.push(`ret. IVA ${f.iva_ret_pct}%`);
+  if(f.isr_ret_pct) partes.push(`ret. ISR ${f.isr_ret_pct}%${f.isr_variable?' (variable)':''}`);
+  if(!f.iva_ret_pct && !f.isr_ret_pct) partes.push('sin retenciones');
+  d.textContent = partes.join(' · ');
+}
+/* David, 18/09: "necesitamos que completen perfiles sólo si la facturación es
+   automática. Las otras ya suben la factura generada y completada". O sea que
+   el RFC, el régimen y el CP sólo hacen falta cuando timbramos nosotros: en los
+   otros dos modos esos datos viajan dentro del XML que ellos suben. */
+function aplicaModo(){
+  const auto = (MODO === 'showma');
+  const card = document.getElementById('fiscalCard');
+  if(card) card.style.display = auto ? '' : 'none';
   const box = document.getElementById('terceroBox');
   if(box) box.style.display = (MODO==='tercero') ? 'grid' : 'none';
-  avisoModo();
 }
 function avisoModo(){
   const a = document.getElementById('modoAviso'); if(!a) return;
@@ -602,8 +643,8 @@ function showTpl(n){
         <label class="f full"><span>Requerimientos / rider</span><textarea class="in-req" placeholder="Escenario, sonido, camerino, etc."></textarea></label>
       </div>
 
-      <div class="sec-t">Te ayudamos a encontrar los escenarios perfectos para ti</div>
-      <div class="hint" style="margin:-6px 0 10px">Diez preguntas rápidas. Con esto SHOWMA sabe a qué hoteles y a qué salas recomendar este show, así que vale la pena contestarlas. Si prefieres, puedes dejarlas para después desde tu perfil.</div>
+      <div class="sec-t">Te ayudamos a encontrar los escenarios perfectos para ti <i style="color:var(--red);font-style:normal">*</i></div>
+      <div class="hint" style="margin:-6px 0 10px">Diez preguntas rápidas, y hacen falta todas. Son las que deciden a qué hoteles y a qué salas te recomendamos: un show sin contestarlas no aparece en las propuestas.</div>
       <div class="grid afgrid" data-af="${n}"></div>
 
       <div class="sec-t">Fotos y multimedia <i style="color:var(--red);font-style:normal">*</i></div>
@@ -736,6 +777,7 @@ function collectProfile(){
     available_to_travel:chk('t_travel'), own_vehicle:chk('t_vehicle'), valid_passport:chk('t_passport'), usa_visa:chk('t_visa'),
     payout_speed:PAYOUT, is_partner:chk('t_partner'), partner_monthly_fee:chk('t_partner')?499:null,
     facturacion_modo:MODO||null,
+    tax_figure_id:(+v('f_figura')||null),
     tercero_rfc:(MODO==='tercero'? (v('f_trfc')||null) : null),
     tercero_legal_name:(MODO==='tercero'? (v('f_tlegal')||null) : null),
     tercero_relacion:(MODO==='tercero'? (v('f_trel')||null) : null),
@@ -820,6 +862,25 @@ function collectAfinidad(el){
   return Object.keys(r).length ? r : null;
 }
 
+/* Las preguntas que faltan por contestar en un show (David, 18/09: "para no
+   afectar las estadísticas, debemos marcar como obligatorias las preguntas").
+
+   El total NO se da por hecho en 10: se cuenta lo que el servidor haya pintado.
+   Si algún día el cuestionario crece o mengua, esto sigue siendo verdad sin que
+   nadie se acuerde de venir a cambiar un número. */
+function afinidadFaltan(el){
+  const caja = el.querySelector('.afgrid');
+  if(!caja) return [];          // el cuestionario no cargó: no se bloquea a nadie
+  const faltan = [];
+  caja.querySelectorAll('select.af-q').forEach(s=>{
+    if(!s.value) faltan.push(s.dataset.k);
+  });
+  caja.querySelectorAll('.afchips').forEach(c=>{
+    if(!c.querySelector('.afchip.on')) faltan.push(c.dataset.k);
+  });
+  return faltan;
+}
+
 function collectShow(el){
   const q=s=>el.querySelector(s); const v=s=>{ const n=q(s); return n?n.value.trim():''; };
   const name=v('.in-name'); if(!name) return null;
@@ -902,6 +963,16 @@ function revisaShows(){
     const name=val('.in-name'); if(!name) continue;
     if(numOf(val('.p-hotel'))==null) return {msg:'El show "'+name+'" necesita un precio para hotel; sin precio no se puede contratar.', abrir:el};
     if(el.querySelectorAll('.ph[data-url]').length===0) return {msg:'Sube al menos una foto del show "'+name+'".', abrir:el};
+    // Las diez preguntas, obligatorias: un show sin contestar no cruza contra
+    // ninguna matriz y queda fuera de las recomendaciones para siempre, así que
+    // dejar pasar uno a medias ensucia las estadísticas de todos.
+    const faltan = afinidadFaltan(el);
+    if(faltan.length) return {
+      // "le faltan 1 pregunta" se lee como un descuido, y un formulario
+      // descuidado se rellena con menos ganas. El verbo concuerda también.
+      msg:'Al show "'+name+'" le '+(faltan.length===1?'falta 1 pregunta':'faltan '+faltan.length+' preguntas')+
+          ' de "Te ayudamos a encontrar los escenarios perfectos para ti". Son las que deciden a qué hoteles te recomendamos.',
+      abrir:el};
     anyShow=true;
   }
   if(!anyShow) return {msg:'Registra al menos un show con nombre, precio y foto.'};
@@ -910,16 +981,25 @@ function revisaShows(){
 function revisaFiscal(prof){
   // El modo primero: de él depende qué más se pide.
   if(!MODO) return {msg:'Elige cómo quieres gestionar tus facturas. Son tres opciones y puedes cambiarla después.'};
-  if(!prof.rfc) return {msg:'El RFC es obligatorio para poder facturar y pagarte.', foco:'f_rfc'};
-  const cRfc=rfcCheck(prof.rfc);
-  if(!cRfc.ok) return {msg:cRfc.msg, foco:'f_rfc'};
-  // El dígito verificador sólo advierte: se puede continuar, pero avisados.
-  if(!cRfc.digito && !confirm(cRfc.msg+'\n\n¿Continuar de todos modos?')) return {msg:'', foco:'f_rfc'};
-  prof.rfc=cRfc.rfc;
-  const elRfc=document.getElementById('f_rfc'); if(elRfc) elRfc.value=cRfc.rfc;
-  if(!prof.legal_name) return {msg:'Escribe tu nombre o razón social tal como aparece en tu constancia fiscal.', foco:'f_legal'};
-  if(!prof.tax_regime) return {msg:'Elige tu régimen fiscal; de él dependen las retenciones de tu pago.', foco:'f_regime'};
-  if(digitsOf(prof.fiscal_postal_code).length!==5) return {msg:'El código postal fiscal son 5 dígitos y hace falta para el CFDI 4.0.', foco:'f_cp'};
+  // La figura fiscal se pide SIEMPRE: de ella salen la comisión y las
+  // retenciones, y esas se calculan igual si la factura la hacemos nosotros o
+  // la sube él. Sin figura, el cálculo cae en la de por defecto y a un RESICO
+  // se le retiene ocho veces más ISR del que le toca.
+  if(!prof.tax_figure_id) return {msg:'Elige tu figura fiscal. De ella salen la comisión y las retenciones de tus pagos.', foco:'f_figura'};
+  // Los datos fiscales completos SÓLO cuando timbramos nosotros (David, 18/09).
+  // Quien sube su propia factura ya trae ahí su RFC y su régimen.
+  if(MODO==='showma'){
+    if(!prof.rfc) return {msg:'El RFC es obligatorio para que podamos facturar por ti.', foco:'f_rfc'};
+    const cRfc=rfcCheck(prof.rfc);
+    if(!cRfc.ok) return {msg:cRfc.msg, foco:'f_rfc'};
+    // El dígito verificador sólo advierte: se puede continuar, pero avisados.
+    if(!cRfc.digito && !confirm(cRfc.msg+'\n\n¿Continuar de todos modos?')) return {msg:'', foco:'f_rfc'};
+    prof.rfc=cRfc.rfc;
+    const elRfc=document.getElementById('f_rfc'); if(elRfc) elRfc.value=cRfc.rfc;
+    if(!prof.legal_name) return {msg:'Escribe tu nombre o razón social tal como aparece en tu constancia fiscal.', foco:'f_legal'};
+    if(!prof.tax_regime) return {msg:'Elige tu régimen fiscal del SAT; hace falta para poder timbrar tu CFDI.', foco:'f_regime'};
+    if(digitsOf(prof.fiscal_postal_code).length!==5) return {msg:'El código postal fiscal son 5 dígitos y hace falta para el CFDI 4.0.', foco:'f_cp'};
+  }
   if(MODO==='tercero'){
     const tr=rfcCheck(prof.tercero_rfc);
     if(!prof.tercero_rfc) return {msg:'Escribe el RFC de quien factura por ti.', foco:'f_trfc'};
@@ -1143,6 +1223,7 @@ window.guardarParcial = guardarParcial;
     set('f_holder',a.bank_account_holder); set('f_clabe',a.bank_clabe);
     set('f_currency',a.preferred_currency);
     set('f_trfc',a.tercero_rfc); set('f_tlegal',a.tercero_legal_name); set('f_trel',a.tercero_relacion);
+    if(a.tax_figure_id){ set('f_figura', String(a.tax_figure_id)); avisoFigura(); }
     if(a.facturacion_modo){
       const tarjeta=document.querySelector('#modos .modo[data-modo="'+a.facturacion_modo+'"]');
       if(tarjeta) pickModo(tarjeta);
@@ -1160,6 +1241,11 @@ window.guardarParcial = guardarParcial;
       });
     }catch(_){}
     loadCsdState();
+    await cargarFiguras();
+    // el catálogo llega después que los datos: se repinta la elección guardada
+    if(a.tax_figure_id){ const s=document.getElementById('f_figura');
+      if(s){ s.value=String(a.tax_figure_id); avisoFigura(); } }
+    aplicaModo();
   }catch(e){
     if(String(e).indexOf('401')>-1){ try{ localStorage.removeItem('ricky_token'); }catch(_){} location.href=BASE+'/'; }
   }

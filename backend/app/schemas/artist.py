@@ -88,6 +88,8 @@ class ArtistBase(BaseModel):
     tercero_rfc: Rfc = None
     tercero_legal_name: str | None = None
     tercero_relacion: TerceroRelacion = None
+    # La elige el proveedor en el registro; de ella salen comisión y retenciones.
+    tax_figure_id: int | None = None
 
     # location
     city: str | None = None
@@ -153,6 +155,8 @@ class ArtistUpdate(BaseModel):
     tercero_rfc: Rfc = None
     tercero_legal_name: str | None = None
     tercero_relacion: TerceroRelacion = None
+    # La elige el proveedor en el registro; de ella salen comisión y retenciones.
+    tax_figure_id: int | None = None
     city: str | None = None
     region: str | None = None
     country: str | None = None
