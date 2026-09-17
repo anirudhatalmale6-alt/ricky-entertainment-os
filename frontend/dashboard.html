@@ -581,6 +581,13 @@
   .mcell.over{background:rgba(56,44,161,.09);border-color:var(--acc);border-style:solid}
   .mcell.past{background:repeating-linear-gradient(135deg,transparent,transparent 6px,rgba(24,28,52,.03) 6px,rgba(24,28,52,.03) 12px);border-style:solid;border-color:var(--line)}
   .mcell.past.empty{opacity:.6}
+  /* Salón fuera de servicio: se ve que está retirado sin esconder su historia. */
+  .mcell.inact{background:repeating-linear-gradient(135deg,transparent,transparent 5px,rgba(239,68,68,.05) 5px,rgba(239,68,68,.05) 10px)}
+  .vname.vinact .vnm{color:var(--mut);text-decoration:line-through}
+  .vname.vinact>span{color:var(--bad);font-weight:650}
+  .vre{margin-top:5px;border:1px solid var(--line);background:var(--card);border-radius:7px;
+    font-size:10.5px;font-weight:650;color:var(--acc);padding:3px 8px;cursor:pointer;font-family:inherit}
+  .vre:hover{background:var(--inp)}
   /* "+" to add an actuación (search artist) into this venue+day */
   .cadd{position:absolute;border:0;cursor:pointer;display:grid;place-items:center;line-height:1;padding:0;font-weight:600}
   .mcell.empty .cadd{inset:0;margin:auto;width:26px;height:26px;border-radius:50%;background:var(--ov);color:var(--mut2);font-size:18px;border:1px dashed var(--line);transition:.12s}
@@ -3069,7 +3076,15 @@ function maestroVenues(bk){
   (CACHE.venues||[]).forEach(v=>{ if(v&&v.id) m.set(v.id,{id:v.id,name:v.name,capacity:(v.capacity!=null?v.capacity:null)}); });
   // require a real venue name: a booking whose venue was deleted may keep a dangling
   // venue_id (no name) — those must not spawn a "Sin venue" row.
-  bk.forEach(b=>{ if(!b.venue_id||!b.venue_name) return; if(!m.has(b.venue_id)) m.set(b.venue_id,{id:b.venue_id,name:b.venue_name,capacity:(b.venue_capacity!=null?b.venue_capacity:null)}); });
+  //
+  // David, 17/09: "cuando trato de eliminar un venue, lo desactiva pero no lo
+  // elimina de la vista". Aquí estaba el porqué: un salón desactivado sale de
+  // CACHE.venues, pero vuelve a entrar por sus ACTUACIONES, que conservan
+  // venue_id y venue_name. Se marca como inactivo para que la fila diga lo que
+  // es y no ofrezca agendar; renderMaestro además la esconde en las semanas
+  // donde ese salón no tiene nada.
+  const activos=new Set((CACHE.venues||[]).map(v=>v&&v.id).filter(Boolean));
+  bk.forEach(b=>{ if(!b.venue_id||!b.venue_name) return; if(!m.has(b.venue_id)) m.set(b.venue_id,{id:b.venue_id,name:b.venue_name,capacity:(b.venue_capacity!=null?b.venue_capacity:null),inactivo:!activos.has(b.venue_id)}); });
   return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name));
 }
 // Per-venue colour identity (base tints from David's model palette + extra distinct
@@ -3115,18 +3130,27 @@ function renderMaestro(){
   const todayStr=ymd(new Date()); const DN=['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM'];
   let html='<div class="mhd"></div>';
   days.forEach((d,i)=>{ const t=ymd(d)===todayStr; html+=`<div class="mhd${t?' today':''}">${DN[i]}<span class="dn">${d.getDate()}</span></div>`; });
-  venues.forEach((v,vi)=>{
+  // Un salón fuera de servicio sólo ocupa fila en las semanas donde tiene
+  // actuaciones que enseñar. En el resto desaparece, que es lo que espera quien
+  // acaba de darle a quitar. Esconderlo SIEMPRE borraría de la vista historia
+  // real; dejarlo siempre es lo que le chirriaba a David.
+  const diasSemana=days.map(d=>ymd(d));
+  const visibles=venues.filter(v=>!v.inactivo || bk.some(b=>
+    (b.venue_id||0)===(v.id||0) && diasSemana.includes(ymd(new Date(b.starts_at)))));
+  visibles.forEach((v,vi)=>{
     const vc=bk.filter(b=>(b.venue_id||0)===(v.id||0)).length;
     const capTxt=(v.capacity!=null&&v.capacity!=='')?('Cap. '+v.capacity):`${vc} ${vc===1?'actuación':'actuaciones'}`;
-    html+=`<div class="vname">${v.id?`<button class="vx" title="Eliminar venue" onclick="delVenue(${v.id},'${esc(v.name).replace(/'/g,"\\'")}',${vc})">✕</button>`:''}<div class="vnh"><span class="vico">📍</span><span class="vnm">${esc(v.name)}</span></div><span>${capTxt}</span></div>`;
+    html+=`<div class="vname${v.inactivo?' vinact':''}">${(v.id&&!v.inactivo)?`<button class="vx" title="Eliminar venue" onclick="delVenue(${v.id},'${esc(v.name).replace(/'/g,"\\'")}',${vc})">✕</button>`:''}<div class="vnh"><span class="vico">${v.inactivo?'🚫':'📍'}</span><span class="vnm">${esc(v.name)}</span></div><span>${v.inactivo?'Fuera de servicio':capTxt}</span>${v.inactivo?`<button class="vre" onclick="reactivarVenue(${v.id},'${esc(v.name).replace(/'/g,"\\'")}')">Reactivar</button>`:''}</div>`;
     days.forEach(d=>{
       const ds=ymd(d);
       const past=ds<todayStr;   // no se agenda en fechas pasadas
       const cards=bk.filter(b=>(b.venue_id||0)===(v.id||0)&&ymd(new Date(b.starts_at))===ds).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
-      html+=`<div class="mcell${cards.length?'':' empty'}${past?' past':''}" data-vid="${v.id||''}" data-date="${ds}">${cards.map(b=>maestroCard(b,vi)).join('')}${past?'':`<button class="cadd" title="Agregar actuación" onclick="openAddAct(${v.id},'${ds}')">+</button>`}</div>`;
+      // Sin "+" en un salón fuera de servicio: el selector ya no lo lista, pero
+      // este botón pasaba el id directo y dejaba agendar en un salón retirado.
+      html+=`<div class="mcell${cards.length?'':' empty'}${past?' past':''}${v.inactivo?' inact':''}" data-vid="${v.id||''}" data-date="${ds}">${cards.map(b=>maestroCard(b,vi)).join('')}${(past||v.inactivo)?'':`<button class="cadd" title="Agregar actuación" onclick="openAddAct(${v.id},'${ds}')">+</button>`}</div>`;
     });
   });
-  if(!venues.length) html+=`<div style="grid-column:1/-1;padding:26px;text-align:center" class="muted">Aún no hay actuaciones programadas en esta cadena.</div>`;
+  if(!visibles.length) html+=`<div style="grid-column:1/-1;padding:26px;text-align:center" class="muted">Aún no hay actuaciones programadas en esta cadena.</div>`;
   grid.innerHTML=html; wireMaestroDnD(); updateWeekKpi(); updateBudgetKpi(); updateNotifyBtn();
   ajustarAltoMaestro();
   const lbl=document.getElementById('maestroWeek');
@@ -3367,6 +3391,22 @@ async function delVenue(id,name,count){
       : 'Salón eliminado ✓');
   }catch(e){ toast('No se pudo quitar: '+(e.message||''),true); }
 }
+
+/* Volver a poner en servicio un salón retirado. El endpoint ya existía
+   (/companies/venues/{id}/reactivar) pero no había ningún botón que lo llamara:
+   quitar un salón era, en la práctica, irreversible desde la pantalla. */
+async function reactivarVenue(id, name){
+  if(!confirm(`¿Volver a poner "${name}" en servicio?\n\nVuelve a aparecer para agendar.`)) return;
+  try{
+    const v = await post('/companies/venues/'+id+'/reactivar', {});
+    CACHE.venues = [...(CACHE.venues||[]), {id:v.id, name:v.name,
+      capacity:(v.capacity!=null?v.capacity:null), company_id:v.company_id}];
+    CACHE.myProps = null;
+    renderMaestro();
+    toast(`"${name}" está otra vez en servicio ✓`);
+  }catch(e){ toast('No se pudo reactivar: '+(e.message||''), true); }
+}
+window.reactivarVenue=reactivarVenue;
 
 /* Propiedades del usuario. Un director (rol hotel) no puede pedir /companies
    (es admin-only); sus propiedades salen del dashboard de su cadena. El admin
