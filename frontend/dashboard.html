@@ -590,6 +590,10 @@
   .amod .asrch input{width:100%;border:1px solid var(--line);background:var(--inp);border-radius:10px;padding:10px 12px 10px 34px;font-size:13.5px;color:var(--txt)}
   .amod .asrch .ai{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mut2)}
   .amod .alist{flex:1;overflow-y:auto;padding:4px 10px 8px}
+  /* Una lista que scrollea siempre parte la última fila. La sombra interior de
+     abajo no se mueve con el contenido, así que esa fila a medias se lee como
+     "sigue habiendo más" y no como una tarjeta rota. */
+  .amod.actpick .alist{box-shadow:inset 0 -16px 14px -14px rgba(12,16,30,.22)}
   /* Tarjeta de artista para pickers (reemplazo / agendar) */
   .acard2{display:flex;align-items:center;gap:11px;padding:9px 8px;border-bottom:1px solid var(--line)}
   .acard2:last-child{border-bottom:0}
@@ -607,12 +611,21 @@
   .arow2 .az span{font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
   .arow2 .ap{font-size:12.5px;font-weight:700;color:var(--acc);flex:none}
   /* Picker de artistas al agendar (tarjetas ricas: foto, ubicación, idiomas, video, mensaje) */
-  .amod.actpick{max-width:780px}
+  /* David, 17/09: "las actuaciones aparecen cortadas... reconfigurar el tamaño
+     del pop a casi pantalla completa". Con 780px cabían dos columnas y la fila
+     de abajo quedaba partida por la mitad contra el pie, que es lo que se ve
+     cortado. Ahora ocupa casi toda la ventana y las columnas se calculan solas
+     según el ancho: cuatro en un portátil, dos en una pantalla pequeña. */
+  .amod.actpick{max-width:min(1480px,95vw);width:95vw;max-height:94vh}
   /* Fila de filtros: búsqueda + ubicación (con miras a operar a nivel nacional) */
   .amod.actpick .afilters{display:flex;gap:8px;margin:14px 18px 8px;align-items:center;flex-wrap:wrap}
   .amod.actpick .afilters .asrch{margin:0;flex:1;min-width:180px}
   .afsel{border:1px solid var(--line);background:var(--inp);border-radius:10px;padding:9px 11px;font-size:12.5px;color:var(--txt);cursor:pointer;max-width:230px;flex:none}
-  .artgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:6px 14px 10px}
+  /* auto-fill en vez de "1fr 1fr": las tarjetas mandan su ancho mínimo y el
+     número de columnas sale del espacio que haya. Y el padding de abajo evita
+     que la última fila quede pegada al pie, que se lee como recortada aunque
+     se pueda bajar con la rueda. */
+  .artgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;padding:6px 14px 18px}
   .acard3{display:flex;gap:10px;border:1.5px solid var(--line);border-radius:13px;padding:9px;cursor:pointer;transition:.12s;background:var(--card)}
   .acard3:hover{border-color:var(--acc);box-shadow:0 6px 16px rgba(56,44,161,.12)}
   .acard3.sel{border-color:var(--acc);background:#382ca10d;box-shadow:0 0 0 2px #382ca133 inset}
@@ -620,7 +633,9 @@
   .acard3 .ac3-disp{position:absolute;left:4px;bottom:4px;font-size:8.5px;font-weight:700;color:#fff;background:rgba(16,185,129,.92);padding:1px 5px;border-radius:10px}
   .acard3 .ac3-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
   .acard3 .ac3-h{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
-  .acard3 .ac3-h b{font-size:13px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acard3 .ac3-h b{min-width:0}
+  .acard3 .ac3-h b{font-size:13px;font-weight:750;overflow-wrap:anywhere;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .acard3 .ac3-price{font-size:12px;font-weight:750;color:var(--acc);flex:none}
   .acard3 .ac3-sub{font-size:11px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .acard3 .ac3-meta{font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -664,7 +679,7 @@
      la fecha y el hotel que ya venía capturando siguen ahí. Sin esta línea las
      dos capas comparten z-index y el orden depende de quién se creó primero. */
   #apMov{z-index:70}
-  @media(max-width:560px){ .artgrid{grid-template-columns:1fr} }
+  @media(max-width:560px){ .artgrid{grid-template-columns:1fr} .amod.actpick{width:98vw;max-height:96vh} }
   .amod .af{border-top:1px solid var(--line);padding:13px 18px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
   .amod .af .fld{display:flex;flex-direction:column;gap:4px}
   .amod .af .fld label{font-size:10.5px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
