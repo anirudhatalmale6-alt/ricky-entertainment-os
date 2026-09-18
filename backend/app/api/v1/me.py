@@ -33,7 +33,7 @@ from app.models.user import Role, User
 from app.core import security
 from app.services.facturama import FacturamaError, get_facturama
 from app.services import afinidad as af
-from app.services import facturacion, figura_fiscal, mailer, passwords, periodos, rfc as rfc_svc
+from app.services import cfdi_subido, facturacion, figura_fiscal, mailer, passwords, periodos, rfc as rfc_svc
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
     ContractAcceptance,
@@ -692,6 +692,188 @@ async def save_my_fiscal(payload: FiscalDataIn, scope: CurrentScope, db: DbSessi
     return _fiscal_out(artist)
 
 
+# --- Facturas que sube el proveedor (modos "propia" y "tercero") ----------
+# David, 18/09: "sin factura no hay pago". Aquí se sube, se comprueba y queda en
+# la MISMA tabla que las que timbramos nosotros, marcada con su origen.
+
+_MAX_FACTURA_BYTES = 8 * 1024 * 1024
+
+
+def _round2(x) -> float:
+    return round(float(x or 0), 2)
+
+
+def _corte_texto() -> str:
+    """El aviso de cortes, palabra por palabra como lo escribió David (18/09).
+
+    Sólo corregí la concordancia: él escribió "las fechas de corte SERA" y son
+    dos fechas. Vive aquí y no copiado en el HTML para que el mismo texto salga
+    en la pantalla del músico, en el correo y donde haga falta.
+    """
+    return ("Las fechas de corte serán los días 15 y último día de cada mes, "
+            "correspondientes a cada periodo de facturación. Las facturas "
+            "recibidas después de la fecha límite se procesarán en el periodo "
+            "de pago siguiente.")
+
+
+@router.get("/facturas/pendientes")
+async def facturas_pendientes(scope: CurrentScope, db: DbSession):
+    """Qué tiene que facturar este proveedor: periodo, hotel e importe.
+
+    Quien emite su propia factura necesita saber A QUIÉN se la hace, con qué RFC
+    y por cuánto. Sin esto factura a ojo, el CFDI sale mal y hay que rehacerlo.
+    """
+    artist_id = await _require_cobra(scope)
+    artist = await _load_artist(db, artist_id)
+    figura = await facturacion._load_figura(db, artist)
+
+    # Las quincenas ya CERRADAS que aún tienen actuaciones sin factura.
+    hoy = date_cls.today()
+    claves = []
+    k = periodos.last_closed(hoy)
+    for _ in range(6):                      # medio año hacia atrás, de sobra
+        claves.append(k)
+        k = periodos.previous(k)
+
+    salida = []
+    for clave in claves:
+        bookings = await facturacion.pending_bookings_for_period(db, clave, artist_id=artist_id)
+        if not bookings:
+            continue
+        # Una factura por HOTEL: el receptor del CFDI es el hotel, no SHOWMA.
+        por_hotel: dict[int, list] = {}
+        for b in bookings:
+            por_hotel.setdefault(b.company_id, []).append(b)
+        for company_id, lista in por_hotel.items():
+            company = await db.get(Company, company_id)
+            honorarios = sum(float(b.agreed_price or 0) for b in lista)
+            d = facturacion.compute_desglose(honorarios, figura)
+            salida.append({
+                "periodo": clave,
+                "periodo_label": periodos.label(clave),
+                "corte": periodos.cutoff(clave).isoformat(),
+                "pago_estimado": periodos.payment_date(clave).isoformat(),
+                "company_id": company_id,
+                "hotel": company.name if company else "—",
+                "hotel_rfc": company.tax_id if company else None,
+                "hotel_razon_social": company.legal_name if company else None,
+                "hotel_regimen": company.tax_regime if company else None,
+                "actuaciones": len(lista),
+                # Las claves son las que devuelve compute_desglose, no las que yo
+                # daba por hechas: honorarios/base no existen, es base_cfdi.
+                "honorarios": _round2(honorarios),
+                "base": d["base_cfdi"],
+                "comision": d["comision"],
+                "iva": d["iva"],
+                "ret_iva": d["ret_iva"],
+                "ret_isr": d["ret_isr"],
+                "total_cfdi": d["total"],
+                # Sin RFC del hotel no se le puede facturar, y es mejor decirlo
+                # aquí que dejar que emita un CFDI que habrá que cancelar.
+                "puede_facturar": bool(company and company.tax_id),
+            })
+    return {"aviso_corte": _corte_texto(), "modo": artist.facturacion_modo, "periodos": salida}
+
+
+@router.post("/facturas")
+async def subir_factura(
+    scope: CurrentScope,
+    db: DbSession,
+    periodo: str = Form(...),
+    company_id: int = Form(...),
+    xml: UploadFile = File(...),
+    pdf: UploadFile | None = File(None),
+):
+    """Sube el CFDI de una quincena. Se comprueba antes de aceptarlo."""
+    artist_id = await _require_cobra(scope)
+    artist = await _load_artist(db, artist_id)
+    if artist.facturacion_modo == "showma":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Tu facturación es automática: SHOWMA emite el CFDI por ti, "
+                                   "no hace falta que subas nada.")
+
+    datos_xml = await xml.read()
+    if len(datos_xml) > _MAX_FACTURA_BYTES:
+        raise HTTPException(status_code=413, detail="El XML es demasiado grande.")
+    try:
+        cfdi = cfdi_subido.leer(datos_xml)
+    except cfdi_subido.CfdiInvalido as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    bookings = await facturacion.pending_bookings_for_period(
+        db, periodo, artist_id=artist_id, company_id=company_id)
+    if not bookings:
+        raise HTTPException(status_code=422,
+                            detail="No hay actuaciones pendientes de facturar en ese periodo "
+                                   "para ese hotel. Puede que ya se hayan facturado.")
+    company = await db.get(Company, company_id)
+    figura = await facturacion._load_figura(db, artist)
+    honorarios = sum(float(b.agreed_price or 0) for b in bookings)
+    esperado = facturacion.compute_desglose(honorarios, figura)["total"]
+
+    # Quién puede emitir: él, o el tercero que registró. En modo "tercero" la
+    # factura la hace el tercero, así que su RFC también vale.
+    emisores = [artist.rfc]
+    if artist.facturacion_modo == "tercero" and artist.tercero_rfc:
+        emisores.append(artist.tercero_rfc)
+    try:
+        cfdi_subido.comprobar(cfdi, emisores_validos=emisores,
+                              receptor_esperado=company.tax_id if company else None,
+                              total_esperado=esperado)
+    except cfdi_subido.CfdiInvalido as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    # ¿Ya estaba subida? El índice único del UUID lo impediría igual, pero un
+    # 500 de base de datos no le dice nada al músico.
+    ya = await db.scalar(select(Cfdi).where(Cfdi.uuid == cfdi.uuid))
+    if ya is not None:
+        raise HTTPException(status_code=409,
+                            detail="Esa factura ya estaba subida (mismo folio fiscal). "
+                                   "Si te equivocaste de archivo, sube el correcto.")
+
+    sello = uuid.uuid4().hex
+    nombre_xml = f"cfdi_{artist_id}_{sello}.xml"
+    datos_pdf = b""
+    url_pdf = None
+    if pdf is not None:
+        datos_pdf = await pdf.read()
+        if datos_pdf:
+            if len(datos_pdf) > _MAX_FACTURA_BYTES:
+                raise HTTPException(status_code=413, detail="El PDF es demasiado grande.")
+            url_pdf = f"{settings.ROOT_PATH}/uploads/cfdi_{artist_id}_{sello}.pdf"
+
+    # Los archivos se escriben DESPUÉS de que la fila entre bien. Al revés, un
+    # fallo entre el write y el commit deja el XML huérfano en disco: me pasó
+    # tres veces mientras probaba esto, y en producción nadie los ve ni los
+    # limpia.
+    fila = Cfdi(
+        period=periodo, artist_id=artist_id, company_id=company_id,
+        status="stamped", uuid=cfdi.uuid, serie=cfdi.serie, folio=cfdi.folio,
+        issuer_rfc=cfdi.emisor_rfc, receiver_rfc=cfdi.receptor_rfc,
+        subtotal=cfdi.subtotal, total=cfdi.total,
+        stamped_at=datetime.utcnow(),
+        origen=("tercero" if artist.facturacion_modo == "tercero" else "propia"),
+        xml_url=f"{settings.ROOT_PATH}/uploads/{nombre_xml}", pdf_url=url_pdf,
+        uploaded_by=scope.user.id, uploaded_at=datetime.utcnow(),
+    )
+    db.add(fila)
+    await db.flush()
+    # Las actuaciones quedan enlazadas, igual que con el timbrado automático:
+    # así no se pueden volver a facturar y el cierre no las vuelve a tomar.
+    for b in bookings:
+        b.cfdi_id = fila.id
+    await db.commit()
+    carpeta = ensure_upload_dir()
+    (carpeta / nombre_xml).write_bytes(datos_xml)
+    if datos_pdf:
+        (carpeta / f"cfdi_{artist_id}_{sello}.pdf").write_bytes(datos_pdf)
+    return {"ok": True, "uuid": cfdi.uuid, "actuaciones": len(bookings),
+            "total": cfdi.total,
+            "detalle": f"Factura recibida por ${cfdi.total:,.2f}, "
+                       f"{len(bookings)} {'actuación' if len(bookings)==1 else 'actuaciones'}. "
+                       f"El pago sale el {periodos.payment_date(periodo).strftime('%d/%m/%Y')}."}
+
+
 @router.post("/fiscal/csd")
 async def upload_csd(
     scope: CurrentScope,
@@ -846,9 +1028,32 @@ def _afinidad_valida(respuestas) -> dict | None:
     return limpio or None
 
 
+def _afinidad_completa(respuestas, *, donde: str) -> None:
+    """Las diez, o no se guarda (David, 18/09: "no dejar guardar el Show sin ellas").
+
+    Un show con el cuestionario a medias no cruza contra las matrices y queda
+    fuera de las recomendaciones para siempre, sin dar ningún error: se limita a
+    no aparecer. Por eso se bloquea al guardar y no sólo en el formulario.
+
+    Se dice CUÁNTAS y CUÁLES faltan. "Faltan respuestas" obliga a ir contando a
+    mano por una pantalla de diez desplegables.
+    """
+    puestas = set(respuestas or {})
+    faltan = [p for p in af.PREGUNTAS if p not in puestas]
+    if faltan:
+        textos = [af.PREGUNTAS_TEXTO.get(p, {}).get("show") or p for p in faltan]
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(f"Al show le {'falta 1 pregunta' if len(faltan)==1 else f'faltan {len(faltan)} preguntas'} "
+                    f"de «Te ayudamos a encontrar los escenarios perfectos para ti»: "
+                    + "; ".join(textos[:3]) + ("…" if len(textos) > 3 else "")),
+        )
+
+
 def _nuevo_show(artist_id: int, payload: ShowCreate) -> Show:
     datos = payload.model_dump(exclude={"seasonal_rates", "images"})
     datos["afinidad"] = _afinidad_valida(datos.get("afinidad"))
+    _afinidad_completa(datos["afinidad"], donde="alta")
     show = Show(artist_id=artist_id, **datos)
     for rate in payload.seasonal_rates:
         show.seasonal_rates.append(ShowSeasonalRate(**rate.model_dump()))
@@ -863,6 +1068,12 @@ def _aplicar_show(show: Show, payload: ShowUpdate) -> None:
     images = data.pop("images", None)
     if "afinidad" in data:
         data["afinidad"] = _afinidad_valida(data["afinidad"])
+        # Al EDITAR sólo se exige si el show ya las tenía completas: así se
+        # impide vaciarlas, pero no se bloquea a quien entra a cambiar un precio
+        # de un show viejo que nunca tuvo cuestionario. Esos 23 shows anteriores
+        # quedarían inmodificables, y con ellos su precio y sus fotos.
+        if len(show.afinidad or {}) >= len(af.PREGUNTAS):
+            _afinidad_completa(data["afinidad"], donde="edición")
     for field, value in data.items():
         setattr(show, field, value)
     if rates is not None:

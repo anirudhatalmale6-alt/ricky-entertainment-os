@@ -7701,6 +7701,11 @@ const RENDER = {
 
   async bill(box){
     if(!ME.artist_id) return hotelBill(box);   // hotels/admin -> invoicing screen (screen 6)
+    // Quien no factura por SHOWMA sube aquí su CFDI de cada quincena. Se pide
+    // antes que los payouts porque es lo que le bloquea el cobro: si hay algo
+    // pendiente de facturar, eso va arriba del todo.
+    let pend = null;
+    try{ pend = await api('/me/facturas/pendientes'); }catch(e){ pend = null; }
     const data = await api('/me/payouts');
     const invoices = (data && data.items) || [];
     CACHE.payouts = invoices; CACHE.payoutFigura = (data && data.figura) || null;
@@ -7712,9 +7717,9 @@ const RENDER = {
     const vencN=invoices.filter(x=>x.status==='overdue').length;
     const STL={paid:['Pagada','is-paid'],sent:['Enviada','is-sent'],overdue:['Vencida','is-overdue'],open:['En curso','is-open']};
   const stl=s=>STL[s]||['—','is-open'];
-    if(!invoices.length){ box.innerHTML=cutoffNotice('artist')+`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no tienes facturas</h3>
+    if(!invoices.length){ box.innerHTML=cutoffNotice('artist')+subirFacturasHTML(pend)+`<div class="box"><div class="soon"><div class="big">🧾</div><h3 style="justify-content:center">Aún no tienes facturas</h3>
       <p style="max-width:460px;margin:10px auto 0">En cuanto confirmes o realices actuaciones, aquí verás tu facturación agrupada por hotel y mes, con el desglose completo: Platform Service, IVA trasladado, retenciones y tu total a recibir.</p></div></div>`; return; }
-    box.innerHTML=cutoffNotice('artist')+`
+    box.innerHTML=cutoffNotice('artist')+subirFacturasHTML(pend)+`
       <div class="kpis">
         <div class="kpi"><div class="kh"><div><div class="k">Total a recibir</div><div class="v">${MXN(total)}</div><div class="d">${invoices.length} factura${invoices.length===1?'':'s'}</div></div><div class="kc violet">🧾</div></div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Cobrado</div><div class="v">${MXN(cobrado)}</div><div class="d">${total>0?Math.round(cobrado/total*100):0}% del total</div></div><div class="kc green">✅</div></div></div>
@@ -8561,10 +8566,112 @@ const qDMY=iso=>iso?qDM(iso)+'/'+iso.slice(0,4):'—';                   // 2026
 // Aviso de periodización de facturas. Los cortes son los días 15 y 30 de cada
 // mes y el pago sale 10 días después del corte; la redacción cambia según quien
 // mire, porque el hotel PAGA y el músico COBRA.
+/* El texto es el que escribió David (18/09), con una corrección: él puso "las
+   fechas de corte SERÁ" y son dos fechas.
+
+   Y dice "último día de cada mes", no "30". No es un matiz: en febrero el 30 no
+   existe y en los meses de 31 días el 31 se quedaría fuera de toda quincena. El
+   servidor ya cortaba por el último día; el aviso decía otra cosa. */
+/* ---- Subir mi factura (modos "propia" y "tercero") ---------------------
+   David, 18/09: "sin factura no hay pago". Se le enseña QUÉ facturar -- hotel,
+   RFC del hotel, periodo e importe -- porque quien emite por su cuenta necesita
+   esos datos para que el CFDI salga bien a la primera. */
+let FACT_PEND = null;
+// Un corte y un día de pago son FECHAS, no instantes. fmtDate les pega la hora
+// y sale "10-ago 12:00 a.m.", que además parece medianoche de un día antes.
+const soloFecha = iso => { if(!iso) return '—';
+  const d = new Date(String(iso).length<=10 ? iso+'T12:00:00' : iso);
+  return d.toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}); };
+function subirFacturasHTML(pend){
+  FACT_PEND = pend;
+  if(!pend || pend.modo === 'showma') return '';       // SHOWMA factura por él
+  const filas = (pend.periodos || []);
+  if(!filas.length){
+    return `<div class="box" style="margin-bottom:16px">
+      <h3>📤 Subir mis facturas</h3>
+      <div class="hint" style="margin:0">No tienes periodos pendientes de facturar. Cuando cierre una
+        quincena con actuaciones realizadas, aparecerá aquí lo que tienes que facturar.</div></div>`;
+  }
+  return `<div class="box" style="margin-bottom:16px">
+    <h3>📤 Subir mis facturas</h3>
+    <div class="hint">Esto es lo que tienes que facturar. Sube el XML timbrado (y el PDF si lo tienes)
+      de cada periodo; en cuanto lo recibimos y cuadra, tu pago entra en el siguiente depósito.</div>
+    <table><thead><tr><th>Periodo</th><th>Hotel</th><th>Facturar a</th><th>Actuaciones</th><th>Importe</th><th></th></tr></thead><tbody>
+    ${filas.map((f,i)=>`<tr>
+      <td><b>${esc(f.periodo_label)}</b><div class="muted" style="font-size:11px">corte ${soloFecha(f.corte)}</div></td>
+      <td>${esc(f.hotel)}</td>
+      <td>${f.puede_facturar
+            ? `<span style="font-family:monospace">${esc(f.hotel_rfc)}</span>
+               ${f.hotel_razon_social?`<div class="muted" style="font-size:11px">${esc(f.hotel_razon_social)}</div>`:''}`
+            : `<span class="chip c-pending">Falta el RFC del hotel</span>`}</td>
+      <td>${f.actuaciones}</td>
+      <td><b>${MXN2(f.total_cfdi)}</b></td>
+      <td style="text-align:right">${f.puede_facturar
+          ? `<button class="btn mini" onclick="facturaAbrir(${i})">Subir factura</button>`
+          : `<span class="muted" style="font-size:11.5px">Te avisamos en cuanto lo tengamos</span>`}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+function facturaAbrir(i){
+  const f = (FACT_PEND && FACT_PEND.periodos || [])[i]; if(!f) return;
+  let ov=document.getElementById('facMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='facMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) facturaCerrar(); }); }
+  ov.innerHTML=`<div class="amod" style="max-width:560px;position:relative">
+    <button class="ax" onclick="facturaCerrar()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Subir factura · ${esc(f.periodo_label)}</b>
+      <span class="as">${esc(f.hotel)} · ${f.actuaciones} ${f.actuaciones===1?'actuación':'actuaciones'}</span></div>
+    <div class="rqbody">
+      <div class="hint" style="margin-top:0">Emite el CFDI con estos datos:</div>
+      <div class="mrow"><span>RFC del hotel</span><b style="font-family:monospace">${esc(f.hotel_rfc||'—')}</b></div>
+      ${f.hotel_razon_social?`<div class="mrow"><span>Razón social</span><b>${esc(f.hotel_razon_social)}</b></div>`:''}
+      ${f.hotel_regimen?`<div class="mrow"><span>Régimen</span><b>${esc(f.hotel_regimen)}</b></div>`:''}
+      <div class="mrow"><span>Total del CFDI</span><b>${MXN2(f.total_cfdi)}</b></div>
+      <div class="mrow"><span>Pago estimado</span><b>${soloFecha(f.pago_estimado)}</b></div>
+      <div class="fld" style="margin-top:14px"><label>XML timbrado <i style="color:var(--bad)">*</i></label>
+        <input type="file" id="facXml" accept=".xml,text/xml,application/xml"></div>
+      <div class="fld"><label>PDF (opcional)</label>
+        <input type="file" id="facPdf" accept=".pdf,application/pdf"></div>
+      <div class="hint" id="facMsg" style="margin-bottom:0"></div>
+    </div>
+    <div class="af"><button class="btn ghost" onclick="facturaCerrar()">Cancelar</button>
+      <button class="ago" id="facGo" onclick="facturaSubir(${i})">Subir factura</button></div>
+  </div>`;
+  ov.style.display='flex';
+}
+function facturaCerrar(){ const o=document.getElementById('facMov'); if(o) o.style.display='none'; }
+async function facturaSubir(i){
+  const f = (FACT_PEND && FACT_PEND.periodos || [])[i]; if(!f) return;
+  const xml=(document.getElementById('facXml')||{}).files||[];
+  const pdf=(document.getElementById('facPdf')||{}).files||[];
+  const msg=document.getElementById('facMsg');
+  if(!xml.length){ if(msg){ msg.textContent='Elige el archivo XML de tu factura.'; msg.style.color='var(--bad)'; } return; }
+  const btn=document.getElementById('facGo'); if(btn){ btn.disabled=true; btn.textContent='Subiendo…'; }
+  const fd=new FormData();
+  fd.append('periodo', f.periodo); fd.append('company_id', f.company_id);
+  fd.append('xml', xml[0]); if(pdf.length) fd.append('pdf', pdf[0]);
+  try{
+    // API ya lleva el prefijo y el /api/v1; armarlo a mano rompe en el demo,
+    // que cuelga de /demo.
+    const r=await fetch(API+'/me/facturas',
+      {method:'POST', headers:{Authorization:'Bearer '+TOKEN}, body:fd});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.detail || 'No se pudo subir la factura.');
+    facturaCerrar(); toast(j.detalle || 'Factura recibida ✓'); show('bill', true);
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent='Subir factura'; }
+    // El motivo se dice ENTERO: "no se pudo" obliga a adivinar qué cambiar.
+    if(msg){ msg.textContent=e.message; msg.style.color='var(--bad)'; }
+  }
+}
+window.facturaAbrir=facturaAbrir; window.facturaCerrar=facturaCerrar; window.facturaSubir=facturaSubir;
+
 function cutoffNotice(role){
+  const base = 'Las fechas de corte serán los días 15 y último día de cada mes, '
+             + 'correspondientes a cada periodo de facturación.';
   const linea = role==='artist'
-    ? 'Fechas de corte: días 15 y 30 de cada mes. Tu pago se procesa 10 días posteriores a la fecha de corte del periodo correspondiente.'
-    : 'Fechas de corte: días 15 y 30 de cada mes. Tu factura se emite en cada corte y el pago se procesa 10 días posteriores a la fecha de corte.';
+    ? base + ' Las facturas recibidas después de la fecha límite se procesarán en el periodo de pago siguiente.'
+    : base + ' Tu factura se emite en cada corte y el pago se procesa 10 días posteriores.';
   return `<div class="cutbar" id="cutbar">
     <span class="ci">ℹ️</span>
     <div class="cx">${linea}
