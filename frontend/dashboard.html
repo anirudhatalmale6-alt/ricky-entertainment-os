@@ -665,12 +665,36 @@
      número de columnas sale del espacio que haya. Y el padding de abajo evita
      que la última fila quede pegada al pie, que se lee como recortada aunque
      se pueda bajar con la rueda. */
-  .artgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:12px;padding:6px 14px 18px}
-  .acard3{display:flex;gap:10px;border:1.5px solid var(--line);border-radius:13px;padding:9px;cursor:pointer;transition:.12s;background:var(--card)}
+  .artgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;padding:6px 14px 18px}
+  /* Tarjeta vertical: la foto manda (David, 19/09). */
+  /* SIN overflow:hidden. Con él, la tarjeta es un item de grid cuyo tamaño
+     mínimo automático pasa a 0, la fila se calcula a 70px y la foto de 284px
+     queda recortada con el cuerpo fuera de la vista. Las esquinas se redondean
+     en la propia foto, que es lo que se quería tapar. */
+  .acard3{display:flex;flex-direction:column;gap:0;border:1.5px solid var(--line);border-radius:14px;
+    padding:0;cursor:pointer;transition:.12s;background:var(--card)}
   .acard3:hover{border-color:var(--acc);box-shadow:0 6px 16px rgba(56,44,161,.12)}
   .acard3.sel{border-color:var(--acc);background:#382ca10d;box-shadow:0 0 0 2px #382ca133 inset}
-  .acard3 .ac3-ph{width:116px;height:116px;border-radius:12px;flex:none;background-size:cover;background-position:center;display:grid;place-items:center;color:#fff;font-size:22px;position:relative;overflow:hidden}
-  .acard3 .ac3-disp{position:absolute;left:4px;bottom:4px;font-size:8.5px;font-weight:700;color:#fff;background:rgba(16,185,129,.92);padding:1px 5px;border-radius:10px}
+  .acard3 .ac3-ph{width:100%;aspect-ratio:16/9;border-radius:12px 12px 0 0;flex:none;background-size:cover;
+    background-position:center;display:grid;place-items:center;color:#fff;font-size:30px;position:relative;overflow:hidden}
+  .acard3 .ac3-km{position:absolute;right:8px;bottom:8px;font-size:10.5px;font-weight:700;color:#fff;
+    background:rgba(12,16,30,.66);padding:3px 8px;border-radius:20px;backdrop-filter:blur(3px)}
+  .acard3 .ac3-busy{position:absolute;left:8px;top:8px;right:8px;font-size:10.5px;font-weight:700;
+    color:#7a4a00;background:rgba(253,230,180,.95);padding:4px 8px;border-radius:8px;line-height:1.3}
+  .acard3 .ac3-b{padding:11px 12px 12px;display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+  .acard3 .ac3-stars{margin-left:6px;color:#b7791f;font-weight:700}
+  .acard3 .ac3-stars i{font-style:normal;color:var(--mut);font-weight:600}
+  .acard3 .ac3-sel{flex:1;border:0;border-radius:9px;background:var(--acc);color:#fff;font-size:12.5px;
+    font-weight:700;padding:9px 10px;cursor:pointer;font-family:inherit}
+  .acard3 .ac3-sel:hover{background:#2c2280}
+  .acard3 .ac3-sel.on{background:var(--ok)}
+  .acard3 .ac3-sel:disabled{background:var(--inp);color:var(--mut);cursor:not-allowed}
+  .acard3 .ac3-msg{margin-top:6px;width:100%;border:1px solid var(--line);background:var(--card);
+    border-radius:9px;font-size:11.5px;font-weight:650;color:var(--mut);padding:7px;cursor:pointer;font-family:inherit}
+  .acard3 .ac3-msg:hover{background:var(--inp)}
+  .acard3 .ac3-disp{position:absolute;left:8px;bottom:8px;font-size:10.5px;font-weight:700;color:#fff;
+    background:rgba(16,185,129,.94);padding:3px 9px;border-radius:20px;backdrop-filter:blur(3px)}
+  .acard3 .ac3-disp.no{background:rgba(239,68,68,.94)}
   .acard3 .ac3-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
   .acard3 .ac3-h{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
   .acard3 .ac3-h b{min-width:0}
@@ -709,7 +733,8 @@
   .crrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
   .crrow b{font-size:13px;font-weight:700;display:block}
   .crrow span{font-size:11.5px;color:var(--mut)}
-  .acard3 .ac3-act{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:auto;padding-top:4px}
+  .acard3 .ac3-act{display:flex;align-items:center;gap:7px;margin-top:auto;padding-top:9px}
+  .acard3 .ac3-act .mini.ver{flex:0 0 auto}
   .acard3 .ac3-pick{font-size:11px;font-weight:700;color:var(--acc)}
   .acard3 .ac3-btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
   /* "Ver perfil" pesa más que "Mensaje": es el paso que decide la contratación
@@ -719,7 +744,7 @@
      la fecha y el hotel que ya venía capturando siguen ahí. Sin esta línea las
      dos capas comparten z-index y el orden depende de quién se creó primero. */
   #apMov{z-index:70}
-  @media(max-width:900px){ .acard3 .ac3-ph{width:84px;height:84px} }
+  @media(max-width:900px){ .acard3 .ac3-ph{aspect-ratio:16/9} }
   @media(max-width:560px){ .artgrid{grid-template-columns:1fr} #actMov{padding:0} .amod.actpick{width:100vw;height:100vh;max-height:100vh;border-radius:0} }
   .amod .af{border-top:1px solid var(--line);padding:13px 18px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
   .amod .af .fld{display:flex;flex-direction:column;gap:4px}
@@ -1924,6 +1949,9 @@ const API = (window.RICKY_API ?? "http://localhost:8000") + "/api/v1";  // "" = 
 const PERIOD = (()=>{ const d=new Date(); return {year:d.getFullYear(), month:d.getMonth()+1}; })();
 let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company", NOTIF_CACHE=[];
 let BLOCKED=new Set();   // fechas 'YYYY-MM-DD' que el artista bloqueó (vacaciones/enfermedad)
+// Normaliza para buscar: minúsculas y sin acentos. NFD separa la letra de su
+// tilde y el rango \u0300-\u036f borra la tilde suelta.
+const sinTildes = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
 const MXN = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(n||0);
 const MXN2 = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
 /* ---- Cifras de público -------------------------------------------------
@@ -3577,10 +3605,13 @@ async function openAddAct(venueId,dateStr){
 function actClose(){ const ov=document.getElementById('actMov'); if(ov) ov.style.display='none'; }
 function actRender(){
   const list=document.getElementById('actList'); if(!list) return;
-  const q=(document.getElementById('actQ')?.value||'').trim().toLowerCase();
+  // Sin acentos en los dos lados. Buscar "roman" no encontraba "Set Romántico",
+  // y en un producto en español la gente escribe sin acentos casi siempre: el
+  // buscador decía "no hay nada" teniendo el show delante.
+  const q=sinTildes(document.getElementById('actQ')?.value||'');
   const loc=(document.getElementById('actLoc')?.value||'');
   let items=CACHE.shows||[];
-  if(q) items=items.filter(s=>((s.show_name||'')+' '+(s.artist_name||'')+' '+pretty(s.category||'')+' '+pretty(s.subcategory||'')).toLowerCase().includes(q));
+  if(q) items=items.filter(s=>sinTildes((s.show_name||'')+' '+(s.artist_name||'')+' '+pretty(s.category||'')+' '+pretty(s.subcategory||'')).includes(q));
   if(loc) items=items.filter(s=>(s.artist_city||'')===loc);
   // Sólo se muestra quien cumple: dentro del radio y libre esa fecha (David
   // 2026-08-09). Se lleva la cuenta de los ocultos para explicar el porqué.
@@ -3619,7 +3650,6 @@ function actRender(){
     const langs=(s.show_languages||[]).slice(0,3).join(', ');
     const eff=(s.effective_price!=null?s.effective_price:s.price_hotel);
     const tags=[];
-    if(s.busy_note) tags.push(`<span class="atag busy">🕒 ${esc(s.busy_note)}</span>`);
     if(s.has_season) tags.push(`<span class="atag seas">${(s.season_pct||0)<0?'🔻':'🔺'} ${esc(s.season_label||'Temporada')} ${(s.season_pct>0?'+':'')+(s.season_pct||0)}%</span>`);
     if(s.has_special_rate) tags.push('<span class="atag rate">🏷️ Tarifa especial</span>');
     if(s.travel_fee_applied) tags.push(`<span class="atag km">🚗 Incluye ${MXN(s.travel_fee_applied)} de traslado (a más de ${s.travel_fee_km_applied} km)</span>`);
@@ -3634,21 +3664,32 @@ function actRender(){
       :(s.is_available===true?'<span class="ac3-disp">● Disponible</span>':'<span class="ac3-disp">● Disponible</span>');
     const km=s.distance_km!=null?`📏 ${s.distance_km<1?'<1':Math.round(s.distance_km)} km`:'';
     const meta=[s.artist_city?`📍 ${esc(s.artist_city)}`:'',km,langs?`🗣️ ${esc(langs)}`:''].filter(Boolean).join(' · ');
+    // Tarjeta con la foto de protagonista (David, 19/09). Lo que antes iba en
+    // texto a la derecha de una miniatura, ahora va encima de la foto: estado,
+    // distancia y el match. Ningún dato se pierde — "toda la Data se sigue
+    // presentando, es nuestra ventaja" (David).
+    const estrellas = (s.rating!=null && s.reviews_count)
+      ? `<span class="ac3-stars">★ ${(+s.rating).toFixed(1)} <i>(${s.reviews_count})</i></span>` : '';
     return `<div class="acard3${ADDACT.showId===s.id?' sel':''}${nd?' nodisp':''}" onclick="${nd?`actBlocked(${s.id})`:`actPick(${s.id})`}">
-      <div class="ac3-ph" ${ph}>${s.image_url?'':`<b style="font-weight:800;letter-spacing:1px;opacity:.42">${esc(inicialesProv(s.artist_name||s.show_name))}</b>`}${disp}${matchEsquina(mv, 'Afinidad con esta sala: marca, público y experiencia')}</div>
+      <div class="ac3-ph" ${ph}>${s.image_url?'':`<b style="font-weight:800;letter-spacing:1px;opacity:.42">${esc(inicialesProv(s.artist_name||s.show_name))}</b>`}
+        ${disp}
+        ${km?`<span class="ac3-km">${km}</span>`:''}
+        ${matchEsquina(mv, 'Afinidad con esta sala: marca, público y experiencia')}
+        ${s.busy_note?`<span class="ac3-busy">🕒 ${esc(s.busy_note)}</span>`:''}
+      </div>
       <div class="ac3-b">
         <div class="ac3-h"><b>${titulo}</b>${priceHtml}</div>
         <div class="ac3-sub">${[who,esc(cat)].filter(Boolean).join(' · ')||'—'}</div>
-        <div class="ac3-meta">${meta}</div>
+        <div class="ac3-meta">${meta}${estrellas}</div>
         ${nd?`<div class="ac3-why">🚫 ${esc(s.unavailable_reason||'No disponible ese día')}</div>`:''}
         ${tags.length?`<div class="ac3-tags">${tags.join('')}</div>`:''}
         <div class="ac3-act">
-          <span class="ac3-pick">${nd?'No disponible':(ADDACT.showId===s.id?'✓ Seleccionado':'Seleccionar')}</span>
-          ${s.artist_id?`<div class="ac3-btns">
-            <button class="mini ver" onclick="event.stopPropagation();openArtistProfile(${s.artist_id},${s.id})">👤 Ver perfil</button>
-            <button class="mini" onclick="event.stopPropagation();pickerMessage(${s.artist_id})">💬 Mensaje</button>
-          </div>`:''}
+          ${s.artist_id?`<button class="mini ver" onclick="event.stopPropagation();openArtistProfile(${s.artist_id},${s.id})">Ver perfil</button>`:'<span></span>'}
+          <button class="ac3-sel${ADDACT.showId===s.id?' on':''}" ${nd?'disabled':''}
+            onclick="event.stopPropagation();${nd?`actBlocked(${s.id})`:`actPick(${s.id})`}">
+            ${nd?'No disponible':(ADDACT.showId===s.id?'✓ Seleccionado':'Seleccionar')}</button>
         </div>
+        ${s.artist_id?`<button class="ac3-msg" onclick="event.stopPropagation();pickerMessage(${s.artist_id})">💬 Mensaje</button>`:''}
       </div></div>`;
   }).join('');
 }

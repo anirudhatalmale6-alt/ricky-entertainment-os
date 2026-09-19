@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentScope, CurrentUser, DbSession, require_permission
 from app.models.artist import Artist
+from app.models.review import Review
 from app.models.artist_client_rate import ArtistClientRate
 from app.models.company import Company
 from app.models.media import ShowImage
@@ -188,7 +189,28 @@ async def list_shows(
             else:
                 s.is_available = True
                 if s.artist_id in busy:
-                    s.busy_note = f"Ya tiene otra actuación ese día a las {busy[s.artist_id]:%H:%M}"
+                    # David, 19/09: "pongamos No Disponible 20:00". El texto
+                    # largo no cabía en la tarjeta nueva, y su primer intento
+                    # ("Solo hoy 20:00") se leía al revés, como si ESTUVIERA
+                    # libre a esa hora.
+                    s.busy_note = f"No disponible {busy[s.artist_id]:%H:%M}"
+
+    # Reseñas reales por artista. David, 19/09: su diseño ponía "4.8 (32)" en
+    # todas las tarjetas y en la plataforma hay 13 reseñas entre 4 proveedores.
+    # Se mandan las que hay; la tarjeta no pinta estrella a quien no tiene
+    # ninguna, en vez de inventarle una nota.
+    ids = {s.artist_id for s in shows if s.artist_id}
+    if ids:
+        filas = (await db.execute(
+            select(Review.artist_id, func.count(Review.id), func.avg(Review.rating))
+            .where(Review.artist_id.in_(ids))
+            .group_by(Review.artist_id)
+        )).all()
+        notas = {aid: (int(n), round(float(prom), 1)) for aid, n, prom in filas}
+        for s in shows:
+            n, prom = notas.get(s.artist_id, (0, None))
+            s.reviews_count = n
+            s.rating = prom
 
     if max_km is not None:
         # Sólo pasa quien se puede demostrar que está dentro del radio: sin

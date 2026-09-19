@@ -176,6 +176,9 @@ class ShowOut(ShowBase):
     # al guardar de nuevo mandaría vacío y BORRARÍA lo ya contestado.
     afinidad: dict | None = None
     rating: float | None = None
+    # Cuántas reseñas sostienen ese rating. Sin el número, un 5.0 de UNA reseña
+    # se lee igual que un 4.8 de treinta, y no valen lo mismo para decidir.
+    reviews_count: int | None = None
     seasonal_rates: list[SeasonalRateOut] = []
     images: list[ShowImageOut] = []
     created_at: datetime
