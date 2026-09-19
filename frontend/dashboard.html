@@ -7479,16 +7479,18 @@ const RENDER = {
     const facMonth=latestK? new Date(+latestK.split('-')[0],+latestK.split('-')[1]-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'}) : '—';
     const priced=invb.filter(b=>b.agreed_price); const avgCost=priced.length? Math.round(priced.reduce((a,b)=>a+num(b.agreed_price),0)/priced.length):0;
     const cancel=bk.filter(b=>b.status==='cancelled').length;
-    // Default the Maestro to the busiest week so the grid lands populated.
-    const wc={}; bk.forEach(b=>{const k=ymd(mondayOf(new Date(b.starts_at)));wc[k]=(wc[k]||0)+1;});
-    let bestW=null,bestN=-1; for(const k in wc){ if(wc[k]>bestN){bestN=wc[k];bestW=k;} }
+    // El calendario abre en la semana DE HOY. Antes abría en la semana con más
+    // actuaciones "para que la rejilla saliera con contenido", y eso tenía
+    // sentido cuando sólo había datos de demostración: hoy abre en agosto y
+    // David tiene que ir a buscar la semana en curso cada vez que entra
+    // (19/09). Un calendario de trabajo empieza donde estás parado.
     // Lista real de venues de la cadena (para mostrar también los vacíos/nuevos en el Maestro).
     // Sólo los salones EN SERVICIO: los desactivados no se pueden agendar. Sus
     // actuaciones pasadas sí siguen saliendo, porque entran por las reservas.
     CACHE.venues = (gb.comps||[]).flatMap(c=>(c.venues||[])
       .filter(v=>v.is_active!==false)
       .map(v=>({id:v.id,name:v.name,capacity:(v.capacity!=null?v.capacity:null),company_id:c.id,company_name:c.name})));
-    CACHE.homeBk = bk; CACHE.homeBudget = budget; if(!MAESTRO_REF) MAESTRO_REF = bestW? new Date(bestW+'T00:00:00') : new Date();
+    CACHE.homeBk = bk; CACHE.homeBudget = budget; if(!MAESTRO_REF) MAESTRO_REF = new Date();
     box.innerHTML=`
       <!-- David, 17/09: "eliminar solicitudes del dashboard de los hoteles, y
            usar ese espacio para reacomodar ziggy y la info general de
