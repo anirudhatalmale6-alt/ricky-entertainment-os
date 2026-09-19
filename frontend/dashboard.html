@@ -581,6 +581,27 @@
   .mcell.over{background:rgba(56,44,161,.09);border-color:var(--acc);border-style:solid}
   .mcell.past{background:repeating-linear-gradient(135deg,transparent,transparent 6px,rgba(24,28,52,.03) 6px,rgba(24,28,52,.03) 12px);border-style:solid;border-color:var(--line)}
   .mcell.past.empty{opacity:.6}
+  /* Repetir actuación */
+  .repdias{display:flex;gap:6px;flex-wrap:wrap}
+  /* La etiqueta ARRIBA del campo: en fgrid salían pegadas al lado y se leía
+     "Desde09/22/2026" de un tirón. */
+  .repfechas-cab{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:14px}
+  .repfechas-cab label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:650;color:var(--mut)}
+  .repfechas-cab input{border:1px solid var(--line);background:var(--inp);border-radius:9px;
+    padding:9px 10px;font-size:13px;font-family:inherit;color:var(--txt)}
+  .repdia{border:1.5px solid var(--line);background:var(--card);border-radius:9px;padding:7px 13px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:inherit;color:var(--mut)}
+  .repdia.on{border-color:var(--acc);background:#382ca10d;color:var(--acc)}
+  .repfechas{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:7px;
+    margin-top:10px;max-height:260px;overflow:auto;padding:2px}
+  .repf{border:1.5px solid var(--line);background:var(--card);border-radius:9px;padding:7px 9px;
+    text-align:left;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:2px}
+  .repf b{font-size:12px;font-weight:700;text-transform:capitalize}
+  .repf span{font-size:10.5px;color:var(--mut)}
+  .repf.ok{border-color:#bfe6d0;background:#f3fbf6}
+  .repf.mal{border-color:#f0c9c9;background:#fdf4f4}
+  .repf.mal span{color:var(--bad)}
+  .repf.fuera{opacity:.45;text-decoration:line-through}
   /* Salón fuera de servicio: se ve que está retirado sin esconder su historia. */
   .mcell.inact{background:repeating-linear-gradient(135deg,transparent,transparent 5px,rgba(239,68,68,.05) 5px,rgba(239,68,68,.05) 10px)}
   .vname.vinact .vnm{color:var(--mut);text-decoration:line-through}
@@ -3686,6 +3707,147 @@ async function actConfirm(){
   }
 }
 /* ---- Modificar actuación: cambiar fecha y hora (desde el calendario o la agenda) ---- */
+
+/* ---- Repetir una actuación en varias fechas ---------------------------
+   David, 19/09: "hay una cadena que programa todo el año... imagina tener que
+   registrar cada día. Pero idealmente sería por días de semana".
+
+   El flujo tiene dos pasos a propósito. Primero se SIMULA en el servidor y se
+   enseña el calendario con las fechas, el total y los choques; sólo entonces se
+   crea. 104 fechas son más de millón y medio de pesos: eso no se confirma a
+   ciegas. */
+let REP = null;
+const REP_DIAS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+function repetirAbrir(bid){
+  const b=(CACHE.homeBk||[]).find(x=>x.id===+bid)||(CACHE.agenda||[]).find(x=>x.id===+bid);
+  if(!b){ toast('No se encontró la actuación.',true); return; }
+  const st=new Date(b.starts_at);
+  const hasta=new Date(st); hasta.setMonth(hasta.getMonth()+3);
+  REP = {b, dias:[st.getDay()===0?6:st.getDay()-1], excluir:new Set(), sim:null,
+         desde: ymd(st), hasta: ymd(hasta),
+         hora: String(st.getHours()).padStart(2,'0')+':'+String(st.getMinutes()).padStart(2,'0')};
+  editActClose();
+  let ov=document.getElementById('repMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='repMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) repetirCerrar(); }); }
+  ov.style.display='flex';
+  repetirPintar();
+  repetirSimular();
+}
+function repetirCerrar(){ const o=document.getElementById('repMov'); if(o) o.style.display='none'; REP=null; }
+
+function repetirPintar(){
+  const ov=document.getElementById('repMov'); if(!ov||!REP) return;
+  const b=REP.b;
+  ov.innerHTML=`<div class="amod" style="position:relative;max-width:720px">
+    <button class="ax" onclick="repetirCerrar()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Repetir actuación</b><span class="as">${esc(b.show_name||b.artist_name||'Actuación')}${b.venue_name?' · '+esc(b.venue_name):''}</span></div>
+    <div class="rqbody">
+      <div class="fld"><label>Días de la semana</label>
+        <div class="repdias">${REP_DIAS.map((d,i)=>
+          `<button class="repdia${REP.dias.includes(i)?' on':''}" onclick="repetirDia(${i})">${d}</button>`).join('')}</div></div>
+      <div class="repfechas-cab">
+        <label>Desde<input id="repDesde" type="date" value="${REP.desde}" onchange="repetirCampo()"></label>
+        <label>Hasta<input id="repHasta" type="date" value="${REP.hasta}" onchange="repetirCampo()"></label>
+        <label>Hora<input id="repHora" type="time" value="${REP.hora}" onchange="repetirCampo()"></label>
+      </div>
+      <div id="repResumen" class="hint" style="margin-top:12px">Calculando…</div>
+      <div id="repLista"></div>
+    </div>
+    <div class="af"><span class="hint" id="repTotal" style="margin-right:auto"></span>
+      <button class="btn ghost" onclick="repetirCerrar()">Cancelar</button>
+      <button class="ago" id="repGo" onclick="repetirCrear()" disabled>Crear</button></div>
+  </div>`;
+}
+function repetirDia(i){
+  if(!REP) return;
+  const k=REP.dias.indexOf(i);
+  if(k>=0) REP.dias.splice(k,1); else REP.dias.push(i);
+  REP.excluir.clear();
+  repetirPintar(); repetirSimular();
+}
+function repetirCampo(){
+  if(!REP) return;
+  REP.desde=(document.getElementById('repDesde')||{}).value||REP.desde;
+  REP.hasta=(document.getElementById('repHasta')||{}).value||REP.hasta;
+  REP.hora=(document.getElementById('repHora')||{}).value||REP.hora;
+  REP.excluir.clear();
+  repetirSimular();
+}
+function repetirQuitar(fecha){
+  if(!REP) return;
+  if(REP.excluir.has(fecha)) REP.excluir.delete(fecha); else REP.excluir.add(fecha);
+  repetirSimular();
+}
+
+function repetirCuerpo(simular){
+  const c = {show_id:REP.b.show_id, venue_id:REP.b.venue_id, dias:REP.dias,
+             desde:REP.desde, hasta:REP.hasta, hora:REP.hora, simular:!!simular};
+  // Sólo en la creación de verdad. Ver el comentario de arriba.
+  if(!simular) c.excluir = [...REP.excluir];
+  return c;
+}
+async function repetirSimular(){
+  if(!REP) return;
+  const res=document.getElementById('repResumen'), lista=document.getElementById('repLista'),
+        go=document.getElementById('repGo'), tot=document.getElementById('repTotal');
+  if(go) go.disabled=true;
+  if(!REP.dias.length){ if(res) res.textContent='Elige al menos un día de la semana.';
+    if(lista) lista.innerHTML=''; if(tot) tot.textContent=''; return; }
+  if(res) res.textContent='Calculando…';
+  try{
+    const r=await post('/bookings/repetir', repetirCuerpo(true));
+    REP.sim=r;
+    // Lo que de verdad se va a crear = lo que el servidor da por bueno MENOS lo
+    // que el usuario quitó a mano. El servidor no sabe de esas últimas al
+    // simular, a propósito.
+    const buenas = r.detalle.filter(d=>!d.choque && !REP.excluir.has(d.fecha));
+    const crean = buenas.length;
+    const total = buenas.reduce((a,d)=>a+(+d.precio||0),0);
+    REP.crean = crean; REP.total = total;
+    const saltan=r.se_saltan, quitadas=REP.excluir.size;
+    if(res) res.innerHTML = `Se crearían <b>${crean}</b> ${crean===1?'actuación':'actuaciones'}`
+      + (saltan? ` · <span style="color:var(--bad)">${saltan} con problema, se saltan</span>`:'')
+      + (quitadas? ` · ${quitadas} que quitaste`:'')
+      + `. Puedes quitar o volver a poner fechas tocándolas.`;
+    if(tot) tot.innerHTML = `Total: <b>${MXN2(total)}</b>`;
+    if(lista) lista.innerHTML = `<div class="repfechas">${r.detalle.map(d=>{
+        const fuera=REP.excluir.has(d.fecha);
+        const cls = d.choque? 'mal' : (fuera? 'fuera':'ok');
+        return `<button class="repf ${cls}" onclick="repetirQuitar('${d.fecha}')"
+          title="${esc(d.choque||'')}">
+          <b>${fmtCorta(d.fecha)}</b><span>${d.choque? '⚠ '+esc(d.choque.slice(0,34)) : MXN2(d.precio)}</span></button>`;
+      }).join('')}</div>`;
+    if(go) go.disabled = !crean;
+  }catch(e){
+    if(res) res.textContent = e.message || 'No se pudo calcular.';
+    if(lista) lista.innerHTML=''; if(tot) tot.textContent='';
+  }
+}
+const fmtCorta = iso => { const d=new Date(iso+'T12:00:00');
+  return d.toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'}); };
+
+async function repetirCrear(){
+  if(!REP||!REP.sim) return;
+  if(!confirm(`Se van a crear ${REP.crean} actuaciones por un total de ${MXN2(REP.total)}.\n\n`
+    + `Quedan como borrador: no se avisa a nadie hasta que pulses "Guardar y notificar".\n\n¿Continuar?`)) return;
+  const go=document.getElementById('repGo'); if(go){ go.disabled=true; go.textContent='Creando…'; }
+  try{
+    const res=await post('/bookings/repetir', repetirCuerpo(false));
+    repetirCerrar();
+    toast(`${res.creadas} actuaciones creadas ✓`
+      + (res.se_saltan? ` · ${res.se_saltan} saltadas por choques`:''));
+    show('home', true);
+  }catch(e){
+    if(go){ go.disabled=false; go.textContent='Crear'; }
+    toast(e.message||'No se pudieron crear.', true);
+  }
+}
+window.repetirAbrir=repetirAbrir; window.repetirCerrar=repetirCerrar;
+window.repetirDia=repetirDia; window.repetirCampo=repetirCampo;
+window.repetirQuitar=repetirQuitar; window.repetirCrear=repetirCrear;
+
 function openEditAct(bid){
   bid=Number(bid);
   const b=(CACHE.homeBk||[]).find(x=>x.id===bid)||(CACHE.agenda||[]).find(x=>x.id===bid);
@@ -3712,7 +3874,8 @@ function openEditAct(bid){
       <div class="fld"><label>Hora</label><input id="edTime" type="time" value="${tstr}"></div>
     </div>
     ${venueRow}
-    <div style="padding:8px 4px 2px"><button class="ago" style="width:100%" id="edGo" onclick="editActSave(${b.id})">Guardar cambios</button></div>
+    <div style="padding:8px 4px 2px"><button class="btn ghost" style="width:100%;margin-bottom:8px" onclick="repetirAbrir(${b.id})">🔁 Repetir esta actuación en varias fechas</button>
+      <button class="ago" style="width:100%" id="edGo" onclick="editActSave(${b.id})">Guardar cambios</button></div>
     <div class="hint" style="padding:4px 6px 2px">El cambio le llegará al artista cuando pulses "Guardar y notificar".</div>
   </div>`;
   ov.style.display='flex';

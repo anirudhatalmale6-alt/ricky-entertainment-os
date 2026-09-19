@@ -11,7 +11,7 @@ company_id / artist_id / commission_pct are derived server-side from the chosen
 venue and show, and the commission is snapshotted so later re-tiering never
 rewrites past money.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import date as date_cls, datetime, time as dtime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -807,3 +807,154 @@ async def notify_artists(payload: NotifyIn, db: DbSession, bg: BackgroundTasks):
     await db.commit()
     avisos.despachar(bg, correos)
     return {"notified": notified, "artists": len(artists), "emails": emails}
+
+
+# --- Repetir una actuación en varias fechas -------------------------------
+# David, 19/09: "hay una cadena que programa todo el año... imagina tener que
+# registrar cada día. Pero idealmente sería por días de semana".
+
+# Tope duro de fechas por operación. Un año de lunes+jueves son ~104; 400 deja
+# sitio de sobra para varios días a la semana durante un año y aun así impide
+# que un rango mal escrito (año 2222) intente crear medio millón de filas.
+_MAX_REPETICIONES = 400
+
+
+class RepetirIn(BaseModel):
+    show_id: int
+    venue_id: int
+    dias: list[int]                      # 0=lunes … 6=domingo
+    desde: date_cls
+    hasta: date_cls
+    hora: str = "20:00"                  # HH:MM
+    duracion_min: int | None = None
+    agreed_price: float | None = None    # None = precio del show con su temporada
+    excluir: list[str] = []              # fechas YYYY-MM-DD que el usuario quitó
+    simular: bool = True                 # True = sólo calcula, NO crea nada
+    booker_id: int | None = None
+    event_type: str | None = None
+
+
+def _fechas_de(dias: list[int], desde: date_cls, hasta: date_cls,
+               excluir: set[str]) -> list[date_cls]:
+    dias = {d for d in dias if 0 <= d <= 6}
+    salida, cursor = [], desde
+    while cursor <= hasta and len(salida) <= _MAX_REPETICIONES:
+        if cursor.weekday() in dias and cursor.isoformat() not in excluir:
+            salida.append(cursor)
+        cursor += timedelta(days=1)
+    return salida
+
+
+@router.post("/repetir", dependencies=[Depends(require_permission("booking.manage"))])
+async def repetir_actuacion(payload: RepetirIn, db: DbSession):
+    """Crea la misma actuación en todas las fechas elegidas, o las simula.
+
+    Con `simular` (por defecto) NO escribe nada: devuelve las fechas, el precio
+    de cada una y los choques. Eso es lo que pinta el calendario de confirmación,
+    y es la razón de que exista: 104 fechas son más de millón y medio de pesos, y
+    eso se enseña ANTES, no después.
+
+    Con `simular=False` crea TODAS de una vez o ninguna. Mandar 104 altas sueltas
+    desde el navegador se corta a la mitad y deja 60 creadas y 44 no, sin que
+    nadie sepa cuáles: eso es peor que no crear ninguna.
+
+    Las fechas con choque NO tumban la operación, se saltan y se devuelven con su
+    motivo. En un año entero siempre habrá alguna, y fallar entera por una sola
+    obligaría a cazarla a mano antes de poder empezar.
+    """
+    show = (await db.execute(
+        select(Show).options(selectinload(Show.seasonal_rates)).where(Show.id == payload.show_id)
+    )).scalar_one_or_none()
+    if show is None:
+        raise HTTPException(status_code=404, detail="Show not found")
+    venue = await db.get(Venue, payload.venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    if not payload.dias:
+        raise HTTPException(status_code=422, detail="Elige al menos un día de la semana.")
+    if payload.hasta < payload.desde:
+        raise HTTPException(status_code=422, detail="La fecha final es anterior a la inicial.")
+
+    try:
+        hh, mm = (int(x) for x in payload.hora.split(":")[:2])
+        if not (0 <= hh <= 23 and 0 <= mm <= 59):
+            raise ValueError
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=422, detail="La hora no es válida (formato HH:MM).")
+
+    fechas = _fechas_de(payload.dias, payload.desde, payload.hasta, set(payload.excluir))
+    if not fechas:
+        raise HTTPException(status_code=422,
+                            detail="Con esos días y ese rango no sale ninguna fecha.")
+    if len(fechas) > _MAX_REPETICIONES:
+        raise HTTPException(
+            status_code=422,
+            detail=(f"Son {len(fechas)} fechas y el máximo por operación es "
+                    f"{_MAX_REPETICIONES}. Acorta el rango y repite la operación."))
+
+    company = await db.get(Company, venue.company_id) if venue.company_id else None
+    commission_pct = (round(RISK_COMMISSION[company.risk_tier] * 100, 2) if company else None)
+    dur = payload.duracion_min or getattr(show, "duration_minutes", None) or 60
+    hoy = date_cls.today()
+
+    detalle, crear, total = [], [], 0.0
+    for f in fechas:
+        inicio = datetime.combine(f, dtime(hh, mm))
+        fin = inicio + timedelta(minutes=dur)
+        precio = payload.agreed_price
+        if precio is None:
+            precio = pricing.effective_price(show, inicio)["price"]
+        precio = float(precio or 0)
+
+        motivo = None
+        if f < hoy:
+            motivo = "Fecha pasada"
+        elif show.artist_id:
+            bloqueado, razon = await availability.is_blocked(db, show.artist_id, inicio)
+            if bloqueado:
+                motivo = "El artista bloqueó ese día" + (f" ({razon})" if razon else "")
+            else:
+                # Mismo margen de traslado que al crear una suelta, pero contando
+                # también las que va a crear esta misma operación: si no, dos
+                # fechas del propio lote podrían chocar entre ellas.
+                try:
+                    await _check_travel_buffer(db, show.artist_id, inicio, fin)
+                except HTTPException as e:
+                    motivo = str(e.detail)
+                else:
+                    for otro_ini, otro_fin in crear:
+                        if otro_ini < fin + timedelta(hours=TRAVEL_BUFFER_HOURS) and \
+                           inicio - timedelta(hours=TRAVEL_BUFFER_HOURS) < otro_fin:
+                            motivo = "Choca con otra fecha de esta misma repetición"
+                            break
+
+        detalle.append({"fecha": f.isoformat(), "hora": f"{hh:02d}:{mm:02d}",
+                        "precio": precio, "choque": motivo})
+        if motivo is None:
+            crear.append((inicio, fin))
+            total += precio
+
+    resumen = {
+        "fechas": len(detalle),
+        "se_crean": len(crear),
+        "se_saltan": sum(1 for d in detalle if d["choque"]),
+        "total": round(total, 2),
+        "detalle": detalle,
+        "simulado": payload.simular,
+    }
+    if payload.simular:
+        return resumen
+
+    for inicio, fin in crear:
+        precio = next(d["precio"] for d in detalle if d["fecha"] == inicio.date().isoformat())
+        db.add(Booking(
+            show_id=show.id, venue_id=venue.id, company_id=venue.company_id,
+            artist_id=show.artist_id, booker_id=payload.booker_id,
+            starts_at=inicio, ends_at=fin, event_type=payload.event_type,
+            agreed_price=precio, currency="MXN", commission_pct=commission_pct,
+            status=BookingStatus.PENDING, confirmed_at=None,
+        ))
+    # Un solo commit: o entran las N o no entra ninguna.
+    await db.commit()
+    resumen["creadas"] = len(crear)
+    return resumen
