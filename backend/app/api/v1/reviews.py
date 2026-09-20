@@ -207,41 +207,83 @@ async def resenas_de_artista(
 @router.get("/resumen")
 async def resumen_de_periodo(scope: CurrentScope, db: DbSession,
                              year: int | None = None, month: int | None = None):
-    """La calificación media de MIS propiedades en un mes, con cuántas la sostienen.
+    """El NIVEL de lo que contrataste en el periodo, más el detalle de reseñas.
 
-    David, 20/09: "podemos mostrar el promedio de las actuaciones contratadas en
-    el periodo". Esto es la nota REAL que ponen los hoteles al calificar, no la
-    retención de público que se enseñaba antes con cara sonriente.
+    David, 20/09: "el promedio de los artistas que se han contratado, si
+    contratas puros de 5, te da promedio de 5, como un score del nivel de
+    actuaciones que has contratado".
 
-    Va siempre acompañada del NÚMERO de reseñas. En producción septiembre tiene
-    2: un 5 solitario dejaría el mes en "5.0" y se leería como un mes perfecto.
-    Con el número al lado, quien lo mire sabe cuánto pesa.
+    O sea que NO es el promedio de las reseñas escritas este mes — eso era lo
+    que había antes y en septiembre lo sostenían dos reseñas. Es el promedio de
+    la calificación ACUMULADA de cada artista que contrataste, contando una vez
+    por actuación: si contratas tres veces al mismo 5 estrellas, el mes pesa
+    tres veces hacia el 5. Así el número existe desde el primer mes, porque el
+    artista ya trae su historial aunque nadie haya calificado todavía.
+
+    Las actuaciones de artistas que aún no tienen ninguna reseña quedan FUERA
+    del promedio, no cuentan como cero: un artista nuevo no es un mal artista.
+    Por eso vuelve también `con_nivel` / `actuaciones`, para poder decir sobre
+    cuántas está calculado.
     """
     empresas = await _mis_empresas(db, scope)
-    q = (select(func.count(Review.id), func.avg(Review.rating))
-         .select_from(Review).join(Booking, Booking.id == Review.booking_id))
-    if empresas:
-        q = q.where(Booking.company_id.in_(empresas))
-    elif not scope.is_admin:
-        return {"n": 0, "promedio": None, "sin_calificar": 0}
+    vacio = {"promedio": None, "con_nivel": 0, "actuaciones": 0,
+             "n": 0, "prom_resenas": None, "sin_calificar": 0, "distribucion": {}}
+    if not empresas and not scope.is_admin:
+        return vacio
+
+    ini = fin = None
     if year and month:
         ini = datetime(year, month, 1)
         fin = datetime(year + (month == 12), (month % 12) + 1, 1)
-        q = q.where(Booking.starts_at >= ini, Booking.starts_at < fin)
-    n, prom = (await db.execute(q)).one()
 
-    # Cuántas quedaron sin calificar en ese mismo periodo: el promedio de 2
-    # reseñas sobre 20 actuaciones dice bastante menos de lo que parece.
+    # 1) las actuaciones del periodo y de quién son
+    qb = select(Booking.artist_id).where(Booking.status != BookingStatus.CANCELLED)
+    if empresas:
+        qb = qb.where(Booking.company_id.in_(empresas))
+    if ini:
+        qb = qb.where(Booking.starts_at >= ini, Booking.starts_at < fin)
+    artistas_contratados = [a for a in (await db.execute(qb)).scalars().all() if a]
+
+    # 2) la calificación acumulada de cada artista, de toda su historia
+    qn = (select(Review.artist_id, func.avg(Review.rating))
+          .where(Review.artist_id.isnot(None)).group_by(Review.artist_id))
+    nivel = {aid: float(p) for aid, p in (await db.execute(qn)).all() if p is not None}
+
+    notas = [nivel[a] for a in artistas_contratados if a in nivel]
+    promedio = round(sum(notas) / len(notas), 1) if notas else None
+
+    # 3) el detalle de reseñas del periodo, para el panel de satisfacción
+    async def _reparto(con_fecha: bool) -> dict[int, int]:
+        q = (select(Review.rating, func.count(Review.id))
+             .select_from(Review).join(Booking, Booking.id == Review.booking_id)
+             .group_by(Review.rating))
+        if empresas:
+            q = q.where(Booking.company_id.in_(empresas))
+        if con_fecha and ini:
+            q = q.where(Booking.starts_at >= ini, Booking.starts_at < fin)
+        return {int(r): int(n) for r, n in (await db.execute(q)).all() if r is not None}
+
+    dist = await _reparto(True)
+    alcance = "periodo"
+    if not sum(dist.values()) and ini:
+        dist = await _reparto(False)
+        alcance = "historico"
+    total = sum(dist.values())
+    prom_res = (round(sum(r * n for r, n in dist.items()) / total, 1) if total else None)
+
     qp = (select(func.count(Booking.id)).where(
             Booking.status == BookingStatus.COMPLETED,
             ~Booking.id.in_(select(Review.booking_id))))
     if empresas:
         qp = qp.where(Booking.company_id.in_(empresas))
-    if year and month:
+    if ini:
         qp = qp.where(Booking.starts_at >= ini, Booking.starts_at < fin)
     sin = (await db.execute(qp)).scalar() or 0
-    return {"n": int(n or 0), "promedio": (round(float(prom), 1) if prom is not None else None),
-            "sin_calificar": int(sin)}
+
+    return {"promedio": promedio, "con_nivel": len(notas),
+            "actuaciones": len(artistas_contratados),
+            "n": total, "prom_resenas": prom_res, "alcance": alcance,
+            "sin_calificar": int(sin), "distribucion": dist}
 
 
 @router.get("/pendientes")
