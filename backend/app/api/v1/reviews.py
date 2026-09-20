@@ -204,6 +204,46 @@ async def resenas_de_artista(
     }
 
 
+@router.get("/resumen")
+async def resumen_de_periodo(scope: CurrentScope, db: DbSession,
+                             year: int | None = None, month: int | None = None):
+    """La calificación media de MIS propiedades en un mes, con cuántas la sostienen.
+
+    David, 20/09: "podemos mostrar el promedio de las actuaciones contratadas en
+    el periodo". Esto es la nota REAL que ponen los hoteles al calificar, no la
+    retención de público que se enseñaba antes con cara sonriente.
+
+    Va siempre acompañada del NÚMERO de reseñas. En producción septiembre tiene
+    2: un 5 solitario dejaría el mes en "5.0" y se leería como un mes perfecto.
+    Con el número al lado, quien lo mire sabe cuánto pesa.
+    """
+    empresas = await _mis_empresas(db, scope)
+    q = (select(func.count(Review.id), func.avg(Review.rating))
+         .select_from(Review).join(Booking, Booking.id == Review.booking_id))
+    if empresas:
+        q = q.where(Booking.company_id.in_(empresas))
+    elif not scope.is_admin:
+        return {"n": 0, "promedio": None, "sin_calificar": 0}
+    if year and month:
+        ini = datetime(year, month, 1)
+        fin = datetime(year + (month == 12), (month % 12) + 1, 1)
+        q = q.where(Booking.starts_at >= ini, Booking.starts_at < fin)
+    n, prom = (await db.execute(q)).one()
+
+    # Cuántas quedaron sin calificar en ese mismo periodo: el promedio de 2
+    # reseñas sobre 20 actuaciones dice bastante menos de lo que parece.
+    qp = (select(func.count(Booking.id)).where(
+            Booking.status == BookingStatus.COMPLETED,
+            ~Booking.id.in_(select(Review.booking_id))))
+    if empresas:
+        qp = qp.where(Booking.company_id.in_(empresas))
+    if year and month:
+        qp = qp.where(Booking.starts_at >= ini, Booking.starts_at < fin)
+    sin = (await db.execute(qp)).scalar() or 0
+    return {"n": int(n or 0), "promedio": (round(float(prom), 1) if prom is not None else None),
+            "sin_calificar": int(sin)}
+
+
 @router.get("/pendientes")
 async def pendientes_de_calificar(scope: CurrentScope, db: DbSession):
     """Actuaciones ya realizadas de MIS propiedades que todavía nadie calificó.

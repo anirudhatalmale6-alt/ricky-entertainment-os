@@ -1570,6 +1570,29 @@
 
 /* ZIGGY */
 .zig-h{display:flex;align-items:center;gap:7px}
+
+/* David, 19/09: "todo lo que sea de ZIGGY lo haremos un poco mas oscuro para
+   destacarlo". Es la misma caja .box pero en oscuro, asi que hay que repintar
+   a mano el titulo, el enlace y las rayas separadoras: todos heredan colores
+   calculados para fondo blanco y sobre morado se vuelven ilegibles. */
+.box.zigbox{background:#221c52;border-color:#342b77;color:#fff}
+.box.zigbox .bhead h3{color:#fff}
+.box.zigbox .bhead a{color:#cfc6ff}
+.box.zigbox .sugg{border-top-color:rgba(255,255,255,.13);padding:7px 0;gap:9px}
+.box.zigbox .sugg .sav{width:34px;height:34px;border-radius:9px;font-size:13px}
+.box.zigbox .sugg .sz b{font-size:12px}
+.box.zigbox .sugg .sz span{font-size:10.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.box.zigbox .sugg .asg{padding:6px 10px;font-size:11px}
+.box.zigbox .sugg .sz b{color:#fff}
+.box.zigbox .sugg .sz span{color:#bdb5e8}
+.box.zigbox .sugg .sz .disp{color:#6ee7b7}
+.box.zigbox .muted{color:#bdb5e8}
+.box.zigbox .zigmas{color:#d9d2ff}
+/* Seis novedades ya no caben en la columna en pantallas bajas: en vez de
+   empujar el calendario, la lista scrollea dentro de su caja. */
+.zignov{max-height:232px;overflow:auto;margin-right:-4px;padding-right:4px}
+.zignov::-webkit-scrollbar{width:5px}
+.zignov::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:3px}
 .zig-ic{flex:0 0 auto;vertical-align:middle}
 
 /* Iconos de ZIGGY: el <span> fija el tamaño y el SVG lo rellena */
@@ -1615,10 +1638,15 @@
 .zres.zres-barra{background:linear-gradient(120deg,#2a1e86 0%,#4636c9 55%,#5b4ae0 100%);
   border-color:#2a1e86;color:#fff}
 .zres-barra .zres-k{color:#c9c0ff}
-.zres-barra .zres-chip{background:rgba(255,255,255,.16);color:#fff;backdrop-filter:blur(2px)}
-.zres-barra .zres-chip.ok{background:rgba(16,185,129,.30);color:#eafff6}
-.zres-barra .zres-chip.warn{background:rgba(245,158,11,.30);color:#fff4e0}
-.zres-barra .zres-chip.bad{background:rgba(239,68,68,.32);color:#ffeaea}
+/* Un solo color de chip y el estado en un punto. David, 20/09: "esos colores no
+   estan en ninguna parte del sistema". El punto si usa --ok/--warn/--bad, que
+   son los mismos que ya llevan los estados en las tablas. */
+.zres-barra .zres-chip{background:rgba(255,255,255,.14);color:#fff;backdrop-filter:blur(2px);
+  display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.18)}
+.zres-barra .zres-chip::before{content:'';width:7px;height:7px;border-radius:50%;flex:none;background:#c9c0ff}
+.zres-barra .zres-chip.ok::before{background:var(--ok)}
+.zres-barra .zres-chip.warn::before{background:var(--warn)}
+.zres-barra .zres-chip.bad::before{background:var(--bad)}
 .zres-barra .zres-cta{background:#fff;color:#2a1e86}
 .zres-barra .zres-cta:hover{background:#efeafe}
 .zres-barra .zres-mi{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff}
@@ -1673,7 +1701,7 @@
 .zres-barra .zres-cta{padding:10px 16px;font-size:12.5px}
 /* Acciones de la barra: buscador + botones, a la derecha */
 .zres-acc{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-left:auto}
-.zbusca{position:relative;width:180px;flex:0 0 auto}
+.zbusca{position:relative;width:300px;flex:0 1 auto}
 .zbusca input{width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;
   padding:10px 12px 10px 34px;font-size:12.5px;font-family:inherit;color:var(--txt)}
 .zbusca input:focus{outline:none;border-color:var(--acc)}
@@ -1715,6 +1743,24 @@
 .mk s{display:block;font-size:11.5px;color:var(--mut);text-decoration:none;margin-top:1px}
 .mk .mkb{display:block;font-size:11px;color:var(--mut);font-style:normal;margin-top:4px}
 .mk .mkb .kbar{margin-bottom:3px}
+
+/* Los mismos cuatro numeros, pero en cuadros 2x2 en vez de lista (David,
+   19/09: "me gusta mas la estetica de 'Resumen de la Semana' en 4 espacios en
+   lugar de formato listado. Reducir fuente para ajustar"). La fuente baja de
+   17 a 15.5 y el icono de 32 a 24 porque en media columna no cabe lo de antes.
+   min-width:0 en .cu: sin el, un importe largo estira su columna del grid y
+   los cuatro cuadros dejan de medir lo mismo. */
+.cuadros{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.cu{min-width:0;border:1px solid var(--line);border-radius:12px;padding:9px 10px 10px;background:var(--inp)}
+.cu .mki{width:24px;height:24px;border-radius:8px;font-size:12px}
+.cu b{display:block;font-size:15.5px;font-weight:750;line-height:1.2;margin-top:6px;
+  overflow-wrap:anywhere}
+.cu s{display:block;font-size:10.5px;color:var(--mut);text-decoration:none;
+  margin-top:2px;line-height:1.25}
+.cu .mkb{display:block;font-size:10.5px;color:var(--mut);margin-top:4px;line-height:1.3}
+.cu .kbreak{gap:4px 9px;margin-top:6px;font-size:10.5px}
+.cu .kbar{height:6px;margin-top:6px}
+.mki.star{background:#fdefd6}
 
 .zres-firma{font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--acc);opacity:.75}
 .zres-k{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)}
@@ -3113,13 +3159,16 @@ function ziggyResumen(d, compacto){
     t: sinCalificar===1 ? '1 sin calificar' : `${sinCalificar} sin calificar`, c:'warn'});
   // El adjetivo también concuerda: "1 solicitud abiertas" se lee como un
   // descuido, y un panel que se lee descuidado se cree menos.
-  if(solicitudes) chips.push({
-    t: solicitudes===1 ? '1 solicitud' : `${solicitudes} solicitudes`,
-    c:'warn'});
+  // El presupuesto va ANTES que las solicitudes: en la barra sólo caben tres y
+  // David pidió ver actuaciones, calificaciones y presupuesto (20/09). Las
+  // solicitudes ya tienen su propia entrada en el menú.
   chips.push(budget<=0
     ? {t:'Sin presupuesto', c:'bad'}
     : (pct>100 ? {t:`Presupuesto ${pct}%`, c:'bad'}
                : {t:`Presupuesto ${pct}%`, c:'ok'}));
+  if(solicitudes) chips.push({
+    t: solicitudes===1 ? '1 solicitud' : `${solicitudes} solicitudes`,
+    c:'warn'});
 
   // --- El titular: manda la regla más urgente que se cumpla ---
   // El orden es por URGENCIA REAL, no por comodidad: primero lo que cuesta
@@ -3179,7 +3228,7 @@ function ziggyResumen(d, compacto){
     <div class="zres-b">
       <div class="zres-k">${compacto? 'Resumen del día' : esc(ziggySaludo())}</div>
       ${compacto?`<h3>${esc(titulo)}</h3>${sub?`<div class="zres-s">${esc(sub)}.</div>`:''}`:''}
-      <div class="zres-chips">${chips.map(c=>
+      <div class="zres-chips">${(compacto? chips : chips.slice(0,3)).map(c=>
         `<span class="zres-chip ${c.c}">${esc(c.t)}</span>`).join('')}</div>
       ${(nota && compacto)?`<div class="zres-n">${esc(nota)}</div>`:''}
     </div>
@@ -3190,8 +3239,8 @@ function ziggyResumen(d, compacto){
                oninput="zBuscar(this.value)" onfocus="zBuscar(this.value)">
         <div class="zb-res" id="zBuscaRes"></div>
       </div>
-      ${accion?`<button class="zres-cta" onclick="${accion.f}">${esc(accion.t)}</button>`:''}
-      ${(typeof NAV_INTEL!=='undefined' && NAV_INTEL)?`<button class="zres-mi" onclick="show('market')">📈 Market Intelligence</button>`:''}
+      ${compacto&&accion?`<button class="zres-cta" onclick="${accion.f}">${esc(accion.t)}</button>`:''}
+      ${(!compacto && typeof NAV_INTEL!=='undefined' && NAV_INTEL)?`<button class="zres-mi" onclick="show('market')">📈 Market Intelligence</button>`:''}
     </div>
   </div>`;
 }
@@ -4079,8 +4128,7 @@ function updateBudgetKpi(){
   // fuera el presupuesto (David, 16/08). El título tiene que decir qué es el
   // número que está debajo.
   set('kUsadoK', budget>0?'Presupuesto mensual':'Gasto del mes');
-  set('kUsadoD', budget>0?'de '+MXN(budget)
-    :'sin presupuesto cargado · cárgalo en Presupuesto para ver el % y el ahorro');
+  set('kUsadoD', budget>0?'de '+MXN(budget):'sin presupuesto cargado');
   set('kUsadoBar', budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto del mes</div>`:'');
   set('kAhorroV', budget>0?MXN(Math.abs(ahorro)):'—');
   set('kAhorroD', budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—');
@@ -7621,6 +7669,26 @@ const RENDER = {
       .filter(v=>v.is_active!==false)
       .map(v=>({id:v.id,name:v.name,capacity:(v.capacity!=null?v.capacity:null),company_id:c.id,company_name:c.name})));
     CACHE.homeBk = bk; CACHE.homeBudget = budget; if(!MAESTRO_REF) MAESTRO_REF = new Date();
+    // La calificación REAL del periodo (David, 20/09). Antes este cuadro
+    // enseñaba la retención de público sobre 5 con cara sonriente, que es otra
+    // cosa: si va a llevar una estrella, tiene que ser la nota de las reseñas.
+    setTimeout(async ()=>{
+      try{
+        const r = await api(`/reviews/resumen?year=${PERIOD.year}&month=${PERIOD.month}`);
+        const v=document.getElementById('kSatV'), d=document.getElementById('kSatD');
+        if(!v||!d) return;
+        if(r.promedio==null){
+          v.textContent='—';
+          d.textContent = r.sin_calificar? `${r.sin_calificar} sin calificar este mes` : 'sin reseñas este mes';
+        }else{
+          v.textContent = r.promedio.toFixed(1)+' / 5';
+          // El NÚMERO de reseñas va siempre: un 5.0 de una sola no vale lo que
+          // un 4.4 de treinta, y este mes puede haber sólo dos.
+          d.innerHTML = `${starRow(r.promedio)} <span style="opacity:.75">${r.n} ${r.n===1?'reseña':'reseñas'}</span>`
+            + (r.sin_calificar? `<div style="margin-top:3px">${r.sin_calificar} sin calificar</div>`:'');
+        }
+      }catch(e){ const d=document.getElementById('kSatD'); if(d) d.textContent=''; }
+    }, 0);
     box.innerHTML=`
       <!-- Los 4 indicadores viven en la columna derecha desde el 17/09. La barra
            de ZIGGY vuelve aquí arriba (David, 20/09: "siempre me gustó la barra
@@ -7651,25 +7719,29 @@ const RENDER = {
           <div class="box">
             <div class="bhead"><h3 style="margin:0">Resumen de la semana</h3>
               <a onclick="show('reports')">Ver reportes</a></div>
-            <div class="minik">
-              <div class="mk"><span class="mki violet">🗓️</span><div><b id="kpiWeekVal">0</b>
-                <s>Actuaciones</s><div class="kbreak" id="kpiWeekBreak" style="margin-top:5px"></div></div></div>
-              <div class="mk"><span class="mki green">💲</span><div><b id="kUsadoV">${MXN(usado)}</b>
-                <s id="kUsadoD">${budget>0?'de '+MXN(budget):'sin presupuesto cargado'}</s>
-                <div class="mkb" id="kUsadoBar">${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div>${usadoPct}% usado`:''}</div></div></div>
-              <div class="mk"><span class="mki blue">🙂</span><div><b>${sat5!=null?sat5.toFixed(1)+' / 5':'—'}</b>
-                <s>Satisfacción media</s><div class="mkb">${sat5!=null?starRow(sat5):''}</div></div></div>
-              <div class="mk"><span class="mki amber">📊</span><div><b id="kAhorroV">${budget>0?MXN(Math.abs(ahorro)):'—'}</b>
-                <s>Ahorro vs presupuesto</s><div class="mkb" id="kAhorroD">${budget>0?(ahorro>=0?`▲ ${ahorroPct}% dentro`:`▼ ${Math.abs(ahorroPct)}% excedido`):'—'}</div></div></div>
+            <div class="cuadros">
+              <div class="cu"><span class="mki violet">🗓️</span>
+                <b id="kpiWeekVal">0</b><s>Actuaciones</s>
+                <div class="kbreak" id="kpiWeekBreak"></div></div>
+              <div class="cu"><span class="mki green">💲</span>
+                <b id="kUsadoV">${MXN(usado)}</b><s>Gasto real</s>
+                <div class="mkb" id="kUsadoD">${budget>0?'de '+MXN(budget):'sin presupuesto'}</div>
+                <div class="mkb" id="kUsadoBar">${budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div>`:''}</div></div>
+              <div class="cu"><span class="mki amber">📊</span>
+                <b id="kAhorroV">${budget>0?MXN(Math.abs(ahorro)):'—'}</b><s>Diferencia vs Ptto</s>
+                <div class="mkb" id="kAhorroD">${budget>0?(ahorro>=0?`▲ ${ahorroPct}% dentro`:`▼ ${Math.abs(ahorroPct)}% excedido`):'—'}</div></div>
+              <div class="cu"><span class="mki star">⭐</span>
+                <b id="kSatV">—</b><s>Satisfacción media</s>
+                <div class="mkb" id="kSatD">cargando…</div></div>
             </div>
           </div>
-          <div class="box">
+          <div class="box zigbox">
             <div class="bhead"><h3 style="margin:0" class="zig-h">${ziggyIcono('destacado',30)} ZIGGY te destaca</h3><a onclick="show('artists')">Ver todas</a></div>
-            ${nov.length? nov.slice(0,3).map(n=>`<div class="sugg">
+            <div class="zignov">${nov.length? nov.slice(0,6).map(n=>`<div class="sugg">
               <div class="sav" ${n.image_url?`style="background-image:url('${n.image_url}')"`:''}>${n.image_url?'':'🎭'}</div>
-              <div class="sz"><b>${esc(n.show_name)}</b><span>${esc(n.artist_name||pretty(n.category))}</span><span style="color:var(--ok)">● Disponible${n.price_hotel?' · '+MXN(n.price_hotel):''}</span></div>
-              <button class="asg" onclick="suggAsignar('${esc((n.artist_name||'').replace(/'/g,''))}')">Asignar</button></div>`).join('') : '<div class="muted" style="padding:6px 0">Sin sugerencias por ahora.</div>'}
-            <div style="margin-top:11px;text-align:center"><a onclick="show('demand')" style="color:var(--acc);font-size:12px;font-weight:600;cursor:pointer">Ver más opciones con IA ⚡</a></div>
+              <div class="sz"><b>${esc(n.show_name)}</b><span>${esc(n.artist_name||pretty(n.category))}</span><span class="disp">● Disponible${n.price_hotel?' · '+MXN(n.price_hotel):''}</span></div>
+              <button class="asg" onclick="suggAsignar('${esc((n.artist_name||'').replace(/'/g,''))}')">Asignar</button></div>`).join('') : '<div class="muted" style="padding:6px 0">Sin sugerencias por ahora.</div>'}</div>
+            <div style="margin-top:11px;text-align:center"><a class="zigmas" onclick="show('demand')" style="font-size:12px;font-weight:600;cursor:pointer">Ver más opciones con IA ⚡</a></div>
           </div>
         </div>
       </div>
