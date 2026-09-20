@@ -225,7 +225,13 @@ textarea{resize:vertical;min-height:70px}
         <label class="f full"><span>Nombre artístico / proveedor <i>*</i></span><input id="p_stage" placeholder="Ej. David Producciones"></label>
         <label class="f"><span>Nombre(s)</span><input id="p_first" placeholder="David"></label>
         <label class="f"><span>Apellidos</span><input id="p_last" placeholder="Rodríguez"></label>
-        <label class="f"><span>Tipo</span><select id="p_type"><option>Solista</option><option>Dúo / Agrupación</option><option selected>Productora / Proveedor</option></select></label>
+        <label class="f"><span>Tipo de perfil <i>*</i></span><select id="p_type" onchange="tipoAyuda()">
+          <option value="">Selecciona…</option>
+          <option>Talento Individual</option>
+          <option>Grupo o Show</option>
+          <option>Productora o Agencia</option>
+          <option>Servicios para Eventos</option>
+        </select><small id="p_type_ayuda" style="display:block;font-size:11px;color:var(--mut);margin-top:4px"></small></label>
         <label class="f"><span>Años de experiencia</span><input id="p_years" placeholder="10+ años"></label>
         <label class="f"><span>Teléfono móvil <i>*</i></span><input id="p_phone" placeholder="+52 998 123 4567"></label>
         <label class="f"><span>Correo electrónico <i>*</i></span><input id="p_email" placeholder="hola@correo.com"></label>
@@ -604,6 +610,37 @@ function avisoRegimen(){
   } else { avisoModo(); }
 }
 
+/* Los cuatro perfiles (David, 20/09). Antes eran tres y "Productora /
+   Proveedor" venía PRESELECCIONADA, así que quien no tocaba el campo quedaba
+   etiquetado de productora sin decirlo: en producción le pasó a cinco, uno de
+   ellos un guitarrista solista. Ahora arranca en "Selecciona…" y es obligatorio,
+   así la respuesta que llega es una respuesta. */
+const TIPO_AYUDA = {
+  'Talento Individual':    'Una sola persona que actúa: músico, solista, mago, bailarín…',
+  'Grupo o Show':          'Un grupo o espectáculo que actúa siempre con la misma gente.',
+  'Productora o Agencia':  'Representas a varios artistas o montas varios shows a la vez.',
+  'Servicios para Eventos':'Sonido, luz, escenario, mobiliario y demás servicios del evento.',
+};
+function tipoAyuda(){
+  const s=document.getElementById('p_type'), a=document.getElementById('p_type_ayuda');
+  if(!s||!a) return;
+  a.textContent = TIPO_AYUDA[s.value] || '';
+}
+/* Si el proveedor tenía guardado un tipo de la lista vieja ("Solista",
+   "Dúo / Agrupación"…), se añade como opción para que su respuesta no
+   desaparezca de la pantalla ni se borre al volver a guardar. Elegirá el nuevo
+   cuando quiera, pero no se le pierde lo que dijo. */
+function tipoRescata(valor){
+  if(!valor) return;
+  const s=document.getElementById('p_type'); if(!s) return;
+  if(![...s.options].some(o=>o.value===valor)){
+    const o=document.createElement('option');
+    o.value=valor; o.textContent=valor+' (perfil anterior)';
+    s.insertBefore(o, s.options[1] || null);
+  }
+  s.value=valor; tipoAyuda();
+}
+
 // ---- Chips (languages / states) ----
 function delChip(b){ b.parentNode.remove(); }
 function addChip(containerId,label){
@@ -954,6 +991,7 @@ function revisaPerfil(prof){
   if(!prof.region) return {msg:'Indica el estado donde estás basado.', foco:'p_state'};
   if(!prof.base_city) return {msg:'Indica tu ciudad base.', foco:'p_city'};
   if(!prof.bio || prof.bio.length<20) return {msg:'Agrega una biografía breve (mínimo 20 caracteres) para tu perfil profesional.', foco:'p_bio'};
+  if(!prof.artist_type) return {msg:'Elige tu tipo de perfil. Nos dice si eres una persona, un grupo, una agencia o un proveedor de servicios.', foco:'p_type'};
   return null;
 }
 function revisaShows(){
@@ -1214,6 +1252,7 @@ window.guardarParcial = guardarParcial;
     set('p_stage',a.stage_name); set('p_email',a.email); set('p_phone',a.phone); set('p_city',a.base_city);
     if(a.first_name) set('p_first',a.first_name); if(a.last_name) set('p_last',a.last_name);
     if(a.region) set('p_state',a.region); if(a.tax_regime) set('f_regime',a.tax_regime);
+    tipoRescata(a.artist_type);
     // Se restaura TODO lo fiscal y bancario, no sólo el régimen. Antes no se
     // hacía y no se notaba porque se podía avanzar con huecos; ahora que el
     // paso se bloquea, quien vuelve a su registro a medias se encontraría
