@@ -1101,7 +1101,7 @@
   .fstrip #budgetMini{transform-origin:top left}
   @media(max-width:900px){.fstrip{grid-template-columns:1fr}}
   @media(max-width:1100px){.splitH{grid-template-columns:1fr}}
-  .rcol{display:flex;flex-direction:column;gap:16px}
+  .rcol{display:flex;flex-direction:column;gap:14px}
   /* sugerencias de IA */
   .sugg{display:flex;gap:11px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
   .sugg:first-of-type{border-top:0}
@@ -1861,10 +1861,10 @@
    alto = 20.4vh para la caja entera. Con la cabecera dentro, cada cuadro se
    queda en unos 72px, asi que solo cabe icono + numero + etiqueta. Por eso el
    diseño tampoco lleva lineas de detalle. */
-.cuadros{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px}
-.cu{min-width:0;border:1px solid var(--line);border-radius:11px;padding:7px 9px 8px;background:var(--inp)}
+.cuadros{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.cu{min-width:0;border:1px solid var(--line);border-radius:11px;padding:6px 9px 7px;background:var(--inp)}
 .cu .mki{width:20px;height:20px;border-radius:7px;font-size:11px}
-.cu b{display:block;font-size:15px;font-weight:750;line-height:1.15;margin-top:4px;
+.cu b{display:block;font-size:14.5px;font-weight:750;line-height:1.1;margin-top:3px;
   overflow-wrap:anywhere}
 .cu s{display:block;font-size:9.5px;color:var(--mut);text-decoration:none;
   margin-top:1px;line-height:1.25}
@@ -1874,44 +1874,51 @@
 /* Alturas del diseño: Resumen 115/564 = 20.4vh, ZIGGY 243/564 = 43.1vh. Son
    min-height, no height: si un dia el contenido crece, se estira en vez de
    recortarse. */
-.rcol > .box:first-child{min-height:20.4vh;padding:11px 12px 12px}
+.rcol > .box:first-child{min-height:20.4vh;padding:9px 12px 10px}
 /* ---- Modulo E del diseño aprobado: recomendacion + novedades ----
    David lo pidio "en color azul claro pero con un tono mas oscuro", asi que es
    lavanda sobre el gris de la pagina, no la caja morada oscura de antes. */
-.zigreco{background:#e9e8fb;border:1px solid #d5d2f5;border-radius:13px;padding:12px}
+.zigreco{background:#e9e8fb;border:1px solid #d5d2f5;border-radius:13px;padding:10px 11px}
 .zr-top{display:flex;align-items:flex-start;gap:10px}
 .zr-top .zig-foto{width:38px;flex:none}
 .zr-tx{flex:1;min-width:0}
 .zr-tx b{display:block;font-size:13px;color:#241d5c;line-height:1.25}
 .zr-tx span{display:block;font-size:11px;color:#4a4386;margin-top:3px;line-height:1.4}
 .zr-top > a{font-size:11px;color:var(--acc);font-weight:650;cursor:pointer;flex:none}
-.zr-btn{width:100%;margin-top:10px;border:0;border-radius:10px;background:var(--acc);
-  color:#fff;font-family:inherit;font-size:12.5px;font-weight:650;padding:10px;cursor:pointer}
+.zr-btn{width:100%;margin-top:8px;border:0;border-radius:10px;background:var(--acc);
+  color:#fff;font-family:inherit;font-size:12px;font-weight:650;padding:8px;cursor:pointer}
 .zr-btn:hover{background:#2c2280}
 /* Las filas de Novedades: foto, nombre con su etiqueta, y el boton al perfil */
-.nov{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid var(--line)}
+.nov{display:flex;align-items:center;gap:8px;padding:3px 0;border-top:1px solid var(--line)}
 .nov:first-child{border-top:0}
-.nv-av{width:34px;height:34px;border-radius:9px;background:var(--grad) center/cover;flex:none;
-  display:grid;place-items:center;color:#fff;font-size:14px}
+.nv-av{width:28px;height:28px;border-radius:8px;background:var(--grad) center/cover;flex:none;
+  display:grid;place-items:center;color:#fff;font-size:12px}
 .nv-tx{flex:1;min-width:0}
 .nv-t{display:flex;align-items:center;gap:6px;min-width:0}
 .nv-t b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nv-tag{flex:none;font-size:9px;font-weight:700;padding:2px 6px;border-radius:999px;
   background:#e0e7ff;color:#3730a3;text-transform:uppercase;letter-spacing:.3px}
-.nv-tx > span{display:block;font-size:10.5px;color:var(--mut);white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
+.nv-tx > span{display:block;font-size:10px;line-height:1.35;color:var(--mut);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nv-pr{font-weight:700;color:var(--txt)!important;font-size:11px!important}
 .nv-btn{flex:none;border:0;background:var(--acc);color:#fff;border-radius:8px;
   font-size:10.5px;font-weight:650;padding:6px 10px;cursor:pointer;font-family:inherit}
 .nv-btn:hover{background:#2c2280}
 /* El conjunto de E (recomendacion + novedades) es lo que mide 243/564 = 43.1vh */
 .rcol .zigreco{flex:none}
-.rcol > .box:first-child .bhead h3{font-size:13px}
+.rcol > .box:first-child .bhead h3{font-size:12.5px}
+.rcol > .box:first-child .bhead a{font-size:10.5px}
 .rcol > .box:first-child .bhead{margin-bottom:0}
 /* Las estrellas del cuadro de satisfaccion, lo mas bajas posible: son lo unico
    que hacia la segunda fila de cuadros 14px mas alta que la primera. */
 .cu .mkb{font-size:9px;margin-top:1px;line-height:1}
 .zignov{max-height:none;overflow:visible}
+/* La caja de Novedades marca donde acaba el grupo D+E, y el calendario se
+   alinea con ella: cada pixel de relleno de mas aqui es un pixel que el
+   calendario tiene que crecer para seguir alineado. */
+.rcol > .box:nth-child(3){padding:10px 12px 11px}
+.rcol > .box:nth-child(3) .bhead h3{font-size:12.5px}
+.rcol > .box:nth-child(3) .bhead a{font-size:10.5px}
 
 .zres-firma{font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--acc);opacity:.75}
 .zres-k{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)}
@@ -3622,28 +3629,45 @@ function ajustarAltoMaestro(){
   const grid=document.getElementById('maestroGrid');
   const caja=grid&&grid.parentElement;            // .maestro
   if(!caja) return;
-  const arriba=caja.getBoundingClientRect().top;
-  // Suelo de 340px: en una ventana muy baja vale más que scrollee a que las
-  // filas queden tan aplastadas que no se lea ninguna actuación.
-  // Debajo del calendario va ahora la franja F, asi que hay que reservarle su
-  // sitio: sin esto el calendario se come la ventana entera y F queda siempre
-  // por debajo del pliegue, que es justo lo que el jefe de David pidio evitar
-  // ("mucho calendario y poca first sight info"). Se mide la franja de verdad
-  // en vez de descontar un numero fijo, porque su alto depende del contenido.
+  const marco = caja.closest('.box');
+  const arriba = caja.getBoundingClientRect().top;
   const franja = document.querySelector('.fstrip');
+
+  // 1) Estimacion: llenar lo que queda de ventana dejandole sitio a la franja F.
   const reserva = franja ? Math.round(franja.getBoundingClientRect().height) + 14 : 0;
-  caja.style.height=Math.max(300, Math.round(window.innerHeight-arriba-64-reserva))+'px';
-  // Segunda pasada. La primera es una estimacion: descuenta la franja pero no
-  // la pista del calendario, ni el relleno de la caja, ni el margen de abajo, y
-  // los tres cambian con el contenido. En vez de afinar una constante a mano
-  // cada vez que algo crece, se MIDE donde acabo la franja de verdad y se le
-  // quita al calendario exactamente lo que sobresale. Asi F queda siempre justo
-  // encima del pliegue, que es lo que pidio el jefe de David.
+  caja.style.height = Math.max(300, Math.round(window.innerHeight - arriba - 64 - reserva)) + 'px';
+
+  // 2) Correccion medida: si la franja se sale por abajo, se le quita al
+  //    calendario exactamente lo que sobresale. Medir y corregir es mas fiable
+  //    que afinar una constante, porque la cabecera, la pista y la propia
+  //    franja cambian de alto con el contenido.
   if(franja){
     const sobra = Math.round(franja.getBoundingClientRect().bottom - window.innerHeight + 12);
     if(sobra > 0){
       const actual = parseInt(caja.style.height, 10) || 0;
       caja.style.height = Math.max(300, actual - sobra) + 'px';
+    }
+  }
+
+  // 3) David, 21/09: "aumentar el alto del calendario para que quede alineado
+  //    con el modulo de NOVEDADES en su linea inferior". Esto manda sobre los
+  //    dos pasos anteriores, que solo dejan el calendario en un alto razonable
+  //    antes de alinear.
+  //
+  //    Se ALINEA, no se fija un 64vh a mano: el pie de Novedades se mueve con
+  //    cuantas novedades haya y con el alto de la ventana, y un numero fijo
+  //    solo estaria alineado en la pantalla donde lo medi. Midiendo, queda
+  //    alineado en todas.
+  //
+  //    Por debajo de 1100px las dos columnas se apilan y no hay nada con que
+  //    alinear, asi que ahi mandan los pasos 1 y 2.
+  const novedades = document.querySelector('.rcol > .box:nth-child(3)');
+  if(novedades && marco && window.innerWidth > 1100){
+    const delta = Math.round(novedades.getBoundingClientRect().bottom
+                             - marco.getBoundingClientRect().bottom);
+    if(Math.abs(delta) > 2){
+      const actual = parseInt(caja.style.height, 10) || 0;
+      caja.style.height = Math.max(300, actual + delta) + 'px';
     }
   }
 }
