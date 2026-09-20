@@ -73,7 +73,7 @@
 
   /* Topbar */
   .main{display:flex;flex-direction:column;min-width:0}
-  .top{display:flex;align-items:center;gap:16px;padding:16px 26px;border-bottom:1px solid var(--line);background:var(--bg2)}
+  .top{display:flex;align-items:center;gap:16px;padding:9px 26px;border-bottom:1px solid var(--line);background:var(--bg2)}
   .top h1{font-size:18px;font-weight:700}
   .top .sub{font-size:12px;color:var(--mut)}
   .spacer{flex:1}
@@ -1058,6 +1058,37 @@
      que el resumen empiece a partir palabras. */
   /* Calendario 535 : columna 194 = 2.76 a 1, del diseño aprobado. */
   .splitH{display:grid;grid-template-columns:2.76fr minmax(215px,1fr);gap:14px;align-items:start}
+  /* La columna izquierda apila calendario (C) y la franja de tres (F); la
+     derecha apila resumen (D), novedades (E), top artistas y facturacion (G).
+     Asi F mide lo mismo que el calendario y G lo mismo que la columna, que es
+     como esta dibujado el diseño aprobado. */
+  .lcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  /* F: tres paneles a lo ancho del calendario, 105/564 = 18.6vh de alto. */
+  .fstrip{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;min-width:0}
+  .fstrip > .box{min-width:0;padding:12px 13px}
+  .fstrip > .box .bhead h3{font-size:13px}
+  .calpista{margin:8px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* F mide 105/564 = 18.6vh. Lo que marcaba el alto de la franja entera eran
+     los cinco renglones de Reportes rapidos a 49px cada uno: 288px de caja, y
+     el calendario se quedaba sin sitio y caia a su suelo de 300px. Dentro de la
+     franja los renglones van a 24 y los iconos a 20. */
+  .fstrip .rep{padding:3px 0;font-size:11px;gap:8px;line-height:1.3}
+  .fstrip .rep .ri{width:18px;height:18px;font-size:10px;border-radius:6px}
+  .fstrip .rep .rl{gap:7px}
+  /* Satisfaccion como en su maqueta: la nota a la izquierda y las barras a la
+     derecha, no una debajo de otra. */
+  .fstrip #satPanel{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center}
+  .fstrip .satnum{flex-direction:column;align-items:flex-start;gap:2px;margin:0;
+    max-width:96px;flex:none}
+  .fstrip .satnum b{font-size:26px}
+  .fstrip .satnum span{font-size:9.5px;line-height:1.35;white-space:normal}
+  .fstrip .satfila{margin-top:5px;grid-template-columns:46px minmax(30px,1fr) 28px;gap:6px}
+  .fstrip .satfila:first-of-type{margin-top:0}
+  .fstrip .satfila .sl,.fstrip .satfila .sv{font-size:10px}
+  .fstrip .satbar{min-width:30px}
+  /* el donut de presupuesto, un punto mas chico */
+  .fstrip #budgetMini{transform-origin:top left}
+  @media(max-width:900px){.fstrip{grid-template-columns:1fr}}
   @media(max-width:1100px){.splitH{grid-template-columns:1fr}}
   .rcol{display:flex;flex-direction:column;gap:16px}
   /* sugerencias de IA */
@@ -1599,19 +1630,6 @@
    destacarlo". Es la misma caja .box pero en oscuro, asi que hay que repintar
    a mano el titulo, el enlace y las rayas separadoras: todos heredan colores
    calculados para fondo blanco y sobre morado se vuelven ilegibles. */
-.box.zigbox{background:#221c52;border-color:#342b77;color:#fff}
-.box.zigbox .bhead h3{color:#fff}
-.box.zigbox .bhead a{color:#cfc6ff}
-.box.zigbox .sugg{border-top-color:rgba(255,255,255,.13);padding:7px 0;gap:9px}
-.box.zigbox .sugg .sav{width:34px;height:34px;border-radius:9px;font-size:13px}
-.box.zigbox .sugg .sz b{font-size:12px}
-.box.zigbox .sugg .sz span{font-size:10.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.box.zigbox .sugg .asg{padding:6px 10px;font-size:11px}
-.box.zigbox .sugg .sz b{color:#fff}
-.box.zigbox .sugg .sz span{color:#bdb5e8}
-.box.zigbox .sugg .sz .disp{color:#6ee7b7}
-.box.zigbox .muted{color:#bdb5e8}
-.box.zigbox .zigmas{color:#d9d2ff}
 /* Seis novedades ya no caben en la columna en pantallas bajas: en vez de
    empujar el calendario, la lista scrollea dentro de su caja. */
 .zignov{max-height:232px;overflow:auto;margin-right:-4px;padding-right:4px}
@@ -1752,6 +1770,8 @@
   white-space:nowrap;font-weight:600}
 .zres-barra .zres-chip::before{display:none}
 .zres-barra .zres-chip.vivo{background:rgba(34,211,238,.18);border-color:rgba(34,211,238,.45)}
+.zres-barra .zres-chip.pulsable{cursor:pointer}
+.zres-barra .zres-chip.pulsable:hover{background:rgba(255,255,255,.26)}
 .zres-barra .zres-chips{margin-top:3px;gap:6px}
 .zres-barra .zres-k{font-size:11.5px;letter-spacing:.2px;text-transform:none;
   font-weight:600;color:#ded7ff}
@@ -1844,13 +1864,43 @@
    min-height, no height: si un dia el contenido crece, se estira en vez de
    recortarse. */
 .rcol > .box:first-child{min-height:20.4vh;padding:11px 12px 12px}
+/* ---- Modulo E del diseño aprobado: recomendacion + novedades ----
+   David lo pidio "en color azul claro pero con un tono mas oscuro", asi que es
+   lavanda sobre el gris de la pagina, no la caja morada oscura de antes. */
+.zigreco{background:#e9e8fb;border:1px solid #d5d2f5;border-radius:13px;padding:12px}
+.zr-top{display:flex;align-items:flex-start;gap:10px}
+.zr-top .zig-foto{width:38px;flex:none}
+.zr-tx{flex:1;min-width:0}
+.zr-tx b{display:block;font-size:13px;color:#241d5c;line-height:1.25}
+.zr-tx span{display:block;font-size:11px;color:#4a4386;margin-top:3px;line-height:1.4}
+.zr-top > a{font-size:11px;color:var(--acc);font-weight:650;cursor:pointer;flex:none}
+.zr-btn{width:100%;margin-top:10px;border:0;border-radius:10px;background:var(--acc);
+  color:#fff;font-family:inherit;font-size:12.5px;font-weight:650;padding:10px;cursor:pointer}
+.zr-btn:hover{background:#2c2280}
+/* Las filas de Novedades: foto, nombre con su etiqueta, y el boton al perfil */
+.nov{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid var(--line)}
+.nov:first-child{border-top:0}
+.nv-av{width:34px;height:34px;border-radius:9px;background:var(--grad) center/cover;flex:none;
+  display:grid;place-items:center;color:#fff;font-size:14px}
+.nv-tx{flex:1;min-width:0}
+.nv-t{display:flex;align-items:center;gap:6px;min-width:0}
+.nv-t b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nv-tag{flex:none;font-size:9px;font-weight:700;padding:2px 6px;border-radius:999px;
+  background:#e0e7ff;color:#3730a3;text-transform:uppercase;letter-spacing:.3px}
+.nv-tx > span{display:block;font-size:10.5px;color:var(--mut);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.nv-pr{font-weight:700;color:var(--txt)!important;font-size:11px!important}
+.nv-btn{flex:none;border:0;background:var(--acc);color:#fff;border-radius:8px;
+  font-size:10.5px;font-weight:650;padding:6px 10px;cursor:pointer;font-family:inherit}
+.nv-btn:hover{background:#2c2280}
+/* El conjunto de E (recomendacion + novedades) es lo que mide 243/564 = 43.1vh */
+.rcol .zigreco{flex:none}
 .rcol > .box:first-child .bhead h3{font-size:13px}
 .rcol > .box:first-child .bhead{margin-bottom:0}
 /* Las estrellas del cuadro de satisfaccion, lo mas bajas posible: son lo unico
    que hacia la segunda fila de cuadros 14px mas alta que la primera. */
 .cu .mkb{font-size:9px;margin-top:1px;line-height:1}
-.rcol > .box.zigbox{min-height:43.1vh;display:flex;flex-direction:column}
-.rcol > .box.zigbox .zignov{max-height:none;flex:1 1 auto}
+.zignov{max-height:none;overflow:visible}
 
 .zres-firma{font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--acc);opacity:.75}
 .zres-k{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)}
@@ -3259,7 +3309,9 @@ function ziggyBarraTexto(ahora){
                : (minutos <= 20*60 ? 'Hola' : 'Buenas noches');
   const esteMes = ahora.getFullYear()===PERIOD.year && (ahora.getMonth()+1)===PERIOD.month;
   if(!esteMes) return `${saludo}, estás viendo ${MESES[PERIOD.month-1]||''} de ${PERIOD.year}`;
-  return `${saludo}, es ${ahora.getDate()} de ${(MESES[ahora.getMonth()]||'').toLowerCase()}`;
+  // David, punto B: 'Buenos dias/tardes/noches es 20 de Septiembre de 2026'.
+  // Su maqueta lo enseña sin año; manda lo que escribio, que es mas reciente.
+  return `${saludo}, es ${ahora.getDate()} de ${MESES[ahora.getMonth()]||''} de ${ahora.getFullYear()}`;
 }
 function ziggySaludo(ahora){
   ahora = ahora || new Date();
@@ -3278,6 +3330,44 @@ function ziggySaludo(ahora){
   if(faltan <= 0) return `${saludo}, hoy es el último día de ${nombreMes}`;
   if(faltan === 1) return `${saludo}, mañana se acaba ${nombreMes}`;
   return `${saludo}, quedan ${faltan} días de ${nombreMes}`;
+}
+
+/* La frase de "ZIGGY te recomienda" del diseño aprobado. En su maqueta dice
+   "Hay 2 huecos en Main Stage y 3 artistas ideales para estas fechas".
+
+   Los HUECOS se cuentan de verdad: dias de esta semana en los que un venue no
+   tiene ninguna actuacion. Lo de "artistas ideales" NO se puede sostener
+   todavia — la afinidad depende de los cuestionarios de los hoteles, que estan
+   sin contestar — asi que se dice cuantos proveedores hay para cubrirlos, que
+   es un numero que si existe. El dia que haya afinidad, aqui se cambia la
+   segunda mitad de la frase y ya. */
+function ziggyRecomienda(bk){
+  const venues = (CACHE.venues||[]).filter(v => v && v.id && v.active !== false);
+  if(!venues.length) return 'Agrega tus venues y te digo dónde tienes huecos esta semana.';
+
+  const lunes = mondayOf(MAESTRO_REF || new Date());
+  const fin = new Date(lunes); fin.setDate(lunes.getDate()+7);
+  const ocupado = new Set();
+  (bk||[]).forEach(b=>{
+    if(b.status === 'cancelled') return;
+    const d = new Date(b.starts_at);
+    if(d >= lunes && d < fin && b.venue_id) ocupado.add(b.venue_id + '|' + ymd(d));
+  });
+
+  let peor = null, peorN = 0;
+  venues.forEach(v=>{
+    let libres = 0;
+    for(let i=0;i<7;i++){
+      const d = new Date(lunes); d.setDate(lunes.getDate()+i);
+      if(!ocupado.has(v.id + '|' + ymd(d))) libres++;
+    }
+    if(libres > peorN){ peorN = libres; peor = v; }
+  });
+
+  const catalogo = (CACHE.artistItems||[]).length;
+  if(!peor || !peorN) return 'Esta semana la tienes cubierta en todos tus venues.';
+  return `Hay ${peorN} ${peorN===1?'día libre':'días libres'} esta semana en ${peor.name}`
+       + (catalogo ? ` y ${catalogo} ${catalogo===1?'show':'shows'} para cubrirlos.` : '.');
 }
 
 function ziggyResumen(d, compacto){
@@ -3378,17 +3468,17 @@ function ziggyResumen(d, compacto){
 
   const chipsBarra = [];
   if(enVivo.length) chipsBarra.push({
-    img:'envivo', alto:15, vivo:true,
+    img:'envivo', alto:15, vivo:true, ir:"show('cal')",
     t: enVivo.length===1 ? `${enVivo[0].show_name||enVivo[0].artist_name||'actuación'} ahora`
                          : `${enVivo.length} actuaciones ahora`});
-  if(pend) chipsBarra.push({img:'amber', alto:13,
+  if(pend) chipsBarra.push({img:'amber', alto:13, ir:"show('cal')",
     t:`${pend} ${pend===1?'actuación sin confirmar':'actuaciones sin confirmar'}`});
-  if(sinCalificar) chipsBarra.push({img:'violeta', alto:13,
+  if(sinCalificar) chipsBarra.push({img:'violeta', alto:13, ir:"show('cal')",
     t:`${sinCalificar} ${sinCalificar===1?'actuación sin calificar':'actuaciones sin calificar'}`});
   if(chipsBarra.length < 3 && budget<=0)
-    chipsBarra.push({img:'amber', alto:13, t:'Sin presupuesto cargado'});
+    chipsBarra.push({img:'amber', alto:13, ir:"show('budget')", t:'Sin presupuesto cargado'});
   else if(chipsBarra.length < 3 && budget>0)
-    chipsBarra.push({img:'violeta', alto:13, t:`Presupuesto al ${pct}%`});
+    chipsBarra.push({img:'violeta', alto:13, ir:"show('budget')", t:`Presupuesto al ${pct}%`});
 
   return `<div class="zres${compacto?' zres-col':' zres-barra'}">
     <div class="zres-av">
@@ -3402,7 +3492,7 @@ function ziggyResumen(d, compacto){
       <div class="zres-chips">${compacto
         ? chips.map(c=>`<span class="zres-chip ${c.c}">${esc(c.t)}</span>`).join('')
         : chipsBarra.slice(0,3).map(c=>
-            `<span class="zres-chip${c.vivo?' vivo':''}">${za(c.img,c.alto)}${esc(c.t)}</span>`).join('')}</div>
+            `<span class="zres-chip${c.vivo?' vivo':''}${c.ir?' pulsable':''}"${c.ir?` onclick="${c.ir}" title="Ir a Actuaciones"`:''}>${za(c.img,c.alto)}${esc(c.t)}</span>`).join('')}</div>
       ${(nota && compacto)?`<div class="zres-n">${esc(nota)}</div>`:''}
     </div>
     <div class="zres-acc">
@@ -3524,7 +3614,27 @@ function ajustarAltoMaestro(){
   const arriba=caja.getBoundingClientRect().top;
   // Suelo de 340px: en una ventana muy baja vale más que scrollee a que las
   // filas queden tan aplastadas que no se lea ninguna actuación.
-  caja.style.height=Math.max(340, Math.round(window.innerHeight-arriba-64))+'px';
+  // Debajo del calendario va ahora la franja F, asi que hay que reservarle su
+  // sitio: sin esto el calendario se come la ventana entera y F queda siempre
+  // por debajo del pliegue, que es justo lo que el jefe de David pidio evitar
+  // ("mucho calendario y poca first sight info"). Se mide la franja de verdad
+  // en vez de descontar un numero fijo, porque su alto depende del contenido.
+  const franja = document.querySelector('.fstrip');
+  const reserva = franja ? Math.round(franja.getBoundingClientRect().height) + 14 : 0;
+  caja.style.height=Math.max(300, Math.round(window.innerHeight-arriba-64-reserva))+'px';
+  // Segunda pasada. La primera es una estimacion: descuenta la franja pero no
+  // la pista del calendario, ni el relleno de la caja, ni el margen de abajo, y
+  // los tres cambian con el contenido. En vez de afinar una constante a mano
+  // cada vez que algo crece, se MIDE donde acabo la franja de verdad y se le
+  // quita al calendario exactamente lo que sobresale. Asi F queda siempre justo
+  // encima del pliegue, que es lo que pidio el jefe de David.
+  if(franja){
+    const sobra = Math.round(franja.getBoundingClientRect().bottom - window.innerHeight + 12);
+    if(sobra > 0){
+      const actual = parseInt(caja.style.height, 10) || 0;
+      caja.style.height = Math.max(300, actual - sobra) + 'px';
+    }
+  }
 }
 let _altoMaestroT=null;
 window.addEventListener('resize',()=>{
@@ -4276,10 +4386,10 @@ function pintarSatisfaccion(r){
   el.innerHTML = `
     <div class="satnum"><b>${r.prom_resenas!=null? r.prom_resenas.toFixed(1):'—'}</b>
       <span>${starRow(r.prom_resenas||0)}<br>${n} ${n===1?'reseña':'reseñas'} ${r.alcance==='historico'?'en total (este mes aún ninguna)':'de este mes'}</span></div>
-    ${filas.map(([lab,cl,c])=>`<div class="satfila">
+    <div class="satbarras">${filas.map(([lab,cl,c])=>`<div class="satfila">
       <div class="sl">${lab}</div>
       <div class="satbar"><i class="${cl}" style="width:${Math.round(c*100/n)}%"></i></div>
-      <div class="sv">${Math.round(c*100/n)}%</div></div>`).join('')}
+      <div class="sv">${Math.round(c*100/n)}%</div></div>`).join('')}</div>
     ${r.sin_calificar? `<div class="muted" style="font-size:11px;margin-top:11px">${r.sin_calificar} sin calificar · <a onclick="show('reviews')" style="color:var(--acc);cursor:pointer;font-weight:600">calificar</a></div>`:''}`;
 }
 
@@ -7893,6 +8003,11 @@ const RENDER = {
           d.innerHTML = `<span title="Promedio de la calificación de los artistas contratados, sobre ${r.con_nivel} de ${r.actuaciones} actuaciones">${starRow(r.promedio)}</span>`;
         }
         pintarSatisfaccion(r);
+        // El panel de satisfaccion llega DESPUES de que el calendario se midio,
+        // y al llenarse hace crecer la franja F: sin volver a ajustar, F se
+        // salia unos pixeles por debajo del pliegue. Se re-mide en cuanto hay
+        // contenido nuevo ahi abajo.
+        ajustarAltoMaestro();
       }catch(e){ const d=document.getElementById('kSatD'); if(d) d.textContent=''; }
     }, 0);
     box.innerHTML=`
@@ -7903,7 +8018,15 @@ const RENDER = {
            información, la mitad de alto. -->
       ${ziggyResumen({bk, budget, usado, reqs:(reqs||[]).length, sat5,
                       sinCalificar:(CACHE.porCalificar? CACHE.porCalificar.size : 0)})}
+      <!-- Reparto del diseño aprobado (David, 20/09):
+             columna izquierda = C calendario + F franja de tres paneles
+             columna derecha   = D resumen + E novedades + G top artistas
+           F va DENTRO de la columna del calendario para que mida lo mismo que
+           el (535 en su captura), y G dentro de la derecha (194). Sacados a una
+           rejilla propia de abajo dejan de alinearse con el calendario, que es
+           justo lo que su diseño marca. -->
       <div class="splitH">
+        <div class="lcol">
         <div class="box">
           <div class="mtoolbar">
             <h3 style="margin:0;flex:1">Calendario Maestro</h3>
@@ -7914,7 +8037,23 @@ const RENDER = {
           </div>
           <div class="hint" id="maestroWeek" style="margin:-4px 0 10px"></div>
           <div class="maestro"><div class="mgrid" id="maestroGrid"></div></div>
-          <div class="hint" style="margin:10px 0 0">Arrastra una actuación a otro día o venue para reprogramarla, o usa la "X" / el "+" de cada tarjeta. Cuando termines de acomodar la semana, pulsa "Guardar y notificar" para avisar a los artistas afectados de su fecha, hora y venue.</div>
+          <div class="hint calpista" title="Arrastra una actuación a otro día o venue para reprogramarla, o usa la X / el + de cada tarjeta. Cuando termines, pulsa Guardar y notificar para avisar a los artistas afectados de su fecha, hora y venue.">Arrastra una actuación a otro día o venue para reprogramarla; al terminar, pulsa "Guardar y notificar".</div>
+        </div>
+          <div class="fstrip">
+        <div class="box"><div class="bhead"><h3 style="margin:0">Presupuesto</h3><a onclick="show('budget')">Ver detalle</a></div>
+          <div id="budgetMini">${budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>'}</div></div>
+        <!-- Satisfacción de huéspedes: la nota REAL que pusieron los hoteles y
+             cómo se reparte. Lo pinta pintarSatisfaccion() cuando contesta
+             /reviews/resumen, que ya se pide para el cuadro de la columna. -->
+        <div class="box"><div class="bhead"><h3 style="margin:0">Satisfacción huéspedes</h3><a onclick="show('reviews')">Ver detalle</a></div>
+          <div id="satPanel"><div class="muted" style="padding:10px 0">cargando…</div></div></div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Reportes rápidos</h3><a onclick="show('reports')">Ver todas</a></div>
+          <div class="rep"><div class="rl"><div class="ri">💵</div>Costo por actuación</div><div class="rv">${MXN(avgCost)} <span class="muted" style="font-weight:400">prom.</span></div></div>
+          <div class="rep"><div class="rl"><div class="ri">🏆</div>Artista más usado</div><div class="rv">${topArt[0]?esc(topArt[0].name):'—'}</div></div>
+          <div class="rep"><div class="rl"><div class="ri">🎭</div>Actuaciones totales</div><div class="rv">${dash.total_bookings}</div></div>
+          <div class="rep"><div class="rl"><div class="ri">🚫</div>Cancelaciones</div><div class="rv">${cancel}</div></div>
+          <div class="rep"><div class="rl"><div class="ri">👥</div>Retención de público</div><div class="rv">${satPct!=null?satPct.toFixed(0)+'%':'—'}</div></div></div>
+          </div>
         </div>
         <div class="rcol">
           <!-- Resumen de la semana: los mismos cuatro números de antes, en la
@@ -7938,39 +8077,30 @@ const RENDER = {
                 <b>${cancel}</b><s>Cancelaciones</s></div>
             </div>
           </div>
-          <div class="box zigbox">
-            <div class="bhead"><h3 style="margin:0" class="zig-h">${ziggyFoto(30)} ZIGGY te destaca</h3><a onclick="show('artists')">Ver todas</a></div>
-            <div class="zignov">${nov.length? nov.slice(0,6).map(n=>`<div class="sugg">
-              <div class="sav" ${n.image_url?`style="background-image:url('${n.image_url}')"`:''}>${n.image_url?'':'🎭'}</div>
-              <div class="sz"><b>${esc(n.show_name)}</b><span>${esc(n.artist_name||pretty(n.category))}</span><span class="disp">● Disponible${n.price_hotel?' · '+MXN(n.price_hotel):''}</span></div>
-              <button class="asg" onclick="suggAsignar('${esc((n.artist_name||'').replace(/'/g,''))}')">Asignar</button></div>`).join('') : '<div class="muted" style="padding:6px 0">Sin sugerencias por ahora.</div>'}</div>
-            <div style="margin-top:11px;text-align:center"><a class="zigmas" onclick="show('demand')" style="font-size:12px;font-weight:600;cursor:pointer">Ver más opciones con IA ⚡</a></div>
+          <div class="zigreco">
+            <div class="zr-top">${ziggyFoto(38)}
+              <div class="zr-tx"><b>ZIGGY te recomienda</b>
+                <span id="zigRecoTx">${esc(ziggyRecomienda(bk))}</span></div>
+              <a onclick="show('artists')">Ver más</a></div>
+            <button class="zr-btn" onclick="show('artists')">Ver Proveedores →</button>
           </div>
-        </div>
-      </div>
-      <!-- Fila de abajo en dos alturas: los tres paneles de 2 columnas primero
-           (suman 6 y cierran la fila justos), y debajo los dos de 3. Si se
-           cambia el orden hay que rehacer la cuenta: con 2+2+3 el tercero no
-           cabe, salta de fila y deja media fila vacia. -->
-      <div class="gridB">
-        <div class="box sp2"><div class="bhead"><h3 style="margin:0">Presupuesto</h3><a onclick="show('budget')">Ver detalle</a></div>
-          <div id="budgetMini">${budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>'}</div></div>
-        <!-- Satisfacción de huéspedes: la nota REAL que pusieron los hoteles y
-             cómo se reparte. Lo pinta pintarSatisfaccion() cuando contesta
-             /reviews/resumen, que ya se pide para el cuadro de la columna. -->
-        <div class="box sp2"><div class="bhead"><h3 style="margin:0">Satisfacción huéspedes</h3><a onclick="show('reviews')">Ver detalle</a></div>
-          <div id="satPanel"><div class="muted" style="padding:10px 0">cargando…</div></div></div>
-        <div class="box sp2"><div class="bhead"><h3 style="margin:0">Reportes rápidos</h3><a onclick="show('reports')">Ver todas</a></div>
-          <div class="rep"><div class="rl"><div class="ri">💵</div>Costo por actuación</div><div class="rv">${MXN(avgCost)} <span class="muted" style="font-weight:400">prom.</span></div></div>
-          <div class="rep"><div class="rl"><div class="ri">🏆</div>Artista más usado</div><div class="rv">${topArt[0]?esc(topArt[0].name):'—'}</div></div>
-          <div class="rep"><div class="rl"><div class="ri">🎭</div>Actuaciones totales</div><div class="rv">${dash.total_bookings}</div></div>
-          <div class="rep"><div class="rl"><div class="ri">🚫</div>Cancelaciones</div><div class="rv">${cancel}</div></div>
-          <div class="rep"><div class="rl"><div class="ri">👥</div>Retención de público</div><div class="rv">${satPct!=null?satPct.toFixed(0)+'%':'—'}</div></div></div>
-        <div class="box sp3"><div class="bhead"><h3 style="margin:0">Top Artistas</h3><a onclick="show('reports')">Ver todas</a></div>
+          <div class="box">
+            <div class="bhead"><h3 style="margin:0">Novedades</h3><a onclick="show('artists')">Ver todas${nov.length?` (${nov.length})`:''}</a></div>
+            <div class="zignov">${nov.length? nov.slice(0,6).map(n=>`<div class="nov">
+              <div class="nv-av" ${n.image_url?`style="background-image:url('${esc(n.image_url)}')"`:''}>${n.image_url?'':'🎭'}</div>
+              <div class="nv-tx">
+                <div class="nv-t"><b>${esc(n.show_name)}</b>${(n.days_ago!=null&&n.days_ago<=7)?'<span class="nv-tag">Nueva</span>':''}</div>
+                <span>${esc(n.artist_name || pretty(n.category||''))}</span>
+                ${n.price_hotel?`<span class="nv-pr">${MXN(n.price_hotel)}</span>`:''}</div>
+              <button class="nv-btn" onclick="zAbrir(${+n.artist_id||0},${+n.id||0})">Ver Perfil</button></div>`).join('')
+              : '<div class="muted" style="padding:6px 0">Sin novedades por ahora.</div>'}</div>
+          </div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Top Artistas</h3><a onclick="show('reports')">Ver todas</a></div>
           ${topArt.length? topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} ${a.count===1?'actuación':'actuaciones'}</span></div><b>${MXN(a.sum)}</b></div>`).join('') : '<div class="muted">Sin datos aún.</div>'}</div>
-        <div class="box sp3"><div class="bhead"><h3 style="margin:0">Facturación</h3><a onclick="show('bill')">Ver facturas</a></div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Facturación</h3><a onclick="show('bill')">Ver facturas</a></div>
           <div class="invmini"><div class="im-ico">💲</div><div class="im-s" style="text-transform:capitalize">${facMonth}</div><div class="im-v">${MXN(facTot)}</div><div class="im-s">${latestRows.length} ${latestRows.length===1?'actuación':'actuaciones'}</div>
             <button class="btn" style="width:100%;margin-top:12px" onclick="show('bill')">Ver facturación</button></div></div>
+        </div>
       </div>
       <div class="qbar">
         <button onclick="qtool('Plantillas')"><span class="qi">📋</span>Plantillas</button>
