@@ -87,16 +87,18 @@ async def list_shows(
         rows = (await db.execute(
             select(Artist.id, Artist.stage_name, Artist.profile_image_url,
                    Artist.base_city, Artist.region, Artist.is_partner,
-                   Artist.is_productora)
+                   Artist.is_productora, Artist.artist_type)
             .where(Artist.id.in_(artist_ids))
         )).all()
-        for aid, nm, av, city, region_, partner, prod in rows:
+        for aid, nm, av, city, region_, partner, prod, tipo in rows:
             names[aid] = nm
             avatars[aid] = av
             cities[aid] = city
             regions[aid] = region_
             partners[aid] = bool(partner)
-            productoras[aid] = bool(prod)
+            # Misma regla que en el bloqueo: la marca de SHOWMA o el perfil
+            # "Productora o Agencia" que eligió al registrarse.
+            productoras[aid] = bool(prod) or (tipo or "").strip() == "Productora o Agencia"
     # Tarifas especiales: si el hotel/cadena que consulta tiene una tarifa pactada
     # con el artista, el precio efectivo la refleja (sin tocar el precio público).
     scope_company_id = scope.company_id

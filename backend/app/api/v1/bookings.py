@@ -137,7 +137,7 @@ async def _check_travel_buffer(db: DbSession, artist_id: int, starts_at: datetim
     es_productora = False
     if artist_id is not None:
         artista = await db.get(Artist, artist_id)
-        es_productora = bool(artista and artista.is_productora)
+        es_productora = bool(artista and artista.cubre_varios_a_la_vez)
     stmt = select(Booking).where(
         Booking.artist_id == artist_id,
         Booking.status.in_(_ACTIVE),

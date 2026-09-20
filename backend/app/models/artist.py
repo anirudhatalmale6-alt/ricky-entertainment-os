@@ -59,6 +59,28 @@ class Artist(Base, TimestampMixin):
     # la base de cuentas que nadie pidio.
     is_productora: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    @property
+    def cubre_varios_a_la_vez(self) -> bool:
+        """Si puede tener VARIOS shows a la misma hora (David, 20/09).
+
+        Son dos cosas distintas y por eso se miran las dos:
+
+        - `artist_type == "Productora o Agencia"`: lo dice él al registrarse. Es
+          una afirmación sobre su negocio — manda gente distinta a cada sitio —
+          y basta para que sus shows dejen de bloquearse entre ellos.
+        - `is_productora`: lo otorga SHOWMA, y además da poder para dar de alta
+          músicos y mandar correos desde el dominio. Ese NO se auto-concede.
+
+        Se separan a propósito. Que alguien declare ser agencia no puede
+        regalarle crear cuentas en nuestro dominio; y al revés, no hace falta
+        concederle nada para que sus dos grupos puedan tocar la misma noche.
+
+        Ojo con el texto exacto: los cinco proveedores contaminados de
+        producción guardan "Productora / Proveedor", de la lista vieja, que NO
+        casa con esta cadena. Así que esto no les abre la puerta por accidente.
+        """
+        return bool(self.is_productora) or (self.artist_type or "").strip() == "Productora o Agencia"
+
     # --- Who they are --------------------------------------------------
     stage_name: Mapped[str] = mapped_column(String(255), index=True)   # Nombre artistico / proveedor
     first_name: Mapped[str | None] = mapped_column(String(120))

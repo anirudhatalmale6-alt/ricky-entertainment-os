@@ -4998,7 +4998,12 @@ function apProductoraHTML(a){
       Una productora manda gente distinta a cada show, así que contratar uno no
       bloquea los demás a la misma hora. Un proveedor que actúa él mismo sí se
       bloquea entero: no puede estar en dos hoteles a la vez.
-      ${a.artist_type?`<div style="margin-top:6px">En su registro eligió: <b>${esc(a.artist_type)}</b>. Eso es lo que él dijo, no lo que decide el sistema.</div>`:''}
+      ${a.artist_type?`<div style="margin-top:6px">En su registro eligió: <b>${esc(a.artist_type)}</b>.
+        ${a.artist_type.trim()==='Productora o Agencia'
+          ? 'Con ese perfil ya puede tener varios shows a la vez, sin que tengas que marcar nada.'
+          : 'Ese perfil NO permite varios a la vez; si de verdad es una agencia, márcalo abajo.'}</div>`:''}
+      <div style="margin-top:6px">La marca de abajo es aparte: además le deja dar de alta músicos
+        y mandar correos desde el dominio de SHOWMA, así que ésa la das tú.</div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span class="trck${on?' on':''}">${on?'✓ Es productora':'Proveedor individual'}</span>
