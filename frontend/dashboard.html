@@ -1650,7 +1650,9 @@
 .zres-barra .zres-k{font-size:10px}
 .zres-barra .zres-s{font-size:12px;margin-top:2px;display:inline}
 .zres-barra .zres-chips{margin-top:6px}
-.zres-barra .zres-chip{font-size:11.5px;padding:3px 10px}
+.zres-barra .zres-chip{font-size:12.5px;padding:6px 13px}
+.zres-barra .zres-chips{margin-top:5px;gap:7px}
+.zres-barra .zres-k{font-size:11px;letter-spacing:.8px}
 .zres-barra .zres-n{margin-top:6px;padding-top:6px;font-size:11.5px}
 .zres-barra .zres-cta{padding:10px 16px;font-size:12.5px}
 /* Acciones de la barra: buscador + botones, a la derecha */
@@ -3159,13 +3161,11 @@ function ziggyResumen(d, compacto){
       <span class="zres-firma">ZIGGY</span>
     </div>
     <div class="zres-b">
-      <div class="zres-k">Resumen del día</div>
-      <h3>${esc(titulo)}</h3>
-      ${sub?`<div class="zres-s">${esc(sub)}.</div>`:''}
+      <div class="zres-k">${compacto? 'Resumen del día' : esc(ziggySaludo())}</div>
+      ${compacto?`<h3>${esc(titulo)}</h3>${sub?`<div class="zres-s">${esc(sub)}.</div>`:''}`:''}
       <div class="zres-chips">${chips.map(c=>
         `<span class="zres-chip ${c.c}">${esc(c.t)}</span>`).join('')}</div>
-      ${nota?`<div class="zres-n">${esc(nota)}</div>`:''}
-      ${''/* el orden se mantiene; lo que cambia es el alto, vía CSS */}
+      ${(nota && compacto)?`<div class="zres-n">${esc(nota)}</div>`:''}
     </div>
     <div class="zres-acc">
       <div class="zbusca">
