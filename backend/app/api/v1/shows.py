@@ -280,6 +280,7 @@ async def novedades(
     _: CurrentUser,
     days: int = Query(7, ge=1, le=60, description="Antigüedad máxima en días"),
     limit: int = Query(12, ge=1, le=50),
+    completar: bool = Query(False, description="Rellenar con los más recientes aunque sean viejos"),
 ):
     """Recently published shows — 'Novedades'. Powers the hotel dashboard's
     suggestions and the "Novedad" tag on new listings (David: los artistas recién
@@ -295,6 +296,19 @@ async def novedades(
         .limit(limit)
     )
     shows = list((await db.execute(stmt)).scalars().unique().all())
+    if completar and len(shows) < limit:
+        ya = {s.id for s in shows}
+        relleno = (
+            select(Show)
+            .options(*_SHOW_RELS)
+            .join(Artist, Show.artist_id == Artist.id)
+            .where(Show.is_active.is_(True), Show.created_at < cutoff)
+            .order_by(Show.created_at.desc())
+            .limit(limit - len(shows))
+        )
+        for s in (await db.execute(relleno)).scalars().unique().all():
+            if s.id not in ya:
+                shows.append(s)
     artist_ids = {s.artist_id for s in shows}
     names: dict[int, str] = {}
     if artist_ids:

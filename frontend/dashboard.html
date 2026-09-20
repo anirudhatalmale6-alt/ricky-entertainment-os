@@ -1068,6 +1068,17 @@
   .fstrip > .box{min-width:0;padding:12px 13px}
   .fstrip > .box .bhead h3{font-size:13px}
   .calpista{margin:8px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Facturacion dentro de la franja F: el bloque venia pensado para una caja
+     alta (icono de 46px, importe de 24 y un boton ancho abajo). En 167px de
+     alto no cabe, asi que aqui va en horizontal — icono a la izquierda, mes e
+     importe a la derecha — y el boton se quita: la cabecera ya tiene su enlace
+     "Ver facturas", que lleva al mismo sitio. */
+  .fstrip .invmini{text-align:left;display:grid;grid-template-columns:auto 1fr;
+    gap:3px 11px;align-items:center;padding:4px 0 0}
+  .fstrip .invmini .im-ico{width:36px;height:36px;font-size:16px;margin:0;grid-row:span 3}
+  .fstrip .invmini .im-v{font-size:21px;line-height:1.1}
+  .fstrip .invmini .im-s{font-size:10.5px;margin:0}
+  .fstrip .invmini .btn{display:none}
   /* F mide 105/564 = 18.6vh. Lo que marcaba el alto de la franja entera eran
      los cinco renglones de Reportes rapidos a 49px cada uno: 288px de caja, y
      el calendario se quedaba sin sitio y caia a su suelo de 300px. Dentro de la
@@ -4443,13 +4454,13 @@ function updateBudgetKpi(){
   // fuera el presupuesto (David, 16/08). El título tiene que decir qué es el
   // número que está debajo.
   set('kUsadoK', budget>0?'Presupuesto mensual':'Gasto del mes');
-  // kUsadoD dejo de ser una linea de detalle y es la ETIQUETA del cuadro, asi
-  // que aqui se escribe la etiqueta entera, no un "de $X" suelto.
-  set('kUsadoD', budget>0 ? `Presupuesto (${Math.round(usado*100/budget)}% usado)`
-                          : 'Gasto real');
+  set('kUsadoD', 'Gasto real');
   set('kUsadoBar', budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto del mes</div>`:'');
   set('kAhorroV', budget>0?MXN(Math.abs(ahorro)):'—');
-  set('kAhorroD', budget>0?(ahorro>=0?`<span class="ktrend">▲ ${ahorroPct}%</span> dentro de presupuesto`:`<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`):'—');
+  set('kAhorroD', budget>0
+    ? (ahorro>=0 ? `<span class="ktrend">▲ ${ahorroPct}%</span> dentro`
+                 : `<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`)
+    : 'sin presupuesto');
   set('budgetMini', budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>');
 }
 const starRow = v => { const f=Math.round(v||0); let s=''; for(let i=1;i<=5;i++) s+=(i<=f?'★':'☆'); return s; };
@@ -7917,7 +7928,11 @@ const RENDER = {
   },
   async home(box){
     if(ME.artist_id) return artistHome(box);   // artists get their personal dashboard
-    let nov=[]; try{ const nv=await api('/shows/novedades?days=30&limit=8'); nov=nv.novedades||[]; }catch(e){}
+    // completar=true: si en 30 días no hay 4 shows nuevos, se rellena con los
+    // siguientes más recientes para que el panel no se vea vacío (David,
+    // 20/09). La etiqueta "Nueva" sigue saliendo de days_ago, así que sólo la
+    // llevan los que de verdad lo son.
+    let nov=[]; try{ const nv=await api('/shows/novedades?days=30&limit=4&completar=true'); nov=nv.novedades||[]; }catch(e){}
     if(!GID){                                  // no chain scope yet -> never call /groups/null/...
       box.innerHTML=`<div class="box" style="text-align:center;padding:48px 24px">
         <div style="font-size:34px;margin-bottom:8px">🏨</div>
@@ -8040,8 +8055,9 @@ const RENDER = {
           <div class="hint calpista" title="Arrastra una actuación a otro día o venue para reprogramarla, o usa la X / el + de cada tarjeta. Cuando termines, pulsa Guardar y notificar para avisar a los artistas afectados de su fecha, hora y venue.">Arrastra una actuación a otro día o venue para reprogramarla; al terminar, pulsa "Guardar y notificar".</div>
         </div>
           <div class="fstrip">
-        <div class="box"><div class="bhead"><h3 style="margin:0">Presupuesto</h3><a onclick="show('budget')">Ver detalle</a></div>
-          <div id="budgetMini">${budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>'}</div></div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Facturación</h3><a onclick="show('bill')">Ver facturas</a></div>
+          <div class="invmini"><div class="im-ico">💲</div><div class="im-s" style="text-transform:capitalize">${facMonth}</div><div class="im-v">${MXN(facTot)}</div><div class="im-s">${latestRows.length} ${latestRows.length===1?'actuación':'actuaciones'}</div>
+            <button class="btn" style="width:100%;margin-top:12px" onclick="show('bill')">Ver facturación</button></div></div>
         <!-- Satisfacción de huéspedes: la nota REAL que pusieron los hoteles y
              cómo se reparte. Lo pinta pintarSatisfaccion() cuando contesta
              /reviews/resumen, que ya se pide para el cuadro de la columna. -->
@@ -8069,12 +8085,13 @@ const RENDER = {
                 <b id="kpiWeekVal">0</b><s>Actuaciones</s></div>
               <div class="cu"><span class="mki green">💲</span>
                 <b id="kUsadoV">${MXN(usado)}</b>
-                <s id="kUsadoD">${budget>0?`Presupuesto (${usadoPct}% usado)`:'Gasto real'}</s></div>
+                <s id="kUsadoD">Gasto real</s></div>
               <div class="cu"><span class="mki star">⭐</span>
                 <b id="kSatV">—</b><s>Satisfacción media</s>
                 <div class="mkb" id="kSatD"></div></div>
-              <div class="cu"><span class="mki blue">🛡️</span>
-                <b>${cancel}</b><s>Cancelaciones</s></div>
+              <div class="cu" id="cuReal"><span class="mki amber">📊</span>
+                <b id="kAhorroV">${budget>0?MXN(Math.abs(ahorro)):'—'}</b><s>Real vs Ptto</s>
+                <div class="mkb" id="kAhorroD">${budget>0?(ahorro>=0?`▲ ${ahorroPct}% dentro`:`▼ ${Math.abs(ahorroPct)}% excedido`):'sin presupuesto'}</div></div>
             </div>
           </div>
           <div class="zigreco">
@@ -8086,7 +8103,7 @@ const RENDER = {
           </div>
           <div class="box">
             <div class="bhead"><h3 style="margin:0">Novedades</h3><a onclick="show('artists')">Ver todas${nov.length?` (${nov.length})`:''}</a></div>
-            <div class="zignov">${nov.length? nov.slice(0,6).map(n=>`<div class="nov">
+            <div class="zignov">${nov.length? nov.slice(0,4).map(n=>`<div class="nov">
               <div class="nv-av" ${n.image_url?`style="background-image:url('${esc(n.image_url)}')"`:''}>${n.image_url?'':'🎭'}</div>
               <div class="nv-tx">
                 <div class="nv-t"><b>${esc(n.show_name)}</b>${(n.days_ago!=null&&n.days_ago<=7)?'<span class="nv-tag">Nueva</span>':''}</div>
@@ -8097,9 +8114,8 @@ const RENDER = {
           </div>
         <div class="box"><div class="bhead"><h3 style="margin:0">Top Artistas</h3><a onclick="show('reports')">Ver todas</a></div>
           ${topArt.length? topArt.map((a,i)=>`<div class="listrow"><div class="rank">${i+1}</div><div class="lz"><b>${esc(a.name)}</b><span>${a.count} ${a.count===1?'actuación':'actuaciones'}</span></div><b>${MXN(a.sum)}</b></div>`).join('') : '<div class="muted">Sin datos aún.</div>'}</div>
-        <div class="box"><div class="bhead"><h3 style="margin:0">Facturación</h3><a onclick="show('bill')">Ver facturas</a></div>
-          <div class="invmini"><div class="im-ico">💲</div><div class="im-s" style="text-transform:capitalize">${facMonth}</div><div class="im-v">${MXN(facTot)}</div><div class="im-s">${latestRows.length} ${latestRows.length===1?'actuación':'actuaciones'}</div>
-            <button class="btn" style="width:100%;margin-top:12px" onclick="show('bill')">Ver facturación</button></div></div>
+        <div class="box"><div class="bhead"><h3 style="margin:0">Presupuesto</h3><a onclick="show('budget')">Ver detalle</a></div>
+          <div id="budgetMini">${budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>'}</div></div>
         </div>
       </div>
       <div class="qbar">
