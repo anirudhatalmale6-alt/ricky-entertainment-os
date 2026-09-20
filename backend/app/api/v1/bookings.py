@@ -117,28 +117,51 @@ async def _check_blocked_day(db: DbSession, artist_id: int | None, starts_at: da
 
 
 async def _check_travel_buffer(db: DbSession, artist_id: int, starts_at: datetime,
-                               ends_at: datetime | None, exclude_id: int | None = None):
-    """Reject if this artist already has an active actuacion within the 1h buffer."""
+                               ends_at: datetime | None, exclude_id: int | None = None,
+                               show_id: int | None = None):
+    """Rechaza si ya hay una actuación activa dentro del margen de traslado.
+
+    A QUIÉN mira depende de quién sea el proveedor (David, 20/09):
+
+      - proveedor que actúa él mismo: se mira TODO su catálogo. Tenga dos shows
+        o diez, es la misma persona y no puede estar en dos hoteles a la vez.
+      - productora: se mira SÓLO ese show. Cada show suyo lo cubre un grupo
+        distinto, así que contratar a uno no puede dejar sin fecha a los demás
+        ("nos bloquearía el resto de los músicos").
+
+    La marca de productora la otorga SHOWMA; no es el campo "Tipo" que el
+    proveedor elige en el registro, que viene preseleccionado y no es fiable.
+    """
     new_start = _naive(starts_at) - timedelta(hours=TRAVEL_BUFFER_HOURS)
     new_end = _naive(ends_at or starts_at) + timedelta(hours=TRAVEL_BUFFER_HOURS)
-    rows = (await db.execute(
-        select(Booking).where(
-            Booking.artist_id == artist_id,
-            Booking.status.in_(_ACTIVE),
-        )
-    )).scalars().all()
+    es_productora = False
+    if artist_id is not None:
+        artista = await db.get(Artist, artist_id)
+        es_productora = bool(artista and artista.is_productora)
+    stmt = select(Booking).where(
+        Booking.artist_id == artist_id,
+        Booking.status.in_(_ACTIVE),
+    )
+    # Con productora y show conocido, el choque se busca dentro del MISMO show.
+    # Sin show_id no se puede acotar, así que se conserva la regla estricta: es
+    # preferible un bloqueo de más que una doble reserva del mismo grupo.
+    if es_productora and show_id is not None:
+        stmt = stmt.where(Booking.show_id == show_id)
+    rows = (await db.execute(stmt)).scalars().all()
     for b in rows:
         if exclude_id is not None and b.id == exclude_id:
             continue
         b_start = _naive(b.starts_at)
         b_end = _naive(b.ends_at or b.starts_at)
         if b_start < new_end and new_start < b_end:  # overlap with buffer
+            quien = ("Ese show ya está comprometido"
+                     if (es_productora and show_id is not None)
+                     else "El artista ya tiene una actuación")
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    f"El artista ya tiene una actuacion el "
-                    f"{b_start:%Y-%m-%d %H:%M}. Se necesita al menos "
-                    f"{TRAVEL_BUFFER_HOURS}h de margen entre shows."
+                    f"{quien} el {b_start:%d/%m/%Y a las %H:%M}. "
+                    f"Se necesita al menos {TRAVEL_BUFFER_HOURS}h de margen."
                 ),
             )
 
@@ -165,7 +188,8 @@ async def create_booking(payload: BookingCreate, db: DbSession):
     )
 
     await _check_blocked_day(db, show.artist_id, payload.starts_at)
-    await _check_travel_buffer(db, show.artist_id, payload.starts_at, payload.ends_at)
+    await _check_travel_buffer(db, show.artist_id, payload.starts_at, payload.ends_at,
+                               show_id=show.id)
 
     # Si no vino un precio pactado, se toma el del show YA AJUSTADO por la
     # temporada del artista para esa fecha (Navidad +300 %, baja −10 %…).
@@ -385,7 +409,8 @@ async def update_booking(booking_id: int, payload: BookingUpdate, db: DbSession)
             raise HTTPException(status_code=422, detail="ends_at must be after starts_at")
         if booking.artist_id:
             await _check_blocked_day(db, booking.artist_id, new_start)
-            await _check_travel_buffer(db, booking.artist_id, new_start, new_end, exclude_id=booking.id)
+            await _check_travel_buffer(db, booking.artist_id, new_start, new_end,
+                                       exclude_id=booking.id, show_id=booking.show_id)
     # moving to another venue (drag on the Calendario Maestro): re-derive the property scope
     if data.get("venue_id") is not None and data["venue_id"] != booking.venue_id:
         new_venue = await db.get(Venue, data["venue_id"])
@@ -918,7 +943,7 @@ async def repetir_actuacion(payload: RepetirIn, db: DbSession):
                 # también las que va a crear esta misma operación: si no, dos
                 # fechas del propio lote podrían chocar entre ellas.
                 try:
-                    await _check_travel_buffer(db, show.artist_id, inicio, fin)
+                    await _check_travel_buffer(db, show.artist_id, inicio, fin, show_id=show.id)
                 except HTTPException as e:
                     motivo = str(e.detail)
                 else:

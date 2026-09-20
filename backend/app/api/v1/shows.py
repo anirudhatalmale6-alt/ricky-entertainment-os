@@ -77,18 +77,26 @@ async def list_shows(
     cities: dict[int, str | None] = {}
     regions: dict[int, str | None] = {}
     partners: dict[int, bool] = {}
+    # Quién es productora. De esto depende si una actuación bloquea a TODO su
+    # catálogo o sólo a ese show (David, 20/09). Se lee la marca interna, la que
+    # otorga SHOWMA, y NO el campo "Tipo" del registro: ese viene con
+    # "Productora / Proveedor" preseleccionado, así que lo tienen puesto cinco
+    # proveedores que no lo son — entre ellos un guitarrista solista.
+    productoras: dict[int, bool] = {}
     if artist_ids:
         rows = (await db.execute(
             select(Artist.id, Artist.stage_name, Artist.profile_image_url,
-                   Artist.base_city, Artist.region, Artist.is_partner)
+                   Artist.base_city, Artist.region, Artist.is_partner,
+                   Artist.is_productora)
             .where(Artist.id.in_(artist_ids))
         )).all()
-        for aid, nm, av, city, region_, partner in rows:
+        for aid, nm, av, city, region_, partner, prod in rows:
             names[aid] = nm
             avatars[aid] = av
             cities[aid] = city
             regions[aid] = region_
             partners[aid] = bool(partner)
+            productoras[aid] = bool(prod)
     # Tarifas especiales: si el hotel/cadena que consulta tiene una tarifa pactada
     # con el artista, el precio efectivo la refleja (sin tocar el precio público).
     scope_company_id = scope.company_id
@@ -120,7 +128,7 @@ async def list_shows(
     # (vacaciones/enfermedad) y actuaciones que ya tiene esa fecha.
     day = availability.as_date(on)
     blocked = await availability.blocked_on(db, day) if day else {}
-    busy = await availability.busy_on(db, day) if day else {}
+    busy, busy_show = await availability.busy_on(db, day) if day else ({}, {})
 
     # Distancia al hotel que consulta. El venue manda (es donde ocurre el show),
     # luego el hotel indicado y, si no, el del propio usuario — un administrador
@@ -151,6 +159,7 @@ async def list_shows(
         s.artist_city = cities.get(s.artist_id)
         s.artist_region = regions.get(s.artist_id)
         s.artist_partner = partners.get(s.artist_id, False)
+        s._es_productora = productoras.get(s.artist_id, False)
         # La distancia va ANTES del precio: el extra por larga distancia
         # (gasolina) depende de a cuántos km está el hotel.
         # SIEMPRE se asigna, aunque no haya de dónde medir. Antes sólo se ponía
@@ -188,7 +197,14 @@ async def list_shows(
                 )
             else:
                 s.is_available = True
-                if s.artist_id in busy:
+                # Una productora se mira POR SHOW: que uno de sus grupos esté
+                # tocando no deja sin fecha a los demás. Quien actúa él mismo se
+                # sigue mirando por artista, que es lo que impide contratar al
+                # mismo guitarrista en dos hoteles a la misma hora.
+                if getattr(s, "_es_productora", False):
+                    if s.id in busy_show:
+                        s.busy_note = f"No disponible {busy_show[s.id]:%H:%M}"
+                elif s.artist_id in busy:
                     # David, 19/09: "pongamos No Disponible 20:00". El texto
                     # largo no cabía en la tarjeta nueva, y su primer intento
                     # ("Solo hoy 20:00") se leía al revés, como si ESTUVIERA

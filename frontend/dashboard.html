@@ -4966,6 +4966,7 @@ async function openArtistProfile(artistId, showId, previo){
         ? apShowsHTML(shows.filter(s=>s.id!==sel.id),tray,'Otros shows del proveedor')
         : apShowsHTML(shows,tray)}
       ${apReviewsHTML(rev)}
+      ${apProductoraHTML(a)}
       ${apAfinidadHTML(a,shows)}
       ${apTarjetaHTML(a)}
     </div>
@@ -4978,6 +4979,47 @@ async function openArtistProfile(artistId, showId, previo){
           : `<button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button>`}`}</div>
   </div>`;
 }
+/* ---- Marcar a un proveedor como PRODUCTORA --------------------------------
+   David, 20/09: "solo las productoras puedan permitir varios shows a la vez".
+
+   Esta marca decide si una actuación bloquea TODO el catálogo del proveedor o
+   sólo ese show. La otorga SHOWMA, nunca el proveedor: por eso vive aquí, en la
+   ficha que sólo abre el administrador, y no en su registro.
+
+   No se usa el campo "Tipo" del formulario de alta para esto. Ese desplegable
+   trae "Productora / Proveedor" preseleccionado, así que lo tienen puesto cinco
+   proveedores que no lo son, incluido un guitarrista solista. */
+function apProductoraHTML(a){
+  if(!ME || !ME.is_admin || !a || !a.id) return '';
+  const on = !!a.is_productora;
+  return `<div class="apsec" id="apProd">
+    <h4>Tipo de proveedor</h4>
+    <div class="muted" style="font-size:12.5px;margin-bottom:10px">
+      Una productora manda gente distinta a cada show, así que contratar uno no
+      bloquea los demás a la misma hora. Un proveedor que actúa él mismo sí se
+      bloquea entero: no puede estar en dos hoteles a la vez.
+      ${a.artist_type?`<div style="margin-top:6px">En su registro eligió: <b>${esc(a.artist_type)}</b>. Eso es lo que él dijo, no lo que decide el sistema.</div>`:''}
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="trck${on?' on':''}">${on?'✓ Es productora':'Proveedor individual'}</span>
+      <button class="btn ghost" onclick="apProductora(${a.id},${on?'false':'true'})">
+        ${on?'Quitar la marca de productora':'Marcar como productora'}</button>
+    </div>
+  </div>`;
+}
+async function apProductora(artistId, valor){
+  const caja=document.getElementById('apProd'); if(caja) caja.style.opacity='.5';
+  try{
+    await patch('/artists/'+artistId, {is_productora: !!valor});
+    // El catálogo del selector guarda la disponibilidad ya calculada: si no se
+    // tira, el hotel seguiría viendo el bloqueo viejo hasta recargar.
+    CACHE.showsBy = {}; CACHE.shows = null;
+    toast(valor? 'Marcado como productora ✓' : 'Marca de productora retirada');
+    openArtistProfile(artistId, null);
+  }catch(e){ toast('No se pudo cambiar: '+(e.message||''), true); if(caja) caja.style.opacity=''; }
+}
+window.apProductora=apProductora;
+
 /* ---- Vista previa: la ficha del proveedor vista por un hotel ---------------
    David, 12/09: "ya se está registrando gente... que puedan ver cómo verán su
    ficha los contratantes, porque ahora solo los registran pero no saben cómo se

@@ -412,6 +412,11 @@ async def _booking_from_proposal(
     starts_at = req.event_date or _now()
     if req.event_date is not None:
         await _check_blocked_day(db, winner.artist_id, starts_at)
+        # Sin show_id a propósito: una actuación nacida de una solicitud no
+        # apunta a ningún show del catálogo (se crea con show_id=None más
+        # abajo). Al no saber QUÉ grupo se compromete, ni siquiera en una
+        # productora, se aplica la regla estricta por proveedor. Bloquear de más
+        # aquí es preferible a comprometer dos veces al mismo grupo.
         await _check_travel_buffer(db, winner.artist_id, starts_at, None)
 
     note = f"Generada desde solicitud #{req.id}: {req.title}"

@@ -62,25 +62,37 @@ async def is_blocked(db, artist_id: int, when) -> tuple[bool, str | None]:
     return (row is not None), (row.reason if row else None)
 
 
-async def busy_on(db, day: date) -> dict[int, datetime]:
-    """{artist_id: hora de la primera actuación} de quienes ya trabajan ese día.
+async def busy_on(db, day: date) -> tuple[dict[int, datetime], dict[int, datetime]]:
+    """Quién ya trabaja ese día, por ARTISTA y por SHOW.
+
+    Devuelve dos mapas: {artist_id: hora} y {show_id: hora}. Quien pregunta
+    elige cuál mirar, y de eso depende a quién se bloquea:
+
+      - un proveedor que actúa él mismo se mira por ARTISTA: tenga dos shows o
+        diez, no puede estar en dos hoteles a la vez;
+      - una productora se mira por SHOW, porque cada show suyo lo cubre gente
+        distinta (David, 20/09: "una productora tiene varios shows con personas
+        diferentes... nos bloquearía el resto de los músicos").
 
     Sirve para avisar en el catálogo; el choque real (con margen de traslado) se
     revisa a la hora de guardar, cuando ya se conoce la hora exacta.
     """
     if day is None:
-        return {}
+        return {}, {}
     start = datetime(day.year, day.month, day.day)
     end = start + timedelta(days=1)
     rows = (await db.execute(
-        select(Booking.artist_id, Booking.starts_at).where(
+        select(Booking.artist_id, Booking.show_id, Booking.starts_at).where(
             Booking.status.in_(_ACTIVE),
             Booking.starts_at >= start,
             Booking.starts_at < end,
         ).order_by(Booking.starts_at)
     )).all()
-    out: dict[int, datetime] = {}
-    for aid, starts in rows:
-        if aid is not None and aid not in out:
-            out[aid] = _naive(starts)
-    return out
+    por_artista: dict[int, datetime] = {}
+    por_show: dict[int, datetime] = {}
+    for aid, sid, starts in rows:
+        if aid is not None and aid not in por_artista:
+            por_artista[aid] = _naive(starts)
+        if sid is not None and sid not in por_show:
+            por_show[sid] = _naive(starts)
+    return por_artista, por_show
