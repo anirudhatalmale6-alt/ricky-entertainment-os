@@ -1627,6 +1627,58 @@
   padding:11px 14px;font-size:12.5px;line-height:1.5;margin-bottom:14px}
 .apprev b{color:#0d4a30}
 /* Versión de columna: el icono y la firma arriba, el resto debajo. */
+/* Versión BARRA: mismo contenido, menos alto. Lo que baja la altura es meter
+   los chips y la nota en la misma línea del texto en vez de apilarlos, y bajar
+   el icono de 92 a 56. Nada de información se quita: eso era justo lo que él
+   quería conservar. */
+/* En pantalla ancha la barra NO envuelve: icono, texto y acciones en una fila.
+   Con envoltura, las acciones se caian a su propio renglon y la barra crecia a
+   214px — mas alta que la que el queria reducir. */
+.zres.zres-barra{padding:11px 16px;gap:14px;align-items:center;margin:12px 0;flex-wrap:nowrap}
+@media(max-width:1200px){ .zres.zres-barra{flex-wrap:wrap} }
+/* Chips y nota en una sola linea con el subtexto: son los dos renglones que
+   engordaban la barra. Si no caben, bajan solos. */
+.zres-barra .zres-b{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.zres-barra .zres-k{width:100%;margin-bottom:-2px}
+.zres-barra h3{width:100%}
+.zres-barra .zres-n{border-top:0;margin:0;padding:0;width:100%}
+.zres-barra .zres-b{flex:1 1 auto;min-width:0}
+.zres-acc{flex:0 0 auto}
+.zres-barra .zig-ic{width:56px!important;height:56px!important}
+.zres-barra .zres-firma{display:none}
+.zres-barra h3{font-size:16px;line-height:1.3;margin:1px 0 0;max-width:none}
+.zres-barra .zres-k{font-size:10px}
+.zres-barra .zres-s{font-size:12px;margin-top:2px;display:inline}
+.zres-barra .zres-chips{margin-top:6px}
+.zres-barra .zres-chip{font-size:11.5px;padding:3px 10px}
+.zres-barra .zres-n{margin-top:6px;padding-top:6px;font-size:11.5px}
+.zres-barra .zres-cta{padding:10px 16px;font-size:12.5px}
+/* Acciones de la barra: buscador + botones, a la derecha */
+.zres-acc{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-left:auto}
+.zbusca{position:relative;width:210px;flex:0 0 auto}
+.zbusca input{width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;
+  padding:10px 12px 10px 34px;font-size:12.5px;font-family:inherit;color:var(--txt)}
+.zbusca input:focus{outline:none;border-color:var(--acc)}
+.zb-lupa{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.6}
+.zb-res{display:none;position:absolute;z-index:40;top:calc(100% + 5px);left:0;right:0;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 14px 34px rgba(12,16,30,.18);max-height:320px;overflow:auto;padding:5px}
+.zb-item{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;
+  padding:7px 8px;border-radius:9px;cursor:pointer;text-align:left;font-family:inherit}
+.zb-item:hover{background:var(--inp)}
+.zb-img{width:34px;height:34px;border-radius:8px;flex:none;background:var(--grad);
+  background-size:cover;background-position:center}
+.zb-tx{flex:1;min-width:0}
+.zb-tx b{display:block;font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zb-tx s{display:block;font-size:11px;color:var(--mut);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zb-pr{font-size:12px;font-weight:700;color:var(--acc);flex:none}
+.zb-vacio{padding:12px;font-size:12px;color:var(--mut);text-align:center}
+.zres-mi{border:1px solid var(--line);background:var(--card);border-radius:11px;
+  padding:10px 14px;font-size:12.5px;font-weight:650;color:var(--txt);cursor:pointer;font-family:inherit}
+.zres-mi:hover{background:var(--inp)}
+@media(max-width:1100px){ .zres-acc{width:100%;margin-left:0} .zbusca{flex:1} }
+@media(max-width:900px){ .zres-barra .zig-ic{width:44px!important;height:44px!important} }
+
 .zres-col{flex-direction:column;align-items:flex-start;gap:10px;margin:0;padding:14px 16px}
 .zres-col .zres-av{flex-direction:row;gap:8px;align-items:center}
 .zres-col .zres-av .zig-ic{width:44px!important;height:44px!important}
@@ -1948,6 +2000,7 @@ const API = (window.RICKY_API ?? "http://localhost:8000") + "/api/v1";  // "" = 
 // el usuario puede cambiarlo desde el selector de arriba a la derecha.
 const PERIOD = (()=>{ const d=new Date(); return {year:d.getFullYear(), month:d.getMonth()+1}; })();
 let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company", NOTIF_CACHE=[];
+let NAV_INTEL=false;   // ¿este usuario puede entrar a Market Intelligence?
 let BLOCKED=new Set();   // fechas 'YYYY-MM-DD' que el artista bloqueó (vacaciones/enfermedad)
 // Normaliza para buscar: minúsculas y sin acentos. NFD separa la letra de su
 // tilde y el rango \u0300-\u036f borra la tilde suelta.
@@ -2668,6 +2721,10 @@ function applyRole(){
   const isPartnerArtist = isArtist && !!ME.is_partner;
   const canIntel = canPartner || isPartnerArtist;
   show('news', canIntel); show('market', canIntel); show('demand', canIntel);
+  // La barra de ZIGGY enseña el botón de Market Intelligence sólo a quien puede
+  // entrar. Es un add-on de pago: un botón que lleva a una pantalla cerrada es
+  // peor que no tenerlo.
+  NAV_INTEL = canIntel;
   if(lbls[1]) lbls[1].style.display = canIntel?'':'none';
   // Home is the consolidated view for a chain/admin, AND the artist's personal dashboard.
   show('home', ME.is_admin || isDirector || isArtist);
@@ -3096,7 +3153,7 @@ function ziggyResumen(d, compacto){
 
   // En la columna no cabe en horizontal, pero el CONTENIDO es el mismo: mismo
   // titular, mismos chips, misma nota y mismo botón. Sólo cambia cómo se apila.
-  return `<div class="zres${compacto?' zres-col':''}">
+  return `<div class="zres${compacto?' zres-col':' zres-barra'}">
     <div class="zres-av">
       ${ziggyIcono(pend||sinCalificar||solicitudes||budget<=0 ? 'neutral' : 'listo', 92)}
       <span class="zres-firma">ZIGGY</span>
@@ -3108,8 +3165,18 @@ function ziggyResumen(d, compacto){
       <div class="zres-chips">${chips.map(c=>
         `<span class="zres-chip ${c.c}">${esc(c.t)}</span>`).join('')}</div>
       ${nota?`<div class="zres-n">${esc(nota)}</div>`:''}
+      ${''/* el orden se mantiene; lo que cambia es el alto, vía CSS */}
     </div>
-    ${accion?`<button class="zres-cta" onclick="${accion.f}">${esc(accion.t)}</button>`:''}
+    <div class="zres-acc">
+      <div class="zbusca">
+        <span class="zb-lupa">🔎</span>
+        <input id="zBusca" autocomplete="off" placeholder="Buscar proveedor, show o instrumento…"
+               oninput="zBuscar(this.value)" onfocus="zBuscar(this.value)">
+        <div class="zb-res" id="zBuscaRes"></div>
+      </div>
+      ${accion?`<button class="zres-cta" onclick="${accion.f}">${esc(accion.t)}</button>`:''}
+      ${(typeof NAV_INTEL!=='undefined' && NAV_INTEL)?`<button class="zres-mi" onclick="show('market')">📈 Market Intelligence</button>`:''}
+    </div>
   </div>`;
 }
 
@@ -7539,12 +7606,13 @@ const RENDER = {
       .map(v=>({id:v.id,name:v.name,capacity:(v.capacity!=null?v.capacity:null),company_id:c.id,company_name:c.name})));
     CACHE.homeBk = bk; CACHE.homeBudget = budget; if(!MAESTRO_REF) MAESTRO_REF = new Date();
     box.innerHTML=`
-      <!-- David, 17/09: "eliminar solicitudes del dashboard de los hoteles, y
-           usar ese espacio para reacomodar ziggy y la info general de
-           actuaciones, presupuestos... eso nos da para crecer el calendario".
-           Los 4 indicadores y el banner ancho de ZIGGY ya no van arriba: bajan a
-           la columna de la derecha, que es la que se estaba desaprovechando. El
-           calendario arranca ahora en lo alto de la pantalla. -->
+      <!-- Los 4 indicadores viven en la columna derecha desde el 17/09. La barra
+           de ZIGGY vuelve aquí arriba (David, 20/09: "siempre me gustó la barra
+           de ZIGGY con la información, pero nos ocupaba mucho sitio... pensé
+           rediseñarlo más estrecho, con la misma información"). Misma
+           información, la mitad de alto. -->
+      ${ziggyResumen({bk, budget, usado, reqs:(reqs||[]).length, sat5,
+                      sinCalificar:(CACHE.porCalificar? CACHE.porCalificar.size : 0)})}
       <div class="splitH">
         <div class="box">
           <div class="mtoolbar">
@@ -7579,8 +7647,6 @@ const RENDER = {
                 <s>Ahorro vs presupuesto</s><div class="mkb" id="kAhorroD">${budget>0?(ahorro>=0?`▲ ${ahorroPct}% dentro`:`▼ ${Math.abs(ahorroPct)}% excedido`):'—'}</div></div></div>
             </div>
           </div>
-          ${ziggyResumen({bk, budget, usado, reqs:(reqs||[]).length, sat5,
-                          sinCalificar:(CACHE.porCalificar? CACHE.porCalificar.size : 0)}, true)}
           <div class="box">
             <div class="bhead"><h3 style="margin:0" class="zig-h">${ziggyIcono('destacado',30)} ZIGGY te destaca</h3><a onclick="show('artists')">Ver todas</a></div>
             ${nov.length? nov.slice(0,3).map(n=>`<div class="sugg">
@@ -8918,6 +8984,76 @@ async function facturaSubir(i){
   }
 }
 window.facturaAbrir=facturaAbrir; window.facturaCerrar=facturaCerrar; window.facturaSubir=facturaSubir;
+
+/* ---- Buscador de la barra de ZIGGY (David, 20/09) ------------------------
+   "¿podemos replicar la misma barra de búsqueda que está en proveedores, y que
+   abra el perfil desde el dashboard?".
+
+   Usa EXACTAMENTE la misma lista que la pantalla de Proveedores
+   (CACHE.artistItems) y los mismos campos: nombre, show, categoría,
+   subcategoría e instrumentos. Si buscara sobre otra cosa, el mismo texto daría
+   resultados distintos en dos pantallas y nadie sabría cuál creer.
+
+   Se carga la primera vez que alguien escribe, no al abrir el Dashboard: son
+   dos llamadas que la mayoría de las visitas no necesita. */
+let ZB_CARGANDO = false;
+async function zCargarProveedores(){
+  if(CACHE.artistItems && CACHE.artistItems.length) return CACHE.artistItems;
+  if(ZB_CARGANDO) return [];
+  ZB_CARGANDO = true;
+  try{
+    let refCo=null; try{ refCo=await anyCompanyId(); }catch(e){}
+    const shows = await api('/shows'+(refCo?'?near_company_id='+refCo:''));
+    let amap={};
+    try{ (await api('/artists')||[]).forEach(a=>{ amap[a.id]={name:a.stage_name,
+          city:a.base_city||a.city, profileImg:a.profile_image_url||null}; }); }catch(e){}
+    const seen=new Set(), items=[];
+    (shows||[]).filter(s=>s.is_active!==false).forEach(s=>{
+      const key=(s.artist_id||'')+'|'+s.show_name; if(seen.has(key)) return; seen.add(key);
+      const a=amap[s.artist_id]||{};
+      items.push({id:s.id, artistId:s.artist_id, name:a.name||s.show_name, show:s.show_name,
+        cat:s.category, sub:s.subcategory, genres:s.genres||[],
+        img:(s.images&&s.images[0]&&s.images[0].url)||a.profileImg||null,
+        city:(a.city||s.artist_city||null),
+        price:(s.effective_price!=null?s.effective_price:s.price_hotel)});
+    });
+    CACHE.artistItems = items;
+    return items;
+  }catch(e){ return []; }
+  finally{ ZB_CARGANDO = false; }
+}
+async function zBuscar(txt){
+  const caja=document.getElementById('zBuscaRes'); if(!caja) return;
+  const q=sinTildes(txt);
+  if(q.length < 2){ caja.style.display='none'; caja.innerHTML=''; return; }
+  caja.style.display='block';
+  caja.innerHTML='<div class="zb-vacio">Buscando…</div>';
+  const items = await zCargarProveedores();
+  const hit = items.filter(i=>sinTildes(
+      (i.name||'')+' '+(i.show||'')+' '+pretty(i.cat||'')+' '+pretty(i.sub||'')+' '+(i.genres||[]).join(' ')
+    ).includes(q)).slice(0,8);
+  if(!hit.length){ caja.innerHTML='<div class="zb-vacio">Sin resultados para «'+esc(txt)+'»</div>'; return; }
+  caja.innerHTML = hit.map(i=>`
+    <button class="zb-item" onclick="zAbrir(${i.artistId||0},${i.id})">
+      <span class="zb-img" ${i.img?`style="background-image:url('${esc(i.img)}')"`:''}></span>
+      <span class="zb-tx"><b>${esc(i.show||i.name)}</b>
+        <s>${esc([i.name, pretty(i.cat||''), i.city].filter(Boolean).join(' · '))}</s></span>
+      ${i.price!=null?`<span class="zb-pr">${MXN(i.price)}</span>`:''}
+    </button>`).join('');
+}
+function zAbrir(artistId, showId){
+  const caja=document.getElementById('zBuscaRes');
+  if(caja){ caja.style.display='none'; }
+  const inp=document.getElementById('zBusca'); if(inp) inp.value='';
+  if(artistId) openArtistProfile(artistId, showId||null);
+  else toast('Ese show no tiene ficha de proveedor.', true);
+}
+// Cerrar el desplegable al tocar fuera; si no, se queda abierto tapando el calendario.
+document.addEventListener('click', e=>{
+  const c=document.getElementById('zBuscaRes');
+  if(c && !e.target.closest('.zbusca')) c.style.display='none';
+});
+window.zBuscar=zBuscar; window.zAbrir=zAbrir;
 
 function cutoffNotice(role){
   const base = 'Las fechas de corte serán los días 15 y último día de cada mes, '
