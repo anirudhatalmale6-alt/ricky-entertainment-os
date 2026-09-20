@@ -560,9 +560,9 @@
      pequenos". Con 3 salones sobraba media pantalla abajo.
      El alto del contenedor lo pone ajustarAltoMaestro() al pintar y al cambiar
      el tamano de la ventana; aqui solo se dice como se reparte. */
-  .maestro{overflow:auto;padding-bottom:4px}
-  .mgrid{display:grid;grid-template-columns:118px repeat(7,minmax(88px,1fr));gap:5px;min-width:0;
-    grid-template-rows:auto;grid-auto-rows:minmax(74px,1fr);min-height:100%}
+  .maestro{overflow:auto;padding-bottom:2px}
+  .mgrid{display:grid;grid-template-columns:110px repeat(7,minmax(88px,1fr));gap:4px;min-width:0;
+    grid-template-rows:auto;grid-auto-rows:minmax(66px,1fr);min-height:100%}
   .mhd{font-size:10.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;text-align:center;padding:4px 0}
   .mhd.today{color:#fff;background:var(--grad);border-radius:7px}
   .mhd .dn{font-size:14px;font-weight:800;display:block;color:var(--txt)}
@@ -1608,6 +1608,22 @@
 /* Resumen del día de ZIGGY */
 .zres{display:flex;align-items:center;gap:18px;margin:14px 0;padding:16px 20px;flex-wrap:wrap;
   border-radius:16px;background:linear-gradient(135deg,#efeafe,#f7f5ff);border:1px solid #e0dafc}
+/* Barra con el violeta de su maqueta (David, 20/09: "más como el diseño, en
+   colores y distribución"). Sobre fondo oscuro hay que repintar TODO lo que
+   heredaba color del tema claro: kicker, chips y el botón secundario se
+   quedarían ilegibles si sólo se cambia el fondo. */
+.zres.zres-barra{background:linear-gradient(120deg,#2a1e86 0%,#4636c9 55%,#5b4ae0 100%);
+  border-color:#2a1e86;color:#fff}
+.zres-barra .zres-k{color:#c9c0ff}
+.zres-barra .zres-chip{background:rgba(255,255,255,.16);color:#fff;backdrop-filter:blur(2px)}
+.zres-barra .zres-chip.ok{background:rgba(16,185,129,.30);color:#eafff6}
+.zres-barra .zres-chip.warn{background:rgba(245,158,11,.30);color:#fff4e0}
+.zres-barra .zres-chip.bad{background:rgba(239,68,68,.32);color:#ffeaea}
+.zres-barra .zres-cta{background:#fff;color:#2a1e86}
+.zres-barra .zres-cta:hover{background:#efeafe}
+.zres-barra .zres-mi{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff}
+.zres-barra .zres-mi:hover{background:rgba(255,255,255,.22)}
+.zres-barra .zbusca input{background:rgba(255,255,255,.95);border-color:transparent}
 /* min-width:0, no 220px: con un titular de una frase entera, un mínimo fijo
    hace que el texto empuje el banner fuera de la caja en pantallas estrechas.
    Con 0 el bloque se encoge y la frase parte de línea, que es lo que tiene que
@@ -1634,7 +1650,7 @@
 /* En pantalla ancha la barra NO envuelve: icono, texto y acciones en una fila.
    Con envoltura, las acciones se caian a su propio renglon y la barra crecia a
    214px — mas alta que la que el queria reducir. */
-.zres.zres-barra{padding:11px 16px;gap:14px;align-items:center;margin:12px 0;flex-wrap:nowrap}
+.zres.zres-barra{padding:11px 16px;gap:14px;align-items:center;margin:10px 0 12px;flex-wrap:nowrap}
 @media(max-width:1200px){ .zres.zres-barra{flex-wrap:wrap} }
 /* Chips y nota en una sola linea con el subtexto: son los dos renglones que
    engordaban la barra. Si no caben, bajan solos. */
@@ -1657,7 +1673,7 @@
 .zres-barra .zres-cta{padding:10px 16px;font-size:12.5px}
 /* Acciones de la barra: buscador + botones, a la derecha */
 .zres-acc{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-left:auto}
-.zbusca{position:relative;width:210px;flex:0 0 auto}
+.zbusca{position:relative;width:180px;flex:0 0 auto}
 .zbusca input{width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;
   padding:10px 12px 10px 34px;font-size:12.5px;font-family:inherit;color:var(--txt)}
 .zbusca input:focus{outline:none;border-color:var(--acc)}
@@ -3098,12 +3114,12 @@ function ziggyResumen(d, compacto){
   // El adjetivo también concuerda: "1 solicitud abiertas" se lee como un
   // descuido, y un panel que se lee descuidado se cree menos.
   if(solicitudes) chips.push({
-    t: solicitudes===1 ? '1 solicitud abierta' : `${solicitudes} solicitudes abiertas`,
+    t: solicitudes===1 ? '1 solicitud' : `${solicitudes} solicitudes`,
     c:'warn'});
   chips.push(budget<=0
-    ? {t:'Presupuesto · sin cargar', c:'bad'}
-    : (pct>100 ? {t:`Presupuesto · ${pct}% usado`, c:'bad'}
-               : {t:`Presupuesto · ${pct}% usado`, c:'ok'}));
+    ? {t:'Sin presupuesto', c:'bad'}
+    : (pct>100 ? {t:`Presupuesto ${pct}%`, c:'bad'}
+               : {t:`Presupuesto ${pct}%`, c:'ok'}));
 
   // --- El titular: manda la regla más urgente que se cumpla ---
   // El orden es por URGENCIA REAL, no por comodidad: primero lo que cuesta
