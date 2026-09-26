@@ -8672,11 +8672,23 @@ const RENDER = {
           <div class="hh"><div style="font-weight:650">➕ Publicar un nuevo show</div>
             <div class="tag2">Misma ficha que en el registro</div></div>
           ${showFields(null)}
+          <!-- Las diez preguntas, TAMBIEN al publicar desde aqui. Sin ellas el
+               servidor rechaza el alta (son obligatorias desde el 18/09) y
+               desde esta ficha no habia forma de contestarlas: el boton de
+               afinidad solo existe en los shows que YA tienen numero. Resultado:
+               publicar un show desde el perfil era imposible. -->
+          <div class="afnuevo">
+            <div class="hh" style="margin-bottom:4px"><div style="font-weight:650">🎯 Te ayudamos a encontrar los escenarios perfectos para ti</div>
+              <div class="tag2" id="afNuevoEstado">10 preguntas</div></div>
+            <div class="hint" style="margin-bottom:8px">Son obligatorias: con ellas SHOWMA sabe a qué hoteles y a qué salas encaja el show. Sin contestarlas no se puede publicar.</div>
+            <div class="fgrid" id="afNuevo"><div class="muted">Cargando preguntas…</div></div>
+          </div>
           <div class="saverow"><button class="btn" onclick="addShow(this)">Publicar show</button>
-            <span class="muted" style="font-size:12px">Nombre, tarifa hotel y al menos una foto.</span></div>
+            <span class="muted" style="font-size:12px">Nombre, tarifa hotel, una foto y las diez preguntas.</span></div>
         </div>
       </div>`;
     initShowForms(p.shows);
+    afNuevoCargar();
     // El músico de una productora no cobra por SHOWMA, así que estas dos ni se
     // piden: darían 403 y dejarían "Cargando…" colgado para siempre en una
     // sección que además ya no existe en su pantalla.
@@ -9926,7 +9938,10 @@ function collectShowForm(k){
     travel_fee:n('tfee'), travel_fee_km:i('tkm')||30,
     offers_audition:!!(el('aud')&&el('aud').checked),
     images:(SHOW_IMGS[k]||[]).map((u,idx)=>({url:u,is_profile:idx===0})),
-    seasonal_rates:seasCollect(k)
+    seasonal_rates:seasCollect(k),
+    // Solo en el alta: al editar, las respuestas se guardan solas desde el
+    // boton de afinidad, y mandarlas vacias aqui las borraria.
+    ...(k==='new' ? {afinidad: Object.keys(AF_NUEVO).length ? AF_NUEVO : null} : {})
   };
 }
 // --- Tarifas por temporada del show (suplementos / descuentos) ---
@@ -10108,8 +10123,18 @@ async function addShow(btn){
   if(!body.show_name){ toast('Ponle un nombre al show.',true); return; }
   if(body.price_hotel==null){ toast('Pon la tarifa para hotel; sin precio no se puede contratar.',true); return; }
   if(!body.images.length){ toast('Sube al menos una foto para que el show se vea en el catálogo.',true); return; }
+  // Se avisa AQUI de las preguntas que faltan. Antes el aviso lo daba el
+  // servidor con un 422 y el texto salia en un alert, pero sin las preguntas a
+  // la vista no habia nada que hacer con ese aviso.
+  const faltan = AFQ ? Object.keys(AFQ.preguntas).filter(k=>!AF_NUEVO[k]) : [];
+  if(faltan.length){
+    toast(`Te ${faltan.length===1?'falta 1 pregunta':'faltan '+faltan.length+' preguntas'} de las diez de afinidad.`, true);
+    const caja=document.getElementById('afNuevo');
+    if(caja) caja.scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
   btn.disabled=true;
-  try{ await post('/me/artist/shows',body); SHOW_IMGS['new']=[]; toast('Show publicado ✓'); show('profile',true); }
+  try{ await post('/me/artist/shows',body); SHOW_IMGS['new']=[]; AF_NUEVO={}; toast('Show publicado ✓'); show('profile',true); }
   catch(e){ alert('No se pudo publicar: '+e.message); btn.disabled=false; }
 }
 // Partner es el plan de PAGO que abre Market Intelligence, Tendencias y
@@ -10546,6 +10571,80 @@ window.zSet=zSet; window.zTogle=zTogle; window.zMood=zMood; window.zLimpiar=zLim
 let AFQ = null;      // el cuestionario, del servidor
 let AFPROP = {};     // company_id -> respuestas
 let AFSAL = {};      // venue_id  -> {mood, efectivas}
+
+/* ---- Las diez preguntas al PUBLICAR un show desde el perfil --------------
+   Van aparte de afSet/afTogle a proposito: esos dos guardan en el servidor en
+   cuanto tocas algo, y para eso hace falta un show que ya exista. En el alta
+   todavia no hay show, asi que las respuestas se quedan en memoria y viajan
+   dentro del propio POST del show.
+
+   Sin esto, publicar un show desde el perfil era IMPOSIBLE: el formulario
+   mandaba el alta sin preguntas, el servidor la rechazaba por incompleta
+   (obligatorias desde el 18/09) y no habia ningun sitio donde contestarlas,
+   porque el boton de afinidad solo aparece en shows que ya tienen numero.
+   Geovanni Marroquin lo intento 15 veces seguidas el 26/09. */
+let AF_NUEVO = {};
+
+async function afNuevoCargar(){
+  const caja = document.getElementById('afNuevo');
+  if(!caja) return;
+  try{ if(!AFQ) AFQ = await api('/afinidad/cuestionario'); }
+  catch(e){
+    caja.innerHTML = `<div class="muted">No se pudieron cargar las preguntas (${esc(e.message||'sin conexión')}).
+      <a onclick="afNuevoCargar()" style="color:var(--acc);cursor:pointer;font-weight:600">Reintentar</a></div>`;
+    return;
+  }
+  afNuevoPintar();
+}
+
+function afNuevoPintar(){
+  const caja = document.getElementById('afNuevo');
+  if(!caja || !AFQ) return;
+  caja.innerHTML = Object.keys(AFQ.preguntas).map(k=>{
+    const q = AFQ.preguntas[k];
+    const texto = q.show || q.titulo;
+    const valor = AF_NUEVO[k];
+    if(q.multiple){
+      const puestas = Array.isArray(valor) ? valor : (valor?[valor]:[]);
+      return `<div class="field"><label>${esc(texto)}
+        <span class="hint" style="font-weight:400"> · elige hasta ${q.max}</span></label>
+        <div class="zchips">${q.opciones.map(o=>
+          `<button type="button" class="zchip${puestas.includes(o)?' on':''}"
+             onclick="afNuevoTogle('${k}','${String(o).replace(/'/g,"\\'")}')">${esc((q.etiquetas&&q.etiquetas[o])||o)}</button>`
+        ).join('')}</div></div>`;
+    }
+    return `<div class="field"><label>${esc(texto)}</label>
+      <select onchange="afNuevoSet('${k}',this.value)">
+        <option value="">— sin contestar —</option>
+        ${q.opciones.map(o=>`<option value="${esc(o)}"${valor===o?' selected':''}>${esc((q.etiquetas&&q.etiquetas[o])||o)}</option>`).join('')}
+      </select></div>`;
+  }).join('');
+  afNuevoEstado();
+}
+
+function afNuevoEstado(){
+  const el = document.getElementById('afNuevoEstado');
+  if(!el || !AFQ) return;
+  const total = Object.keys(AFQ.preguntas).length;
+  const puestas = Object.keys(AFQ.preguntas).filter(k=>AF_NUEVO[k]).length;
+  el.textContent = puestas>=total ? 'Las diez contestadas ✓' : `${puestas} de ${total} contestadas`;
+}
+
+function afNuevoSet(k, v){
+  if(v) AF_NUEVO[k]=v; else delete AF_NUEVO[k];
+  afNuevoEstado();
+}
+
+function afNuevoTogle(k, o){
+  const max = (AFQ && AFQ.preguntas[k] && AFQ.preguntas[k].max) || 3;
+  let lista = Array.isArray(AF_NUEVO[k]) ? AF_NUEVO[k].slice() : (AF_NUEVO[k]?[AF_NUEVO[k]]:[]);
+  if(lista.includes(o)) lista = lista.filter(x=>x!==o);
+  else if(lista.length < max) lista.push(o);
+  else { toast(`Puedes elegir hasta ${max}.`, true); return; }
+  if(lista.length) AF_NUEVO[k]=lista; else delete AF_NUEVO[k];
+  afNuevoPintar();
+}
+window.afNuevoCargar=afNuevoCargar; window.afNuevoSet=afNuevoSet; window.afNuevoTogle=afNuevoTogle;
 
 function afCampo(nivel, id, k, valor){
   const q = AFQ.preguntas[k];
