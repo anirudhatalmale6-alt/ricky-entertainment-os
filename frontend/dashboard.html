@@ -619,6 +619,25 @@
   .mcell:not(.empty):hover .cadd{opacity:1;transform:scale(1)}
   /* Add-actuación modal */
   .mov{position:fixed;inset:0;background:rgba(12,16,30,.55);backdrop-filter:blur(2px);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px}
+  /* Ventana de video: el marco mantiene 16:9 pase lo que pase con el ancho. */
+  .vidmov{display:none}
+  .vidbox{position:relative;width:100%;max-width:880px;background:#11141f;border-radius:16px;
+    padding:14px;box-shadow:0 24px 70px rgba(12,16,30,.5)}
+  .vidbox .ax{position:absolute;top:-14px;right:-14px;width:32px;height:32px;border-radius:50%;
+    border:0;background:#fff;color:#1e2430;font-size:15px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+  .vidtit{color:#fff;font-size:13.5px;font-weight:650;margin-bottom:9px}
+  .vidmarco{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+  .vidmarco iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .vidpie{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;
+    color:#b9c0d4;font-size:11.5px}
+  .vidpie .btn{padding:5px 10px;font-size:11px;background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.28);color:#fff;text-decoration:none}
+  .vidpie .btn:hover{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.4)}
+  .apvcanal{position:absolute;top:7px;right:7px;font-style:normal;font-size:9px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.4px;background:rgba(255,255,255,.9);color:#1e2430;
+    padding:2px 6px;border-radius:999px}
+  .apvid{position:relative;cursor:pointer}
+  @media(max-width:620px){.vidbox{padding:10px}}
   .amod{background:var(--card);border-radius:16px;width:100%;max-width:460px;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(12,16,30,.4);overflow:hidden}
   .amod .ah{padding:16px 18px;border-bottom:1px solid var(--line)}
   .amod .ah b{font-size:15px;font-weight:750}
@@ -4108,7 +4127,10 @@ function actRender(){
     const mv = (MATCH_VENUE||{})[String(s.id)];
     if(s.artist_partner) tags.push('<span class="atag part">✓ Partner</span>');
     if(s.offers_audition) tags.push('<span class="atag aud">🎤 Acepta audiciones</span>');
-    if(s.video_url) tags.push(`<span class="atag vid" onclick="event.stopPropagation();window.open('${esc(s.video_url)}','_blank')">▶ Video</span>`);
+    // La etiqueta dice lo que hay detras: un video se reproduce aqui dentro, un
+    // canal se abre fuera, porque un canal no se puede reproducir.
+    if(s.video_url && videoEtiqueta(s.video_url)) tags.push(
+      `<span class="atag vid" onclick="event.stopPropagation();videoAbrir(${esc(JSON.stringify(s.video_url))},${esc(JSON.stringify(s.show_name||'Video'))})">${videoEtiqueta(s.video_url)}</span>`);
     const priceHtml=eff!=null?(((s.has_special_rate||s.has_season||s.travel_fee_applied)&&s.price_hotel&&s.price_hotel!=eff)?`<span class="ac3-price"><s style="color:var(--mut);font-weight:400">${MXN(s.price_hotel)}</s> ${MXN(eff)}</span>`:`<span class="ac3-price">${MXN(eff)}</span>`):'';
     // Disponibilidad del día: el artista pudo bloquearlo o ya tener actuación.
     const nd=s.is_available===false;
@@ -5334,9 +5356,10 @@ function apMediaHTML(socLinks, videos, photos){
   const col=(titulo,html)=>html?`<div><h5>${esc(titulo)}</h5>${html}</div>`:'';
   const soc=socLinks.length?`<div class="apsoc">${socLinks.join('')}</div>`:'';
   const vid=videos.length?`<div class="apvids">${videos.slice(0,2).map(v=>
-    `<a class="apvid" href="${esc(v.url)}" target="_blank" rel="noopener"
+    `<a class="apvid" onclick="videoAbrir(${esc(JSON.stringify(v.url))},${esc(JSON.stringify(v.name||'Video'))})"
         ${v.img?`style="background-image:url('${esc(v.img)}')"`:''}>
-      <span class="pl">${ico('play')}</span><b>${esc(v.name||'Ver video')}</b></a>`).join('')}</div>`:'';
+      <span class="pl">${ico('play')}</span><b>${esc(v.name||'Ver video')}</b>
+      ${videoInfo(v.url)&&!videoInfo(v.url).embed?'<i class="apvcanal">canal</i>':''}</a>`).join('')}</div>`:'';
   // Antes se pintaban 6 y ninguna abría. Ahora se pintan hasta 12, la última
   // avisa de cuántas quedan, y cualquiera abre el visor sobre la lista COMPLETA:
   // las que no caben en la rejilla se ven pasando de una a otra.
@@ -5768,6 +5791,97 @@ function rmPropImg(i){ PROP_IMGS.splice(i,1); renderPropImgs(); }
    error en consola — que es justo el fallo que se estaba arreglando. */
 const LBGAL = {};
 let LBFOTOS = [], LBI = 0;
+
+/* ===== Video en una ventana sobre la misma pagina ========================
+   David, 26/09: las cadenas grandes tienen el internet capado en las oficinas y
+   quiere mejorar la navegacion. Antes el video abria pestaña nueva.
+
+   AVISO para quien venga detras: esto NO esquiva un bloqueo de red. Si el
+   firewall corta youtube.com, el iframe se corta igual que la pestaña nueva; el
+   bloqueo es por dominio y le da lo mismo quien pida. Lo que si se hace es
+   usar youtube-nocookie.com, que algunas empresas tienen permitido porque no
+   rastrea, y dar una salida cuando no carga (copiar liga y QR para el celular).
+
+   Y lo importante: la MITAD de los enlaces que hay cargados no son videos, son
+   CANALES (youtube.com/@alguien) o el usuario suelto. Un canal no se puede
+   reproducir porque no apunta a ningun video. Esos NO abren la ventana: el
+   boton dice "Ver canal" y abre fuera, que es lo que realmente es. Sin esto,
+   seis shows de produccion enseñarian un cuadro negro. */
+const VID_PATRONES = [
+  /youtube\.com\/watch\?(?:[^\s]*[?&])?v=([A-Za-z0-9_-]{11})/,
+  /youtu\.be\/([A-Za-z0-9_-]{11})/,
+  /youtube\.com\/embed\/([A-Za-z0-9_-]{11})/,
+  /youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/,
+];
+const VIMEO_PATRON = /vimeo\.com\/(?:video\/)?(\d+)/;
+
+/* Devuelve como se puede enseñar ese enlace: incrustado, o solo como liga. */
+function videoInfo(url){
+  const u = String(url||'').trim();
+  if(!u) return null;
+  for(const re of VID_PATRONES){
+    const m = u.match(re);
+    if(m) return {tipo:'youtube', id:m[1], url:u,
+                  embed:`https://www.youtube-nocookie.com/embed/${m[1]}?rel=0`};
+  }
+  const v = u.match(VIMEO_PATRON);
+  if(v) return {tipo:'vimeo', id:v[1], url:u,
+                embed:`https://player.vimeo.com/video/${v[1]}`};
+  // Ni video de YouTube ni de Vimeo: canal, usuario suelto o cualquier otra
+  // cosa. Se puede abrir, pero no reproducir aqui dentro.
+  const externo = /^https?:\/\//i.test(u) ? u
+                : (u.startsWith('@') ? 'https://www.youtube.com/'+u : null);
+  return externo ? {tipo:'enlace', url:externo, embed:null} : null;
+}
+
+/* El texto del boton dice la verdad sobre lo que hay detras. */
+function videoEtiqueta(url){
+  const i = videoInfo(url);
+  if(!i) return null;
+  return i.embed ? '▶ Video' : '▶ Ver canal';
+}
+
+function videoAbrir(url, titulo){
+  const info = videoInfo(url);
+  if(!info) return;
+  if(!info.embed){ window.open(info.url, '_blank', 'noopener'); return; }
+  let ov = document.getElementById('vidMov');
+  if(!ov){
+    ov = document.createElement('div'); ov.id='vidMov'; ov.className='mov vidmov';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e=>{ if(e.target===ov) videoCerrar(); });
+    document.addEventListener('keydown', e=>{
+      if(e.key==='Escape' && ov.style.display==='flex') videoCerrar(); });
+  }
+  ov.innerHTML = `<div class="vidbox">
+    <button class="ax" onclick="videoCerrar()" aria-label="Cerrar">✕</button>
+    <div class="vidtit">${esc(titulo||'Video')}</div>
+    <div class="vidmarco"><iframe src="${esc(info.embed)}" title="${esc(titulo||'Video')}"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
+      allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+    <div class="vidpie">
+      <span>¿No se ve? Puede que la red de tu oficina bloquee YouTube.</span>
+      <button class="btn ghost mini" onclick="videoCopiar('${esc(info.url).replace(/'/g,"\\'")}',this)">Copiar liga</button>
+      <a class="btn ghost mini" href="${esc(info.url)}" target="_blank" rel="noopener">Abrir en YouTube</a>
+    </div>
+  </div>`;
+  ov.style.display='flex';
+}
+
+function videoCerrar(){
+  const ov=document.getElementById('vidMov');
+  // Se vacia el HTML, no solo se esconde: un iframe escondido sigue sonando.
+  if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+}
+
+async function videoCopiar(url, btn){
+  try{ await navigator.clipboard.writeText(url); if(btn){ const t=btn.textContent; btn.textContent='Copiada ✓';
+        setTimeout(()=>{ btn.textContent=t; },1600); } }
+  catch(e){ toast('No se pudo copiar: '+url, true); }
+}
+
+window.videoAbrir=videoAbrir; window.videoCerrar=videoCerrar;
+window.videoCopiar=videoCopiar;
 
 function lightbox(a, i){
   LBFOTOS = Array.isArray(a) ? a.filter(Boolean) : (a ? [a] : []);
