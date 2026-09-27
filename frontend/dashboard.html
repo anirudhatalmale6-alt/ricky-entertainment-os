@@ -3996,7 +3996,7 @@ function moodOpciones(puesto){
     Object.entries(MOOD_ETIQUETA).map(([v,l])=>
       `<option value="${v}"${puesto===v?' selected':''}>${esc(l)}</option>`).join('');
 }
-/* ---- "+ Añadir lugar": registrar un nuevo venue en una propiedad ---- */
+/* ---- "+ Añadir venue": registrar un nuevo venue en una propiedad ---- */
 async function openAddVenue(){
   let comps=await myProperties();
   if(!comps.length){ toast('Primero registra una propiedad en tu cadena.',true); return; }
@@ -4005,12 +4005,12 @@ async function openAddVenue(){
     ov.addEventListener('click',e=>{ if(e.target===ov) venClose(); }); }
   ov.innerHTML=`<div class="amod rqmod" style="position:relative">
     <button class="ax" onclick="venClose()" aria-label="Cerrar">✕</button>
-    <div class="ah"><b>Añadir lugar</b><span class="as">Registra un nuevo venue en tu propiedad</span></div>
+    <div class="ah"><b>Añadir venue</b><span class="as">Registra un nuevo venue en tu propiedad</span></div>
     <div class="rqbody">
       ${comps.length===1
         ? `<div class="field"><label>Propiedad</label><select id="vn_comp" disabled>${comps.map(c=>`<option value="${c.id}">${esc(c.name)}${c.city?' · '+esc(c.city):''}</option>`).join('')}</select></div>`
         : `<div class="field"><label>Propiedad *</label><select id="vn_comp">${comps.map(c=>`<option value="${c.id}">${esc(c.name)}${c.city?' · '+esc(c.city):''}</option>`).join('')}</select></div>`}
-      <div class="field"><label>Nombre del lugar *</label><input id="vn_name" placeholder="p. ej. Terraza, Lobby Bar, Salón Principal"></div>
+      <div class="field"><label>Nombre del venue *</label><input id="vn_name" placeholder="p. ej. Terraza, Lobby Bar, Salón Principal"></div>
       <div class="fgrid">
         <div class="field"><label>Aforo</label><input id="vn_cap" type="number" min="0" step="10" placeholder="Personas"></div>
         <div class="field"><label>Estilo</label>
@@ -4019,7 +4019,7 @@ async function openAddVenue(){
       </div>
       <div class="field"><label>Horario habitual</label><input id="vn_sch" placeholder="p. ej. 20:00 – 00:00"></div>
     </div>
-    <div class="af"><button class="ago" id="vn_go" onclick="submitVenue(this)">Guardar lugar</button></div>
+    <div class="af"><button class="ago" id="vn_go" onclick="submitVenue(this)">Guardar venue</button></div>
   </div>`;
   ov.style.display='flex';
 }
@@ -4029,7 +4029,7 @@ async function submitVenue(btn){
   const cid=+g('vn_comp').value;
   const name=(g('vn_name').value||'').trim();
   if(!cid){ toast('Elige una propiedad.',true); return; }
-  if(!name){ toast('Ponle un nombre al lugar.',true); return; }
+  if(!name){ toast('Ponle un nombre al venue.',true); return; }
   const body={name};
   const cap=g('vn_cap').value; if(cap!=='') body.capacity=+cap;
   const mood=g('vn_mood').value; if(mood) body.mood=mood;
@@ -4040,7 +4040,7 @@ async function submitVenue(btn){
     (CACHE.venues=CACHE.venues||[]).push({id:v.id,name:v.name||name,company_id:cid});
     venClose(); toast('Lugar añadido ✓');
     renderMaestro();   // el nuevo lugar aparece como fila vacía, lista para agregar actuaciones con "+"
-  }catch(e){ btn.disabled=false; btn.textContent='Guardar lugar'; toast('No se pudo guardar: '+(e.message||''),true); }
+  }catch(e){ btn.disabled=false; btn.textContent='Guardar venue'; toast('No se pudo guardar: '+(e.message||''),true); }
 }
 async function delBooking(id,name){
   if(!confirm(`¿Quitar "${name}" del calendario?\n\nSe eliminará esta actuación del tablero.`)) return;
@@ -8232,7 +8232,7 @@ const RENDER = {
             <h3 style="margin:0;flex:1">Calendario Maestro</h3>
             <div class="mnav"><button class="mbtn" onclick="maestroWeek(-1)">‹</button><button class="mbtn today" onclick="maestroWeek(0)">Hoy</button><button class="mbtn" onclick="maestroWeek(1)">›</button></div>
             <div class="mtabs"><button class="on">Semana</button><button onclick="show('cal')">Agenda</button></div>
-            <button class="addvenue" onclick="openAddVenue()">+ Añadir lugar</button>
+            <button class="addvenue" onclick="openAddVenue()">+ Añadir venue</button>
             <button class="notifybtn" id="notifyBtn" onclick="saveAndNotify()" title="Notifica a los artistas los cambios que hiciste" disabled>Guardar y notificar<span class="nb-badge" id="notifyCount" style="display:none">0</span></button>
           </div>
           <div class="hint" id="maestroWeek" style="margin:-4px 0 10px"></div>
