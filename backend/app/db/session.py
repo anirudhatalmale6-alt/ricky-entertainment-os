@@ -32,6 +32,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 # column here at boot — idempotent and safe (ADD COLUMN only, never drops).
 _SQLITE_ADDED_COLUMNS = [
     # (table, column, sqlite column definition)
+    # Expediente del proveedor para cadenas hoteleras (David, 26/09)
+    ("artist_documents", "vence_el", "DATE"),
+    ("artist_documents", "emitido_el", "DATE"),
+    ("artist_documents", "declarado", "BOOLEAN DEFAULT 0"),
+    ("artist_documents", "no_aplica", "BOOLEAN DEFAULT 0"),
+    ("artist_documents", "nota", "VARCHAR(255)"),
     ("artists", "auto_confirm_bookings", "BOOLEAN DEFAULT 0"),
     ("artists", "profile_image_url", "VARCHAR(500)"),
     ("request_proposals", "images", "JSON"),
