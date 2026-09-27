@@ -1045,6 +1045,12 @@
   .mcard .mtime{font-weight:800;font-size:11.5px;color:var(--txt);letter-spacing:.2px;padding-right:12px}
   .mcard .mstyle{font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;padding-right:2px}
   .mcard .mch2{display:flex;align-items:center;gap:6px;margin-top:3px}
+  /* Vista mas global del calendario: la tarjeta pierde aire, no datos. */
+  .maestro .mcard{padding:5px 8px 5px 9px}
+  .maestro .mcard .mtime{font-size:11px;line-height:1.25}
+  .maestro .mcard .mstyle{font-size:10.5px;line-height:1.25;margin-top:0}
+  .maestro .mcard .mch2{margin-top:2px;gap:5px}
+  .maestro .mcell{padding:4px;gap:4px}
   .mcard .mnm{flex:1;min-width:0;font-size:10px;color:var(--mut);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mcard .mav{width:18px;height:18px;border-radius:50%;flex:none;background-size:cover;background-position:center;box-shadow:0 1px 2px rgba(24,28,52,.2)}
   .mcard .mav.ini{display:grid;place-items:center;color:#fff;font-size:9px;font-weight:800}
@@ -3689,6 +3695,28 @@ function renderMaestro(){
    lo que hay encima cambia de alto: el titular de ZIGGY puede ser de una o dos
    lineas, y con una resta fija el calendario se saldria justo los dias en que
    hay mas que contar. Se reservan 64px para el texto de ayuda de debajo. */
+/* Filas iguales o filas a su aire, segun quepa.
+
+   Las filas eran siempre 1fr, o sea todas del mismo alto, asi que un venue sin
+   ninguna actuacion esa semana ocupaba lo mismo que otro con dos apiladas. Con
+   seis venues solo se veian tres.
+
+   El 1fr estaba por algo: David pidio el 17/09 que con pocos venues el
+   calendario llenara el espacio en vez de dejar un hueco abajo. Asi que no se
+   puede quitar sin mas, se ELIGE:
+
+   - Si el contenido natural CABE en la caja, 1fr: las filas estiran y llenan.
+   - Si NO cabe, auto: cada fila toma lo suyo y las vacias se quedan en su
+     minimo. Se ven mas venues de una pasada, que es lo que pidio el 27/09. */
+function ajustarFilasMaestro(){
+  const grid = document.getElementById('maestroGrid');
+  const caja = grid && grid.parentElement;
+  if(!caja) return;
+  grid.style.gridAutoRows = 'minmax(66px,auto)';
+  const cabe = grid.scrollHeight <= caja.clientHeight;
+  grid.style.gridAutoRows = cabe ? 'minmax(66px,1fr)' : 'minmax(66px,auto)';
+}
+
 function ajustarAltoMaestro(){
   const grid=document.getElementById('maestroGrid');
   const caja=grid&&grid.parentElement;            // .maestro
@@ -3696,6 +3724,7 @@ function ajustarAltoMaestro(){
   const marco = caja.closest('.box');
   const arriba = caja.getBoundingClientRect().top;
   const franja = document.querySelector('.fstrip');
+  ajustarFilasMaestro();
 
   // 1) Estimacion: llenar lo que queda de ventana dejandole sitio a la franja F.
   const reserva = franja ? Math.round(franja.getBoundingClientRect().height) + 14 : 0;
