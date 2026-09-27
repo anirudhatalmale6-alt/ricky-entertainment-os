@@ -830,6 +830,8 @@
   .trhd{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line)}
   .trhd b{font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--acc)}
   .trhd .trsub{font-size:10.5px;color:var(--mut);margin-left:auto;text-align:right}
+  .trpie{padding:8px 12px 10px;font-size:10.5px;line-height:1.45;color:var(--mut);
+    border-top:1px solid var(--line)}
   /* Una sola línea, fina: valor en negrita, etiqueta al lado y la muestra entre
      paréntesis. Da los mismos datos que la rejilla en un quinto del espacio. */
   .trline{display:flex;flex-wrap:wrap;align-items:baseline;padding:10px 12px;gap:6px 0}
@@ -5198,6 +5200,8 @@ function trayectoriaHTML(t, checks){
     <div class="trhd">${ico('check')}<b>Verificaciones</b><span class="trsub">Datos del sistema, no los escribe el artista${desde?' · '+esc(desde):''}</span></div>
     ${lista}
     ${cells.length?`<div class="trline">${cells.join('')}</div>`:''}
+    <div class="trpie">La documentación es responsabilidad del proveedor.
+      SHOWMA solo valida lo expresamente señalado.</div>
   </div>`;
 }
 /* Un dato de la línea verificada: valor, etiqueta y, entre paréntesis, sobre
