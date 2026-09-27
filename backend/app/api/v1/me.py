@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import CurrentUser, CurrentScope, DbSession
 from app.core.config import settings
 from app.core.storage import ensure_upload_dir
+from app.services import expediente as exp
 from app.models.artist import Artist
 from app.models.artist_client_rate import ArtistClientRate
 from app.models.blocked_date import ArtistBlockedDate
@@ -491,18 +492,43 @@ async def upload_image(scope: CurrentScope, file: UploadFile = File(...)):
 
 # --- Legal documents ------------------------------------------------------
 # Tipos de documento admitidos (coincide con el registro de artista y /MASTER).
-_DOC_TYPES = {
+# Los del expediente para cadenas MAS los de siempre. Los viejos se quedan
+# aunque no esten en el checklist: hay archivos subidos con esos tipos y
+# quitarlos de la lista los volveria imposibles de reemplazar.
+_DOC_TYPES = set(exp.POR_CODIGO) | {
     "identificacion", "comprobante_domicilio", "constancia_sat", "contrato",
     "rider_tecnico", "rider_hospitalidad", "press_kit", "comprobante_bancario", "otro",
 }
 _ALLOWED_DOC_TYPES = {
     "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+    # La lista de empleados va en Excel (David, 26/09: "una productora puede
+    # tener decenas de bailarines, es mas facil que pongan todos en un solo
+    # archivo"). Sin esto, ese renglon del checklist no se puede cumplir.
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.ms-excel": "xls",
+    "text/csv": "csv",
 }
 _MAX_DOC_BYTES = 10 * 1024 * 1024
 
 
 def _doc_out(d: ArtistDocument) -> dict:
-    return {"id": d.id, "doc_type": d.doc_type, "url": d.url, "filename": d.filename}
+    return {"id": d.id, "doc_type": d.doc_type, "url": d.url, "filename": d.filename,
+            "vence_el": d.vence_el.isoformat() if d.vence_el else None,
+            "emitido_el": d.emitido_el.isoformat() if d.emitido_el else None,
+            "declarado": bool(d.declarado), "no_aplica": bool(d.no_aplica),
+            "nota": d.nota,
+            "subido_el": d.updated_at.isoformat() if getattr(d, "updated_at", None) else None}
+
+
+def _fecha(valor: str | None):
+    """Una fecha del formulario. Vacio es None; basura es un error dicho claro."""
+    if not valor or not valor.strip():
+        return None
+    try:
+        return date_cls.fromisoformat(valor.strip()[:10])
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"La fecha «{valor}» no es válida.") from e
 
 
 @router.get("/artist/documents")
@@ -521,6 +547,10 @@ async def upload_document(
     db: DbSession,
     file: UploadFile = File(...),
     doc_type: str = Form(...),
+    vence_el: str | None = Form(None),
+    emitido_el: str | None = Form(None),
+    declarado: bool = Form(False),
+    nota: str | None = Form(None),
 ):
     """Sube (o reemplaza) un documento legal del artista.
 
@@ -559,15 +589,126 @@ async def upload_document(
         )
     )
     doc = res.scalar_one_or_none()
+    v, e = _fecha(vence_el), _fecha(emitido_el)
     if doc is None:
         doc = ArtistDocument(artist_id=artist_id, doc_type=doc_type, url=url, filename=filename)
         db.add(doc)
     else:
         doc.url = url
         doc.filename = filename
+    doc.vence_el = v
+    doc.emitido_el = e
+    doc.declarado = bool(declarado)
+    doc.nota = (nota or "").strip()[:255] or None
+    # Subir un archivo deshace el "no aplica": si lo mandas, es que sí te aplica.
+    doc.no_aplica = False
     await db.commit()
     await db.refresh(doc)
     return _doc_out(doc)
+
+
+# --- Expediente para cadenas hoteleras -------------------------------------
+async def _expediente_de(db, artist_id: int) -> dict:
+    """El expediente de un proveedor: cada renglón con su estado y su fecha.
+
+    Una sola función para las dos vistas, la del proveedor y la del hotel. Si
+    cada una calculara su propio estado acabarían discrepando, y el día que no
+    coincidan el que pierde la discusión es el proveedor, que ve "completo" en
+    su pantalla mientras el hotel ve que le falta algo.
+    """
+    a = await db.get(Artist, artist_id)
+    rfc = getattr(a, "rfc", None) if a else None
+    res = await db.execute(select(ArtistDocument).where(ArtistDocument.artist_id == artist_id))
+    subidos = {d.doc_type: d for d in res.scalars().all()}
+    hoy = date_cls.today()
+
+    grupos, total, cubiertos, proximo = [], 0, 0, None
+    for clave, titulo in exp.GRUPOS:
+        filas = []
+        for tipo in exp.CATALOGO:
+            if tipo.grupo != clave or not exp.aplica(tipo, rfc=rfc):
+                continue
+            doc = subidos.get(tipo.codigo)
+            est, limite = exp.estado(
+                tipo,
+                tiene_archivo=bool(doc and doc.url),
+                marcado_no_aplica=bool(doc and doc.no_aplica),
+                vence_el=doc.vence_el if doc else None,
+                emitido_el=doc.emitido_el if doc else None,
+                hoy=hoy,
+            )
+            total += 1
+            if exp.cuenta_como_completo(est):
+                cubiertos += 1
+            if limite and est != exp.VENCIDO and (proximo is None or limite < proximo):
+                proximo = limite
+            filas.append({
+                "codigo": tipo.codigo, "nombre": tipo.nombre, "ayuda": tipo.ayuda,
+                "opcional": tipo.opcional, "caducidad": tipo.caducidad,
+                "meses_max": tipo.meses_max,
+                "estado": est,
+                "vence": limite.isoformat() if limite else None,
+                "dias": (limite - hoy).days if limite else None,
+                "doc": _doc_out(doc) if doc and doc.url else None,
+            })
+        if filas:
+            # Lo que pide algo, arriba. Dentro del grupo: vencido, por vencer,
+            # pendiente y al final lo que ya está.
+            orden = {exp.VENCIDO: 0, exp.POR_VENCER: 1, exp.PENDIENTE: 2,
+                     exp.COMPLETO: 3, exp.NO_APLICA: 4}
+            filas.sort(key=lambda f: orden.get(f["estado"], 9))
+            faltan = sum(1 for f in filas if not exp.cuenta_como_completo(f["estado"]))
+            vencen = sum(1 for f in filas if f["estado"] == exp.POR_VENCER)
+            grupos.append({"clave": clave, "titulo": titulo, "filas": filas,
+                           "total": len(filas),
+                           "cubiertos": len(filas) - faltan,
+                           "por_vencer": vencen})
+    grupos.sort(key=lambda g: (g["cubiertos"] >= g["total"], g["clave"]))
+    return {
+        "total": total, "cubiertos": cubiertos,
+        "completo": total > 0 and cubiertos >= total,
+        # El expediente vale hasta que se caiga el primer documento. No es un
+        # sello para siempre: se cae solo el día que algo vence.
+        "vigente_hasta": proximo.isoformat() if proximo else None,
+        "grupos": grupos,
+        "aviso": ("Documentos cargados por el proveedor. SHOWMA los almacena y avisa de "
+                  "sus vencimientos; no valida su autenticidad."),
+    }
+
+
+@router.get("/artist/expediente")
+async def mi_expediente(scope: CurrentScope, db: DbSession):
+    """El expediente del propio proveedor, para su pantalla."""
+    return await _expediente_de(db, await _require_artist(scope))
+
+
+@router.post("/artist/documents/{doc_type}/no-aplica")
+async def marcar_no_aplica(doc_type: str, scope: CurrentScope, db: DbSession,
+                           valor: bool = Form(True)):
+    """Marca (o desmarca) un renglón como que no le corresponde.
+
+    Sólo los que el checklist deja como "si aplica". Un obligatorio no se puede
+    esquivar con un clic: si se pudiera, el expediente completo dejaría de
+    significar nada.
+    """
+    artist_id = await _require_ficha_propia(scope)
+    tipo = exp.POR_CODIGO.get(doc_type)
+    if tipo is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Tipo de documento no válido.")
+    if not tipo.opcional:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"«{tipo.nombre}» es obligatorio para todos, no se puede marcar como no aplica.")
+    res = await db.execute(select(ArtistDocument).where(
+        ArtistDocument.artist_id == artist_id, ArtistDocument.doc_type == doc_type))
+    doc = res.scalar_one_or_none()
+    if doc is None:
+        doc = ArtistDocument(artist_id=artist_id, doc_type=doc_type, url="", filename=None)
+        db.add(doc)
+    doc.no_aplica = bool(valor)
+    await db.commit()
+    return await _expediente_de(db, artist_id)
 
 
 # --- Facturación electrónica (CFDI) · datos fiscales + CSD -----------------
