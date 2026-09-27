@@ -832,6 +832,40 @@
   .trhd .trsub{font-size:10.5px;color:var(--mut);margin-left:auto;text-align:right}
   .trpie{padding:8px 12px 10px;font-size:10.5px;line-height:1.45;color:var(--mut);
     border-top:1px solid var(--line)}
+  /* ---- Expediente del proveedor ---- */
+  .expcab{display:flex;align-items:center;gap:12px;margin:10px 0 8px;flex-wrap:wrap}
+  .expnum{font-size:13px;color:var(--mut);white-space:nowrap}
+  .expnum b{font-size:20px;font-weight:750;color:var(--txt)}
+  .expbar{flex:1;min-width:120px;height:8px;border-radius:5px;background:var(--ov2);overflow:hidden}
+  .expbar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#6d5ef0,#382ca1)}
+  .expest{font-size:12px;font-weight:650;color:var(--mut);white-space:nowrap}
+  .expest.ok{color:#0b7a5b}
+  /* Los grupos, cerrados. Seis lineas en vez de diecisiete fichas. */
+  .expgr{border-top:1px solid var(--line)}
+  .expgr:first-of-type{border-top:0}
+  .expgh{display:flex;align-items:center;gap:9px;padding:11px 2px;cursor:pointer}
+  .expgh b{flex:1;font-size:13px;min-width:0}
+  .expgh .fl{color:var(--mut);font-size:15px;transition:transform .15s;display:inline-block}
+  .expgr.on .expgh .fl{transform:rotate(90deg)}
+  .expct{font-size:11.5px;color:var(--mut);white-space:nowrap}
+  .exppill{font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:999px;
+    text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+  .exppill.ok{background:#e8f8f0;color:#0b7a5b}
+  .exppill.warn{background:#fdf1dc;color:#8a5a00}
+  .exppill.bad{background:#fdeaea;color:#b03030}
+  .expfilas{padding:0 0 8px 6px}
+  .expfila{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed #edeff3}
+  .expnom{flex:1;min-width:0}
+  .expnom b{display:block;font-size:12.5px;font-weight:600}
+  .expnom s{display:block;text-decoration:none;font-size:10.5px;color:var(--mut);margin-top:1px}
+  .expfila.urg .expnom s{color:var(--bad);font-weight:600}
+  .expfila.pv .expnom s{color:#8a5a00;font-weight:600}
+  .expaviso{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
+    font-size:10.5px;line-height:1.45;color:var(--mut)}
+  .expdecl{display:flex;gap:9px;align-items:flex-start;margin-top:4px;font-size:12px;
+    line-height:1.4;color:var(--txt);cursor:pointer}
+  .expdecl input{margin-top:2px;flex:none}
+  .btn.mini{padding:5px 10px;font-size:11px;flex:none}
   /* Una sola línea, fina: valor en negrita, etiqueta al lado y la muestra entre
      paréntesis. Da los mismos datos que la rejilla en un quinto del espacio. */
   .trline{display:flex;flex-wrap:wrap;align-items:baseline;padding:10px 12px;gap:6px 0}
@@ -8783,6 +8817,15 @@ const RENDER = {
           </div>
         </div>
       </div>`}
+      <!-- El expediente para cadenas hoteleras. Va en el perfil y no en una
+           pantalla aparte porque es del proveedor, no de cada show, y porque
+           David pidio no llenar el menu de accesos. Lo pinta expPintar() con lo
+           que devuelve /me/artist/expediente. -->
+      <div class="box" id="boxExpediente">
+        <h3>📁 Expediente para cadenas</h3>
+        <div class="hint">Los documentos que piden las cadenas grandes. Súbelos una vez y aquí se te avisa cuando alguno esté por vencer.</div>
+        <div id="expCuerpo"><div class="muted" style="padding:10px 0">Cargando…</div></div>
+      </div>
       <div class="box">
         <h3>🎭 Mis publicaciones</h3><div class="hint">Tus shows en el catálogo · edita tarifas y descripciones, o publica uno nuevo</div>
         <div id="shows">${p.shows.map(showEditor).join("")||'<div class="muted" style="margin-bottom:14px">Todavía no tienes shows publicados.</div>'}</div>
@@ -8807,6 +8850,7 @@ const RENDER = {
       </div>`;
     initShowForms(p.shows);
     afNuevoCargar();
+    expCargar();
     // El músico de una productora no cobra por SHOWMA, así que estas dos ni se
     // piden: darían 403 y dejarían "Cargando…" colgado para siempre en una
     // sección que además ya no existe en su pantalla.
@@ -10689,6 +10733,186 @@ window.zSet=zSet; window.zTogle=zTogle; window.zMood=zMood; window.zLimpiar=zLim
 let AFQ = null;      // el cuestionario, del servidor
 let AFPROP = {};     // company_id -> respuestas
 let AFSAL = {};      // venue_id  -> {mood, efectivas}
+
+/* ===== Expediente del proveedor ==========================================
+   Los documentos que piden las cadenas grandes (HYATT y dos mas). El servidor
+   ya devuelve cada renglon con su estado y su fecha, y los grupos ORDENADOS por
+   urgencia, asi que aqui no se vuelve a decidir nada de eso: si el hotel y el
+   proveedor calcularan cada uno por su lado acabarian discrepando.
+
+   Los grupos van CERRADOS salvo el que pide algo. David, 26/09: "no deben estar
+   visibles todo el tiempo" y "como logramos ordenar tantas cosas sin que se
+   vean mil iconos". Cerrados, el proveedor ve seis lineas en vez de diecisiete
+   fichas, y cada cabecera le dice si tiene que entrar o no. */
+let EXP = null;
+const EXP_ABIERTOS = new Set();
+
+function expFecha(iso){
+  if(!iso) return '—';
+  const [a,m,d] = String(iso).slice(0,10).split('-').map(Number);
+  if(!a||!m||!d) return iso;
+  return new Date(a, m-1, d).toLocaleDateString('es-MX',
+    {day:'numeric', month:'short', year:'numeric'});
+}
+
+async function expCargar(){
+  const caja = document.getElementById('expCuerpo');
+  if(!caja) return;
+  try{ EXP = await api('/me/artist/expediente'); }
+  catch(e){
+    caja.innerHTML = `<div class="muted" style="padding:10px 0">No se pudo cargar el expediente (${esc(e.message||'')}).
+      <a onclick="expCargar()" style="color:var(--acc);cursor:pointer;font-weight:600">Reintentar</a></div>`;
+    return;
+  }
+  expPintar();
+}
+
+function expPintar(){
+  const caja = document.getElementById('expCuerpo');
+  if(!caja || !EXP) return;
+  const pct = EXP.total ? Math.round(EXP.cubiertos*100/EXP.total) : 0;
+  // La primera vez se abre solo el primer grupo con algo pendiente. Despues
+  // manda lo que el usuario haya abierto o cerrado a mano.
+  if(!EXP_ABIERTOS.size){
+    const pide = EXP.grupos.find(g => g.cubiertos < g.total || g.por_vencer);
+    if(pide) EXP_ABIERTOS.add(pide.clave);
+  }
+  caja.innerHTML = `
+    <div class="expcab">
+      <div class="expnum"><b>${EXP.cubiertos}</b> de ${EXP.total}</div>
+      <div class="expbar"><i style="width:${pct}%"></i></div>
+      <div class="expest ${EXP.completo?'ok':''}">${EXP.completo
+        ? 'Listo para cadenas grandes ✓'
+        : `Te faltan ${EXP.total-EXP.cubiertos}`}</div>
+    </div>
+    ${EXP.vigente_hasta?`<div class="hint" style="margin:-2px 0 10px">Vigente hasta el ${expFecha(EXP.vigente_hasta)}, que es cuando vence el primero.</div>`:''}
+    ${EXP.grupos.map(g=>{
+      const abierto = EXP_ABIERTOS.has(g.clave);
+      const vencidos = g.filas.filter(f=>f.estado==='vencido').length;
+      const sinSubir = g.filas.filter(f=>f.estado==='pendiente').length;
+      const etiqueta = vencidos ? `${vencidos} vencido${vencidos>1?'s':''}`
+                     : sinSubir ? `falta ${sinSubir}`
+                     : (g.por_vencer ? `${g.por_vencer} por vencer` : 'completo');
+      const clase = vencidos ? 'bad' : sinSubir ? 'bad' : (g.por_vencer ? 'warn' : 'ok');
+      const falta = g.total - g.cubiertos;
+      return `<div class="expgr${abierto?' on':''}">
+        <div class="expgh" onclick="expAbrir('${g.clave}')">
+          <span class="fl">›</span><b>${esc(g.titulo)}</b>
+          <span class="exppill ${clase}">${etiqueta}</span>
+          <span class="expct">${g.cubiertos} de ${g.total}</span></div>
+        ${abierto?`<div class="expfilas">${g.filas.map(expFila).join('')}</div>`:''}
+      </div>`;
+    }).join('')}
+    <div class="expaviso">${esc(EXP.aviso)}</div>`;
+}
+
+function expFila(f){
+  const pie = f.estado==='vencido' ? `Venció el ${expFecha(f.vence)}`
+            : f.estado==='por_vencer' ? `Vence en ${f.dias} ${f.dias===1?'día':'días'} · ${expFecha(f.vence)}`
+            : f.estado==='completo' ? (f.vence? `Al día · vence ${expFecha(f.vence)}` : 'Al día')
+            : f.estado==='no_aplica' ? 'No te aplica'
+            : (f.ayuda || 'Falta subirlo');
+  const boton = f.estado==='pendiente' ? 'Subir'
+              : (f.estado==='vencido'||f.estado==='por_vencer') ? 'Actualizar' : 'Reemplazar';
+  const urgente = f.estado==='vencido' ? ' urg' : (f.estado==='por_vencer' ? ' pv' : '');
+  return `<div class="expfila${urgente}">
+    <div class="expnom"><b>${esc(f.nombre)}</b><s>${esc(pie)}</s></div>
+    ${f.doc? `<a class="btn mini ghost" href="${esc(f.doc.url)}" target="_blank" rel="noopener">Ver</a>`:''}
+    ${f.opcional && f.estado==='pendiente'
+      ? `<button class="btn mini ghost" onclick="expNoAplica('${f.codigo}',true)">No me aplica</button>`:''}
+    ${f.estado==='no_aplica'
+      ? `<button class="btn mini ghost" onclick="expNoAplica('${f.codigo}',false)">Sí me aplica</button>`
+      : `<button class="btn mini${f.estado==='pendiente'||f.estado==='vencido'?'':' ghost'}" onclick="expSubir('${f.codigo}')">${boton}</button>`}
+  </div>`;
+}
+
+/* La ventana de subida. Pide la fecha que corresponda al tipo de documento y
+   no una generica: a una poliza se le pregunta hasta cuando vale, y a un recibo
+   de luz cuando lo emitieron, porque un recibo no vence nunca — lo que pasa es
+   que a los 3 meses ya no lo aceptan. Preguntarle a alguien cuando vence su
+   recibo de luz no tiene respuesta. */
+function expSubir(codigo){
+  const fila = (EXP.grupos.flatMap(g=>g.filas)).find(f=>f.codigo===codigo);
+  if(!fila) return;
+  let ov = document.getElementById('expMov');
+  if(!ov){
+    ov = document.createElement('div'); ov.id='expMov'; ov.className='mov';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e=>{ if(e.target===ov) expCerrar(); });
+  }
+  const pideFecha = fila.caducidad === 'fecha';
+  const pideEmision = fila.caducidad === 'antiguedad';
+  ov.innerHTML = `<div class="amod" style="max-width:440px">
+    <div class="ah"><b>${esc(fila.nombre)}</b>
+      ${fila.ayuda?`<span class="as">${esc(fila.ayuda)}</span>`:''}</div>
+    <div class="rqbody" style="padding:14px 17px">
+      <div class="field"><label>Archivo</label>
+        <input type="file" id="expFile" accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.csv"></div>
+      ${pideFecha?`<div class="field"><label>¿Hasta cuándo es válido?</label>
+        <input type="date" id="expVence"></div>`:''}
+      ${pideEmision?`<div class="field"><label>¿Qué fecha tiene el documento?</label>
+        <input type="date" id="expEmite">
+        <div class="hint">No vale si tiene más de ${fila.meses_max} ${fila.meses_max===1?'mes':'meses'}. Con esa fecha calculamos cuándo hay que renovarlo.</div></div>`:''}
+      <div class="field"><label>Nota (opcional)</label>
+        <input id="expNota" maxlength="255" placeholder="Aseguradora, número de póliza…"></div>
+      <label class="expdecl"><input type="checkbox" id="expDecl">
+        <span>Declaro que este documento es auténtico y está vigente.</span></label>
+    </div>
+    <div class="af"><span class="hint" id="expMsg" style="margin-right:auto"></span>
+      <button class="btn ghost" onclick="expCerrar()">Cancelar</button>
+      <button class="btn" id="expOk" onclick="expEnviar('${codigo}',this)">Subir</button></div>
+  </div>`;
+  ov.style.display='flex';
+}
+
+function expCerrar(){ const ov=document.getElementById('expMov'); if(ov){ ov.style.display='none'; ov.innerHTML=''; } }
+
+async function expEnviar(codigo, btn){
+  const f = document.getElementById('expFile');
+  const msg = document.getElementById('expMsg');
+  const di = (id)=>{ const n=document.getElementById(id); return n? n.value : ''; };
+  if(!f || !f.files.length){ if(msg) msg.textContent='Elige el archivo.'; return; }
+  // La declaracion es lo que sostiene el descargo: sin ella no se sube.
+  if(!document.getElementById('expDecl').checked){
+    if(msg) msg.textContent='Marca la declaración para poder subirlo.'; return;
+  }
+  btn.disabled=true; const t0=btn.textContent; btn.textContent='Subiendo…';
+  try{
+    const fd = new FormData();
+    fd.append('file', f.files[0]);
+    fd.append('doc_type', codigo);
+    if(di('expVence')) fd.append('vence_el', di('expVence'));
+    if(di('expEmite')) fd.append('emitido_el', di('expEmite'));
+    if(di('expNota'))  fd.append('nota', di('expNota'));
+    fd.append('declarado', 'true');
+    const r = await fetch(API+'/me/artist/documents', {method:'POST', headers:{Authorization:"Bearer "+TOKEN}, body:fd});
+    if(!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || 'no se pudo subir');
+    expCerrar();
+    toast('Documento guardado ✓');
+    await expCargar();
+  }catch(e){
+    btn.disabled=false; btn.textContent=t0;
+    if(msg) msg.textContent = e.message || 'No se pudo subir.';
+  }
+}
+window.expSubir=expSubir; window.expCerrar=expCerrar; window.expEnviar=expEnviar;
+
+function expAbrir(clave){
+  if(EXP_ABIERTOS.has(clave)) EXP_ABIERTOS.delete(clave); else EXP_ABIERTOS.add(clave);
+  expPintar();
+}
+
+async function expNoAplica(codigo, valor){
+  try{
+    const fd = new FormData(); fd.append('valor', valor ? 'true' : 'false');
+    const r = await fetch(API+`/me/artist/documents/${codigo}/no-aplica`,
+                          {method:'POST', headers:{Authorization:"Bearer "+TOKEN}, body:fd});
+    if(!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || 'no se pudo');
+    EXP = await r.json();
+    expPintar();
+  }catch(e){ toast(e.message||'No se pudo guardar.', true); }
+}
+window.expCargar=expCargar; window.expAbrir=expAbrir; window.expNoAplica=expNoAplica;
 
 /* ---- Las diez preguntas al PUBLICAR un show desde el perfil --------------
    Van aparte de afSet/afTogle a proposito: esos dos guardan en el servidor en
