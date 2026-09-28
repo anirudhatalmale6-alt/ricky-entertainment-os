@@ -1043,15 +1043,17 @@
   .mcard.fixed{cursor:default}
   /* Formato de cuadro (David): 1) Hora  2) Estilo (DJ, Violín, Solista…)  3) Foto + Nombre. Sin precio. */
   .mcard .mtime{font-weight:800;font-size:11.5px;color:var(--txt);letter-spacing:.2px;padding-right:12px}
-  .mcard .mstyle{font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;padding-right:2px}
+  .mcard .mstyle{font-size:10px;font-weight:500;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;padding-right:2px}
   .mcard .mch2{display:flex;align-items:center;gap:6px;margin-top:3px}
   /* Vista mas global del calendario: la tarjeta pierde aire, no datos. */
   .maestro .mcard{padding:5px 8px 5px 9px}
   .maestro .mcard .mtime{font-size:11px;line-height:1.25}
   .maestro .mcard .mstyle{font-size:10.5px;line-height:1.25;margin-top:0}
-  .maestro .mcard .mch2{margin-top:2px;gap:5px}
+  .maestro .mcard .mch2{margin-top:2px;gap:5px;align-items:flex-start}
   .maestro .mcell{padding:4px;gap:4px}
-  .mcard .mnm{flex:1;min-width:0;font-size:10px;color:var(--mut);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mcard .mnm{flex:1;min-width:0;font-size:11px;color:var(--txt);font-weight:750;
+    line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow:hidden;overflow-wrap:anywhere}
   .mcard .mav{width:18px;height:18px;border-radius:50%;flex:none;background-size:cover;background-position:center;box-shadow:0 1px 2px rgba(24,28,52,.2)}
   .mcard .mav.ini{display:grid;place-items:center;color:#fff;font-size:9px;font-weight:800}
   .mcard .mdot{position:absolute;top:7px;right:7px;width:8px;height:8px;border-radius:50%;background:var(--ok)}
@@ -3653,8 +3655,8 @@ function maestroCard(b,vi){
     ${fixed?'':`<button class="med" title="Cambiar fecha y hora" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();openEditAct(${b.id})">✎</button>`}
     <button class="mx" title="Quitar del calendario" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();delBooking(${b.id},'${nm}')">✕</button>
     <div class="mtime">${hh}</div>
-    <div class="mstyle">${esc(estilo)}</div>
-    <div class="mch2">${av}<span class="mnm">${esc(nombre)}</span></div></div>`;
+    <div class="mch2">${av}<span class="mnm">${esc(nombre)}</span></div>
+    <div class="mstyle">${esc(estilo)}</div></div>`;
 }
 function renderMaestro(){
   const grid=document.getElementById('maestroGrid'); if(!grid) return;
