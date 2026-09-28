@@ -1948,6 +1948,25 @@
    alto = 20.4vh para la caja entera. Con la cabecera dentro, cada cuadro se
    queda en unos 72px, asi que solo cabe icono + numero + etiqueta. Por eso el
    diseño tampoco lleva lineas de detalle. */
+/* Los tres numeros del dinero, en fila y en el orden en que se leen:
+   presupuesto, gasto, diferencia. Un jefe de hotel no entendia el gasto real
+   suelto (David, 27/09) y con razon: sin el presupuesto al lado no hay con que
+   compararlo. Puestos en fila, la resta se ve sola. */
+.dinero{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;margin-top:7px;
+  border:1px solid var(--line);border-radius:11px;background:var(--inp);overflow:hidden}
+.dinero .dn{padding:8px 9px 9px;min-width:0;border-left:1px solid var(--line)}
+.dinero .dn:first-child{border-left:0}
+.dinero .dn .mki{width:20px;height:20px;border-radius:7px;font-size:11px}
+.dinero .dn s{display:block;text-decoration:none;font-size:9.5px;color:var(--mut);margin-top:4px;
+  line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dinero .dn b{display:block;font-size:15px;font-weight:750;line-height:1.15;margin-top:1px;
+  overflow-wrap:anywhere}
+.dinero .dn b.mal{color:var(--bad)}
+.dinero .dn b.bien{color:#0b7a5b}
+.dinero .dn i{display:block;font-style:normal;font-size:9px;color:var(--mut);margin-top:2px;line-height:1.25}
+#dnDif b.mal ~ i{color:var(--bad)}
+#dnDif b.bien ~ i{color:#0b7a5b}
+.mki.red{background:#fdeaea}
 .cuadros{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
 .cu{min-width:0;border:1px solid var(--line);border-radius:11px;padding:6px 9px 7px;background:var(--inp)}
 .cu .mki{width:20px;height:20px;border-radius:7px;font-size:11px}
@@ -4591,13 +4610,18 @@ function updateBudgetKpi(){
   // fuera el presupuesto (David, 16/08). El título tiene que decir qué es el
   // número que está debajo.
   set('kUsadoK', budget>0?'Presupuesto mensual':'Gasto del mes');
-  set('kUsadoD', 'Gasto real');
   set('kUsadoBar', budget>0?`<div class="kbar"><i style="width:${Math.min(100,usadoPct)}%"></i></div><div class="d" style="margin-top:6px">${usadoPct}% del presupuesto del mes</div>`:'');
-  set('kAhorroV', budget>0?MXN(Math.abs(ahorro)):'—');
+  set('kPptoV', budget>0?MXN(budget):'—');
+  set('kAhorroV', budget>0 ? (ahorro>=0?'−':'+')+MXN(Math.abs(ahorro)) : '—');
+  const dif=document.getElementById('kAhorroV');
+  if(dif) dif.className = budget<=0 ? '' : (ahorro>=0?'bien':'mal');
+  const ico=document.getElementById('kDifIco');
+  if(ico){ ico.textContent = budget<=0?'📊':(ahorro>=0?'↓':'↑');
+           ico.className = 'mki '+(budget<=0?'violet':(ahorro>=0?'green':'red')); }
   set('kAhorroD', budget>0
-    ? (ahorro>=0 ? `<span class="ktrend">▲ ${ahorroPct}%</span> dentro`
-                 : `<span style="color:var(--bad);font-weight:700">▼ ${Math.abs(ahorroPct)}%</span> excedido`)
-    : 'sin presupuesto');
+    ? (ahorro>=0 ? `↓ ${Math.abs(ahorroPct)}% bajo presupuesto`
+                 : `↑ ${Math.abs(ahorroPct)}% sobre presupuesto`)
+    : 'Carga tu presupuesto para comparar');
   set('budgetMini', budget>0? budgetDonut(gastado,comprometido,disponible) : '<div class="muted">Carga presupuestos por propiedad.</div>');
 }
 const starRow = v => { const f=Math.round(v||0); let s=''; for(let i=1;i<=5;i++) s+=(i<=f?'★':'☆'); return s; };
@@ -8311,18 +8335,25 @@ const RENDER = {
           <div class="box">
             <div class="bhead"><h3 style="margin:0">Resumen de la semana</h3>
               <a onclick="show('reports')">Ver reportes</a></div>
+            <div class="dinero">
+              <div class="dn"><span class="mki green">💲</span>
+                <s>Presupuesto</s><b id="kPptoV">${budget>0?MXN(budget):'—'}</b></div>
+              <div class="dn"><span class="mki blue">📊</span>
+                <s>Gasto real</s><b id="kUsadoV">${MXN(usado)}</b></div>
+              <div class="dn" id="dnDif"><span class="mki ${budget<=0?'violet':(ahorro>=0?'green':'red')}" id="kDifIco">${budget<=0?'📊':(ahorro>=0?'↓':'↑')}</span>
+                <s>Diferencia</s>
+                <b id="kAhorroV" class="${budget<=0?'':(ahorro>=0?'bien':'mal')}">${budget>0?(ahorro>=0?'−':'+')+MXN(Math.abs(ahorro)):'—'}</b>
+                <i id="kAhorroD">${budget>0
+                  ? (ahorro>=0 ? `↓ ${Math.abs(ahorroPct)}% bajo presupuesto`
+                               : `↑ ${Math.abs(ahorroPct)}% sobre presupuesto`)
+                  : 'Carga tu presupuesto para comparar'}</i></div>
+            </div>
             <div class="cuadros">
               <div class="cu" id="cuActuaciones"><span class="mki violet">🗓️</span>
                 <b id="kpiWeekVal">0</b><s>Actuaciones</s></div>
-              <div class="cu"><span class="mki green">💲</span>
-                <b id="kUsadoV">${MXN(usado)}</b>
-                <s id="kUsadoD">Gasto real</s></div>
               <div class="cu"><span class="mki star">⭐</span>
                 <b id="kSatV">—</b><s>Satisfacción media</s>
                 <div class="mkb" id="kSatD"></div></div>
-              <div class="cu" id="cuReal"><span class="mki amber">📊</span>
-                <b id="kAhorroV">${budget>0?MXN(Math.abs(ahorro)):'—'}</b><s>Real vs Ptto</s>
-                <div class="mkb" id="kAhorroD">${budget>0?(ahorro>=0?`▲ ${ahorroPct}% dentro`:`▼ ${Math.abs(ahorroPct)}% excedido`):'sin presupuesto'}</div></div>
             </div>
           </div>
           <div class="zigreco">
