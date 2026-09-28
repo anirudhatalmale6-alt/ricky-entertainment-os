@@ -1051,6 +1051,21 @@
   .maestro .mcard .mstyle{font-size:10.5px;line-height:1.25;margin-top:0}
   .maestro .mcard .mch2{margin-top:2px;gap:5px;align-items:flex-start}
   .maestro .mcell{padding:4px;gap:4px}
+  /* Varias actuaciones el mismo dia: se APRIETAN las tarjetas en vez de estirar
+     la fila. La fila la marca la celda mas ocupada, asi que un venue con dos
+     shows empujaba hacia abajo a los otros cinco. Idea de la esposa de David.
+
+     Lo que se encoge es el aire, no la letra: la hora y el nombre se quedan
+     legibles, y lo que desaparece a partir de la tercera es el estilo, que es
+     lo unico repetido -media agenda son solistas-. */
+  .mcell.apretada{gap:3px}
+  .mcell.apretada .mcard{padding:3px 7px 3px 8px}
+  .mcell.apretada .mcard .mstyle{font-size:9.5px;margin-top:0}
+  .mcell.apretada .mcard .mch2{margin-top:1px}
+  .mcell.apretada .mcard .mav{width:15px;height:15px}
+  .mcell.muyapretada .mcard .mstyle{display:none}
+  .mcell.muyapretada .mcard{padding:2px 6px 2px 7px}
+  .mcell.muyapretada .mcard .mtime{font-size:10.5px}
   .mcard .mnm{flex:1;min-width:0;font-size:11px;color:var(--txt);font-weight:750;
     line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;overflow-wrap:anywhere}
@@ -3683,7 +3698,7 @@ function renderMaestro(){
       const cards=bk.filter(b=>(b.venue_id||0)===(v.id||0)&&ymd(new Date(b.starts_at))===ds).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
       // Sin "+" en un salón fuera de servicio: el selector ya no lo lista, pero
       // este botón pasaba el id directo y dejaba agendar en un salón retirado.
-      html+=`<div class="mcell${cards.length?'':' empty'}${past?' past':''}${v.inactivo?' inact':''}" data-vid="${v.id||''}" data-date="${ds}">${cards.map(b=>maestroCard(b,vi)).join('')}${(past||v.inactivo)?'':`<button class="cadd" title="Agregar actuación" onclick="openAddAct(${v.id},'${ds}')">+</button>`}</div>`;
+      html+=`<div class="mcell${cards.length?'':' empty'}${cards.length>1?' apretada':''}${cards.length>2?' muyapretada':''}${past?' past':''}${v.inactivo?' inact':''}" data-vid="${v.id||''}" data-date="${ds}">${cards.map(b=>maestroCard(b,vi)).join('')}${(past||v.inactivo)?'':`<button class="cadd" title="Agregar actuación" onclick="openAddAct(${v.id},'${ds}')">+</button>`}</div>`;
     });
   });
   if(!visibles.length) html+=`<div style="grid-column:1/-1;padding:26px;text-align:center" class="muted">Aún no hay actuaciones programadas en esta cadena.</div>`;
