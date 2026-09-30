@@ -74,6 +74,81 @@ async def artist_trayectoria(artist_id: int, db: DbSession, _: CurrentUser):
     return datos
 
 
+@router.get("/expedientes/todos")
+async def expedientes_del_mercado(db: DbSession, _: CurrentUser):
+    """El estado del expediente de TODOS los proveedores, de una vez.
+
+    Para el filtro del buscador. Pidiendo uno por uno serian 40 peticiones para
+    pintar una casilla, asi que se traen los artistas y los documentos en dos
+    consultas y la cuenta se hace en memoria. Mismo patron que
+    /artists/distinciones/todas.
+
+    Devuelve solo el recuento, nunca los archivos ni las fechas de cada
+    documento: esto alimenta una casilla de filtro, no una ficha.
+    """
+    from datetime import date as _date
+
+    from app.services import expediente as exp
+
+    artistas = (await db.execute(select(Artist.id, Artist.rfc))).all()
+    docs = (await db.execute(select(ArtistDocument))).scalars().all()
+    por_artista: dict[int, list] = {}
+    for d in docs:
+        por_artista.setdefault(d.artist_id, []).append(d)
+
+    hoy = _date.today()
+    salida: dict[str, dict] = {}
+    for aid, rfc in artistas:
+        subidos = {d.doc_type: d for d in por_artista.get(aid, [])}
+        total = cubiertos = 0
+        for tipo in exp.CATALOGO:
+            if not exp.aplica(tipo, rfc=rfc):
+                continue
+            doc = subidos.get(tipo.codigo)
+            est, _limite = exp.estado(
+                tipo,
+                tiene_archivo=bool(doc and doc.url),
+                marcado_no_aplica=bool(doc and doc.no_aplica),
+                vence_el=doc.vence_el if doc else None,
+                emitido_el=doc.emitido_el if doc else None,
+                hoy=hoy,
+            )
+            total += 1
+            if exp.cuenta_como_completo(est):
+                cubiertos += 1
+        salida[str(aid)] = {"cubiertos": cubiertos, "total": total,
+                            "completo": total > 0 and cubiertos >= total}
+    return salida
+
+
+@router.get("/{artist_id}/expediente")
+async def artist_expediente(artist_id: int, db: DbSession, _: CurrentUser):
+    """El expediente de un proveedor, como lo ve el HOTEL.
+
+    Reusa la misma funcion que la pantalla del proveedor. Si cada lado calculara
+    su propio estado acabarian discrepando, y el dia que no coincidan el que
+    pierde la discusion es el proveedor: ve "completo" en su pantalla mientras
+    el hotel ve que le falta algo.
+
+    Lo que SI cambia respecto a la vista del proveedor: aqui no viajan las URL
+    de los archivos. El hotel ve QUE documentos hay y en que estado, no se los
+    descarga. Que un hotel pueda bajarse la identificacion oficial de alguien
+    por tener cuenta es una decision de datos personales que nadie ha tomado, y
+    no se toma por descuido en un endpoint.
+    """
+    await _get_artist_or_404(db, artist_id)
+    from app.api.v1.me import _expediente_de
+
+    datos = await _expediente_de(db, artist_id)
+    for grupo in datos.get("grupos", []):
+        for fila in grupo.get("filas", []):
+            doc = fila.get("doc")
+            if doc:
+                fila["doc"] = {"subido_el": doc.get("subido_el"),
+                               "declarado": doc.get("declarado")}
+    return datos
+
+
 @router.get("/distinciones/todas")
 async def distinciones_del_mercado(db: DbSession, _: CurrentUser):
     """La distinción más fuerte de cada proveedor, para pintarla en las tarjetas

@@ -841,6 +841,19 @@
   .trhd .trsub{font-size:10.5px;color:var(--mut);margin-left:auto;text-align:right}
   .trpie{padding:8px 12px 10px;font-size:10.5px;line-height:1.45;color:var(--mut);
     border-top:1px solid var(--line)}
+  /* La etiqueta del expediente ES puerta, las otras son solo dato. Por eso
+     lleva cursor y una flechita: si se vieran iguales, el hotel pulsaria las
+     que no abren nada y pensaria que algo falla. */
+  .trck.exp{cursor:pointer;border-style:dashed}
+  .afchk{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;
+    border:1px solid var(--line);background:var(--card);border-radius:9px;padding:9px 11px;
+    color:var(--txt);font-weight:500}
+  .afchk input{flex:none;margin:0}
+  .afchk:hover{border-color:var(--acc)}
+  .trck.exp::after{content:'›';margin-left:5px;opacity:.7;font-weight:700}
+  .trck.exp:hover{filter:brightness(.96)}
+  .trck.exp.cargando{opacity:.55;cursor:default}
+  .trck.exp.cargando::after{content:''}
   /* ---- Expediente del proveedor ---- */
   .expcab{display:flex;align-items:center;gap:12px;margin:10px 0 8px;flex-wrap:wrap}
   .expnum{font-size:13px;color:var(--mut);white-space:nowrap}
@@ -4940,13 +4953,29 @@ function apDistCard(artistId){
   return `<div class="acdist" title="${esc(d.detalle||'')}">${ico(DIST_ICO[d.tipo]||'medal')}
     <b>${esc(d.texto||'')}</b></div>`;
 }
+/* El estado del expediente de todos, para el filtro. Una sola peticion, y NO
+   se espera a que conteste: la lista se pinta igual y el filtro empieza a
+   funcionar cuando llega. Si falla, la casilla se esconde en vez de quedarse
+   filtrando sobre un mapa vacio, que dejaria el catalogo en blanco. */
+async function cargarExpedientes(){
+  try{
+    EXP_TODOS = await api('/artists/expedientes/todos');
+    if(AF.exp) applyArtistFilters();
+  }catch(e){
+    EXP_TODOS = null;
+    const c = document.querySelector('.afexp');
+    if(c) c.style.display = 'none';
+  }
+}
+
 async function cargarDistinciones(){
   // Falla en silencio: una medalla que no llegó no puede romper la búsqueda.
   try{ CACHE.distinciones=await api('/artists/distinciones/todas'); }
   catch(e){ CACHE.distinciones={}; }
 }
 /* ---- Buscar Artistas (screen 4) ---- */
-let AF={cat:'',loc:'',km:100};
+let AF={cat:'',loc:'',km:100,exp:false};
+let EXP_TODOS=null;   // {artist_id: {cubiertos,total,completo}} para el filtro
 function artGrad(cat){ const c=CATCOL[cat]||'#382ca1'; return `linear-gradient(135deg,${c},#8b5cf6)`; }
 // Dos letras como mucho: "Sax & Soul" -> "SS", y el "&" no cuenta como palabra.
 function inicialesProv(nombre){
@@ -5203,6 +5232,10 @@ function applyArtistFilters(){
     // Radio desde el hotel: sólo pasa quien está dentro y tiene ciudad.
     if(AF.km && (i.km==null || i.km>AF.km)) return false;
     if(max<60000 && i.price && i.price>max) return false;
+    if(AF.exp && EXP_TODOS){
+      const e = EXP_TODOS[String(i.artistId)];
+      if(!e || !e.completo) return false;
+    }
     if(q){ const hay=(i.name+' '+i.show+' '+i.cat+' '+(i.sub||'')+' '+(i.genres||[]).join(' ')).toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
   });
@@ -5554,6 +5587,8 @@ async function openArtistProfile(artistId, showId, previo){
     ['contrato_firmado','Contrato marco firmado'],
     ['partner','Partner SHOWMA'],
   ].filter(([k])=>v[k]).map(([,l])=>`<span class="trck on">✓ ${esc(l)}</span>`);
+  checks.push(`<span class="trck exp cargando" id="chipExp" onclick="expHotelAbrir(${a.id})"
+    title="Documentación para cadenas hoteleras">Expediente…</span>`);
   const subt=a.artist_type?pretty(a.artist_type):(a.is_partner?'Proveedor de espectáculos':'');
 
   ov.innerHTML=`<div class="amod apmod" style="position:relative">
@@ -5602,6 +5637,7 @@ async function openArtistProfile(artistId, showId, previo){
            <button class="ago" onclick="apSeleccionar(${sel.id})">Seleccionar este show</button>`
           : `<button class="ago" onclick="apMessage(${artistId})">Mandar mensaje</button>`}`}</div>
   </div>`;
+  expChipCargar(a.id);
 }
 /* ---- Marcar a un proveedor como PRODUCTORA --------------------------------
    David, 20/09: "solo las productoras puedan permitir varios shows a la vez".
@@ -8412,8 +8448,9 @@ const RENDER = {
         partner:a.partner,langs:a.langs,
         isNew:s.created_at?(now-new Date(s.created_at).getTime())<7*864e5:false,genres:s.genres||[]});
     });
-    CACHE.artistItems=items; AF={cat:'',loc:'',km:100};
+    CACHE.artistItems=items; AF={cat:'',loc:'',km:100,exp:AF&&AF.exp||false};
     await cargarDistinciones();
+  cargarExpedientes();
     const locs=[...new Set(items.map(i=>i.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     const catCount={}; items.forEach(i=>{catCount[i.cat]=(catCount[i.cat]||0)+1;});
     const cats=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
@@ -8421,6 +8458,9 @@ const RENDER = {
       <div class="filters">
         <div class="filtrow">
           <div class="field" style="margin:0"><label>Buscar</label><input id="af_q" oninput="applyArtistFilters()" placeholder="Nombre, tipo de show, instrumento…"></div>
+          <div class="field afexp" style="margin:0"><label>Documentación</label>
+            <label class="afchk"><input type="checkbox" id="af_exp" onchange="AF.exp=this.checked;applyArtistFilters()">
+              <span>Solo con expediente completo</span></label></div>
           <div class="field" style="margin:0"><label>Locación</label><select id="af_loc" onchange="AF.loc=this.value;applyArtistFilters()"><option value="">Todas las locaciones</option>${locs.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div>
           <div class="field" style="margin:0"><label>Distancia desde el hotel</label><select id="af_km" onchange="AF.km=+this.value;applyArtistFilters()">
             <option value="50">Hasta 50 km</option><option value="100" selected>Hasta 100 km</option>
@@ -10819,6 +10859,88 @@ window.zSet=zSet; window.zTogle=zTogle; window.zMood=zMood; window.zLimpiar=zLim
 let AFQ = null;      // el cuestionario, del servidor
 let AFPROP = {};     // company_id -> respuestas
 let AFSAL = {};      // venue_id  -> {mood, efectivas}
+
+/* La etiqueta del expediente en la ficha que ve el hotel, y su detalle.
+
+   Llega vacia y se rellena cuando contesta el servidor: la ficha no debe
+   tardar mas en abrirse por un dato secundario.
+
+   El hotel ve QUE documentos hay y en que estado, pero NO los archivos. Que
+   cualquiera con cuenta pueda bajarse la identificacion oficial de una persona
+   es una decision sobre datos de terceros que nadie ha tomado, y no se toma
+   por descuido. El endpoint tampoco manda las URL. */
+const EXPH = {};
+
+async function expChipCargar(artistId){
+  const chip = document.getElementById('chipExp');
+  if(!chip || !artistId) return;
+  try{
+    const e = await api('/artists/'+artistId+'/expediente');
+    EXPH[artistId] = e;
+    chip.classList.remove('cargando');
+    if(e.completo){
+      chip.classList.add('on');
+      chip.textContent = '✓ Expediente completo';
+    }else{
+      chip.textContent = `Expediente ${e.cubiertos} de ${e.total}`;
+    }
+  }catch(err){
+    // Si falla, la etiqueta se va: mejor que no este a que se quede en
+    // "Expediente…" para siempre, que se lee como que no tiene documentos.
+    chip.remove();
+  }
+}
+
+function expHotelAbrir(artistId){
+  const e = EXPH[artistId];
+  if(!e) return;
+  let ov = document.getElementById('expHMov');
+  if(!ov){
+    ov = document.createElement('div'); ov.id='expHMov'; ov.className='mov';
+    ov.style.zIndex = 210;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', ev=>{ if(ev.target===ov) expHotelCerrar(); });
+    document.addEventListener('keydown', ev=>{
+      if(ev.key==='Escape' && ov.style.display==='flex') expHotelCerrar(); });
+  }
+  const pct = e.total ? Math.round(e.cubiertos*100/e.total) : 0;
+  ov.innerHTML = `<div class="amod" style="max-width:470px">
+    <button class="ax" onclick="expHotelCerrar()" aria-label="Cerrar">✕</button>
+    <div class="ah"><b>Expediente del proveedor</b>
+      <span class="as">Documentación que piden las cadenas hoteleras</span>
+      <div class="expcab" style="margin-bottom:0">
+        <div class="expnum"><b>${e.cubiertos}</b> de ${e.total}</div>
+        <div class="expbar"><i style="width:${pct}%"></i></div>
+        <div class="expest ${e.completo?'ok':''}">${e.completo?'Completo ✓':'Incompleto'}</div>
+      </div>
+      ${e.vigente_hasta?`<div class="hint" style="margin-top:6px">Vigente hasta el ${expFecha(e.vigente_hasta)}.</div>`:''}
+    </div>
+    <div class="rqbody" style="padding:10px 17px 14px">
+      ${e.grupos.map(g=>{
+        const vencidos = g.filas.filter(f=>f.estado==='vencido').length;
+        const sinSubir = g.filas.filter(f=>f.estado==='pendiente').length;
+        const clase = (vencidos||sinSubir) ? 'bad' : (g.por_vencer ? 'warn':'ok');
+        const etiqueta = vencidos ? `${vencidos} vencido${vencidos>1?'s':''}`
+                       : sinSubir ? `falta ${sinSubir}`
+                       : (g.por_vencer ? `${g.por_vencer} por vencer` : 'completo');
+        return `<div class="expgr on"><div class="expgh" style="cursor:default">
+          <b>${esc(g.titulo)}</b><span class="exppill ${clase}">${etiqueta}</span>
+          <span class="expct">${g.cubiertos} de ${g.total}</span></div>
+          <div class="expfilas">${g.filas.map(f=>`<div class="expfila${f.estado==='vencido'?' urg':(f.estado==='por_vencer'?' pv':'')}">
+            <div class="expnom"><b>${esc(f.nombre)}</b><s>${
+              f.estado==='vencido' ? 'Venció el '+expFecha(f.vence)
+              : f.estado==='por_vencer' ? 'Vence en '+f.dias+' días'
+              : f.estado==='completo' ? (f.vence? 'Al día · vence '+expFecha(f.vence) : 'Al día')
+              : f.estado==='no_aplica' ? 'No le aplica' : 'No lo ha subido'}</s></div></div>`).join('')}</div>
+        </div>`;
+      }).join('')}
+      <div class="expaviso">${esc(e.aviso)}</div>
+    </div>
+  </div>`;
+  ov.style.display='flex';
+}
+function expHotelCerrar(){ const ov=document.getElementById('expHMov'); if(ov){ ov.style.display='none'; ov.innerHTML=''; } }
+window.expChipCargar=expChipCargar; window.expHotelAbrir=expHotelAbrir; window.expHotelCerrar=expHotelCerrar;
 
 /* ===== Expediente del proveedor ==========================================
    Los documentos que piden las cadenas grandes (HYATT y dos mas). El servidor
