@@ -32,6 +32,7 @@ from app.models.enums import (
 from app.models.show import Show
 from app.models.venue import Venue
 from app.services import availability, avisos, pricing
+from app.services import recurrente
 from app.schemas.booking import (
     AttendanceIn,
     BookingCreate,
@@ -196,6 +197,9 @@ async def create_booking(payload: BookingCreate, db: DbSession):
     agreed_price = payload.agreed_price
     if agreed_price is None:
         agreed_price = pricing.effective_price(show, payload.starts_at)["price"]
+        if await recurrente.aplica(db, show=show, company_id=venue.company_id,
+                                   fecha=payload.starts_at):
+            agreed_price = recurrente.precio_recurrente(show)
 
     # A booking added on the Calendario Maestro starts as a DRAFT (borrador):
     # notified_at is NULL, so the artist doesn't see it yet. The hotel keeps
@@ -502,6 +506,9 @@ async def cancel_booking(booking_id: int, scope: CurrentScope, db: DbSession, bg
     booking.cancelled_at = _now()
     booking.cancellation_reason = reason
     booking.cancelled_by = "admin" if scope.is_admin else "hotel"
+    # Si esta cancelacion deja al hotel por debajo de cinco, las que quedan
+    # vuelven a su precio normal (solo futuras y sin facturar).
+    await recurrente.recalcular_tras_cancelar(db, booking)
     correos = await _notify_artist_cancel(db, booking, reason)   # avisar al músico
     await db.commit()
     avisos.despachar(bg, correos)
@@ -929,6 +936,15 @@ async def repetir_actuacion(payload: RepetirIn, db: DbSession):
         precio = payload.agreed_price
         if precio is None:
             precio = pricing.effective_price(show, inicio)["price"]
+            tarifa = recurrente.precio_recurrente(show)
+            if tarifa is not None:
+                ya = await recurrente.cuantas_hay(
+                    db, show_id=show.id, company_id=venue.company_id, desde=inicio)
+                ini_v, fin_v = recurrente.ventana(inicio)
+                en_tanda = sum(1 for g in fechas
+                               if ini_v <= datetime.combine(g, dtime(hh, mm)) < fin_v)
+                if ya + en_tanda >= recurrente.MINIMO:
+                    precio = tarifa
         precio = float(precio or 0)
 
         motivo = None
