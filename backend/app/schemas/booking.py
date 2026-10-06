@@ -62,6 +62,9 @@ class AttendanceIn(BaseModel):
 class BookingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    # Folio de la orden de actuación: OA-2026-00147. Es el número con el que el
+    # hotel y su contador siguen esta actuación hasta la factura.
+    folio: str | None = None
     show_id: int | None
     venue_id: int | None
     company_id: int | None
@@ -83,6 +86,10 @@ class BookingOut(BaseModel):
     notes: str | None
     invoice_paid: bool = False
     payout_paid: bool = False
+    # Actuación no completada: por qué, y la nota que escribió el hotel.
+    incidencia_motivo: str | None = None
+    incidencia_nota: str | None = None
+    incidencia_at: datetime | None = None
     created_at: datetime
 
     # Venue capacity is carried alongside so occupancy can be computed. Filled by

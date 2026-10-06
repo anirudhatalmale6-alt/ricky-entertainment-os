@@ -27,7 +27,7 @@ from app.schemas.auth import (
     TotpVerifyRequest,
 )
 from app.schemas.user import UserOut
-from app.services import mailer, passwords
+from app.services import folios, mailer, passwords
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -86,6 +86,8 @@ async def register_artist(payload: ArtistRegisterRequest, db: DbSession):
         email=payload.email,
     )
     db.add(artist)
+    await db.flush()
+    await folios.asignar_proveedor(db, artist)
     await db.commit()
     return LoginResult(access_token=security.create_access_token(user.id))
 

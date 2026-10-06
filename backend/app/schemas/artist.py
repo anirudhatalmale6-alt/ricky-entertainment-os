@@ -179,6 +179,10 @@ class TarjetaIn(BaseModel):
 class ArtistOut(ArtistBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    # Código de identificación del proveedor: PRV-00014. Es lo que se pone en la
+    # orden de actuación y en la factura para poder rastrear sin depender del
+    # nombre comercial, que cambia.
+    codigo: str | None = None
     is_verified: bool
     is_active: bool
     # Estado de la tarjeta publica (para pintar el interruptor y la liga).

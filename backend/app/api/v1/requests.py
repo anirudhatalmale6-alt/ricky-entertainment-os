@@ -25,6 +25,7 @@ from app.models.booking import Booking
 from app.models.company import Company
 from app.models.enums import RISK_COMMISSION, BookingStatus, ProposalStatus, RequestStatus
 from app.models.product_request import ProductRequest, RequestProposal
+from app.services import folios
 from app.schemas.product_request import (
     ProductRequestCreate,
     ProductRequestOut,
@@ -447,6 +448,7 @@ async def _booking_from_proposal(
     )
     db.add(booking)
     await db.flush()  # assign booking.id within the same transaction
+    await folios.asignar_orden(db, booking)
     return booking
 
 

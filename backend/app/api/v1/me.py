@@ -34,7 +34,7 @@ from app.models.user import Role, User
 from app.core import security
 from app.services.facturama import FacturamaError, get_facturama
 from app.services import afinidad as af
-from app.services import cfdi_subido, facturacion, figura_fiscal, mailer, passwords, periodos, rfc as rfc_svc
+from app.services import cfdi_subido, facturacion, figura_fiscal, folios, mailer, passwords, periodos, rfc as rfc_svc
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
     ContractAcceptance,
@@ -1649,6 +1649,7 @@ async def _crear_musico(
     )
     db.add(musico)
     await db.flush()
+    await folios.asignar_proveedor(db, musico)
     return musico, user
 
 

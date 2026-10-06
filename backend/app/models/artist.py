@@ -29,6 +29,10 @@ class Artist(Base, TimestampMixin):
     __tablename__ = "artists"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Código de identificación del proveedor: PRV-00014 (David, 06/10). Es lo que
+    # permite rastrear sus órdenes de actuación y sus facturas sin depender del
+    # nombre comercial, que cambia. Sale del id y se guarda; ver services/folios.
+    codigo: Mapped[str | None] = mapped_column(String(20), unique=True, index=True)
     # A profile may (optionally) have a login account.
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), unique=True)
 

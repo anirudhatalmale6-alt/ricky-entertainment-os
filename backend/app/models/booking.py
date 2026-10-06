@@ -38,6 +38,11 @@ class Booking(Base, TimestampMixin):
     __tablename__ = "bookings"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Folio de la ORDEN DE ACTUACIÓN: OA-2026-00147 (David, 06/10). Es el número
+    # con el que el hotel y su contador siguen esta actuación hasta la factura
+    # global que la cubre. Se asigna al crearla y NO se vuelve a tocar: ni al
+    # reprogramarla, ni al cambiarle el precio. Ver services/folios.
+    folio: Mapped[str | None] = mapped_column(String(24), unique=True, index=True)
     # CFDI que ya cubre esta actuación. Es el candado contra facturar (y pagar)
     # dos veces lo mismo: el cierre de quincena sólo toma las que lo tienen NULL.
     cfdi_id: Mapped[int | None] = mapped_column(Integer, index=True)
@@ -102,6 +107,19 @@ class Booking(Base, TimestampMixin):
     # payout_paid:  el recibo/pago al talento fue liquidado (egreso).
     invoice_paid: Mapped[bool] = mapped_column(Boolean, default=False)
     payout_paid: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # --- Actuación no completada (David, 06/10) ------------------------
+    # El hotel la marca desde la misma ventana de calificar. No es una
+    # cancelación: la actuación estaba confirmada y llegó el día. Por eso tiene
+    # sus propios campos y no reusa cancellation_reason, que responde a otra
+    # pregunta y saldría mezclado en los reportes.
+    #
+    # Al marcarla, el estado pasa a NO_SHOW y con eso SALE de la facturación:
+    # el cierre de quincena sólo toma las que están en COMPLETED.
+    incidencia_motivo: Mapped[str | None] = mapped_column(String(32))
+    incidencia_nota: Mapped[str | None] = mapped_column(Text)
+    incidencia_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    incidencia_por: Mapped[int | None] = mapped_column(Integer)
 
     show: Mapped["Show | None"] = relationship()      # noqa: F821
     venue: Mapped["Venue | None"] = relationship()    # noqa: F821

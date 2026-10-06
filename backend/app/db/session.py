@@ -38,6 +38,15 @@ _SQLITE_ADDED_COLUMNS = [
     ("artist_documents", "declarado", "BOOLEAN DEFAULT 0"),
     ("artist_documents", "no_aplica", "BOOLEAN DEFAULT 0"),
     ("artist_documents", "nota", "VARCHAR(255)"),
+    # Códigos de identificación y actuación no completada (David, 06/10).
+    # Sin UNIQUE en el ALTER: SQLite no deja añadir una columna única a una
+    # tabla con filas. El índice único se crea aparte, después del relleno.
+    ("artists", "codigo", "VARCHAR(20)"),
+    ("bookings", "folio", "VARCHAR(24)"),
+    ("bookings", "incidencia_motivo", "VARCHAR(32)"),
+    ("bookings", "incidencia_nota", "TEXT"),
+    ("bookings", "incidencia_at", "DATETIME"),
+    ("bookings", "incidencia_por", "INTEGER"),
     ("artists", "auto_confirm_bookings", "BOOLEAN DEFAULT 0"),
     ("artists", "profile_image_url", "VARCHAR(500)"),
     ("request_proposals", "images", "JSON"),
@@ -121,6 +130,12 @@ _SQLITE_ADDED_COLUMNS = [
 # que quedaron en error (sin UUID) no chocan entre ellos.
 _SQLITE_ADDED_INDEXES = [
     ("ux_cfdis_uuid", "CREATE UNIQUE INDEX IF NOT EXISTS ux_cfdis_uuid ON cfdis(uuid)"),
+    # Que dos proveedores u órdenes compartan código es justo lo que haría
+    # inservible rastrear por código. La base lo impide, no la aplicación.
+    ("ux_artists_codigo",
+     "CREATE UNIQUE INDEX IF NOT EXISTS ux_artists_codigo ON artists(codigo)"),
+    ("ux_bookings_folio",
+     "CREATE UNIQUE INDEX IF NOT EXISTS ux_bookings_folio ON bookings(folio)"),
 ]
 
 
@@ -141,6 +156,23 @@ def _apply_additive_columns(sync_conn) -> None:
                     "UPDATE bookings SET notified_at = COALESCE(confirmed_at, created_at) "
                     "WHERE notified_at IS NULL"
                 )
+
+    # Códigos de identificación. Se rellena en CADA arranque, no sólo el primero:
+    # el código sale del id y de la fecha de alta, que no cambian, así que esto
+    # escribe siempre lo mismo y da igual cuántas veces corra. Es la red que
+    # garantiza que ninguna fila se quede sin código aunque se cree por un camino
+    # que no pasa por services/folios. Tiene que ir ANTES de los índices únicos.
+    # Debe coincidir carácter por carácter con app/services/folios.py.
+    for ddl in (
+        "UPDATE artists SET codigo = 'PRV-' || printf('%05d', id) WHERE codigo IS NULL",
+        "UPDATE bookings SET folio = 'OA-' "
+        "|| strftime('%Y', COALESCE(created_at, CURRENT_TIMESTAMP)) "
+        "|| '-' || printf('%05d', id) WHERE folio IS NULL",
+    ):
+        try:
+            sync_conn.exec_driver_sql(ddl)
+        except Exception:
+            logging.getLogger("showma.db").warning("No se pudo rellenar códigos: %s", ddl[:40])
 
     for nombre, ddl in _SQLITE_ADDED_INDEXES:
         try:

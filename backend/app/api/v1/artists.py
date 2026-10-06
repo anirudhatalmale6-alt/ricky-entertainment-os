@@ -14,6 +14,7 @@ from app.models.media import ArtistDocument, ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
 from app.schemas.artist import ArtistCreate, ArtistOut, ArtistUpdate, TarjetaIn
+from app.services import folios
 
 router = APIRouter(prefix="/artists", tags=["artists"])
 
@@ -180,6 +181,8 @@ async def create_artist(payload: ArtistCreate, db: DbSession):
     for doc in payload.documents:
         artist.documents.append(ArtistDocument(**doc.model_dump()))
     db.add(artist)
+    await db.flush()
+    await folios.asignar_proveedor(db, artist)
     await db.commit()
     return await _get_artist_or_404(db, artist.id)
 

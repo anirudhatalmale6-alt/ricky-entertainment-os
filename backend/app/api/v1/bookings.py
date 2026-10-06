@@ -32,7 +32,7 @@ from app.models.enums import (
 from app.models.show import Show
 from app.models.venue import Venue
 from app.services import availability, avisos
-from app.services import recurrente, tarifa
+from app.services import folios, recurrente, tarifa
 from app.schemas.booking import (
     AttendanceIn,
     BookingCreate,
@@ -227,6 +227,7 @@ async def create_booking(payload: BookingCreate, db: DbSession):
     )
     db.add(booking)
     await db.flush()
+    await folios.asignar_orden(db, booking)
     # Si esta es la quinta del mismo show en el mismo hotel, las anteriores de la
     # misma ventana bajan tambien a la tarifa de volumen: el hotel contrato cinco
     # y las cinco valen la tarifa, no solo la ultima (solo futuras y sin facturar).
@@ -1010,6 +1011,8 @@ async def repetir_actuacion(payload: RepetirIn, db: DbSession):
     # ultima fecha de la tanda, que puede abarcar meses.
     if nuevas:
         await db.flush()
+        for nueva in nuevas:
+            await folios.asignar_orden(db, nueva)
         await recurrente.recalcular_tras_crear(
             db, nuevas[0], hasta=nuevas[-1].starts_at)
     # Un solo commit: o entran las N o no entra ninguna.

@@ -286,6 +286,111 @@ async def resumen_de_periodo(scope: CurrentScope, db: DbSession,
             "sin_calificar": int(sin), "distribucion": dist}
 
 
+# Los motivos de una actuación que no se completó (David, 06/10: "No llegó, mal
+# clima, llegó tarde…"). Es una lista cerrada A PROPÓSITO: si cada hotel escribe
+# el motivo a su manera, en seis meses no se puede contar cuántas veces falló un
+# proveedor, que es justo lo que esto tiene que contestar. El texto libre va
+# aparte, en la nota, y ahí cabe todo lo que no entre en la lista.
+MOTIVOS_INCIDENCIA: list[tuple[str, str]] = [
+    ("no_llego", "No llegó"),
+    ("llego_tarde", "Llegó tarde"),
+    ("incompleta", "Se interrumpió o no terminó"),
+    ("clima", "Mal clima"),
+    ("cancelo_hotel", "El hotel la suspendió"),
+    ("otro", "Otro motivo"),
+]
+_MOTIVOS = {c for c, _ in MOTIVOS_INCIDENCIA}
+
+
+class IncidenciaIn(BaseModel):
+    motivo: str
+    nota: str | None = Field(None, max_length=600)
+
+
+@router.get("/motivos-incidencia")
+async def motivos_incidencia(_: CurrentScope):
+    """La lista para pintar los botones, servida desde aquí para que pantalla y
+    servidor no puedan discrepar sobre qué motivos existen."""
+    return {"motivos": [{"codigo": c, "texto": t} for c, t in MOTIVOS_INCIDENCIA]}
+
+
+@router.post("/bookings/{booking_id}/no-completada")
+async def marcar_no_completada(booking_id: int, payload: IncidenciaIn,
+                               scope: CurrentScope, db: DbSession):
+    """El hotel marca que la actuación no se completó, y por qué.
+
+    No es una cancelación: estaba confirmada y llegó el día. Por eso tiene sus
+    propios campos y no reusa los de cancelación, que responden a otra pregunta.
+
+    Tiene consecuencia en el dinero, y conviene decirlo claro: al pasar a
+    NO_SHOW la actuación SALE de la facturación, porque el cierre de quincena
+    sólo toma las que están en COMPLETED. Si un proveedor llegó tarde pero tocó,
+    y el hotel igual quiere pagar (completa o a medias), eso hoy se resuelve
+    dejándola como realizada y ajustando el importe a mano. Pendiente de que
+    David diga qué quiere que pase en ese caso.
+    """
+    if payload.motivo not in _MOTIVOS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Motivo no válido. Opciones: {', '.join(sorted(_MOTIVOS))}")
+    booking = await _actuacion_calificable(db, booking_id, scope)
+    # Si ya se facturó, la factura dice que ocurrió. Cambiarle el estado aquí
+    # dejaría el CFDI contando una actuación que la plataforma da por no hecha, y
+    # eso es exactamente lo que no puede pasar en la parte contable.
+    if booking.cfdi_id:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Esta actuación ya está en una factura emitida. Escríbenos y la revisamos: "
+            "un CFDI no se corrige, se cancela y se emite otro.")
+
+    booking.status = BookingStatus.NO_SHOW
+    booking.incidencia_motivo = payload.motivo
+    booking.incidencia_nota = (payload.nota or "").strip() or None
+    booking.incidencia_at = _now()
+    booking.incidencia_por = scope.user.id if scope.user is not None else None
+    await db.commit()
+    await db.refresh(booking)
+    texto = dict(MOTIVOS_INCIDENCIA)[payload.motivo]
+    return {
+        "booking_id": booking.id,
+        "folio": booking.folio,
+        "status": booking.status.value,
+        "motivo": booking.incidencia_motivo,
+        "motivo_texto": texto,
+        "nota": booking.incidencia_nota,
+        "marcada_el": booking.incidencia_at.isoformat() if booking.incidencia_at else None,
+        "factura": "Queda fuera de la facturación de la quincena.",
+    }
+
+
+@router.delete("/bookings/{booking_id}/no-completada")
+async def deshacer_no_completada(booking_id: int, scope: CurrentScope, db: DbSession):
+    """Deshace la marca. Hace falta: se marca en caliente, la noche del evento, y
+    a veces se marca la actuación equivocada. Vuelve a COMPLETED, que es donde
+    estaba, y con eso vuelve a entrar en la facturación."""
+    booking = await db.get(Booking, booking_id)
+    if booking is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Actuación no encontrada")
+    if not scope.is_admin and booking.company_id not in await _mis_empresas(db, scope):
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "Sólo el hotel que contrató esta actuación puede corregirla.")
+    if booking.status != BookingStatus.NO_SHOW:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "Esta actuación no está marcada como no completada.")
+    # Si ya está facturada, el estado no se toca: la factura dice que ocurrió.
+    if booking.cfdi_id:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Esta actuación ya está en una factura; avísanos para revisarla.")
+    booking.status = BookingStatus.COMPLETED
+    booking.incidencia_motivo = None
+    booking.incidencia_nota = None
+    booking.incidencia_at = None
+    booking.incidencia_por = None
+    await db.commit()
+    return {"booking_id": booking.id, "status": booking.status.value}
+
+
 @router.get("/pendientes")
 async def pendientes_de_calificar(scope: CurrentScope, db: DbSession):
     """Actuaciones ya realizadas de MIS propiedades que todavía nadie calificó.
@@ -298,7 +403,10 @@ async def pendientes_de_calificar(scope: CurrentScope, db: DbSession):
         return {"items": []}
 
     q = select(Booking).where(
-        Booking.status != BookingStatus.CANCELLED,
+        # Ni canceladas ni marcadas como no completadas: de esas ya se dijo lo
+        # que había que decir, y si siguieran apareciendo aquí el hotel vería
+        # para siempre un "te falta calificar" que no puede quitar.
+        Booking.status.notin_([BookingStatus.CANCELLED, BookingStatus.NO_SHOW]),
         Booking.starts_at < _now(),
     )
     if empresas:

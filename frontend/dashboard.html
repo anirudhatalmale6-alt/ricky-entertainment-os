@@ -303,6 +303,10 @@
   .c-confirmed{background:#60a5fa1f;color:var(--info)}
   .c-completed{background:#34d3991f;color:var(--ok)}
   .c-cancelled{background:#f871711f;color:var(--bad)}
+  /* No completada: ámbar, no rojo. No es una cancelación, es una actuación que
+     se contrató, llegó el día y algo salió mal. Distinguirlas a simple vista es
+     justo lo que pide la parte contable. */
+  .c-no_show{background:#f59e0b24;color:#b45309}
   .c-open{background:#34d3991f;color:var(--ok)}
   .c-fulfilled{background:#382ca11f;color:var(--acc)}
   .star{color:var(--warn);font-size:12px}
@@ -934,8 +938,21 @@
     color:var(--mut);font-size:12px;font-weight:650;cursor:pointer;transition:.12s}
   .rtop:hover{border-color:var(--acc2);color:var(--txt)}
   .rtop.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  /* Variantes de rejilla para los bloques nuevos de la misma ventana. Se añaden
+     como modificador en vez de tocar .rtops, que ya la usan afluencia y
+     retención con sus cuatro opciones exactas. */
+  .rtops.dos{grid-template-columns:repeat(2,1fr)}
+  .rtops.tres{grid-template-columns:repeat(3,1fr)}
+  /* Folio de la orden de actuación: se lee, se copia y no se confunde con el
+     texto de al lado. */
+  .agfolio{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;
+    color:var(--mut);letter-spacing:.2px;margin-top:1px;user-select:all}
+  .rtfolio{display:inline-block;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11.5px;font-weight:650;letter-spacing:.3px;padding:2px 8px;border-radius:6px;
+    background:var(--bg2,#f4f5f9);border:1px solid var(--line);color:var(--mut);user-select:all}
   .trck{font-size:11.5px;font-weight:650;padding:4px 10px;border-radius:20px;border:1px solid var(--line);color:var(--mut)}
   .trck.on{color:#166534;background:#dcfce7;border-color:#bbf7d0}
+  .trck.cod{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.3px;user-select:all}
   /* ---- Perfil del proveedor (rediseño sobre el mockup de David) ---- */
   .apvchk{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;
     border-radius:50%;background:#1d9bf0;color:#fff;font-size:11px;font-weight:900;vertical-align:middle;margin-left:6px}
@@ -5609,6 +5626,10 @@ async function openArtistProfile(artistId, showId, previo){
   ].filter(([k])=>v[k]).map(([,l])=>`<span class="trck on">✓ ${esc(l)}</span>`);
   checks.push(`<span class="trck exp cargando" id="chipExp" onclick="expHotelAbrir(${a.id})"
     title="Documentación para cadenas hoteleras">Expediente…</span>`);
+  // El código del proveedor va en esta misma tira, que es la administrativa. Es
+  // lo que anota el contador del hotel para rastrear órdenes y facturas sin
+  // depender del nombre comercial, que cambia.
+  if(a.codigo) checks.push(`<span class="trck cod" title="Código de proveedor · úsalo para rastrear órdenes y facturas">${esc(a.codigo)}</span>`);
   const subt=a.artist_type?pretty(a.artist_type):(a.is_partner?'Proveedor de espectáculos':'');
 
   ov.innerHTML=`<div class="amod apmod" style="position:relative">
@@ -6183,6 +6204,13 @@ function renderAgenda(fromRange){
       // Ya pasó y no se canceló: lo que toca es calificarla. Es el único momento
       // en que el hotel tiene fresco cómo estuvo el show.
       const pasada = b.starts_at && new Date(b.starts_at) < new Date();
+      // Marcada como no completada: ya está dicho. Lo que falta aquí es poder
+      // deshacerlo, porque esto se marca en caliente la noche del evento y a
+      // veces se marca la actuación de al lado.
+      if(b.status==='no_show'){
+        return `<td><button class="mini" onclick="deshacerNoCompletada(${b.id})"
+          title="${esc(motivoTexto(b.incidencia_motivo))}${b.incidencia_nota?' · '+esc(b.incidencia_nota):''}">↩ Deshacer</button></td>`;
+      }
       if(pasada && b.status!=='cancelled'){
         const falta = !CACHE.porCalificar || CACHE.porCalificar.has(b.id);
         return `<td>${falta
@@ -6200,7 +6228,7 @@ function renderAgenda(fromRange){
     if(b.status==='confirmed' && fut)
       return `<td><div class="agact"><button class="mini" onclick="notifyStatus(${b.id},'on_way')">🚗 En camino</button><button class="mini ok" onclick="notifyStatus(${b.id},'arrived')">📍 Llegué</button><button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></div></td>`;
     return `<td><span class="muted">—</span></td>`; };
-  body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDateAg(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
+  body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDateAg(b.starts_at)}</td><td>${esc(b.show_name||'—')}${b.folio?`<div class="agfolio">${esc(b.folio)}</div>`:''}</td>
       ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}${isArtist?mapsLink(b):''}</td>${ES_MUSICO?'':`<td>${MXN(b.agreed_price)}</td>`}
       <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
     : `<tr><td colspan="${cols}" class="muted" style="text-align:center;padding:22px">Sin actuaciones para este filtro.</td></tr>`;
@@ -6235,9 +6263,51 @@ function ratePick(campo, valor){
     el.classList.toggle('on', el.dataset.v===RATE[campo]);
   });
 }
+// Motivos por los que una actuación no se completó. La lista la sirve el
+// servidor (/reviews/motivos-incidencia); esto es sólo el respaldo para que la
+// ventana abra aunque esa llamada falle, nunca la fuente de verdad.
+let RT_MOTIVOS=[
+  {codigo:'no_llego', texto:'No llegó'},
+  {codigo:'llego_tarde', texto:'Llegó tarde'},
+  {codigo:'incompleta', texto:'Se interrumpió o no terminó'},
+  {codigo:'clima', texto:'Mal clima'},
+  {codigo:'cancelo_hotel', texto:'El hotel la suspendió'},
+  {codigo:'otro', texto:'Otro motivo'},
+];
+async function rtCargarMotivos(){
+  try{
+    const r=await api('/reviews/motivos-incidencia');
+    if(r && r.motivos && r.motivos.length) RT_MOTIVOS=r.motivos;
+  }catch(e){ /* se queda el respaldo */ }
+}
+function rtMotivosHTML(){
+  return `<div class="rtops tres" id="rt_motivos">${RT_MOTIVOS.map(m=>
+    `<button type="button" class="rtop" data-v="${esc(m.codigo)}"
+      onclick="rateMotivo('${esc(m.codigo)}')">${esc(m.texto)}</button>`).join('')}</div>`;
+}
+function rateMotivo(codigo){
+  RATE.motivo=(RATE.motivo===codigo)?null:codigo;
+  document.querySelectorAll('#rt_motivos .rtop').forEach(el=>{
+    el.classList.toggle('on', el.dataset.v===RATE.motivo);
+  });
+}
+// Dos caras de la misma ventana: se realizó (estrellas) o no se completó
+// (motivo). Son excluyentes, por eso es un interruptor y no dos botones al pie:
+// nadie tiene que elegir dos veces lo mismo.
+function rateModo(modo){
+  RATE.modo=modo;
+  document.querySelectorAll('#rt_modo .rtop').forEach(el=>{
+    el.classList.toggle('on', el.dataset.v===modo);
+  });
+  const ok=document.getElementById('rt_ok'), no=document.getElementById('rt_no');
+  if(ok) ok.style.display = modo==='ok' ? '' : 'none';
+  if(no) no.style.display = modo==='no' ? '' : 'none';
+  const btn=document.getElementById('rt_btn');
+  if(btn) btn.textContent = modo==='ok' ? 'Publicar reseña' : 'Marcar como no completada';
+}
 function openRate(bookingId){
   const b=(CACHE.agenda||[]).find(x=>x.id===bookingId)||{};
-  RATE={id:bookingId,stars:0,afluencia:null,retencion:null};
+  RATE={id:bookingId,stars:0,afluencia:null,retencion:null,modo:'ok',motivo:null};
   let ov=document.getElementById('rtMov');
   if(!ov){ ov=document.createElement('div'); ov.id='rtMov'; ov.className='mov'; document.body.appendChild(ov);
     ov.addEventListener('click',e=>{ if(e.target===ov) rateClose(); }); }
@@ -6245,22 +6315,56 @@ function openRate(bookingId){
     <div class="ahd"><h3>Calificar actuación</h3></div>
     <div class="rqbody" style="padding:18px 20px">
       <div style="font-size:13.5px;margin-bottom:3px"><b>${esc(b.show_name||'Actuación')}</b></div>
-      <div class="muted" style="font-size:12.5px;margin-bottom:14px">${esc(b.artist_name||'')}${b.venue_name?' · '+esc(b.venue_name):''}${b.starts_at?' · '+fmtDate(b.starts_at):''}</div>
-      <div class="field"><label>¿Cómo estuvo?</label>
-        <div id="rt_stars" style="font-size:30px;letter-spacing:5px;cursor:pointer;color:#d6d8e0;user-select:none">
-          ${[1,2,3,4,5].map(n=>`<span data-n="${n}" onclick="rateSet(${n})">★</span>`).join('')}
+      <div class="muted" style="font-size:12.5px;margin-bottom:4px">${
+        [b.artist_name&&esc(b.artist_name), b.venue_name&&esc(b.venue_name),
+         b.starts_at&&fmtDate(b.starts_at)].filter(Boolean).join(' · ')}</div>
+      ${b.folio?`<div class="rtfolio">${esc(b.folio)}</div>`:''}
+
+      <div class="field" style="margin-top:12px"><label>¿Se realizó la actuación?</label>
+        <div class="rtops dos" id="rt_modo">
+          <button type="button" class="rtop on" data-v="ok" onclick="rateModo('ok')">Sí, se realizó</button>
+          <button type="button" class="rtop" data-v="no" onclick="rateModo('no')">No se completó</button>
         </div>
-        <div class="hint" id="rt_hint" style="margin-top:2px">Toca las estrellas</div>
       </div>
-      ${rtPublicoHTML()}
-      <div class="field"><label>Comentario (opcional)</label>
-        <textarea id="rt_txt" rows="4" maxlength="1200" placeholder="Lo que otro hotel necesitaría saber antes de contratarlo: puntualidad, trato, si el público respondió…"></textarea></div>
-      <div class="hint">Tu reseña se publica en el perfil del proveedor junto al nombre de tu hotel. Sólo puede escribirla quien contrató esta actuación, por eso vale.</div>
+
+      <div id="rt_ok">
+        <div class="field"><label>¿Cómo estuvo?</label>
+          <div id="rt_stars" style="font-size:30px;letter-spacing:5px;cursor:pointer;color:#d6d8e0;user-select:none">
+            ${[1,2,3,4,5].map(n=>`<span data-n="${n}" onclick="rateSet(${n})">★</span>`).join('')}
+          </div>
+          <div class="hint" id="rt_hint" style="margin-top:2px">Toca las estrellas</div>
+        </div>
+        ${rtPublicoHTML()}
+        <div class="field"><label>Comentario (opcional)</label>
+          <textarea id="rt_txt" rows="4" maxlength="1200" placeholder="Lo que otro hotel necesitaría saber antes de contratarlo: puntualidad, trato, si el público respondió…"></textarea></div>
+        <div class="hint">Tu reseña se publica en el perfil del proveedor junto al nombre de tu hotel. Sólo puede escribirla quien contrató esta actuación, por eso vale.</div>
+      </div>
+
+      <div id="rt_no" style="display:none">
+        <div class="field"><label>¿Qué pasó?</label>
+          ${rtMotivosHTML()}
+        </div>
+        <div class="field"><label>Detalle (opcional)</label>
+          <textarea id="rt_nota" rows="3" maxlength="600" placeholder="Lo que haga falta para entenderlo después: a qué hora se avisó, si se repuso otro día…"></textarea></div>
+        <div class="hint">Queda registrada en la orden de actuación con la fecha y quién la marcó, y <b>sale de la facturación de la quincena</b>. Si te equivocaste, se puede deshacer mientras no esté facturada.</div>
+      </div>
     </div>
     <div class="af"><button class="btn ghost" onclick="rateClose()">Cancelar</button>
       <button class="ago" id="rt_btn" onclick="rateSend()">Publicar reseña</button></div>
   </div>`;
   ov.style.display='flex';
+  rtCargarMotivos().then(()=>{
+    // Si el servidor manda otra lista, se repinta sólo ese bloque. Se hace
+    // después de abrir para que la ventana no espere a una llamada de red.
+    const caja=document.getElementById('rt_motivos');
+    if(!caja) return;                       // la ventana ya se cerró
+    caja.outerHTML=rtMotivosHTML();
+    // Se vuelve a marcar el elegido SIN pasar por rateMotivo, que alterna: si
+    // lo llamara con el mismo valor lo desmarcaría.
+    document.querySelectorAll('#rt_motivos .rtop').forEach(el=>{
+      el.classList.toggle('on', el.dataset.v===RATE.motivo);
+    });
+  });
 }
 function rateSet(n){
   RATE.stars=n;
@@ -6272,8 +6376,31 @@ function rateSet(n){
 }
 function rateClose(){ const ov=document.getElementById('rtMov'); if(ov) ov.style.display='none'; }
 async function rateSend(){
+  const btn=document.getElementById('rt_btn');
+  const volver=t=>{ btn.disabled=false; btn.textContent=t; };
+  if(RATE.modo==='no'){
+    if(!RATE.motivo){ toast('Elige qué pasó antes de marcarla.',true); return; }
+    btn.disabled=true; btn.textContent='Marcando…';
+    try{
+      const nota=(document.getElementById('rt_nota').value||'').trim();
+      const r=await post(`/reviews/bookings/${RATE.id}/no-completada`,
+        {motivo:RATE.motivo, nota:nota||null});
+      if(CACHE.porCalificar) CACHE.porCalificar.delete(RATE.id);
+      // La tabla se repinta desde la caché, así que el estado nuevo tiene que
+      // quedar ahí: si no, la fila sigue diciendo "Realizada" hasta recargar.
+      [CACHE.agenda,CACHE.homeBk].forEach(arr=>{ const x=(arr||[]).find(y=>y.id===RATE.id); if(x){
+        x.status='no_show'; x.incidencia_motivo=RATE.motivo; x.incidencia_nota=nota||null; } });
+      rateClose();
+      toast('Marcada como no completada'+(r&&r.folio?' ('+r.folio+')':'')+' · queda fuera de la facturación');
+      renderAgenda();
+    }catch(e){
+      volver('Marcar como no completada');
+      toast('No se pudo marcar: '+(e.message||''),true);
+    }
+    return;
+  }
   if(!RATE.stars){ toast('Elige cuántas estrellas antes de publicar.',true); return; }
-  const btn=document.getElementById('rt_btn'); btn.disabled=true; btn.textContent='Publicando…';
+  btn.disabled=true; btn.textContent='Publicando…';
   try{
     const txt=(document.getElementById('rt_txt').value||'').trim();
     await post(`/reviews/bookings/${RATE.id}`,{rating:RATE.stars, comment:txt||null,
@@ -6282,12 +6409,32 @@ async function rateSend(){
     rateClose(); toast('Reseña publicada ✓ Gracias, esto le sirve a los demás hoteles');
     renderAgenda();
   }catch(e){
-    btn.disabled=false; btn.textContent='Publicar reseña';
+    volver('Publicar reseña');
     toast('No se pudo publicar: '+(e.message||''),true);
   }
 }
+function motivoTexto(codigo){
+  if(!codigo) return 'No completada';
+  const m=RT_MOTIVOS.find(x=>x.codigo===codigo);
+  return m?m.texto:codigo;
+}
+async function deshacerNoCompletada(id){
+  const b=(CACHE.agenda||[]).find(x=>x.id===id)||{};
+  const detalle=motivoTexto(b.incidencia_motivo)+(b.incidencia_nota?'\n\n"'+b.incidencia_nota+'"':'');
+  if(!confirm('Esta actuación está marcada como no completada:\n\n'+detalle
+    +'\n\n¿Quitar la marca? Volverá a contar como realizada y entrará en la facturación.')) return;
+  try{
+    await del(`/reviews/bookings/${id}/no-completada`);
+    [CACHE.agenda,CACHE.homeBk].forEach(arr=>{ const x=(arr||[]).find(y=>y.id===id); if(x){
+      x.status='completed'; x.incidencia_motivo=null; x.incidencia_nota=null; } });
+    if(CACHE.porCalificar) CACHE.porCalificar.add(id);
+    toast('Marca quitada · vuelve a contar como realizada');
+    renderAgenda();
+  }catch(e){ toast('No se pudo deshacer: '+(e.message||''),true); }
+}
 window.openRate=openRate; window.rateSet=rateSet; window.rateClose=rateClose; window.rateSend=rateSend;
-window.ratePick=ratePick;
+window.ratePick=ratePick; window.rateModo=rateModo; window.rateMotivo=rateMotivo;
+window.motivoTexto=motivoTexto; window.deshacerNoCompletada=deshacerNoCompletada;
 
 function mapsUrl(b){
   if(b.venue_map_url) return b.venue_map_url;
@@ -8897,6 +9044,7 @@ const RENDER = {
       </div>
       <div class="box" style="margin-bottom:16px">
         <h3>👤 Datos del perfil</h3><div class="hint">Cómo te ven los hoteles en el catálogo</div>
+        ${p.codigo?`<div class="hint" style="margin:0 0 10px">Tu código de proveedor es <span class="trck cod">${esc(p.codigo)}</span> · es el que aparece en tus órdenes de actuación y en tus facturas. No cambia nunca.</div>`:''}
         <div class="fgrid">
           <div class="field"><label>Nombre artístico / proveedor</label><input id="pf_stage" value="${esc(p.stage_name||'')}"></div>
           <div class="field"><label>Ciudad base</label><input id="pf_city" value="${esc(p.base_city||'')}"></div>
@@ -10684,7 +10832,7 @@ async function sendMsg(){
   openConv(CACHE.cur);
 }
 
-function chip(s){const map={pending:'Pendiente',confirmed:'Confirmada',completed:'Realizada',cancelled:'Cancelada',open:'Abierta',fulfilled:'Adjudicada',closed:'Cerrada'};
+function chip(s){const map={pending:'Pendiente',confirmed:'Confirmada',completed:'Realizada',cancelled:'Cancelada',no_show:'No completada',open:'Abierta',fulfilled:'Adjudicada',closed:'Cerrada'};
   return `<span class="chip c-${s}">${map[s]||s}</span>`;}
 function fmtDate(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});}
 // Exporta el historial de facturacion a CSV (compatible con Excel, para contabilidad)
