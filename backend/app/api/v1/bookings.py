@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentScope, DbSession, require_permission
+from app.core.config import settings
 from app.models.artist import Artist
 from app.models.booking import Booking
 from app.models.company import Company
@@ -785,7 +786,9 @@ async def notify_artists(payload: NotifyIn, db: DbSession, bg: BackgroundTasks):
         # (notified_at) and apply their approval preference.
         booking.notified_at = booking.notified_at or _now()
         artist = await db.get(Artist, booking.artist_id)
-        auto = bool(artist and artist.auto_confirm_bookings)
+        # Fase 1: la aprobación automática está apagada por configuración
+        # (AUTO_CONFIRM_ENABLED). La preferencia del proveedor se conserva.
+        auto = bool(settings.AUTO_CONFIRM_ENABLED and artist and artist.auto_confirm_bookings)
 
         if item.kind == "reschedule":
             kind = "reschedule"

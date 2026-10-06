@@ -350,9 +350,22 @@ async def pending_bookings_for_period(
         ini = desde
         if ini > fin:
             return []
+    # SIN CALIFICAR NO SE FACTURA (David, 06/10): "esta calificación es el
+    # evento que se necesita para que la orden se cuente en el conglomerado de
+    # la factura; si no se califica no podemos confirmar que ocurrió y no se
+    # paga".
+    #
+    # La condición se pone AQUÍ y no sólo en el estado porque hay dos caminos
+    # que ponen una actuación en REALIZADA: la calificación del hotel y la
+    # pantalla vieja de registrar aforo. Pidiendo la reseña de verdad, da igual
+    # por dónde haya pasado: lo que autoriza el cobro es que alguien del hotel
+    # haya firmado que ocurrió.
+    from app.models.review import Review
+
     stmt = select(Booking).where(
         Booking.status == BookingStatus.COMPLETED,
         Booking.cfdi_id.is_(None),
+        Booking.id.in_(select(Review.booking_id)),
         Booking.starts_at >= _dt.combine(ini, _dt.min.time()),
         Booking.starts_at <= _dt.combine(fin, _dt.max.time()),
     )

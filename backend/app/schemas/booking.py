@@ -90,6 +90,12 @@ class BookingOut(BaseModel):
     incidencia_motivo: str | None = None
     incidencia_nota: str | None = None
     incidencia_at: datetime | None = None
+    # Pase de acceso: el token va al hotel para que pueda enseñar o imprimir el
+    # QR. No es secreto frente a quien ya ve la actuación — es exactamente la
+    # gente que va a repartir el pase.
+    pase_token: str | None = None
+    llegada_at: datetime | None = None
+    llegada_por: str | None = None
     created_at: datetime
 
     # Venue capacity is carried alongside so occupancy can be computed. Filled by

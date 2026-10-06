@@ -297,3 +297,50 @@ async def tarjeta_publica(slug: str, db: DbSession):
     else:
         html = inject + html
     return HTMLResponse(html, headers=_NO_CACHE)
+
+
+# ---------------------------------------------------------------------------
+# PASE DE ACCESO: la pagina que abre el personal de seguridad del hotel al
+# escanear el QR de la orden de actuacion. Publica a proposito -el de la caseta
+# no tiene cuenta- y protegida por un token aleatorio de 128 bits, no por el
+# folio, que es correlativo.
+#
+# Se sirve generada entera desde el servidor, sin fetch para pintarla: esto se
+# abre en un celular en una puerta de servicio y una pantalla en blanco
+# mientras carga es un pase que no sirve.
+# ---------------------------------------------------------------------------
+
+@app.get("/pase/{token}.png", include_in_schema=False)
+async def pase_qr(token: str, db: DbSession):
+    """El QR suelto, para imprimirlo o mandarlo por WhatsApp."""
+    from fastapi.responses import Response
+
+    from app.api.v1.public import pase_data
+    from app.services import pase as pase_svc
+
+    if await pase_data(db, token) is None:
+        raise HTTPException(status_code=404, detail="Pase no valido")
+    png = pase_svc.png_qr(pase_svc.url_pase(token, settings.public_root))
+    return Response(png, media_type="image/png", headers=_NO_CACHE)
+
+
+@app.get("/pase/{token}", include_in_schema=False)
+async def pase_publico(token: str, db: DbSession):
+    from app.api.v1.public import pase_data
+    from app.services import pase as pase_svc, pase_html
+
+    data = await pase_data(db, token)
+    if data is None:
+        # Mismo mensaje para un token invalido que para uno que no existe: decir
+        # "caducado" o "cancelado" ya seria confirmar que la actuacion existe.
+        return HTMLResponse(
+            "<div style=\"font-family:system-ui;text-align:center;padding:80px 20px;color:#697089\">"
+            "<h1 style=\"color:#1b1f2e;font-size:20px\">Este pase no es válido</h1>"
+            "<p style=\"margin-top:8px\">Revisa que hayas escaneado el código completo, "
+            "o pide el pase otra vez a quien contrató la actuación.</p></div>",
+            status_code=404, headers=_NO_CACHE,
+        )
+    qr = pase_svc.qr_data_uri(pase_svc.url_pase(token, settings.public_root))
+    html = pase_html.pagina(data, qr_uri=qr, api_base=f"{settings.ROOT_PATH}/api/v1",
+                            token=token)
+    return HTMLResponse(html, headers=_NO_CACHE)

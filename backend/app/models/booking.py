@@ -121,6 +121,16 @@ class Booking(Base, TimestampMixin):
     incidencia_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     incidencia_por: Mapped[int | None] = mapped_column(Integer)
 
+    # --- Pase de acceso (David, 06/10) ---------------------------------
+    # Token del QR que lleva a la página pública del pase. NO es el folio: el
+    # folio es correlativo y quien tenga uno adivinaría los demás sumando uno.
+    pase_token: Mapped[str | None] = mapped_column(String(40), unique=True, index=True)
+    # Cuándo confirmó seguridad que el grupo llegó, y quién lo dijo. El nombre lo
+    # teclea el de la caseta: no tiene cuenta en SHOWMA, y pedirle una para
+    # apuntar que alguien llegó es la forma más rápida de que no lo apunte nadie.
+    llegada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    llegada_por: Mapped[str | None] = mapped_column(String(120))
+
     show: Mapped["Show | None"] = relationship()      # noqa: F821
     venue: Mapped["Venue | None"] = relationship()    # noqa: F821
     company: Mapped["Company | None"] = relationship()  # noqa: F821

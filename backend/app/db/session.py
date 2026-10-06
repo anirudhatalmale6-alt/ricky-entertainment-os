@@ -47,6 +47,10 @@ _SQLITE_ADDED_COLUMNS = [
     ("bookings", "incidencia_nota", "TEXT"),
     ("bookings", "incidencia_at", "DATETIME"),
     ("bookings", "incidencia_por", "INTEGER"),
+    # Pase de acceso con QR (David, 06/10).
+    ("bookings", "pase_token", "VARCHAR(40)"),
+    ("bookings", "llegada_at", "DATETIME"),
+    ("bookings", "llegada_por", "VARCHAR(120)"),
     ("artists", "auto_confirm_bookings", "BOOLEAN DEFAULT 0"),
     ("artists", "profile_image_url", "VARCHAR(500)"),
     ("request_proposals", "images", "JSON"),
@@ -136,6 +140,8 @@ _SQLITE_ADDED_INDEXES = [
      "CREATE UNIQUE INDEX IF NOT EXISTS ux_artists_codigo ON artists(codigo)"),
     ("ux_bookings_folio",
      "CREATE UNIQUE INDEX IF NOT EXISTS ux_bookings_folio ON bookings(folio)"),
+    ("ux_bookings_pase",
+     "CREATE UNIQUE INDEX IF NOT EXISTS ux_bookings_pase ON bookings(pase_token)"),
 ]
 
 
@@ -168,6 +174,11 @@ def _apply_additive_columns(sync_conn) -> None:
         "UPDATE bookings SET folio = 'OA-' "
         "|| strftime('%Y', COALESCE(created_at, CURRENT_TIMESTAMP)) "
         "|| '-' || printf('%05d', id) WHERE folio IS NULL",
+        # El pase es la excepción: NO puede salir del id, porque la página es
+        # pública y el id es correlativo. randomblob(16) da 128 bits por fila, y
+        # es la misma forma que genera services/pase.nuevo_token().
+        "UPDATE bookings SET pase_token = lower(hex(randomblob(16))) "
+        "WHERE pase_token IS NULL",
     ):
         try:
             sync_conn.exec_driver_sql(ddl)

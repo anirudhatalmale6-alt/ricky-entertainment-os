@@ -52,16 +52,23 @@ def folio_orden(booking_id: int, alta: datetime | None) -> str:
 
 
 async def asignar_orden(db, booking) -> str:
-    """Pone el folio a una orden recién creada y lo devuelve.
+    """Pone el folio y el token del pase a una orden recién creada.
 
     Necesita el id, así que hace ``flush`` si la fila todavía no lo tiene. No
     reasigna: si ya trae folio, se respeta y punto. Ese "y punto" es la regla
     entera de este archivo.
+
+    El token del pase va aquí mismo, en la misma función, para que no haya forma
+    de crear una orden sin su QR: una orden sin pase es una orden que el de
+    seguridad no puede comprobar.
     """
-    if getattr(booking, "folio", None):
-        return booking.folio
     if booking.id is None:
         await db.flush()
+    if not getattr(booking, "pase_token", None):
+        from app.services import pase
+        booking.pase_token = pase.nuevo_token()
+    if getattr(booking, "folio", None):
+        return booking.folio
     booking.folio = folio_orden(booking.id, booking.created_at)
     return booking.folio
 

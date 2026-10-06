@@ -12,7 +12,10 @@ Los numeros son los reales de la base. No se inflan ni se redondean hacia
 arriba: son justo el tipo de dato que un artista le comenta a otro y que un
 hotel puede comprobar por dentro.
 """
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -284,3 +287,99 @@ async def public_artist(slug: str, db: DbSession) -> dict:
             status_code=status.HTTP_404_NOT_FOUND, detail="Tarjeta no disponible"
         )
     return data
+
+
+# ---------------------------------------------------------------------------
+# PASE DE ACCESO de una actuación: lo que ve el personal de seguridad del hotel
+# al escanear el QR. PÚBLICO a propósito — el de la caseta no tiene cuenta en
+# SHOWMA, y pedirle una es la forma más rápida de que nadie lo use.
+#
+# Por eso aquí se enseña lo JUSTO: quién llega, cuántos son, cuándo, en qué
+# salón y en qué estado está la actuación. Ni precio, ni comisión, ni teléfono,
+# ni correo de nadie. Esta respuesta la puede leer cualquiera a quien le
+# reenvíen el mensaje.
+# ---------------------------------------------------------------------------
+
+async def pase_data(db: AsyncSession, token: str) -> dict | None:
+    from app.models.venue import Venue
+    from app.services import pase as pase_svc
+
+    if not token or len(token) < 16:
+        return None
+    b = (await db.execute(
+        select(Booking).where(Booking.pase_token == token))).scalar_one_or_none()
+    if b is None:
+        return None
+
+    artista = await db.get(Artist, b.artist_id) if b.artist_id else None
+    show = await db.get(Show, b.show_id) if b.show_id else None
+    venue = await db.get(Venue, b.venue_id) if b.venue_id else None
+    empresa = await db.get(Company, b.company_id) if b.company_id else None
+
+    estado = b.status.value if hasattr(b.status, "value") else str(b.status)
+    texto, color = pase_svc.ESTADOS.get(estado, (estado, "pend"))
+    # Cuántos llegan: lo dice el show, que es donde el proveedor declara los
+    # integrantes. Sin dato se dice que no se declaró, no se inventa un 1.
+    integrantes = getattr(show, "members", None)
+
+    return {
+        "folio": b.folio,
+        "quien": (artista.stage_name if artista else None) or "— sin proveedor —",
+        "codigo_proveedor": artista.codigo if artista else None,
+        "show": show.show_name if show else None,
+        "integrantes": int(integrantes) if integrantes else None,
+        "cuando": b.starts_at.isoformat() if b.starts_at else None,
+        "termina": b.ends_at.isoformat() if b.ends_at else None,
+        "hotel": empresa.name if empresa else None,
+        "salon": venue.name if venue else None,
+        "estado": estado,
+        "estado_texto": texto,
+        "estado_color": color,
+        "puede_pasar": pase_svc.puede_pasar(estado),
+        "llegada_at": b.llegada_at.isoformat() if b.llegada_at else None,
+        "llegada_por": b.llegada_por,
+    }
+
+
+class LlegadaIn(BaseModel):
+    quien: str | None = Field(None, max_length=120)
+
+
+@router.get("/pase/{token}")
+async def pase_publico(token: str, db: DbSession) -> dict:
+    data = await pase_data(db, token)
+    if data is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pase no válido")
+    return data
+
+
+@router.post("/pase/{token}/llegada")
+async def confirmar_llegada(token: str, payload: LlegadaIn, db: DbSession) -> dict:
+    """Seguridad confirma que el grupo llegó.
+
+    Se puede llamar sin cuenta: la protección es el token, que no se adivina.
+    Y NO cambia el estado de la actuación ni toca dinero — sólo apunta la hora
+    de llegada. Que algo pasó por la puerta no es lo mismo que que la actuación
+    se realizó, y mezclarlas haría que entrara a facturación gente que llegó y
+    luego no tocó. Lo que confirma que ocurrió sigue siendo la calificación del
+    hotel.
+    """
+    b = (await db.execute(
+        select(Booking).where(Booking.pase_token == token))).scalar_one_or_none()
+    if b is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pase no válido")
+    estado = b.status.value if hasattr(b.status, "value") else str(b.status)
+    if estado in ("cancelled",):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esta actuación está cancelada. No registres la llegada: avisa a quien la contrató.")
+    if b.llegada_at is None:          # la primera marca manda; no se pisa
+        b.llegada_at = datetime.utcnow()
+        b.llegada_por = (payload.quien or "").strip()[:120] or None
+        await db.commit()
+        await db.refresh(b)
+    return {
+        "ok": True,
+        "llegada_at": b.llegada_at.isoformat() if b.llegada_at else None,
+        "llegada_por": b.llegada_por,
+    }

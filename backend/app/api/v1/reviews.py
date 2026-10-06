@@ -148,6 +148,22 @@ async def calificar(booking_id: int, payload: ReviewIn, scope: CurrentScope, db:
             author_position=puesto,
         )
         db.add(review)
+
+    # LA CALIFICACIÓN ES LO QUE CIERRA LA ACTUACIÓN (David, 06/10): "si no se
+    # califica no podemos confirmar que ocurrió y no se paga".
+    #
+    # Esto repara algo que estaba roto. Hasta hoy lo único que ponía una
+    # actuación en REALIZADA era la pantalla de registrar aforo, que nadie usa:
+    # en producción hay 179 actuaciones con la fecha ya pasada y 135 siguen en
+    # "confirmada" o "pendiente", y las 14 reseñas que existen están TODAS
+    # sobre actuaciones que nunca se cerraron. Como la facturación sólo toma las
+    # REALIZADAS, el dinero no se movía de ahí.
+    #
+    # No se tocan las canceladas ni las marcadas como no completadas: de esas ya
+    # se dijo que no ocurrieron.
+    if booking.status not in (BookingStatus.CANCELLED, BookingStatus.NO_SHOW):
+        booking.status = BookingStatus.COMPLETED
+
     await db.commit()
     await db.refresh(review)
     # Esta reseña puede mover un ranking: que el siguiente perfil que se abra no

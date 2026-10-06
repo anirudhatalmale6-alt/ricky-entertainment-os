@@ -426,7 +426,9 @@ async def _booking_from_proposal(
 
     # Respect the artist's approval preference (auto vs. manual).
     artist = await db.get(Artist, winner.artist_id)
-    auto = bool(artist and artist.auto_confirm_bookings)
+    # Fase 1: aprobación automática apagada por configuración; la propuesta
+    # aceptada nace PENDIENTE y el proveedor tiene que confirmarla.
+    auto = bool(settings.AUTO_CONFIRM_ENABLED and artist and artist.auto_confirm_bookings)
 
     booking = Booking(
         show_id=None,

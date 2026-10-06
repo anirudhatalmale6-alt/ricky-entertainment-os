@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     # es cambiar una linea del .env y reiniciar; los perfiles ya publicados
     # vuelven con su misma liga porque el slug no se borra.
     TARJETA_PUBLICA: bool = True
+    # Aprobación automática de actuaciones (David, 06/10): "en esta primera fase
+    # vamos a dejarla NO habilitada, no la vamos a eliminar".
+    #
+    # Apagada aquí y no borrando el campo del proveedor: la orden de actuación
+    # sólo toma vida cuando el músico acepta, y toda la cadena que viene detrás
+    # (pase, calificación, factura) se apoya en que alguien aceptó de verdad. El
+    # interruptor del proveedor se queda guardado tal cual; el día que esto
+    # vuelva a True, los tres que ya lo tenían puesto siguen como estaban.
+    AUTO_CONFIRM_ENABLED: bool = False
 
     # Database - SQLite for dev, PostgreSQL (asyncpg) for prod
     #   postgresql+asyncpg://user:pass@host:5432/dbname

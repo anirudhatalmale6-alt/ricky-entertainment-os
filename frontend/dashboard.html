@@ -6217,10 +6217,14 @@ function renderAgenda(fromRange){
           ? `<button class="mini ok" onclick="openRate(${b.id})">★ Calificar</button>`
           : `<button class="mini" onclick="openRate(${b.id})" title="Ya la calificaste, puedes corregirla">★ Calificada</button>`}</td>`;
       }
-      // hotel / cadena: puede cambiar fecha y hora mientras la actuación siga vigente
-      return `<td>${['completed','cancelled'].includes(b.status)
-        ? '<span class="muted">—</span>'
-        : `<button class="mini" onclick="openEditAct(${b.id})">Editar</button>`}</td>`;
+      // hotel / cadena: puede cambiar fecha y hora mientras la actuación siga
+      // vigente, y sacar el pase de acceso para mandárselo a seguridad. El pase
+      // va junto a Editar porque es lo que se hace ANTES de que llegue el día.
+      const pase = b.pase_token
+        ? `<button class="mini" onclick="openPase(${b.id})" title="QR de acceso para seguridad">▣ Pase</button>` : '';
+      return `<td><div class="agact">${['completed','cancelled'].includes(b.status)
+        ? (pase || '<span class="muted">—</span>')
+        : `<button class="mini" onclick="openEditAct(${b.id})">Editar</button>${pase}`}</div></td>`;
     }
     const fut = b.starts_at && new Date(b.starts_at) > new Date();
     if(b.status==='pending')
@@ -6413,6 +6417,50 @@ async function rateSend(){
     toast('No se pudo publicar: '+(e.message||''),true);
   }
 }
+// ---- Pase de acceso (QR) -------------------------------------------------
+// Mientras el correo no pueda salir del servidor, este es el camino que SÍ
+// funciona hoy: el hotel abre el pase, lo imprime o lo manda por WhatsApp. La
+// misma página que abrirá desde el correo el día que el correo salga.
+function paseUrl(token){
+  // API termina en /api/v1; la raíz pública es lo de antes.
+  return API.replace(/\/api\/v1$/,'') + '/pase/' + token;
+}
+function openPase(bid){
+  const b=(CACHE.agenda||[]).find(x=>x.id===bid)||(CACHE.homeBk||[]).find(x=>x.id===bid)||{};
+  if(!b.pase_token){ toast('Esta actuación todavía no tiene pase.',true); return; }
+  const url=paseUrl(b.pase_token);
+  let ov=document.getElementById('pzMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='pzMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) paseClose(); }); }
+  ov.innerHTML=`<div class="amod" style="max-width:400px">
+    <div class="ahd"><h3>Pase de acceso</h3></div>
+    <div class="rqbody" style="padding:16px 20px;text-align:center">
+      <div style="font-size:13.5px;font-weight:700">${esc(b.artist_name||b.show_name||'Actuación')}</div>
+      <div class="muted" style="font-size:12.5px;margin:2px 0 4px">${
+        [b.venue_name&&esc(b.venue_name), b.starts_at&&fmtDate(b.starts_at)].filter(Boolean).join(' · ')}</div>
+      ${b.folio?`<div class="rtfolio" style="margin-bottom:12px">${esc(b.folio)}</div>`:''}
+      <img src="${esc(url)}.png" alt="QR del pase" style="width:200px;height:200px;display:block;margin:4px auto 10px">
+      <div class="hint" style="margin:0 0 10px;text-align:left">Esto lo escanea el personal de
+        seguridad y ve quién llega, cuántos son, a qué hora y si la actuación está confirmada,
+        con un botón para registrar que llegaron.</div>
+      <div class="qact" style="text-align:left">
+        <a href="${esc(url)}" target="_blank" rel="noopener">🔍 Abrir el pase como lo ve seguridad</a>
+        <a href="${esc(url)}.png" download="pase-${esc(b.folio||b.id)}.png">⬇ Descargar el QR</a>
+        <a onclick="paseCopiar('${esc(url)}',this)">🔗 Copiar la liga para mandarla</a>
+      </div>
+    </div>
+    <div class="af"><button class="btn ghost" onclick="paseClose()">Cerrar</button>
+      <button class="ago" onclick="window.print()">Imprimir</button></div>
+  </div>`;
+  ov.style.display='flex';
+}
+function paseClose(){ const ov=document.getElementById('pzMov'); if(ov) ov.style.display='none'; }
+async function paseCopiar(url, el){
+  try{ await navigator.clipboard.writeText(url); el.textContent='✓ Liga copiada'; }
+  catch(e){ toast('No se pudo copiar. La liga es: '+url, true); }
+}
+window.openPase=openPase; window.paseClose=paseClose; window.paseCopiar=paseCopiar;
+
 function motivoTexto(codigo){
   if(!codigo) return 'No completada';
   const m=RT_MOTIVOS.find(x=>x.codigo===codigo);
