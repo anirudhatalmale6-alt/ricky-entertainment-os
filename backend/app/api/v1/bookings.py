@@ -31,8 +31,8 @@ from app.models.enums import (
 )
 from app.models.show import Show
 from app.models.venue import Venue
-from app.services import availability, avisos, pricing
-from app.services import recurrente
+from app.services import availability, avisos
+from app.services import recurrente, tarifa
 from app.schemas.booking import (
     AttendanceIn,
     BookingCreate,
@@ -194,12 +194,15 @@ async def create_booking(payload: BookingCreate, db: DbSession):
 
     # Si no vino un precio pactado, se toma el del show YA AJUSTADO por la
     # temporada del artista para esa fecha (Navidad +300 %, baja −10 %…).
+    # Un solo sitio decide el precio (app/services/tarifa): temporada del
+    # artista, tarifa pactada con ESE hotel y tarifa por volumen. Antes esta
+    # línea calculaba el precio por su cuenta y se dejaba fuera la tarifa
+    # pactada, así que el catálogo enseñaba un número y aquí se guardaba otro.
     agreed_price = payload.agreed_price
     if agreed_price is None:
-        agreed_price = pricing.effective_price(show, payload.starts_at)["price"]
-        if await recurrente.aplica(db, show=show, company_id=venue.company_id,
-                                   fecha=payload.starts_at):
-            agreed_price = recurrente.precio_recurrente(show)
+        agreed_price = (await tarifa.precio_para(
+            db, show=show, company_id=venue.company_id,
+            fecha=payload.starts_at))["price"]
 
     # A booking added on the Calendario Maestro starts as a DRAFT (borrador):
     # notified_at is NULL, so the artist doesn't see it yet. The hotel keeps
@@ -223,6 +226,11 @@ async def create_booking(payload: BookingCreate, db: DbSession):
         confirmed_at=None,
     )
     db.add(booking)
+    await db.flush()
+    # Si esta es la quinta del mismo show en el mismo hotel, las anteriores de la
+    # misma ventana bajan tambien a la tarifa de volumen: el hotel contrato cinco
+    # y las cinco valen la tarifa, no solo la ultima (solo futuras y sin facturar).
+    await recurrente.recalcular_tras_crear(db, booking)
     await db.commit()
     await db.refresh(booking)
     return _decorate(booking, venue, show)
@@ -935,16 +943,15 @@ async def repetir_actuacion(payload: RepetirIn, db: DbSession):
         fin = inicio + timedelta(minutes=dur)
         precio = payload.agreed_price
         if precio is None:
-            precio = pricing.effective_price(show, inicio)["price"]
-            tarifa = recurrente.precio_recurrente(show)
-            if tarifa is not None:
-                ya = await recurrente.cuantas_hay(
-                    db, show_id=show.id, company_id=venue.company_id, desde=inicio)
-                ini_v, fin_v = recurrente.ventana(inicio)
-                en_tanda = sum(1 for g in fechas
-                               if ini_v <= datetime.combine(g, dtime(hh, mm)) < fin_v)
-                if ya + en_tanda >= recurrente.MINIMO:
-                    precio = tarifa
+            # Las de la propia tanda cuentan para la tarifa de volumen aunque
+            # todavía no existan en la base: quien programa cinco de golpe debe
+            # pagar la tarifa en las cinco, no a partir de la sexta.
+            ini_v, fin_v = recurrente.ventana(inicio)
+            en_tanda = sum(1 for g in fechas
+                           if ini_v <= datetime.combine(g, dtime(hh, mm)) < fin_v)
+            precio = (await tarifa.precio_para(
+                db, show=show, company_id=venue.company_id, fecha=inicio,
+                cuenta_extra=max(0, en_tanda - 1)))["price"]
         precio = float(precio or 0)
 
         motivo = None
@@ -986,15 +993,25 @@ async def repetir_actuacion(payload: RepetirIn, db: DbSession):
     if payload.simular:
         return resumen
 
+    nuevas = []
     for inicio, fin in crear:
         precio = next(d["precio"] for d in detalle if d["fecha"] == inicio.date().isoformat())
-        db.add(Booking(
+        nueva = Booking(
             show_id=show.id, venue_id=venue.id, company_id=venue.company_id,
             artist_id=show.artist_id, booker_id=payload.booker_id,
             starts_at=inicio, ends_at=fin, event_type=payload.event_type,
             agreed_price=precio, currency="MXN", commission_pct=commission_pct,
             status=BookingStatus.PENDING, confirmed_at=None,
-        ))
+        )
+        db.add(nueva)
+        nuevas.append(nueva)
+    # Las anteriores que ya tuviera ese hotel en la misma ventana tambien entran
+    # en la tarifa si esta tanda completa las cinco. Se repasa de la primera a la
+    # ultima fecha de la tanda, que puede abarcar meses.
+    if nuevas:
+        await db.flush()
+        await recurrente.recalcular_tras_crear(
+            db, nuevas[0], hasta=nuevas[-1].starts_at)
     # Un solo commit: o entran las N o no entra ninguna.
     await db.commit()
     resumen["creadas"] = len(crear)

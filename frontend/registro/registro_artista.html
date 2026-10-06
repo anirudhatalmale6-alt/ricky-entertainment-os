@@ -696,7 +696,6 @@ function showTpl(n){
       <div class="sec-t">Tarifas base por tipo de evento (MXN)</div>
       <div class="grid three">
         <label class="f"><span>Precio hotel <i style="color:var(--red);font-style:normal">*</i></span><input class="p-hotel" placeholder="$ 10,000"></label>
-        <label class="f"><span>Evento corporativo</span><input class="p-corp" placeholder="$ 12,000"></label>
         <label class="f"><span>Boda</span><input class="p-wedding" placeholder="$ 14,000"></label>
         <label class="f"><span>Evento privado</span><input class="p-private" placeholder="$ 11,000"></label>
         <label class="f"><span>Restaurante / lounge</span><input class="p-restaurant" placeholder="$ 8,000"></label>
@@ -704,6 +703,12 @@ function showTpl(n){
         <label class="f"><span>Hora adicional</span><input class="p-extrahour" placeholder="$ 2,000"></label>
         <label class="f"><span>Traslado (desde)</span><input class="p-transport" placeholder="$ 1,000"></label>
         <label class="f"><span>Hospedaje / Alimentación / Viáticos</span><input class="p-lodging" placeholder="A acordar"></label>
+      </div>
+
+      <div class="sec-t">Precio recurrente <span style="font-weight:400;text-transform:none;color:var(--text3)">(tu tarifa cuando un mismo hotel te contrata varias veces seguidas — déjalo vacío si no das precio por volumen)</span></div>
+      <div class="grid">
+        <label class="f"><span>Precio recurrente (MXN)</span><input class="p-corp" placeholder="$ 8,500"></label>
+        <div class="hint" style="margin:0;align-self:center">Se aplica solo cuando el mismo hotel contrata <b>5 actuaciones o más de este show en 45 días</b>. El hotel lo ve en tu ficha antes de contratar, así que suele programar las 5 de una vez. Si cancela y bajan de 5, las que queden vuelven a tu precio hotel.</div>
       </div>
 
       <div class="sec-t">Extra por larga distancia <span style="font-weight:400;text-transform:none;color:var(--text3)">(monto fijo para gasolina y casetas — se suma solo cuando el hotel está más lejos del límite; déjalo vacío si no cobras extra)</span></div>

@@ -212,6 +212,19 @@ class ShowOut(ShowBase):
     # aplica: sin distancia conocida, sin extra configurado o dentro del umbral).
     travel_fee_applied: float | None = None
     travel_fee_km_applied: int | None = None
+    # Precio recurrente (tarifa por volumen). `recurrent_count` es cuántas
+    # actuaciones de ESTE show lleva ya el hotel que consulta en la misma
+    # ventana de 45 días; sin ?on= no hay ventana que mirar y queda en None, pero
+    # el precio y la condición se enseñan igual para que se pueda planear.
+    recurrent_price: float | None = None
+    recurrent_count: int | None = None
+    recurrent_min: int | None = None
+    recurrent_days: int | None = None
+    recurrent_active: bool = False
+    # True si el precio recurrente es el que quedó en effective_price (puede
+    # estar activo y NO ser el aplicado, si la tarifa pactada con el hotel es
+    # todavía más baja: gana la más baja de las dos y nunca se suman).
+    has_recurrent: bool = False
 
 
 class PriceBenchmarkOut(BaseModel):

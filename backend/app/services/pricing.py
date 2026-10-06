@@ -11,8 +11,20 @@ hasta ahora sólo se guardaban:
    hotel o cadena. Un ``special_price`` absoluto manda sobre todo lo demás;
    un ``discount_pct`` se aplica sobre el precio ya ajustado por temporada.
 
-Orden: base → temporada → tarifa del cliente. Así el descuento pactado con el
-hotel se respeta también en temporada alta.
+3. PRECIO RECURRENTE (``price_corporate``) — la tarifa por volumen: cinco
+   actuaciones del mismo show en 45 días. Quién la activa lo decide
+   ``app/services/recurrente``; aquí sólo entra el importe, ya decidido.
+
+Orden: base → temporada → tarifa del cliente → precio recurrente. Así el
+descuento pactado con el hotel se respeta también en temporada alta.
+
+Cuando coinciden una tarifa especial y el precio recurrente, GANA EL MÁS BAJO y
+nunca se suman. Es lo que le propuse a David el 30/09 y está pendiente de que lo
+confirme; mientras lo piensa vive aquí, en una sola línea (``min``), y sólo en
+el demo. Lo que no está pendiente es que haya UN solo sitio que decida el
+precio: el catálogo le enseñaba al hotel un número y al agendar se cobraba otro,
+y eso no era una forma de hacerlo, era que dos partes del sistema decían cosas
+distintas.
 """
 from __future__ import annotations
 
@@ -63,18 +75,24 @@ def travel_fee_for(show, distance_km) -> tuple[float, int] | None:
     return float(fee), limit
 
 
-def effective_price(show, when=None, client_rate=None, distance_km=None) -> dict:
+def effective_price(show, when=None, client_rate=None, distance_km=None,
+                    recurrent_price=None) -> dict:
     """Precio efectivo + de dónde sale, para poder explicarlo en pantalla.
 
     Devuelve ``{price, base, season_label, season_pct, has_season,
-    has_special_rate, travel_fee, travel_fee_km}``. ``price`` es None si el show
-    no tiene precio público.
+    has_special_rate, has_recurrent, travel_fee, travel_fee_km}``. ``price`` es
+    None si el show no tiene precio público.
+
+    ``recurrent_price`` se pasa SÓLO cuando la tarifa por volumen ya está
+    activada para ese hotel y esa fecha; esta función no la calcula, porque para
+    saberlo hay que mirar las otras actuaciones y eso es una consulta.
     """
     base = float(show.price_hotel) if getattr(show, "price_hotel", None) is not None else None
     out = {
         "price": base, "base": base,
         "season_label": None, "season_pct": None,
         "has_season": False, "has_special_rate": False,
+        "has_recurrent": False,
         "travel_fee": None, "travel_fee_km": None,
     }
     price = base
@@ -95,6 +113,15 @@ def effective_price(show, when=None, client_rate=None, distance_km=None) -> dict
         elif client_rate.discount_pct is not None and price is not None:
             price = round(price * (1 - float(client_rate.discount_pct) / 100.0), 2)
         out["has_special_rate"] = price != base
+
+    # Precio recurrente. Compite con lo ya calculado y gana el más bajo: si el
+    # proveedor pactó con ese hotel algo mejor que su tarifa de volumen, lo
+    # pactado se respeta. Nunca se encadenan los dos descuentos.
+    if recurrent_price is not None and float(recurrent_price) > 0:
+        tarifa = float(recurrent_price)
+        if price is None or tarifa < price:
+            price = tarifa
+            out["has_recurrent"] = True
 
     # Un descuento mayor al 100 % dejaría el precio en negativo: se topa en 0.
     if price is not None and price < 0:

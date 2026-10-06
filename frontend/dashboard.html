@@ -741,6 +741,10 @@
   .acard3 .atag.rate{background:#f59e0b1f;color:#b45309}
   .acard3 .atag.seas{background:#7c5cf01f;color:#5b3fd6}
   .acard3 .atag.km{background:#0ea5e91f;color:#0369a1}
+  /* Precio recurrente: apagado mientras es sólo una condición por cumplir,
+     verde cuando ya está aplicado — así se distingue el aviso del hecho. */
+  .acard3 .atag.recu{background:#64748b17;color:#475569}
+  .acard3 .atag.recu.on{background:#10b9811f;color:#047857;font-weight:700}
   /* Proveedor que no puede esa fecha: se ve, se entiende por qué, y no se elige */
   .acard3.nodisp{opacity:.62;background:var(--ov);border-style:dashed;cursor:not-allowed}
   .acard3.nodisp:hover{border-color:var(--bad);box-shadow:none}
@@ -999,6 +1003,7 @@
   .apsprice{font-size:13.5px;font-weight:800;color:var(--acc);white-space:nowrap;text-align:right}
   .apsmeta{font-size:10.5px;color:var(--mut);margin-top:2px}
   .apsdesc{font-size:11.5px;margin-top:4px;line-height:1.45}
+  .apsrecu{font-size:10.5px;margin-top:4px;padding:3px 7px;border-radius:6px;background:#10b9811a;color:#047857}
   .apstats2{display:flex;gap:11px;flex-wrap:wrap;margin-top:6px;font-size:10.5px;color:var(--mut);align-items:center}
   .apstats2 b{color:var(--txt);font-weight:700}
   .aprevs{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:9px}
@@ -4246,6 +4251,15 @@ function actRender(){
     const tags=[];
     if(s.has_season) tags.push(`<span class="atag seas">${(s.season_pct||0)<0?'🔻':'🔺'} ${esc(s.season_label||'Temporada')} ${(s.season_pct>0?'+':'')+(s.season_pct||0)}%</span>`);
     if(s.has_special_rate) tags.push('<span class="atag rate">🏷️ Tarifa especial</span>');
+    // Precio recurrente (tarifa por volumen). Se enseña SIEMPRE que el show la
+    // tenga, no sólo cuando ya está activada: el valor está en que el hotel vea
+    // la condición antes de contratar y programe las cinco de una vez.
+    if(s.recurrent_price){
+      const rp=MXN(s.recurrent_price), rm=s.recurrent_min||5, rd=s.recurrent_days||45;
+      if(s.recurrent_active) tags.push(`<span class="atag recu on">🔁 Precio recurrente aplicado · ${rp}</span>`);
+      else if(s.recurrent_count) tags.push(`<span class="atag recu">🔁 Llevas ${s.recurrent_count} de ${rm} · a la ${rm}ª ${rp}</span>`);
+      else tags.push(`<span class="atag recu">🔁 ${rm} o más en ${rd} días: ${rp}</span>`);
+    }
     if(s.travel_fee_applied) tags.push(`<span class="atag km">🚗 Incluye ${MXN(s.travel_fee_applied)} de traslado (a más de ${s.travel_fee_km_applied} km)</span>`);
     const mv = (MATCH_VENUE||{})[String(s.id)];
     if(s.artist_partner) tags.push('<span class="atag part">✓ Partner</span>');
@@ -4254,7 +4268,7 @@ function actRender(){
     // canal se abre fuera, porque un canal no se puede reproducir.
     if(s.video_url && videoEtiqueta(s.video_url)) tags.push(
       `<span class="atag vid" onclick="event.stopPropagation();videoAbrir(${esc(JSON.stringify(s.video_url))},${esc(JSON.stringify(s.show_name||'Video'))})">${videoEtiqueta(s.video_url)}</span>`);
-    const priceHtml=eff!=null?(((s.has_special_rate||s.has_season||s.travel_fee_applied)&&s.price_hotel&&s.price_hotel!=eff)?`<span class="ac3-price"><s style="color:var(--mut);font-weight:400">${MXN(s.price_hotel)}</s> ${MXN(eff)}</span>`:`<span class="ac3-price">${MXN(eff)}</span>`):'';
+    const priceHtml=eff!=null?(((s.has_special_rate||s.has_season||s.travel_fee_applied||s.has_recurrent)&&s.price_hotel&&s.price_hotel!=eff)?`<span class="ac3-price"><s style="color:var(--mut);font-weight:400">${MXN(s.price_hotel)}</s> ${MXN(eff)}</span>`:`<span class="ac3-price">${MXN(eff)}</span>`):'';
     // Disponibilidad del día: el artista pudo bloquearlo o ya tener actuación.
     const nd=s.is_available===false;
     const disp=nd?`<span class="ac3-disp no">✕ No disponible</span>`
@@ -4306,6 +4320,11 @@ function actPick(showId){
     const bits=[];
     if(s.has_season) bits.push(`${esc(s.season_label||'Temporada')} ${(s.season_pct>0?'+':'')+(s.season_pct||0)}% sobre ${MXN(s.price_hotel)}`);
     if(s.has_special_rate) bits.push('tarifa pactada con tu hotel');
+    if(s.has_recurrent) bits.push(`precio recurrente (${s.recurrent_min||5} o más de este show en ${s.recurrent_days||45} días)`);
+    else if(s.recurrent_price){
+      const f=(s.recurrent_min||5)-((s.recurrent_count||0)+1);
+      if(f>0) bits.push(`${f} más y baja a ${MXN(s.recurrent_price)} por precio recurrente`);
+    }
     note.innerHTML=bits.length?`🏷️ ${bits.join(' · ')}`:'';
     note.style.display=bits.length?'block':'none';
   }
@@ -5481,6 +5500,7 @@ function apShowsHTML(shows, t, titulo){
         <div class="apstitle"><b>${esc(s.show_name||'Show')}</b>
           ${s.price_hotel?`<span class="apsprice">${MXN(s.price_hotel)}</span>`:''}</div>
         <div class="apsmeta">${esc(meta)}</div>
+        ${(s.price_corporate>0&&s.price_hotel>0&&s.price_corporate<s.price_hotel)?`<div class="apsrecu">🔁 Precio recurrente <b>${MXN(s.price_corporate)}</b> contratando 5 o más de este show en 45 días</div>`:''}
         ${s.description?`<div class="apsdesc">${esc(s.description)}</div>`:''}
         ${marcas.length?`<div class="apstats2">${marcas.join('')}</div>`:''}
       </div></div>`;
@@ -10123,7 +10143,6 @@ function showFields(s){
     <div class="shsec">Tarifas base por tipo de evento (MXN)</div>
     <div class="fgrid fg3">
       ${num('price','Hotel','price_hotel','18000')}
-      ${num('pc','Evento corporativo','price_corporate','')}
       ${num('pw','Boda','price_wedding','')}
       ${num('pp','Evento privado','price_private','')}
       ${num('pr','Restaurante / lounge','price_restaurant','')}
@@ -10131,6 +10150,13 @@ function showFields(s){
       ${num('peh','Hora adicional','extra_hour_price','')}
       ${num('ptr','Traslado (desde)','transport_from_price','')}
       ${num('plo','Hospedaje / viáticos','lodging_price','A acordar')}
+    </div>
+
+    <div class="tfbox">
+      <div class="tfh"><b>🔁 Precio recurrente</b><span class="hint" style="margin:0">Tu tarifa cuando un mismo hotel contrata <b>5 actuaciones o más de este show en 45 días</b>. El hotel la ve en tu ficha antes de contratar, así que suele programar las 5 de una vez. Si cancela y bajan de 5, las que queden vuelven a tu precio hotel. Déjalo vacío si no das precio por volumen.</span></div>
+      <div class="fgrid">
+        ${num('pc','Precio recurrente (MXN)','price_corporate','')}
+      </div>
     </div>
 
     <div class="tfbox">
@@ -10392,9 +10418,22 @@ async function delClientRate(id){
   catch(e){ toast('No se pudo quitar.',true); }
 }
 window.crToggle=crToggle;window.loadClientRates=loadClientRates;window.addClientRate=addClientRate;window.delClientRate=delClientRate;
+// Un precio recurrente que no está por debajo del precio hotel no es una oferta:
+// no se le aplica a nadie y no se enseña. Mejor decírselo al proveedor aquí que
+// dejarle creer que puso un gancho comercial.
+function avisaRecurrente(body){
+  const r=+body.price_corporate||0, h=+body.price_hotel||0;
+  if(r>0 && h>0 && r>=h){
+    return confirm('El precio recurrente ('+MXN(r)+') no es menor que tu precio '
+      +'hotel ('+MXN(h)+'), así que no se aplicará ni se mostrará a los hoteles.\n\n'
+      +'¿Guardar así de todas formas?');
+  }
+  return true;
+}
 async function saveShow(id,btn){
   const body=collectShowForm(id);
   if(!body.show_name){ toast('Ponle un nombre al show.',true); return; }
+  if(!avisaRecurrente(body)) return;
   btn.disabled=true;
   try{ await patch('/me/artist/shows/'+id,body); flash('sh_saved_'+id); toast('Show actualizado ✓'); }
   catch(e){ alert('No se pudo guardar: '+e.message); }
@@ -10421,6 +10460,7 @@ async function addShow(btn){
     if(caja) caja.scrollIntoView({behavior:'smooth',block:'center'});
     return;
   }
+  if(!avisaRecurrente(body)) return;
   btn.disabled=true;
   try{ await post('/me/artist/shows',body); SHOW_IMGS['new']=[]; AF_NUEVO={}; toast('Show publicado ✓'); show('profile',true); }
   catch(e){ alert('No se pudo publicar: '+e.message); btn.disabled=false; }

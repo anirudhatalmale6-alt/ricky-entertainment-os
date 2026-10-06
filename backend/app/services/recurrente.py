@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking
@@ -47,6 +47,21 @@ def precio_recurrente(show) -> float | None:
     """
     v = getattr(show, "price_corporate", None)
     return float(v) if v not in (None, "") and float(v) > 0 else None
+
+
+def es_oferta(show) -> bool:
+    """¿La tarifa de volumen mejora de verdad el precio del hotel?
+
+    En el demo hay un show con precio recurrente 5,000 y precio hotel 5,000.
+    Anunciar "cinco o mas y te cuesta 5,000" cuando una sola cuesta 5,000 no es
+    una oferta, es ruido, y encima no cambia el precio (solo se aplica si es
+    estrictamente menor). Asi que ni se enseña.
+    """
+    t = precio_recurrente(show)
+    base = getattr(show, "price_hotel", None)
+    if t is None or base is None:
+        return False
+    return t < float(base)
 
 
 def ventana(fecha: datetime) -> tuple[datetime, datetime]:
@@ -109,6 +124,30 @@ async def cuantas_hay(db: AsyncSession, *, show_id: int, company_id: int | None,
     return max(0, _mejor_ventana(vecinas, desde) - 1)
 
 
+async def conteos_por_show(db: AsyncSession, *, show_ids: list[int] | set[int],
+                           company_id: int | None, cerca_de: datetime) -> dict[int, int]:
+    """Lo mismo que `cuantas_hay`, pero para el catalogo entero en UNA consulta.
+
+    El catalogo pinta hasta 40 shows de golpe. Llamar a `cuantas_hay` por cada
+    uno son 40 viajes a la base para pintar una pantalla, y el catalogo ya hace
+    bastantes. Aqui se traen todas las fechas de una vez y la ventana se calcula
+    en memoria, que es donde se calcula igual.
+    """
+    if not show_ids or not company_id:
+        return {}
+    q = (select(Booking.show_id, Booking.starts_at)
+         .where(Booking.show_id.in_(list(show_ids)),
+                Booking.company_id == company_id,
+                Booking.status != BookingStatus.CANCELLED,
+                Booking.starts_at > cerca_de - timedelta(days=DIAS_VENTANA),
+                Booking.starts_at < cerca_de + timedelta(days=DIAS_VENTANA)))
+    por_show: dict[int, list[datetime]] = {}
+    for sid, cuando in (await db.execute(q)).all():
+        por_show.setdefault(sid, []).append(cuando)
+    return {sid: max(0, _mejor_ventana(sorted(fechas), cerca_de) - 1)
+            for sid, fechas in por_show.items()}
+
+
 async def aplica(db: AsyncSession, *, show, company_id: int | None,
                  fecha: datetime, incluyendo_esta: bool = True) -> bool:
     """¿Esta actuacion entra ya en tarifa de volumen?"""
@@ -136,49 +175,113 @@ async def estado(db: AsyncSession, *, show, company_id: int | None,
             "activa": n >= MINIMO}
 
 
-async def recalcular_tras_cancelar(db: AsyncSession, cancelada) -> int:
-    """Si una cancelacion deja al hotel por debajo de cinco, devuelve las que
-    quedan a su precio normal. Devuelve cuantas se cambiaron.
+async def repreciar_ventana(db: AsyncSession, *, show_id: int | None,
+                            company_id: int | None, cerca_de: datetime,
+                            hasta: datetime | None = None,
+                            precio_anterior: float | None = None) -> int:
+    """Repasa las actuaciones de ese show en ese hotel alrededor de esa fecha y
+    pone a cada una el precio que le toca HOY. Devuelve cuantas cambiaron.
 
-    SOLO toca actuaciones FUTURAS y SIN FACTURAR. Una que ya se toco y ya se
-    timbro no se reprecia: un CFDI no se corrige, se cancela y se emite otro, y
-    eso ante el SAT es un tramite de verdad. David lo dio por bueno asi.
+    Sirve para los dos sentidos, y tiene que ser la misma funcion, porque la
+    regla es una sola: cinco actuaciones valen la tarifa de volumen y cuatro no.
+
+      - al CREAR la quinta, las cuatro anteriores bajan a la tarifa.
+      - al CANCELAR y quedarse en cuatro, las que queden vuelven a subir.
+
+    Esto salio de una prueba (06/10): se agendaron seis de una en una y solo la
+    quinta y la sexta se cobraron a tarifa de volumen. Las cuatro primeras se
+    quedaron al precio de lista, porque cada actuacion se calculaba el precio
+    cuando nacia y nadie volvia a mirarla. Visto desde el hotel eso es un error:
+    contrato cinco, me cobran dos con descuento. Y era asimetrico, porque
+    cancelar SI repasaba toda la ventana.
+
+    Dos cosas que NO se tocan:
+
+      - Actuaciones PASADAS o ya FACTURADAS. Un CFDI no se corrige, se cancela y
+        se emite otro, y eso ante el SAT es un tramite de verdad.
+      - Precios puestos A MANO. Si el importe guardado no coincide con lo que el
+        sistema habria calculado, es que alguien lo negocio aparte, y el sistema
+        no tiene por que pisarlo. Por eso se compara contra el calculo y no se
+        reescribe a ciegas.
     """
     from sqlalchemy.orm import selectinload
 
     from app.models.show import Show
-    from app.services import pricing
+    # Import local: `tarifa` necesita este modulo, asi que arriba serian
+    # importaciones circulares.
+    from app.services import tarifa as _tarifa
 
-    if not cancelada.show_id or not cancelada.company_id:
+    if not show_id or not company_id:
         return 0
     show = (await db.execute(
         select(Show).options(selectinload(Show.seasonal_rates))
-        .where(Show.id == cancelada.show_id))).scalar_one_or_none()
+        .where(Show.id == show_id))).scalar_one_or_none()
     if show is None or precio_recurrente(show) is None:
         return 0
 
     ahora = datetime.now()
-    ini, fin = ventana(cancelada.starts_at)
-    q = (select(Booking)
-         .where(Booking.show_id == show.id,
-                Booking.company_id == cancelada.company_id,
-                Booking.status != BookingStatus.CANCELLED,
-                Booking.starts_at >= ini,
-                Booking.starts_at < fin))
-    vivas = list((await db.execute(q)).scalars().all())
-    if len(vivas) >= MINIMO:
-        return 0   # siguen siendo cinco o mas: la tarifa se mantiene
+    # Se repasa hacia los DOS lados: una actuacion anterior a la que acaba de
+    # nacer tambien forma parte del grupo de cinco. `hasta` existe para la tanda
+    # del boton de repetir, que puede abarcar meses: con una sola fecha de
+    # referencia quedarian sin repasar las del final de la tanda.
+    desde = cerca_de - timedelta(days=DIAS_VENTANA)
+    fin = (hasta or cerca_de) + timedelta(days=DIAS_VENTANA)
+    vivas = list((await db.execute(
+        select(Booking)
+        .where(Booking.show_id == show.id,
+               Booking.company_id == company_id,
+               Booking.status != BookingStatus.CANCELLED,
+               Booking.starts_at > desde,
+               Booking.starts_at < fin))).scalars().all())
 
-    tarifa = precio_recurrente(show)
     cambiadas = 0
     for b in vivas:
-        # Ya paso: no se toca. Ya facturada: menos todavia.
         if b.starts_at <= ahora:
             continue
         if getattr(b, "cfdi_id", None) or getattr(b, "invoice_paid", False):
             continue
-        if b.agreed_price is None or abs(float(b.agreed_price) - tarifa) > 0.01:
-            continue   # no estaba a tarifa de volumen
-        b.agreed_price = pricing.effective_price(show, b.starts_at)["price"]
+        debido = (await _tarifa.precio_para(
+            db, show=show, company_id=company_id, fecha=b.starts_at,
+            excluir_booking_id=b.id))["price"]
+        if debido is None or b.agreed_price is None:
+            continue
+        actual = float(b.agreed_price)
+        if abs(float(debido) - actual) < 0.01:
+            continue
+        # Solo se corrige si el importe guardado es uno de los dos que el sistema
+        # pudo haber puesto: el calculado de ahora o el de antes del cambio. Si es
+        # otro, lo negocio una persona y se respeta.
+        candidatos = [float(debido)]
+        if precio_anterior is not None:
+            candidatos.append(float(precio_anterior))
+        tarifa_vol = precio_recurrente(show)
+        if tarifa_vol is not None:
+            candidatos.append(float(tarifa_vol))
+        sin_volumen = (await _tarifa.precio_para(
+            db, show=show, company_id=company_id, fecha=b.starts_at,
+            excluir_booking_id=b.id, forzar_sin_recurrente=True))["price"]
+        if sin_volumen is not None:
+            candidatos.append(float(sin_volumen))
+        if not any(abs(actual - c) < 0.01 for c in candidatos):
+            continue   # precio puesto a mano: no se pisa
+        b.agreed_price = debido
         cambiadas += 1
     return cambiadas
+
+
+async def recalcular_tras_cancelar(db: AsyncSession, cancelada) -> int:
+    """Al cancelar: si el hotel baja de cinco, las que queden vuelven a subir."""
+    return await repreciar_ventana(
+        db, show_id=cancelada.show_id, company_id=cancelada.company_id,
+        cerca_de=cancelada.starts_at,
+        precio_anterior=float(cancelada.agreed_price) if cancelada.agreed_price is not None else None)
+
+
+async def recalcular_tras_crear(db: AsyncSession, nueva, hasta: datetime | None = None) -> int:
+    """Al crear: si esta es la quinta, las cuatro anteriores bajan a la tarifa.
+
+    `hasta` es la ultima fecha de la tanda cuando se crean varias de golpe.
+    """
+    return await repreciar_ventana(
+        db, show_id=nueva.show_id, company_id=nueva.company_id,
+        cerca_de=nueva.starts_at, hasta=hasta)

@@ -19,7 +19,7 @@ from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
 from app.models.venue import Venue
 from app.schemas.show import PriceBenchmarkOut, ShowCreate, ShowOut, ShowUpdate
-from app.services import availability, geo, pricing
+from app.services import availability, geo, pricing, recurrente
 
 router = APIRouter(tags=["shows"])
 
@@ -150,6 +150,17 @@ async def list_shows(
         if row is not None:
             origin = (row[0], row[1])
 
+    # Precio recurrente: cuántas actuaciones de cada show lleva ya el hotel en la
+    # misma ventana de 45 días. Se cuenta contra el hotel que CONTRATA (el del
+    # venue si se indicó, que es el company_id con el que se creará la
+    # actuación), no contra el del usuario conectado: un director de cadena
+    # agendando para una propiedad tiene que ver el contador de ESA propiedad.
+    con_tarifa = {s.id for s in shows if recurrente.es_oferta(s)}
+    llevan: dict[int, int] = {}
+    if con_tarifa and on is not None:
+        llevan = await recurrente.conteos_por_show(
+            db, show_ids=con_tarifa, company_id=origin_company_id, cerca_de=on)
+
     for s in shows:
         imgs = list(s.images or [])
         show_img = None
@@ -176,10 +187,26 @@ async def list_shows(
         )
         # Precio efectivo = base → temporada del show (si la fecha cae dentro) →
         # tarifa especial pactada con ese hotel/cadena → extra por distancia.
+        # Tarifa por volumen: sólo entra en el precio si ya está activada para
+        # esta fecha y este hotel. La condición y el importe se enseñan igual
+        # cuando no lo está, para que el hotel pueda planear las cinco.
+        tarifa_rec = recurrente.precio_recurrente(s) if recurrente.es_oferta(s) else None
+        s.recurrent_active = False
+        if tarifa_rec is not None:
+            s.recurrent_price = tarifa_rec
+            s.recurrent_min = recurrente.MINIMO
+            s.recurrent_days = recurrente.DIAS_VENTANA
+            if on is not None:
+                n = llevan.get(s.id, 0)
+                s.recurrent_count = n
+                # +1 porque la que se está agendando también cuenta.
+                s.recurrent_active = (n + 1) >= recurrente.MINIMO
         info = pricing.effective_price(
-            s, on, rate_by_artist.get(s.artist_id), distance_km=s.distance_km
+            s, on, rate_by_artist.get(s.artist_id), distance_km=s.distance_km,
+            recurrent_price=tarifa_rec if s.recurrent_active else None,
         )
         s.effective_price = info["price"]
+        s.has_recurrent = info["has_recurrent"]
         s.has_special_rate = info["has_special_rate"]
         s.season_label = info["season_label"]
         s.season_pct = info["season_pct"]
