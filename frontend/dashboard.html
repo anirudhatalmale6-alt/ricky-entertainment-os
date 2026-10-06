@@ -943,6 +943,9 @@
      retención con sus cuatro opciones exactas. */
   .rtops.dos{grid-template-columns:repeat(2,1fr)}
   .rtops.tres{grid-template-columns:repeat(3,1fr)}
+  .rtgrupo{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--mut);margin:10px 0 5px}
+  .rtgrupo:first-child{margin-top:0}
   /* Folio de la orden de actuación: se lee, se copia y no se confunde con el
      texto de al lado. */
   .agfolio{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;
@@ -6227,11 +6230,16 @@ function renderAgenda(fromRange){
         : `<button class="mini" onclick="openEditAct(${b.id})">Editar</button>${pase}`}</div></td>`;
     }
     const fut = b.starts_at && new Date(b.starts_at) > new Date();
+    // El proveedor también necesita SU pase: en el flujo de David es él quien lo
+    // presenta en la puerta de servicio. Sólo cuando ya está confirmada: un pase
+    // de algo que todavía no aceptó no abre ninguna puerta.
+    const paseA = (b.pase_token && ['confirmed','completed'].includes(b.status))
+      ? `<button class="mini" onclick="openPase(${b.id})" title="Enséñalo en la entrada de servicio">▣ Mi pase</button>` : '';
     if(b.status==='pending')
       return `<td><div class="agact"><button class="mini ok" onclick="artistRespond(${b.id},'accept')">Aceptar</button><button class="mini no" onclick="artistRespond(${b.id},'reject')">Rechazar</button></div></td>`;
     if(b.status==='confirmed' && fut)
-      return `<td><div class="agact"><button class="mini" onclick="notifyStatus(${b.id},'on_way')">🚗 En camino</button><button class="mini ok" onclick="notifyStatus(${b.id},'arrived')">📍 Llegué</button><button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></div></td>`;
-    return `<td><span class="muted">—</span></td>`; };
+      return `<td><div class="agact"><button class="mini" onclick="notifyStatus(${b.id},'on_way')">🚗 En camino</button><button class="mini ok" onclick="notifyStatus(${b.id},'arrived')">📍 Llegué</button>${paseA}<button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></div></td>`;
+    return `<td>${paseA||'<span class="muted">—</span>'}</td>`; };
   body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDateAg(b.starts_at)}</td><td>${esc(b.show_name||'—')}${b.folio?`<div class="agfolio">${esc(b.folio)}</div>`:''}</td>
       ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}${isArtist?mapsLink(b):''}</td>${ES_MUSICO?'':`<td>${MXN(b.agreed_price)}</td>`}
       <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
@@ -6270,24 +6278,38 @@ function ratePick(campo, valor){
 // Motivos por los que una actuación no se completó. La lista la sirve el
 // servidor (/reviews/motivos-incidencia); esto es sólo el respaldo para que la
 // ventana abra aunque esa llamada falle, nunca la fuente de verdad.
+// Los dos grupos del blueprint de David: falló el proveedor, o el evento no se
+// realizó. Las dos dejan la actuación fuera de la factura igual, pero sólo la
+// primera cuenta en el historial del músico.
+let RT_GRUPOS=[
+  {codigo:'no_show', texto:'No llegó el proveedor'},
+  {codigo:'no_ocurrio', texto:'El evento no se realizó'},
+];
 let RT_MOTIVOS=[
-  {codigo:'no_llego', texto:'No llegó'},
-  {codigo:'llego_tarde', texto:'Llegó tarde'},
-  {codigo:'incompleta', texto:'Se interrumpió o no terminó'},
-  {codigo:'clima', texto:'Mal clima'},
-  {codigo:'cancelo_hotel', texto:'El hotel la suspendió'},
-  {codigo:'otro', texto:'Otro motivo'},
+  {codigo:'no_llego', texto:'No llegó', grupo:'no_show'},
+  {codigo:'llego_tarde', texto:'Llegó tarde', grupo:'no_show'},
+  {codigo:'incompleta', texto:'Se interrumpió o no terminó', grupo:'no_show'},
+  {codigo:'cancelo_hotel', texto:'El hotel lo suspendió', grupo:'no_ocurrio'},
+  {codigo:'clima', texto:'Mal clima o fuerza mayor', grupo:'no_ocurrio'},
+  {codigo:'otro', texto:'Otro motivo', grupo:'no_ocurrio'},
 ];
 async function rtCargarMotivos(){
   try{
     const r=await api('/reviews/motivos-incidencia');
     if(r && r.motivos && r.motivos.length) RT_MOTIVOS=r.motivos;
+    if(r && r.grupos && r.grupos.length) RT_GRUPOS=r.grupos;
   }catch(e){ /* se queda el respaldo */ }
 }
 function rtMotivosHTML(){
-  return `<div class="rtops tres" id="rt_motivos">${RT_MOTIVOS.map(m=>
-    `<button type="button" class="rtop" data-v="${esc(m.codigo)}"
-      onclick="rateMotivo('${esc(m.codigo)}')">${esc(m.texto)}</button>`).join('')}</div>`;
+  const bloque=g=>{
+    const ms=RT_MOTIVOS.filter(m=>(m.grupo||'no_show')===g.codigo);
+    if(!ms.length) return '';
+    return `<div class="rtgrupo">${esc(g.texto)}</div>
+      <div class="rtops tres">${ms.map(m=>
+        `<button type="button" class="rtop" data-v="${esc(m.codigo)}"
+          onclick="rateMotivo('${esc(m.codigo)}')">${esc(m.texto)}</button>`).join('')}</div>`;
+  };
+  return `<div id="rt_motivos">${RT_GRUPOS.map(bloque).join('')}</div>`;
 }
 function rateMotivo(codigo){
   RATE.motivo=(RATE.motivo===codigo)?null:codigo;
@@ -6347,6 +6369,9 @@ function openRate(bookingId){
       <div id="rt_no" style="display:none">
         <div class="field"><label>¿Qué pasó?</label>
           ${rtMotivosHTML()}
+          <div class="hint" style="margin:8px 0 0">Las dos dejan la actuación fuera de la
+            factura. La diferencia es que sólo "no llegó el proveedor" cuenta en su historial:
+            un evento que suspendió el hotel no es culpa suya.</div>
         </div>
         <div class="field"><label>Detalle (opcional)</label>
           <textarea id="rt_nota" rows="3" maxlength="600" placeholder="Lo que haga falta para entenderlo después: a qué hora se avisó, si se repuso otro día…"></textarea></div>

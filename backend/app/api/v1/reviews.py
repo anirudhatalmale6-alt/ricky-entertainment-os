@@ -307,15 +307,46 @@ async def resumen_de_periodo(scope: CurrentScope, db: DbSession,
 # el motivo a su manera, en seis meses no se puede contar cuántas veces falló un
 # proveedor, que es justo lo que esto tiene que contestar. El texto libre va
 # aparte, en la nota, y ahí cabe todo lo que no entre en la lista.
-MOTIVOS_INCIDENCIA: list[tuple[str, str]] = [
-    ("no_llego", "No llegó"),
-    ("llego_tarde", "Llegó tarde"),
-    ("incompleta", "Se interrumpió o no terminó"),
-    ("clima", "Mal clima"),
-    ("cancelo_hotel", "El hotel la suspendió"),
-    ("otro", "Otro motivo"),
+#
+# Y van en DOS grupos, los dos que dibujó David en su blueprint del 06/10:
+#
+#   NO SHOW          — el proveedor falló. Cuenta en su historial.
+#   NO SE REALIZÓ    — el evento se cayó por otra razón. NO cuenta contra él.
+#
+# La diferencia no es cosmética. Las dos dejan la actuación fuera de la factura
+# igual, pero apuntarle al músico un evento que suspendió el hotel, o que se cayó
+# por un huracán, es cargarle un historial que no es suyo, y el historial es lo
+# que mira el siguiente hotel antes de contratarlo.
+NO_SHOW = "no_show"            # falló el proveedor
+NO_OCURRIO = "no_ocurrio"      # el evento no se realizó
+
+GRUPOS_INCIDENCIA = [
+    (NO_SHOW, "No llegó el proveedor"),
+    (NO_OCURRIO, "El evento no se realizó"),
 ]
-_MOTIVOS = {c for c, _ in MOTIVOS_INCIDENCIA}
+
+#                 código           texto                          grupo
+MOTIVOS_INCIDENCIA: list[tuple[str, str, str]] = [
+    ("no_llego", "No llegó", NO_SHOW),
+    ("llego_tarde", "Llegó tarde", NO_SHOW),
+    ("incompleta", "Se interrumpió o no terminó", NO_SHOW),
+    ("cancelo_hotel", "El hotel lo suspendió", NO_OCURRIO),
+    ("clima", "Mal clima o fuerza mayor", NO_OCURRIO),
+    ("otro", "Otro motivo", NO_OCURRIO),
+]
+_MOTIVOS = {c for c, _, _ in MOTIVOS_INCIDENCIA}
+_TEXTO = {c: t for c, t, _ in MOTIVOS_INCIDENCIA}
+_GRUPO = {c: g for c, _, g in MOTIVOS_INCIDENCIA}
+
+
+def culpa_del_proveedor(motivo: str | None) -> bool:
+    """¿Esta incidencia es del proveedor? Lo que decide si cuenta en su historial.
+
+    "Otro motivo" cae del lado de NO SE REALIZÓ a propósito: si no sabemos de
+    quién fue, no se lo cargamos a nadie. Acusar por defecto sale barato aquí y
+    caro en el perfil de alguien que vive de esto.
+    """
+    return _GRUPO.get(motivo or "") == NO_SHOW
 
 
 class IncidenciaIn(BaseModel):
@@ -327,7 +358,11 @@ class IncidenciaIn(BaseModel):
 async def motivos_incidencia(_: CurrentScope):
     """La lista para pintar los botones, servida desde aquí para que pantalla y
     servidor no puedan discrepar sobre qué motivos existen."""
-    return {"motivos": [{"codigo": c, "texto": t} for c, t in MOTIVOS_INCIDENCIA]}
+    return {
+        "grupos": [{"codigo": g, "texto": t} for g, t in GRUPOS_INCIDENCIA],
+        "motivos": [{"codigo": c, "texto": t, "grupo": g}
+                    for c, t, g in MOTIVOS_INCIDENCIA],
+    }
 
 
 @router.post("/bookings/{booking_id}/no-completada")
@@ -366,13 +401,14 @@ async def marcar_no_completada(booking_id: int, payload: IncidenciaIn,
     booking.incidencia_por = scope.user.id if scope.user is not None else None
     await db.commit()
     await db.refresh(booking)
-    texto = dict(MOTIVOS_INCIDENCIA)[payload.motivo]
     return {
         "booking_id": booking.id,
         "folio": booking.folio,
         "status": booking.status.value,
         "motivo": booking.incidencia_motivo,
-        "motivo_texto": texto,
+        "motivo_texto": _TEXTO[payload.motivo],
+        "grupo": _GRUPO[payload.motivo],
+        "cuenta_al_proveedor": culpa_del_proveedor(payload.motivo),
         "nota": booking.incidencia_nota,
         "marcada_el": booking.incidencia_at.isoformat() if booking.incidencia_at else None,
         "factura": "Queda fuera de la facturación de la quincena.",
