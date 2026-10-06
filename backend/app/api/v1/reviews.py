@@ -22,6 +22,7 @@ from app.models.enums import BookingStatus
 from app.models.review import Review
 from app.models.show import Show
 from app.models.venue import Venue
+from app.services import historial
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
@@ -163,6 +164,16 @@ async def calificar(booking_id: int, payload: ReviewIn, scope: CurrentScope, db:
     # se dijo que no ocurrieron.
     if booking.status not in (BookingStatus.CANCELLED, BookingStatus.NO_SHOW):
         booking.status = BookingStatus.COMPLETED
+
+    if not existente:
+        historial.registrar(
+            db, booking, historial.CALIFICADA,
+            f"Calificada con {payload.rating} de 5 · confirma que ocurrio y libera el cobro",
+            scope=scope, detalle=payload.comment)
+    else:
+        historial.registrar(db, booking, historial.CALIFICADA,
+                            f"Calificacion corregida a {payload.rating} de 5",
+                            scope=scope, detalle=payload.comment)
 
     await db.commit()
     await db.refresh(review)
@@ -399,6 +410,9 @@ async def marcar_no_completada(booking_id: int, payload: IncidenciaIn,
     booking.incidencia_nota = (payload.nota or "").strip() or None
     booking.incidencia_at = _now()
     booking.incidencia_por = scope.user.id if scope.user is not None else None
+    historial.registrar(db, booking, historial.INCIDENCIA,
+                        f"No se completo: {_TEXTO[payload.motivo]}",
+                        scope=scope, detalle=payload.nota)
     await db.commit()
     await db.refresh(booking)
     return {

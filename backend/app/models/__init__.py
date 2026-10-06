@@ -17,6 +17,7 @@ from app.models.notification import ArtistNotification
 from app.models.blocked_date import ArtistBlockedDate
 from app.models.password_reset import PasswordResetToken
 from app.models.tax_figure import TaxFigure
+from app.models.booking_evento import BookingEvento
 from app.models.cfdi import Cfdi
 from app.models.contract import ContractTemplate, ContractAcceptance
 from app.models.support import SupportMessage
@@ -67,6 +68,7 @@ __all__ = [
     "ArtistBlockedDate",
     "PasswordResetToken",
     "TaxFigure",
+    "BookingEvento",
     "Cfdi",
     "ContractTemplate",
     "ContractAcceptance",

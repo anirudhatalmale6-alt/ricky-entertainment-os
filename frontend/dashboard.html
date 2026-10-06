@@ -946,6 +946,20 @@
   .rtgrupo{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
     color:var(--mut);margin:10px 0 5px}
   .rtgrupo:first-child{margin-top:0}
+  /* Línea de tiempo del historial de una orden. */
+  .hstl{display:flex;flex-direction:column}
+  .hsev{display:flex;gap:11px;padding-bottom:14px;position:relative}
+  .hsev:not(:last-child)::before{content:'';position:absolute;left:13px;top:28px;bottom:0;
+    width:1px;background:var(--line)}
+  .hsic{flex:none;width:27px;height:27px;border-radius:50%;border:1.5px solid;
+    display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--card);z-index:1}
+  .hstx{flex:1;min-width:0;padding-top:3px}
+  .hsh{display:flex;gap:10px;align-items:baseline;justify-content:space-between}
+  .hsh b{font-size:13px;font-weight:650;line-height:1.35}
+  .hsh span{flex:none;font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
+  .hsq{font-size:11.5px;color:var(--mut);margin-top:2px}
+  .hsd{font-size:12px;margin-top:4px;padding:7px 9px;border-radius:8px;
+    background:var(--bg2,#f4f5f9);white-space:pre-line;line-height:1.45}
   /* Folio de la orden de actuación: se lee, se copia y no se confunde con el
      texto de al lado. */
   .agfolio{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;
@@ -3243,7 +3257,7 @@ async function reload(){
   await show(active,true);
 }
 
-const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Actuaciones","Agenda de shows por venue"],
+const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Órdenes de Servicio","Actuaciones programadas por venue · cada una con su folio"],
   master:["Master","Panel de control interno · resumen general de operaciones"],
   artists:["Buscar Proveedores","Encuentra y contrata proveedores para tu hotel y eventos"],
   reqs:["Solicitudes","Tablero de pedidos abiertos"],chat:["Chat","Conversaciones hotel · artista"],
@@ -6225,9 +6239,10 @@ function renderAgenda(fromRange){
       // va junto a Editar porque es lo que se hace ANTES de que llegue el día.
       const pase = b.pase_token
         ? `<button class="mini" onclick="openPase(${b.id})" title="QR de acceso para seguridad">▣ Pase</button>` : '';
+      const hist = `<button class="mini" onclick="openHistorial(${b.id})" title="Qué le ha pasado a esta orden">🕘 Historial</button>`;
       return `<td><div class="agact">${['completed','cancelled'].includes(b.status)
-        ? (pase || '<span class="muted">—</span>')
-        : `<button class="mini" onclick="openEditAct(${b.id})">Editar</button>${pase}`}</div></td>`;
+        ? pase
+        : `<button class="mini" onclick="openEditAct(${b.id})">Editar</button>${pase}`}${hist}</div></td>`;
     }
     const fut = b.starts_at && new Date(b.starts_at) > new Date();
     // El proveedor también necesita SU pase: en el flujo de David es él quien lo
@@ -6239,7 +6254,7 @@ function renderAgenda(fromRange){
       return `<td><div class="agact"><button class="mini ok" onclick="artistRespond(${b.id},'accept')">Aceptar</button><button class="mini no" onclick="artistRespond(${b.id},'reject')">Rechazar</button></div></td>`;
     if(b.status==='confirmed' && fut)
       return `<td><div class="agact"><button class="mini" onclick="notifyStatus(${b.id},'on_way')">🚗 En camino</button><button class="mini ok" onclick="notifyStatus(${b.id},'arrived')">📍 Llegué</button>${paseA}<button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></div></td>`;
-    return `<td>${paseA||'<span class="muted">—</span>'}</td>`; };
+    return `<td><div class="agact">${paseA}<button class="mini" onclick="openHistorial(${b.id})" title="Qué le ha pasado a esta orden">🕘 Historial</button></div></td>`; };
   body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDateAg(b.starts_at)}</td><td>${esc(b.show_name||'—')}${b.folio?`<div class="agfolio">${esc(b.folio)}</div>`:''}</td>
       ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}${isArtist?mapsLink(b):''}</td>${ES_MUSICO?'':`<td>${MXN(b.agreed_price)}</td>`}
       <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
@@ -6485,6 +6500,64 @@ async function paseCopiar(url, el){
   catch(e){ toast('No se pudo copiar. La liga es: '+url, true); }
 }
 window.openPase=openPase; window.paseClose=paseClose; window.paseCopiar=paseCopiar;
+
+// ---- Historial de la orden -----------------------------------------------
+// La pregunta de David: "¿dónde podríamos integrar un historial de la actuación,
+// para ver hora de llegada, cambios…?". Aquí: una línea de tiempo por orden, con
+// la hora, quién lo hizo y el detalle. El icono y el color los manda el servidor
+// para que no haya dos listas que se puedan desincronizar.
+const HCOL={bien:'#15803d', mal:'#b91c1c', aviso:'#b45309', neutro:'#697089'};
+async function openHistorial(bid){
+  const b=(CACHE.agenda||[]).find(x=>x.id===bid)||(CACHE.homeBk||[]).find(x=>x.id===bid)||{};
+  let ov=document.getElementById('hsMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='hsMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) histClose(); }); }
+  ov.innerHTML=`<div class="amod" style="max-width:520px">
+    <div class="ahd"><h3>Historial de la orden</h3></div>
+    <div class="rqbody" style="padding:16px 20px">
+      <div style="font-size:13.5px;font-weight:700">${esc(b.show_name||'Actuación')}</div>
+      <div class="muted" style="font-size:12.5px;margin:2px 0 6px">${
+        [b.artist_name&&esc(b.artist_name), b.venue_name&&esc(b.venue_name),
+         b.starts_at&&fmtDate(b.starts_at)].filter(Boolean).join(' · ')}</div>
+      ${b.folio?`<div class="rtfolio">${esc(b.folio)}</div>`:''}
+      <div id="hsBody" style="margin-top:14px"><div class="muted">Cargando…</div></div>
+    </div>
+    <div class="af"><button class="btn ghost" onclick="histClose()">Cerrar</button></div>
+  </div>`;
+  ov.style.display='flex';
+  try{
+    const r=await api(`/bookings/${bid}/historial`);
+    histPintar(r.eventos||[]);
+  }catch(e){
+    const c=document.getElementById('hsBody');
+    if(c) c.innerHTML=`<div class="muted">No se pudo cargar: ${esc(e.message||'')}</div>`;
+  }
+}
+function histPintar(evs){
+  const c=document.getElementById('hsBody'); if(!c) return;
+  if(!evs.length){ c.innerHTML='<div class="muted">Todavía no hay movimientos registrados.</div>'; return; }
+  c.innerHTML=`<div class="hstl">${evs.map(e=>{
+    const col=HCOL[e.color]||HCOL.neutro;
+    const firma=[e.actor&&esc(e.actor), e.rol_texto&&esc(e.rol_texto)].filter(Boolean).join(' · ');
+    return `<div class="hsev">
+      <div class="hsic" style="color:${col};border-color:${col}33">${e.icono||'•'}</div>
+      <div class="hstx">
+        <div class="hsh"><b>${esc(e.texto||'')}</b><span>${histFecha(e.cuando)}</span></div>
+        ${firma?`<div class="hsq">${firma}</div>`:''}
+        ${e.detalle?`<div class="hsd">${esc(e.detalle)}</div>`:''}
+        ${e.cuenta_al_proveedor===false?'<div class="hsq">No cuenta en el historial del proveedor</div>':''}
+      </div></div>`;
+  }).join('')}</div>`;
+}
+function histFecha(iso){
+  if(!iso) return '';
+  const d=new Date(iso);
+  if(isNaN(d)) return '';
+  return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'2-digit'})
+    +' · '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+}
+function histClose(){ const ov=document.getElementById('hsMov'); if(ov) ov.style.display='none'; }
+window.openHistorial=openHistorial; window.histClose=histClose;
 
 function motivoTexto(codigo){
   if(!codigo) return 'No completada';
@@ -8969,7 +9042,7 @@ const RENDER = {
     const months=[...new Set(bk.map(b=>(b.starts_at||'').slice(0,7)).filter(Boolean))].sort().reverse();
     const mlabel=k=>{const[y,m]=k.split('-');return _cap(new Date(y,m-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'}));};
     const pend = ME.artist_id ? bk.filter(b=>b.status==='pending').length : 0;
-    box.innerHTML=`<div class="box"><h3>🗓️ Agenda de actuaciones</h3>
+    box.innerHTML=`<div class="box"><h3>🗓️ Órdenes de servicio / actuaciones</h3>
       <div class="hint" id="ag_scope">${bk.length} actuaciones · ${scopeTxt}</div>
       ${pend?`<div class="pendbar">🔔 Tienes ${pend} ${pend===1?'actuación pendiente':'actuaciones pendientes'} por aceptar o rechazar.${
         // Al músico de una productora no se le manda a un interruptor que no

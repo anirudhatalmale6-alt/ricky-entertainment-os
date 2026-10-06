@@ -33,7 +33,7 @@ from app.models.enums import (
 from app.models.show import Show
 from app.models.venue import Venue
 from app.services import availability, avisos
-from app.services import folios, recurrente, tarifa
+from app.services import folios, historial, recurrente, tarifa
 from app.schemas.booking import (
     AttendanceIn,
     BookingCreate,
@@ -229,6 +229,8 @@ async def create_booking(payload: BookingCreate, db: DbSession):
     db.add(booking)
     await db.flush()
     await folios.asignar_orden(db, booking)
+    historial.registrar(db, booking, historial.CREADA,
+                        f"Orden emitida · {booking.folio}", scope=None, actor_rol="hotel")
     # Si esta es la quinta del mismo show en el mismo hotel, las anteriores de la
     # misma ventana bajan tambien a la tarifa de volumen: el hotel contrato cinco
     # y las cinco valen la tarifa, no solo la ultima (solo futuras y sin facturar).
@@ -431,13 +433,61 @@ async def update_booking(booking_id: int, payload: BookingUpdate, db: DbSession)
         if new_venue is None:
             raise HTTPException(status_code=404, detail="Venue not found")
         booking.company_id = new_venue.company_id
+    # Lo de antes, para poder contar QUE cambio. Es el unico evento que no se
+    # puede reconstruir despues: la columna solo guarda el valor final.
+    antes = {c: getattr(booking, c) for c in
+             ("starts_at", "ends_at", "venue_id", "agreed_price", "event_type")}
     for field, value in data.items():
         setattr(booking, field, value)
+    despues = {c: getattr(booking, c) for c in antes}
+    cambios = historial.diferencias(antes, {k: v for k, v in despues.items()
+                                            if k in data or antes[k] != v})
+    if cambios:
+        detalle = []
+        if antes["starts_at"] != booking.starts_at:
+            detalle.append(f"Fecha: {antes['starts_at']:%d/%m/%Y %H:%M} -> "
+                           f"{booking.starts_at:%d/%m/%Y %H:%M}")
+        if antes["agreed_price"] != booking.agreed_price:
+            detalle.append(f"Precio: {antes['agreed_price']} -> {booking.agreed_price}")
+        if antes["venue_id"] != booking.venue_id:
+            detalle.append(f"Salon: {antes['venue_id']} -> {booking.venue_id}")
+        historial.registrar(db, booking, historial.CAMBIO,
+                            "Se modifico " + ", ".join(cambios),
+                            detalle=("\n".join(detalle) or None), actor_rol="hotel")
     await db.commit()
     await db.refresh(booking)
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
     show = await db.get(Show, booking.show_id) if booking.show_id else None
     return _decorate(booking, venue, show)
+
+
+@router.get("/{booking_id}/historial")
+async def historial_de_actuacion(booking_id: int, scope: CurrentScope, db: DbSession):
+    """Todo lo que le paso a esta orden: alta, envio, aceptacion, cambios,
+    llegada, calificacion, incidencias, cancelacion y factura.
+
+    Lo ve quien tiene algo que ver con ella: el hotel que la contrato, el
+    proveedor que la toco, y SHOWMA. No es un dato publico — lleva nombres de
+    personas y el motivo de una cancelacion.
+    """
+    booking = await _get_or_404(db, booking_id)
+    if not scope.is_admin:
+        mio = False
+        if scope.company_id and booking.company_id == scope.company_id:
+            mio = True
+        if scope.group_id is not None and booking.company_id:
+            empresa = await db.get(Company, booking.company_id)
+            mio = mio or (empresa is not None and empresa.group_id == scope.group_id)
+        if scope.artist_id and booking.artist_id == scope.artist_id:
+            mio = True
+        if not mio:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Esta actuacion no es tuya.")
+    return {
+        "booking_id": booking.id,
+        "folio": booking.folio,
+        "eventos": await historial.linea_de_tiempo(db, booking),
+    }
 
 
 @router.post(
@@ -451,6 +501,8 @@ async def confirm_booking(booking_id: int, db: DbSession):
         raise HTTPException(status_code=409, detail="Solo se confirma una actuacion pendiente")
     booking.status = BookingStatus.CONFIRMED
     booking.confirmed_at = _now()
+    historial.registrar(db, booking, historial.ACEPTADA,
+                        "El proveedor acepto la actuacion", actor_rol="proveedor")
     await db.commit()
     await db.refresh(booking)
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
@@ -518,6 +570,9 @@ async def cancel_booking(booking_id: int, scope: CurrentScope, db: DbSession, bg
     booking.cancelled_by = "admin" if scope.is_admin else "hotel"
     # Si esta cancelacion deja al hotel por debajo de cinco, las que quedan
     # vuelven a su precio normal (solo futuras y sin facturar).
+    historial.registrar(db, booking, historial.CANCELADA,
+                        "Cancelada por " + ("SHOWMA" if scope.is_admin else "el hotel"),
+                        scope=scope, detalle=reason)
     await recurrente.recalcular_tras_cancelar(db, booking)
     correos = await _notify_artist_cancel(db, booking, reason)   # avisar al músico
     await db.commit()

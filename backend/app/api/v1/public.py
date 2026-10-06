@@ -374,8 +374,15 @@ async def confirmar_llegada(token: str, payload: LlegadaIn, db: DbSession) -> di
             status_code=status.HTTP_409_CONFLICT,
             detail="Esta actuación está cancelada. No registres la llegada: avisa a quien la contrató.")
     if b.llegada_at is None:          # la primera marca manda; no se pisa
+        from app.services import historial
+
         b.llegada_at = datetime.utcnow()
         b.llegada_por = (payload.quien or "").strip()[:120] or None
+        historial.registrar(
+            db, b, historial.LLEGADA, "Llegada confirmada en el acceso",
+            detalle=(f"La registro {b.llegada_por}" if b.llegada_por else
+                     "Sin nombre de quien la registro"),
+            actor_nombre=b.llegada_por, actor_rol="seguridad")
         await db.commit()
         await db.refresh(b)
     return {
