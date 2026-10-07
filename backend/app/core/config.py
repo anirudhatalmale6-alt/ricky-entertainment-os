@@ -51,6 +51,19 @@ class Settings(BaseSettings):
     # vuelva a True, los tres que ya lo tenían puesto siguen como estaban.
     AUTO_CONFIRM_ENABLED: bool = False
 
+    # --- Mailgun (David, 07/10) ---------------------------------------
+    # El correo sale por la API HTTPS de Mailgun y no por SMTP, porque
+    # DigitalOcean bloquea los puertos de correo de salida en el droplet
+    # (comprobado: 587, 465 y 2525 no abren). HTTPS sí sale.
+    #
+    # Si MAILGUN_API_KEY está vacío, el envío sigue por SMTP como hasta ahora.
+    # Así esto se puede desplegar antes de tener la clave sin cambiar nada.
+    MAILGUN_API_KEY: str = ""
+    MAILGUN_DOMAIN: str = ""
+    # "us" o "eu". La dirección de la API cambia según dónde se cree la cuenta,
+    # y mandar a la región equivocada da un 401 que parece clave mala.
+    MAILGUN_REGION: str = "us"
+
     # Database - SQLite for dev, PostgreSQL (asyncpg) for prod
     #   postgresql+asyncpg://user:pass@host:5432/dbname
     DATABASE_URL: str = "sqlite+aiosqlite:///./ricky.db"

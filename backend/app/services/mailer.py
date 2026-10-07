@@ -23,8 +23,55 @@ from app.core.config import settings
 log = logging.getLogger(__name__)
 
 
+def usa_mailgun() -> bool:
+    return bool(settings.MAILGUN_API_KEY and settings.MAILGUN_DOMAIN)
+
+
 def is_configured() -> bool:
-    return bool(settings.SMTP_HOST and settings.mail_from)
+    return bool(usa_mailgun() and settings.mail_from) or bool(
+        settings.SMTP_HOST and settings.mail_from)
+
+
+def _mailgun_url() -> str:
+    """La región NO es cosmética: una cuenta creada en Europa responde 401
+    contra la dirección de Estados Unidos, y ese 401 se lee como clave mala."""
+    host = ("api.eu.mailgun.net" if (settings.MAILGUN_REGION or "us").lower() == "eu"
+            else "api.mailgun.net")
+    return f"https://{host}/v3/{settings.MAILGUN_DOMAIN}/messages"
+
+
+def _mailgun_payload(to: str, subject: str, text: str, html: str | None,
+                     imagenes: dict[str, bytes] | None):
+    """(data, files) de la petición. Separado del envío para poder revisarlo en
+    una prueba sin tocar la red."""
+    data = {
+        "from": formataddr((settings.SMTP_FROM_NAME, settings.mail_from)),
+        "to": to,
+        "subject": subject,
+        "text": text,
+    }
+    if html:
+        data["html"] = html
+    files = []
+    for nombre, datos in (imagenes or {}).items():
+        # Mailgun usa el NOMBRE DEL ARCHIVO como Content-ID de una imagen
+        # "inline". Por eso el archivo se llama igual que el cid que referencia
+        # el HTML (cid:qrpase) y NO qrpase.png: si le pongo la extensión, el
+        # cid pasa a ser "qrpase.png", deja de coincidir, y llega el hueco
+        # blanco donde va el código. Es el mismo fallo silencioso que por SMTP.
+        files.append(("inline", (nombre, datos, "image/png")))
+    return data, files
+
+
+async def _send_mailgun(to: str, subject: str, text: str, html: str | None,
+                        imagenes: dict[str, bytes] | None) -> None:
+    import httpx
+
+    data, files = _mailgun_payload(to, subject, text, html, imagenes)
+    async with httpx.AsyncClient(timeout=20) as cli:
+        r = await cli.post(_mailgun_url(), auth=("api", settings.MAILGUN_API_KEY),
+                           data=data, files=files or None)
+        r.raise_for_status()
 
 
 def _send_sync(to: str, subject: str, text: str, html: str | None,
@@ -76,7 +123,11 @@ async def send(to: str, subject: str, text: str, html: str | None = None,
         log.warning("SMTP no configurado; no se envió '%s' a %s", subject, to)
         return False
     try:
-        await asyncio.to_thread(_send_sync, to, subject, text, html, imagenes)
+        if usa_mailgun():
+            # Por HTTPS, que es lo único que sale del droplet.
+            await _send_mailgun(to, subject, text, html, imagenes)
+        else:
+            await asyncio.to_thread(_send_sync, to, subject, text, html, imagenes)
         return True
     except Exception:  # noqa: BLE001 - se registra y se sigue
         log.exception("Falló el envío de '%s' a %s", subject, to)
