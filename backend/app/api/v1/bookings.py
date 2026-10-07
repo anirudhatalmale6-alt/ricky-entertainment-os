@@ -755,30 +755,30 @@ async def artist_respond(
     ]
 
     # ACEPTADA = la orden toma vida, y es cuando sale el pase (David, 06/10).
-    # Va al hotel, para que se lo pase a seguridad, y al propio proveedor, que
-    # es quien lo enseña en la puerta. El QR se incrusta como imagen; la
-    # direccion del pase va escrita en el cuerpo por si no se pinta.
+    #
+    # SOLO al proveedor, no al hotel (David, 07/10): "el del hotel no hace falta
+    # porque ya esta todo en sistema, y diariamente tendrian que reenviar 3-5
+    # correos, mas lo que entran normalmente... probablemente caeria en el
+    # olvido; esa es la intencion del QR, que puedan verificar sin tener que
+    # usar laptop".
+    #
+    # Y es el modelo correcto, el de la tarjeta de embarque: seguridad no recibe
+    # nada, escanea lo que le enseñan. El hotel sigue teniendo el boton "Pase"
+    # en la lista de ordenes para las veces que lo necesite.
     if action == "accept" and booking.pase_token:
-        from app.services import pase as pase_svc
-
-        empresa = await db.get(Company, booking.company_id) if booking.company_id else None
-        destino = pase_svc.url_pase(booking.pase_token, settings.public_root)
-        png = pase_svc.png_qr(destino, escala=6)
-        base = dict(
-            show=datos["show"], artista=datos["artista"], venue=datos["venue"],
-            hotel=(empresa.name if empresa else "") or "",
-            cuando=datos["cuando"], folio=booking.folio,
-            integrantes=getattr(show, "members", None), url_pase=destino,
-        )
-        a_h, t_h, h_h = avisos.pase_actuacion(**base, para="hotel")
-        correos += [avisos.Aviso(to=d, subject=a_h, text=t_h, html=h_h,
-                                 imagenes={"qrpase": png})
-                    for d in await avisos.correos_hotel(db, booking.company_id)]
         correo_prov = await avisos.correo_artista(db, artist) if artist else None
         if correo_prov:
-            a_p, t_p, h_p = avisos.pase_actuacion(**base, para="proveedor")
+            from app.services import pase as pase_svc
+
+            empresa = await db.get(Company, booking.company_id) if booking.company_id else None
+            destino = pase_svc.url_pase(booking.pase_token, settings.public_root)
+            a_p, t_p, h_p = avisos.pase_actuacion(
+                show=datos["show"], artista=datos["artista"], venue=datos["venue"],
+                hotel=(empresa.name if empresa else "") or "",
+                cuando=datos["cuando"], folio=booking.folio,
+                integrantes=getattr(show, "members", None), url_pase=destino)
             correos.append(avisos.Aviso(to=correo_prov, subject=a_p, text=t_p, html=h_p,
-                                        imagenes={"qrpase": png}))
+                                        imagenes={"qrpase": pase_svc.png_qr(destino, escala=6)}))
     await db.commit()
     avisos.despachar(bg, correos)
     await db.refresh(booking)

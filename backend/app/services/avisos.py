@@ -350,8 +350,7 @@ def prueba() -> tuple[str, str, str]:
 
 def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
                    cuando: datetime | None, folio: str | None,
-                   integrantes: int | None, url_pase: str,
-                   para: str = "proveedor") -> tuple[str, str, str]:
+                   integrantes: int | None, url_pase: str) -> tuple[str, str, str]:
     """(asunto, texto, html) de la confirmación con el PASE DE ACCESO.
 
     David, 06/10: "una confirmación por mail ademas de la registrada en el web,
@@ -376,17 +375,14 @@ def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
         ("Personas que llegan", str(integrantes) if integrantes else ""),
     ]
 
-    if para == "hotel":
-        intro = (f"Tu actuación de <b>{_e(show)}</b> quedó confirmada. "
-                 "Abajo tienes el pase de acceso para pasárselo a seguridad.")
-        cierre = ("Seguridad puede escanear el código o abrir el enlace. Verá quién llega, "
-                  "cuántos son y si la actuación está confirmada, y podrá registrar la hora "
-                  "de llegada.")
-    else:
-        intro = (f"Tu actuación de <b>{_e(show)}</b> quedó confirmada. "
-                 "Este es tu pase: enséñalo al llegar en el acceso de servicio.")
-        cierre = ("Guarda este correo o haz una captura del código. Si no te abre el enlace, "
-                  "enseña el folio de la orden en la entrada.")
+    # Va SOLO al proveedor. El hotel no lo recibe por correo a proposito: ya lo
+    # tiene en el sistema, y reenviarle 3-5 pases al dia a seguridad acabaria en
+    # el olvido (David, 07/10). Si algun dia hace falta la version para el hotel,
+    # son cuatro lineas aqui.
+    intro = (f"Tu actuación de <b>{_e(show)}</b> quedó confirmada. "
+             "Este es tu pase: enséñalo al llegar en el acceso de servicio.")
+    cierre = ("Guarda este correo o haz una captura del código. Si no te abre el enlace, "
+              "enseña el folio de la orden en la entrada.")
 
     qr_html = (
         '<div style="text-align:center;margin:22px 0">'
