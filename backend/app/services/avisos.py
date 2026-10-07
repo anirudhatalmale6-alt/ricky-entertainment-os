@@ -40,6 +40,9 @@ class Aviso:
     # Si viene, se marca en artist_notifications que el correo salió, para que
     # en Master se pueda ver a quién se le avisó de verdad y a quién no.
     notification_id: int | None = None
+    # Imágenes incrustadas por Content-ID: {"qrpase": b"...png..."}. Se usa para
+    # el QR del pase de acceso; ver mailer._send_sync.
+    imagenes: dict | None = None
 
 
 def activo() -> bool:
@@ -72,7 +75,7 @@ async def _marcar_enviados(ids: list[int]) -> None:
 async def _correr(avisos: list[Aviso]) -> None:
     enviados: list[int] = []
     for a in avisos:
-        ok = await mailer.send(a.to, a.subject, a.text, a.html)
+        ok = await mailer.send(a.to, a.subject, a.text, a.html, a.imagenes)
         if ok and a.notification_id:
             enviados.append(a.notification_id)
     await _marcar_enviados(enviados)
@@ -343,3 +346,78 @@ def prueba() -> tuple[str, str, str]:
         f"Panel: {_panel_url()}\n\n— SHOWMA"
     )
     return asunto, texto, mailer.wrap(cuerpo, footer="Correo de prueba enviado desde Master.")
+
+
+def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
+                   cuando: datetime | None, folio: str | None,
+                   integrantes: int | None, url_pase: str,
+                   para: str = "proveedor") -> tuple[str, str, str]:
+    """(asunto, texto, html) de la confirmación con el PASE DE ACCESO.
+
+    David, 06/10: "una confirmación por mail ademas de la registrada en el web,
+    tal y como cuando reservamos un billete de avión u hotel. Este mail debería
+    tener un QR para que personal de seguridad pueda verificar quién llega".
+
+    El QR se incrusta con ``cid:qrpase`` y la imagen la pasa quien envía, en el
+    parámetro ``imagenes`` de mailer.send. Ver allí por qué no es un data: URI.
+
+    Y pase lo que pase con la imagen, LA DIRECCIÓN DEL PASE VA ESCRITA. Un
+    correo cuyo QR no se pinta -porque el cliente de correo es raro, porque se
+    reenvió como texto plano, porque el de la caseta lo abrió en un móvil de
+    2015- tiene que seguir sirviendo. Por eso el enlace está a la vista y no
+    sólo detrás del botón.
+    """
+    filas = [
+        ("Orden", folio or ""),
+        ("Show", show),
+        ("Proveedor", artista),
+        ("Lugar", f"{venue} · {hotel}" if hotel and venue else (venue or hotel)),
+        ("Fecha y hora", _fmt(cuando)),
+        ("Personas que llegan", str(integrantes) if integrantes else ""),
+    ]
+
+    if para == "hotel":
+        intro = (f"Tu actuación de <b>{_e(show)}</b> quedó confirmada. "
+                 "Abajo tienes el pase de acceso para pasárselo a seguridad.")
+        cierre = ("Seguridad puede escanear el código o abrir el enlace. Verá quién llega, "
+                  "cuántos son y si la actuación está confirmada, y podrá registrar la hora "
+                  "de llegada.")
+    else:
+        intro = (f"Tu actuación de <b>{_e(show)}</b> quedó confirmada. "
+                 "Este es tu pase: enséñalo al llegar en el acceso de servicio.")
+        cierre = ("Guarda este correo o haz una captura del código. Si no te abre el enlace, "
+                  "enseña el folio de la orden en la entrada.")
+
+    qr_html = (
+        '<div style="text-align:center;margin:22px 0">'
+        '<img src="cid:qrpase" alt="Pase de acceso" '
+        'style="width:190px;height:190px;border:1px solid #e6e8ec;border-radius:10px">'
+        f'<div style="font-size:12px;color:#6b7280;margin-top:6px">Pase {_e(folio or "")}</div>'
+        "</div>"
+    )
+    enlace_visible = (
+        '<p style="font-size:12.5px;color:#6b7280;word-break:break-all;text-align:center">'
+        f'Si el código no se ve: <a href="{url_pase}" style="color:#382ca1">{url_pase}</a></p>'
+    )
+
+    asunto = f"Pase de acceso · {show}" + (f" · {folio}" if folio else "")
+    html = (
+        f"<p>{intro}</p>"
+        + _ficha(filas)
+        + qr_html
+        + _boton("Abrir el pase", url_pase)
+        + enlace_visible
+        + f'<p style="color:#6b7280;font-size:13px">{cierre}</p>'
+    )
+    plano = [
+        _sin_marcas(intro), "",
+        *[f"{k}: {v}" for k, v in filas if v],
+        "",
+        f"Pase de acceso: {url_pase}",
+        "",
+        _sin_marcas(cierre),
+        "", "— SHOWMA",
+    ]
+    return asunto, "\n".join(plano), mailer.wrap(html, footer=(
+        "Recibes este correo porque tienes una actuación agendada en SHOWMA."
+    ))

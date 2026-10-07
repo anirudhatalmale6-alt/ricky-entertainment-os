@@ -27,7 +27,8 @@ def is_configured() -> bool:
     return bool(settings.SMTP_HOST and settings.mail_from)
 
 
-def _send_sync(to: str, subject: str, text: str, html: str | None) -> None:
+def _send_sync(to: str, subject: str, text: str, html: str | None,
+               imagenes: dict[str, bytes] | None = None) -> None:
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = formataddr((settings.SMTP_FROM_NAME, settings.mail_from))
@@ -35,6 +36,21 @@ def _send_sync(to: str, subject: str, text: str, html: str | None) -> None:
     msg.set_content(text)
     if html:
         msg.add_alternative(html, subtype="html")
+
+    # Imágenes incrustadas (el QR del pase). Van como adjunto con Content-ID y
+    # se referencian con <img src="cid:nombre">.
+    #
+    # NO se usa un data: URI, que es lo primero que uno piensa: Gmail las
+    # descarta enteras y el correo llega con un hueco. Tampoco una URL contra
+    # nuestro servidor, que casi todos los clientes bloquean hasta que el
+    # usuario pulsa "mostrar imágenes" — y un QR que hay que desbloquear para
+    # verlo no sirve en una caseta de vigilancia. El cid es lo único que pinta
+    # solo en Gmail, Outlook y el correo del iPhone.
+    if imagenes and html:
+        parte = msg.get_payload()[-1]          # la alternativa HTML
+        for nombre, datos in imagenes.items():
+            parte.add_related(datos, maintype="image", subtype="png",
+                              cid=f"<{nombre}>", filename=f"{nombre}.png")
 
     mode = (settings.SMTP_SECURITY or "starttls").lower()
     if mode == "ssl":
@@ -52,14 +68,15 @@ def _send_sync(to: str, subject: str, text: str, html: str | None) -> None:
         server.send_message(msg)
 
 
-async def send(to: str, subject: str, text: str, html: str | None = None) -> bool:
+async def send(to: str, subject: str, text: str, html: str | None = None,
+               imagenes: dict[str, bytes] | None = None) -> bool:
     """True si el correo salió. Nunca lanza: un fallo de SMTP no puede tumbar
     una petición del usuario."""
     if not is_configured():
         log.warning("SMTP no configurado; no se envió '%s' a %s", subject, to)
         return False
     try:
-        await asyncio.to_thread(_send_sync, to, subject, text, html)
+        await asyncio.to_thread(_send_sync, to, subject, text, html, imagenes)
         return True
     except Exception:  # noqa: BLE001 - se registra y se sigue
         log.exception("Falló el envío de '%s' a %s", subject, to)
