@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     # vuelva a True, los tres que ya lo tenían puesto siguen como estaban.
     AUTO_CONFIRM_ENABLED: bool = False
 
+    # Precio recurrente (tarifa por volumen). David, 08/10: "mantenlo en stand
+    # by, aun estoy considerando como manejarlo".
+    #
+    # Apagado NO borra nada: los 36 shows conservan su tarifa cargada y la
+    # pantalla del proveedor la sigue guardando. Lo unico que no pasa es que se
+    # aplique sola al agendar. El dia que lo decida, es cambiar esto a true.
+    RECURRENTE_ENABLED: bool = False
+
     # --- Mailgun (David, 07/10) ---------------------------------------
     # El correo sale por la API HTTPS de Mailgun y no por SMTP, porque
     # DigitalOcean bloquea los puertos de correo de salida en el droplet

@@ -45,6 +45,13 @@ def precio_recurrente(show) -> float | None:
     normal, y una migracion para cambiarle el nombre al mismo dato solo añade
     una forma de perderlo.
     """
+    from app.core.config import settings
+
+    # Apagada por configuracion (David, 08/10: "stand by"): se devuelve None y
+    # con eso TODA la cadena se comporta como si el show no tuviera tarifa. Se
+    # corta aqui, en el unico sitio que la lee, y no en los seis que la usan.
+    if not settings.RECURRENTE_ENABLED:
+        return None
     v = getattr(show, "price_corporate", None)
     return float(v) if v not in (None, "") and float(v) > 0 else None
 

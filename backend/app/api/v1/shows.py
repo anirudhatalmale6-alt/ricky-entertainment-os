@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.api.deps import CurrentScope, CurrentUser, DbSession, require_permission
 from app.models.artist import Artist
 from app.models.review import Review
@@ -376,10 +377,26 @@ async def get_show(show_id: int, db: DbSession, _: CurrentUser):
 
 @router.get("/artists/{artist_id}/shows", response_model=list[ShowOut])
 async def list_artist_shows(artist_id: int, db: DbSession, _: CurrentUser):
+    """Los shows de un proveedor, tal como los ve un HOTEL en su ficha."""
     res = await db.execute(
         select(Show).options(*_SHOW_RELS).where(Show.artist_id == artist_id).order_by(Show.show_name)
     )
-    return list(res.scalars().unique().all())
+    shows = list(res.scalars().unique().all())
+    # Con el precio recurrente en stand by (David, 08/10) no se anuncia aqui.
+    # Si se dejara, la ficha le prometeria al hotel una tarifa por volumen que
+    # al agendar no se aplica: el mismo desajuste de "el catalogo dice una cosa
+    # y el cobro hace otra" que ya nos mordio con las tarifas pactadas.
+    #
+    # Se recorta SOLO en esta salida, que es la que ve el hotel. El proveedor
+    # sigue viendo y editando su tarifa en su propio perfil, que va por
+    # /me/artist, asi que no se le borra nada de lo que tiene guardado.
+    if not settings.RECURRENTE_ENABLED:
+        salida = []
+        for sh in shows:
+            out = ShowOut.model_validate(sh)
+            salida.append(out.model_copy(update={"price_corporate": None}))
+        return salida
+    return shows
 
 
 @router.post(
