@@ -910,6 +910,9 @@ async def notify_artists(payload: NotifyIn, db: DbSession, bg: BackgroundTasks):
                 kind,
                 show=show_name,
                 venue=venue_name,
+                # El saludo del correo es "Hola, <nombre del artista>:" (texto de
+                # David). Sin esto saldria "Hola:" a secas.
+                artista=(artist.stage_name if artist else "") or "",
                 hotel=company.name if company else "",
                 cuando=st,
                 # Sin importe si el artista cuelga de una productora: el aviso le

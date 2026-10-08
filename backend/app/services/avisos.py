@@ -151,7 +151,17 @@ async def correos_hotel(db, company_id: int | None) -> list[str]:
 # --- Plantillas -----------------------------------------------------------
 
 def _sin_marcas(v: str) -> str:
-    return _html.unescape(re.sub(r"<[^>]+>", "", v))
+    """El HTML convertido a texto plano legible.
+
+    Los <br> se convierten en saltos de linea ANTES de quitar las etiquetas. Si
+    solo se borran, el texto plano sale con las frases pegadas ("...la
+    solicitud.Gracias por formar parte...") y hay clientes de correo que leen
+    unicamente esa version.
+    """
+    v = re.sub(r"<br\s*/?>", "\n", v, flags=re.I)
+    v = re.sub(r"</p\s*>", "\n\n", v, flags=re.I)
+    texto = _html.unescape(re.sub(r"<[^>]+>", "", v))
+    return re.sub(r"\n{3,}", "\n\n", texto).strip()
 
 
 def _e(v: str | None) -> str:
@@ -199,7 +209,7 @@ def _mk(titulo: str, parrafo: str, filas: list[tuple[str, str]], cta: str, url: 
     plano += [f"{k}: {v}" for k, v in filas if v]
     if cierre:
         plano += ["", _sin_marcas(cierre)]
-    plano += ["", f"Entra a tu panel: {url}", "", "— SHOWMA"]
+    plano += ["", f"Entra a tu panel: {url}", "", _FIRMA_PLANO]
     html = (
         f"<p>{parrafo}</p>"
         + _ficha(filas)
@@ -207,6 +217,7 @@ def _mk(titulo: str, parrafo: str, filas: list[tuple[str, str]], cta: str, url: 
         + _boton(cta, url)
     )
     return "\n".join(plano), mailer.wrap(html, footer=(
+        f"{_FIRMA}<br><br>"
         "Recibes este correo porque tienes una cuenta en SHOWMA. "
         "Puedes ver y responder todo desde tu panel."
     ))
@@ -219,8 +230,13 @@ def _fmt(dt: datetime | None) -> str:
     return d.strftime("%d/%m/%Y a las %H:%M")
 
 
+# La firma con la que cierran todos los avisos. David, 08/10.
+_FIRMA = "SHOWMA<br><span style=\"color:#8b93a1\">People Create Experiences</span>"
+_FIRMA_PLANO = "SHOWMA\nPeople Create Experiences"
+
+
 def actuacion(kind: str, *, show: str, venue: str, hotel: str, cuando: datetime | None,
-              importe: str = "", motivo: str = "") -> tuple[str, str, str]:
+              importe: str = "", motivo: str = "", artista: str = "") -> tuple[str, str, str]:
     """(asunto, texto, html) del aviso al MÚSICO sobre una actuación.
 
     kind: new_booking | confirmed | reschedule | cancelled
@@ -256,11 +272,19 @@ def actuacion(kind: str, *, show: str, venue: str, hotel: str, cuando: datetime 
             "Ver mi agenda", url, cierre,
         )
     else:  # new_booking
-        asunto = f"Nueva actuación: {show}"
+        # Redaccion de David (08/10), tal cual la escribio.
+        asunto = "¡Tienes una nueva solicitud!"
+        saludo = f"Hola, {_e(artista)}:" if artista else "Hola:"
+        quien = f"<b>{_e(hotel)}</b>" if hotel else "Un hotel"
         texto, html = _mk(
-            asunto, f"Te agendaron una actuación de <b>{_e(show)}</b>.", filas,
-            "Confirmar en mi panel", url,
-            "Queda pendiente de tu confirmación. Entra a tu panel para aceptarla.",
+            asunto,
+            f"{saludo}<br><br>{quien} quiere contar contigo para una próxima "
+            "actuación. Entra en tu perfil de SHOWMA para revisar todos los "
+            "detalles y confirmar o rechazar la solicitud.",
+            filas,
+            "Revisar la solicitud", url,
+            "Recuerda que tu disponibilidad no quedará confirmada hasta que "
+            "aceptes la solicitud.<br><br>Gracias por formar parte de SHOWMA.",
         )
     return asunto, texto, html
 
@@ -375,17 +399,34 @@ def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
         ("Personas que llegan", str(integrantes) if integrantes else ""),
     ]
 
+    # Redaccion de David (08/10), con sus correcciones del mismo dia:
+    # "Presenta este codigo cuando llegues a la propiedad, su lectura permitira
+    #  tu entrada y la hora de llegada"
+    # "Una vez finalizada la actuacion, el CLIENTE confirmara la realizacion del
+    #  servicio para continuar con el proceso de facturacion y pago"
+    #
     # Va SOLO al proveedor. El hotel no lo recibe por correo a proposito: ya lo
     # tiene en el sistema, y reenviarle 3-5 pases al dia a seguridad acabaria en
-    # el olvido (David, 07/10). Si algun dia hace falta la version para el hotel,
-    # son cuatro lineas aqui.
-    intro = (f"Tu actuación de <b>{_e(show)}</b> quedó confirmada. "
-             "Este es tu pase: enséñalo al llegar en el acceso de servicio.")
-    cierre = ("Guarda este correo o haz una captura del código. Si no te abre el enlace, "
-              "enseña el folio de la orden en la entrada.")
+    # el olvido (David, 07/10).
+    saludo = f"Hola, {_e(artista)}:" if artista else "Hola:"
+    donde = f"en <b>{_e(hotel)}</b>" if hotel else ""
+    intro = (f"{saludo}<br><br>Tu actuación {donde} está confirmada y ya tienes "
+             "disponible tu pase de acceso.")
+    cierre = (
+        "Presenta este código cuando llegues a la propiedad, su lectura "
+        "permitirá tu entrada y la hora de llegada."
+        "<br><br><b>Importante:</b> Si tu actuación incluye varios integrantes, "
+        "revisa que todos estén registrados y autorizados. El QR es personal y "
+        "no debe compartirse con terceros."
+        "<br><br>Una vez finalizada la actuación, el cliente confirmará la "
+        "realización del servicio para continuar con el proceso de facturación "
+        "y pago."
+        "<br><br>¡Que tengas una excelente actuación!"
+    )
 
     qr_html = (
         '<div style="text-align:center;margin:22px 0">'
+        '<div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#6b7280;margin-bottom:10px">TU PASE DE ACCESO</div>'
         '<img src="cid:qrpase" alt="Pase de acceso" '
         'style="width:190px;height:190px;border:1px solid #e6e8ec;border-radius:10px">'
         f'<div style="font-size:12px;color:#6b7280;margin-top:6px">Pase {_e(folio or "")}</div>'
@@ -396,7 +437,7 @@ def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
         f'Si el código no se ve: <a href="{url_pase}" style="color:#382ca1">{url_pase}</a></p>'
     )
 
-    asunto = f"Pase de acceso · {show}" + (f" · {folio}" if folio else "")
+    asunto = "¡Todo listo para tu próxima actuación!"
     html = (
         f"<p>{intro}</p>"
         + _ficha(filas)
@@ -412,8 +453,9 @@ def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
         f"Pase de acceso: {url_pase}",
         "",
         _sin_marcas(cierre),
-        "", "— SHOWMA",
+        "", _FIRMA_PLANO,
     ]
     return asunto, "\n".join(plano), mailer.wrap(html, footer=(
+        f"{_FIRMA}<br><br>"
         "Recibes este correo porque tienes una actuación agendada en SHOWMA."
     ))

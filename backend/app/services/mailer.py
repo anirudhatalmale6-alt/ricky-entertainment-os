@@ -140,8 +140,10 @@ _WRAP = """<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-seri
  background:#f4f5f7;padding:28px 12px">
  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:14px;
   overflow:hidden;border:1px solid #e6e8ec">
-  <div style="background:#111827;color:#fff;padding:20px 24px;font-size:20px;
-   font-weight:700;letter-spacing:.5px">SHOWMA</div>
+  <div style="background:#111827;color:#fff;padding:18px 24px">
+   <div style="font-size:21px;font-weight:800;letter-spacing:1px;line-height:1">SHOWMA</div>
+   <div style="font-size:10px;letter-spacing:3px;opacity:.65;margin-top:3px">ENTERTAINMENT OS</div>
+  </div>
   <div style="padding:24px;color:#1f2937;font-size:15px;line-height:1.55">{body}</div>
   <div style="padding:16px 24px;background:#fafafa;color:#8b93a1;font-size:12px;
    border-top:1px solid #eef0f3">{footer}</div>
