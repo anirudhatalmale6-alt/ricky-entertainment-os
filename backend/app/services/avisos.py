@@ -223,6 +223,30 @@ def _mk(titulo: str, parrafo: str, filas: list[tuple[str, str]], cta: str, url: 
     ))
 
 
+_DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+_MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+          "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+
+def _dia_largo(dt: datetime | None) -> str:
+    """"jueves, 12 de octubre de 2026". David pide "Dia y fecha"."""
+    if dt is None:
+        return ""
+    d = dt.replace(tzinfo=None) if dt.tzinfo else dt
+    return f"{_DIAS[d.weekday()]}, {d.day} de {_MESES[d.month - 1]} de {d.year}"
+
+
+def _horario(ini: datetime | None, fin: datetime | None) -> str:
+    """"20:00 - 21:30", o solo la hora de inicio si no se sabe cuando termina."""
+    if ini is None:
+        return ""
+    a = (ini.replace(tzinfo=None) if ini.tzinfo else ini).strftime("%H:%M")
+    if fin is None:
+        return a
+    b = (fin.replace(tzinfo=None) if fin.tzinfo else fin).strftime("%H:%M")
+    return f"{a} - {b}"
+
+
 def _fmt(dt: datetime | None) -> str:
     if dt is None:
         return ""
@@ -236,7 +260,8 @@ _FIRMA_PLANO = "SHOWMA\nPeople Create Experiences"
 
 
 def actuacion(kind: str, *, show: str, venue: str, hotel: str, cuando: datetime | None,
-              importe: str = "", motivo: str = "", artista: str = "") -> tuple[str, str, str]:
+              importe: str = "", motivo: str = "", artista: str = "",
+              termina: datetime | None = None) -> tuple[str, str, str]:
     """(asunto, texto, html) del aviso al MÚSICO sobre una actuación.
 
     kind: new_booking | confirmed | reschedule | cancelled
@@ -265,11 +290,36 @@ def actuacion(kind: str, *, show: str, venue: str, hotel: str, cuando: datetime 
             "Recuerda avisar por la plataforma cuando vayas en camino y cuando llegues.",
         )
     elif kind == "cancelled":
-        asunto = f"Actuación cancelada: {show}"
-        cierre = f"Motivo: {_e(motivo)}" if motivo else ""
+        # Redaccion de David (08/10). Sus campos y su orden: Hotel, Fecha,
+        # Horario, Propuesta. No son los mismos que en los otros avisos, y es a
+        # proposito: aqui lo que el musico necesita de un vistazo es QUE dia se
+        # le ha caido de la agenda.
+        asunto = "Tu actuación ha sido cancelada"
+        saludo = f"Hola, {_e(artista)}:" if artista else "Hola:"
+        quien = f"<b>{_e(hotel)}</b>" if hotel else "El hotel"
+        filas = [
+            ("Hotel", hotel),
+            ("Fecha", _dia_largo(cuando)),
+            ("Horario", _horario(cuando, termina)),
+            ("Propuesta", show),
+        ]
+        cierre = (
+            "La cancelación ha sido solicitada por el cliente y ya se encuentra "
+            "registrada en SHOWMA."
+            + (f"<br><br>Motivo indicado: {_e(motivo)}" if motivo else "")
+            + "<br><br><b>No es necesario que te presentes en la propiedad.</b>"
+            "<br><br>Puedes consultar los detalles de la cancelación y, si "
+            "corresponde, las condiciones económicas aplicables desde tu perfil."
+            "<br><br>Lamentamos los inconvenientes que este cambio pueda "
+            "ocasionarte."
+            "<br><br>Tu perfil y disponibilidad permanecen activos para recibir "
+            "nuevas oportunidades."
+        )
         texto, html = _mk(
-            asunto, f"El hotel canceló tu actuación de <b>{_e(show)}</b>.", filas,
-            "Ver mi agenda", url, cierre,
+            asunto,
+            f"{saludo}<br><br>Te informamos de que {quien} ha cancelado la "
+            "siguiente actuación:",
+            filas, "Ver cancelación en SHOWMA", url, cierre,
         )
     else:  # new_booking
         # Redaccion de David (08/10), tal cual la escribio.

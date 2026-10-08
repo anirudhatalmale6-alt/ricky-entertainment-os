@@ -540,6 +540,9 @@ async def _notify_artist_cancel(db: DbSession, booking: Booking, reason: str | N
     asunto, texto, html = avisos.actuacion(
         "cancelled", show=sname, venue=vname,
         hotel=company.name if company else "", cuando=st, motivo=reason or "",
+        # El texto de David saluda por el nombre y enseña el horario completo.
+        artista=(artist.stage_name if artist else "") or "",
+        termina=_naive(booking.ends_at) if booking.ends_at else None,
     )
     await db.flush()
     return [avisos.Aviso(to=destino, subject=asunto, text=texto, html=html,
