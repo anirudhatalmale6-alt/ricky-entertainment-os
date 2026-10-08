@@ -27,6 +27,12 @@ ARTIST_CATEGORIES: dict[str, list[str]] = {
     ],
     "Fotografia y Video": ["Fotografia", "Video"],
     "Produccion": ["Audio", "Iluminacion", "Escenarios"],
+    # David, 08/10: "añadir en las opciones de Show y Musico: Wellness y
+    # Actividades". Las subcategorias las propuse yo para el contexto de hotel
+    # de playa; cambiarlas es editar esta lista y la copia del formulario de
+    # registro, nada mas.
+    "Wellness": ["Yoga", "Meditacion y Mindfulness", "Sonoterapia", "Masaje y Spa", "Fitness"],
+    "Actividades": ["Talleres", "Clases y Cursos", "Juegos y Dinamicas", "Deportes", "Experiencias Guiadas"],
 }
 
 # All valid subcategory values (flattened), for lenient partial-update checks.

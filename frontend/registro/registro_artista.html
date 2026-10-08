@@ -466,12 +466,18 @@ const TAX = {
   "Musica":["Solista","Dueto","Trio","Banda","Orquesta","Mariachi","DJ"],
   "Shows":["Danza","Magia e Ilusionismo","Circo & Acrobacias","Tematico o de Temporada","Infantiles y Familiares","Espectaculos Visuales","Musica en vivo","Comedia & Stand Up","Tributos","Variedades"],
   "Fotografia y Video":["Fotografia","Video"],
-  "Produccion":["Audio","Iluminacion","Escenarios"]
+  "Produccion":["Audio","Iluminacion","Escenarios"],
+  // OJO: esta lista es una COPIA de ARTIST_CATEGORIES (backend/app/models/enums.py).
+  // Esta pagina se abre sin sesion y /artists/taxonomy pide usuario, por eso no
+  // la puede leer del servidor. Si se añade una categoria, hay que tocar LAS DOS.
+  "Wellness":["Yoga", "Meditacion y Mindfulness", "Sonoterapia", "Masaje y Spa", "Fitness"],
+  "Actividades":["Talleres", "Clases y Cursos", "Juegos y Dinamicas", "Deportes", "Experiencias Guiadas"]
 };
 const PRETTY={"Musica":"Música","Produccion":"Producción","Fotografia y Video":"Fotografía y Video",
   "Dueto":"Dúo","Trio":"Trío","Tematico o de Temporada":"Temático o de Temporada",
   "Espectaculos Visuales":"Espectáculos Visuales","Musica en vivo":"Música en vivo",
-  "Fotografia":"Fotografía","Iluminacion":"Iluminación"};
+  "Fotografia":"Fotografía","Iluminacion":"Iluminación",
+  "Meditacion y Mindfulness":"Meditación y Mindfulness","Juegos y Dinamicas":"Juegos y Dinámicas"};
 const pretty=s=>PRETTY[s]||s;
 const opts=arr=>arr.map(v=>`<option value="${v}">${pretty(v)}</option>`).join('');
 
@@ -687,9 +693,9 @@ function showTpl(n){
       <div class="sec-t">Fotos y multimedia <i style="color:var(--red);font-style:normal">*</i></div>
       <div class="photos"><div class="ph add" onclick="pickPhotos(${n})">＋</div></div>
       <input type="file" class="photo-input" accept="image/*" multiple style="display:none" onchange="onPhotos(${n},this)">
-      <div class="hint">Al menos 1 foto (máximo 5). La primera será la portada. Sin foto el show no se puede mostrar a los hoteles.</div>
+      <div class="hint">Al menos 1 foto (máximo 5). La primera será la portada. Sin foto el show no se puede mostrar a los hoteles.<br>Formato recomendado: horizontal 16:9, 1600 × 900 px. Si subes una foto cuadrada o vertical se recorta por arriba y por abajo para que quepa en la tarjeta.</div>
       <div class="grid" style="margin-top:12px">
-        <label class="f"><span>Video promocional</span><input class="in-video" placeholder="YouTube / Vimeo"></label>
+        <label class="f"><span>Video promocional <i style="color:var(--red);font-style:normal">*</i></span><input class="in-video" placeholder="YouTube / Vimeo"></label>
         <label class="f"><span>Audio</span><input class="in-audio" placeholder="Spotify / SoundCloud"></label>
       </div>
 
@@ -1006,6 +1012,9 @@ function revisaShows(){
     const name=val('.in-name'); if(!name) continue;
     if(numOf(val('.p-hotel'))==null) return {msg:'El show "'+name+'" necesita un precio para hotel; sin precio no se puede contratar.', abrir:el};
     if(el.querySelectorAll('.ph[data-url]').length===0) return {msg:'Sube al menos una foto del show "'+name+'".', abrir:el};
+    // Un video es obligatorio (David, 08/10). Es lo que de verdad decide una
+    // contratacion: un hotel compra lo que ve moverse, no una foto fija.
+    if(!val('.in-video')) return {msg:'Pon el enlace de un video del show "'+name+'". Es obligatorio: es lo que mira un hotel antes de contratar.', abrir:el};
     // Las diez preguntas, obligatorias: un show sin contestar no cruza contra
     // ninguna matriz y queda fuera de las recomendaciones para siempre, así que
     // dejar pasar uno a medias ensucia las estadísticas de todos.

@@ -710,7 +710,7 @@
   .acard3:hover{border-color:var(--acc);box-shadow:0 6px 16px rgba(56,44,161,.12)}
   .acard3.sel{border-color:var(--acc);background:#382ca10d;box-shadow:0 0 0 2px #382ca133 inset}
   .acard3 .ac3-ph{width:100%;aspect-ratio:16/9;border-radius:12px 12px 0 0;flex:none;background-size:cover;
-    background-position:center;display:grid;place-items:center;color:#fff;font-size:30px;position:relative;overflow:hidden}
+    background-position:center 30%;display:grid;place-items:center;color:#fff;font-size:30px;position:relative;overflow:hidden}
   .acard3 .ac3-km{position:absolute;right:8px;bottom:8px;font-size:10.5px;font-weight:700;color:#fff;
     background:rgba(12,16,30,.66);padding:3px 8px;border-radius:20px;backdrop-filter:blur(3px)}
   .acard3 .ac3-busy{position:absolute;left:8px;top:8px;right:8px;font-size:10.5px;font-weight:700;
@@ -818,8 +818,12 @@
      porque la barra verificada bajó a cuatro datos (493px) y porque tanto la
      barra del encabezado como las medallas ahora crecen hacia abajo en vez de
      a lo largo. Si algo de eso cambia, medir antes de tocar este número. */
-  .amod.apmod{max-width:650px;max-height:90vh}
-  .aphero{height:190px;background:var(--grad);background-size:cover;background-position:center;position:relative;flex:none}
+  /* David, 08/10: la ficha del proveedor, mas ancha. 650 -> 860. El
+     contenido son bloques apilados, asi que solo se ensancha: no hay
+     rejilla que se rompa. El 94vw es para que en una pantalla chica no
+     se salga por los lados. */
+  .amod.apmod{max-width:860px;width:94vw;max-height:90vh}
+  .aphero{height:190px;background:var(--grad);background-size:cover;background-position:center 30%;position:relative;flex:none}
   .aphscrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,16,32,.05) 0%,rgba(6,16,32,.72) 100%)}
   .aphttl{position:absolute;left:20px;right:20px;bottom:14px;color:#fff}
   .aphttl h2{margin:0;font-size:23px;font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,.4);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -853,9 +857,23 @@
      lleva cursor y una flechita: si se vieran iguales, el hotel pulsaria las
      que no abren nada y pensaria que algo falla. */
   .trck.exp{cursor:pointer;border-style:dashed}
-  .afchk{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;
-    border:1px solid var(--line);background:var(--card);border-radius:9px;padding:9px 11px;
-    color:var(--txt);font-weight:500}
+  /* Casilla con su etiqueta. SIN flex y SIN span dentro: el texto va suelto en
+     el label y se maqueta con el flujo normal.
+     Historia, para que no se repita (David, 08/10: "el texto se sale y pisa el
+     filtro de al lado"): esto era un flex con un <span> dentro, y el span se
+     quedaba en ancho CERO pasara lo que pasara -probado con flex:1, con
+     flex:1 1 auto y con min-width:0-, asi que el texto se pintaba fuera del
+     borde. Con overflow-wrap:anywhere encima partia por cada letra y la caja
+     crecia a 400px de alto con una letra por linea. */
+  .afchk{display:block;cursor:pointer;font-size:12.5px;
+    border:1px solid var(--line);background:var(--card);border-radius:9px;padding:10px 11px;
+    color:var(--txt);font-weight:500;line-height:1.35}
+  /* width:auto es LA linea que faltaba. La regla general
+     ".field input{width:100%}" (arriba) tambien alcanza a la casilla, asi que
+     la casilla ocupaba el ancho entero del filtro y empujaba su texto a la
+     linea de abajo. Eso era tambien lo que dejaba el <span> anterior en ancho
+     cero. Se busco el fallo tres veces en el hijo cuando estaba en la cascada. */
+  .afchk input{width:auto;margin:0 8px 0 0;vertical-align:-1px}
   .afchk input{flex:none;margin:0}
   .afchk:hover{border-color:var(--acc)}
   .trck.exp::after{content:'›';margin-left:5px;opacity:.7;font-weight:700}
@@ -1309,7 +1327,7 @@
   .agfilt{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
   .agfilt .field{min-width:140px;margin-bottom:0}
   .agfilt .btn.ghost{white-space:nowrap}
-  .filtrow{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:12px}
+  .filtrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end}
   @media(max-width:1000px){.filtrow{grid-template-columns:1fr 1fr}}
   .filtrow2{display:flex;align-items:center;gap:16px;margin-top:13px;flex-wrap:wrap}
   .artlayout{display:grid;grid-template-columns:1fr 250px;gap:18px;align-items:start}
@@ -2437,7 +2455,7 @@ const stars = n => n? '★'.repeat(n):'—';
 const esc = s => (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // Display-only accent normalization for category/subcategory labels (keeps raw
 // keys intact for filtering & color lookup — only prettifies what the user sees).
-const PRETTY={"Musica":"Música","Produccion":"Producción","Fotografia y Video":"Fotografía y Video",
+const PRETTY={"Meditacion y Mindfulness":"Meditación y Mindfulness","Juegos y Dinamicas":"Juegos y Dinámicas","Musica":"Música","Produccion":"Producción","Fotografia y Video":"Fotografía y Video",
   "Trio":"Trío","Tematico o de Temporada":"Temático o de Temporada","Espectaculos Visuales":"Espectáculos Visuales",
   "Musica en vivo":"Música en vivo","Fotografia":"Fotografía","Iluminacion":"Iluminación"};
 const pretty = s => PRETTY[s]||s||"";
@@ -8821,15 +8839,14 @@ const RENDER = {
       <div class="filters">
         <div class="filtrow">
           <div class="field" style="margin:0"><label>Buscar</label><input id="af_q" oninput="applyArtistFilters()" placeholder="Nombre, tipo de show, instrumento…"></div>
-          <div class="field afexp" style="margin:0"><label>Documentación</label>
-            <label class="afchk"><input type="checkbox" id="af_exp" onchange="AF.exp=this.checked;applyArtistFilters()">
-              <span>Solo con expediente completo</span></label></div>
           <div class="field" style="margin:0"><label>Locación</label><select id="af_loc" onchange="AF.loc=this.value;applyArtistFilters()"><option value="">Todas las locaciones</option>${locs.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div>
           <div class="field" style="margin:0"><label>Distancia desde el hotel</label><select id="af_km" onchange="AF.km=+this.value;applyArtistFilters()">
             <option value="50">Hasta 50 km</option><option value="100" selected>Hasta 100 km</option>
             <option value="300">Hasta 300 km</option><option value="0">Sin límite</option></select></div>
           <div class="field" style="margin:0"><label>Presupuesto máx.</label><input id="af_max" type="range" min="5000" max="60000" step="1000" value="60000" oninput="document.getElementById('af_maxv').textContent=(+this.value>=60000?'Sin límite':MXN(+this.value));applyArtistFilters()"><span id="af_maxv" class="hint" style="margin-top:4px">Sin límite</span></div>
           <div class="field" style="margin:0"><label>Ordenar por</label><select id="af_sort" onchange="applyArtistFilters()"><option value="best">Mejor coincidencia</option><option value="price">Menor precio</option></select></div>
+          <div class="field afexp" style="margin:0"><label>Documentación</label>
+            <label class="afchk"><input type="checkbox" id="af_exp" onchange="AF.exp=this.checked;applyArtistFilters()">Expediente completo</label></div>
         </div>
       </div>
       <div class="artlayout">
@@ -10482,7 +10499,7 @@ function showFields(s){
     <div class="shsec">Fotos del show <span>· la primera es la portada que ven los hoteles</span></div>
     <div class="shph" id="f_${k}_ph"></div>
     <input type="file" id="f_${k}_file" accept="image/*" multiple style="display:none" onchange="onShowPhotos('${k}',this)">
-    <div class="hint" style="margin:0">Hasta ${SHOW_IMG_MAX} fotos. Toca ★ para usar otra como portada. Sin foto el show no se muestra en el catálogo.</div>
+    <div class="hint" style="margin:0">Hasta ${SHOW_IMG_MAX} fotos. Toca ★ para usar otra como portada. Sin foto el show no se muestra en el catálogo.<br>Formato recomendado: horizontal 16:9, 1600 × 900 px. Si subes una foto cuadrada o vertical se recorta por arriba y por abajo para que quepa en la tarjeta.</div>
 
     <div class="shsec">Tarifas base por tipo de evento (MXN)</div>
     <div class="fgrid fg3">
@@ -10794,6 +10811,8 @@ async function addShow(btn){
   if(!body.show_name){ toast('Ponle un nombre al show.',true); return; }
   if(body.price_hotel==null){ toast('Pon la tarifa para hotel; sin precio no se puede contratar.',true); return; }
   if(!body.images.length){ toast('Sube al menos una foto para que el show se vea en el catálogo.',true); return; }
+  // Video obligatorio (David, 08/10): es lo que mira un hotel antes de contratar.
+  if(!body.video_url){ toast('Pon el enlace de un video del show. Es obligatorio: es lo que mira un hotel antes de contratar.',true); return; }
   // Se avisa AQUI de las preguntas que faltan. Antes el aviso lo daba el
   // servidor con un 422 y el texto salia en un alert, pero sin las preguntas a
   // la vista no habia nada que hacer con ese aviso.
