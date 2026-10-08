@@ -3885,6 +3885,24 @@ function updateNotifyBtn(){
 async function saveAndNotify(){
   if(!NOTIFY_PENDING.size) return;
   const items=[...NOTIFY_PENDING.entries()].map(([booking_id,kind])=>({booking_id,kind}));
+
+  // Segunda confirmación antes de avisar (David, 08/10). Se cuentan PROVEEDORES
+  // distintos, no actuaciones: mover cinco fechas del mismo músico le manda un
+  // aviso a UNA persona, y decir "5 proveedores" sería mentir sobre a cuánta
+  // gente se le escribe.
+  const dondeBuscar=[CACHE.homeBk||[], CACHE.agenda||[]];
+  const proveedores=new Set(), sinIdentificar=[];
+  items.forEach(it=>{
+    let b=null;
+    for(const arr of dondeBuscar){ b=arr.find(x=>x.id===it.booking_id); if(b) break; }
+    if(b && b.artist_id) proveedores.add(b.artist_id); else sinIdentificar.push(it.booking_id);
+  });
+  const n=proveedores.size+sinIdentificar.length;
+  const actos=items.length;
+  if(!confirm(
+      `Se notificará a ${n} proveedor${n===1?'':'es'}`
+      +(actos!==n ? ` sobre ${actos} actuacion${actos===1?'':'es'}.` : '.')
+      +'\n\n¿Desea continuar?')) return;
   const btn=document.getElementById('notifyBtn'); if(btn) btn.disabled=true;
   try{
     const r=await post('/bookings/notify',{items});
@@ -4382,6 +4400,9 @@ async function actConfirm(){
   if(!ADDACT.showId){ toast('Elige un artista primero.',true); return; }
   const t=document.getElementById('actTime')?.value||'20:00';
   const price=+document.getElementById('actPrice')?.value||ADDACT.price||null;
+  // El aviso va ANTES de crearla: una vez creada ya cuenta como comprometida y
+  // avisar entonces llega tarde.
+  if(!avisaSiRebasa(price)) return;
   const go=document.getElementById('actGo'); if(go){ go.disabled=true; go.textContent='Agregando…'; }
   try{
     const r=await fetch(API+'/bookings',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
@@ -4658,6 +4679,35 @@ function updateWeekKpi(){
 function inPeriodMonth(iso){ if(!iso) return false; const d=new Date(iso); return d.getFullYear()===PERIOD.year && (d.getMonth()+1)===PERIOD.month; }
 // "Presupuesto mensual" / "Ahorro" / donut — recomputados en vivo desde el
 // calendario, así se mueven en cuanto agregas, mueves o quitas actuaciones.
+// Cuánto hay comprometido del presupuesto del mes y cuánto queda. Lo usan la
+// tarjeta del dashboard y los avisos de "te estás pasando" (David, 08/10).
+// Mismo cálculo en un solo sitio: si la tarjeta y el aviso contaran distinto,
+// el aviso saltaría cuando la pantalla dice que aún queda dinero.
+function estadoPresupuesto(extra){
+  const bk=CACHE.homeBk||[]; const budget=+CACHE.homeBudget||0; const num=x=>+x||0;
+  const cuenta=b=>['completed','confirmed','pending'].includes(b.status)&&inPeriodMonth(b.starts_at);
+  const usado=bk.filter(cuenta).reduce((a,b)=>a+num(b.agreed_price),0);
+  const nuevo=usado+num(extra);
+  return {budget, usado, nuevo, hay:budget>0,
+          sePasa: budget>0 && nuevo>budget,
+          exceso: Math.max(0, nuevo-budget),
+          queda: Math.max(0, budget-usado)};
+}
+// Avisa si esta actuación rebasa el presupuesto autorizado del periodo.
+// Devuelve true si se puede seguir. No bloquea: avisa. El jefe de
+// entretenimiento puede tener permiso para pasarse; lo que no puede es
+// pasarse sin enterarse.
+function avisaSiRebasa(importe){
+  const e=estadoPresupuesto(importe);
+  if(!e.sePasa) return true;
+  return confirm(
+    'Está rebasando el presupuesto autorizado para el periodo.\n\n'
+    +'Presupuesto del mes:  '+MXN(e.budget)+'\n'
+    +'Ya comprometido:      '+MXN(e.usado)+'\n'
+    +'Esta actuación:       '+MXN(importe||0)+'\n'
+    +'Quedaría en:          '+MXN(e.nuevo)+'  ('+MXN(e.exceso)+' por encima)\n\n'
+    +'¿Desea continuar?');
+}
 function updateBudgetKpi(){
   const usadoV=document.getElementById('kUsadoV'); if(!usadoV) return;   // sólo en el Dashboard
   const bk=CACHE.homeBk||[]; const budget=+CACHE.homeBudget||0; const num=x=>+x||0;
