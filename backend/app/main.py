@@ -344,3 +344,25 @@ async def pase_publico(token: str, db: DbSession):
     html = pase_html.pagina(data, qr_uri=qr, api_base=f"{settings.ROOT_PATH}/api/v1",
                             token=token)
     return HTMLResponse(html, headers=_NO_CACHE)
+
+
+@app.get("/responder/{token}", include_in_schema=False)
+async def responder_publico(token: str, db: DbSession):
+    """La pagina donde el proveedor acepta o rechaza desde el correo.
+
+    Abrir esto NO acepta nada: solo pinta. Lo que decide es el POST del boton.
+    """
+    from app.services import respuesta as resp, respuesta_html
+
+    b = await resp.por_token(db, token)
+    if b is None:
+        return HTMLResponse(
+            "<div style=\"font-family:system-ui;text-align:center;padding:80px 20px;color:#697089\">"
+            "<h1 style=\"color:#1b1f2e;font-size:20px\">Este enlace no es válido</h1>"
+            "<p style=\"margin-top:8px\">Puede que la solicitud ya no exista. "
+            "Entra a tu perfil de SHOWMA para verlo.</p></div>",
+            status_code=404, headers=_NO_CACHE,
+        )
+    datos = await resp.datos_para_pantalla(db, b)
+    html = respuesta_html.pagina(datos, api_base=f"{settings.ROOT_PATH}/api/v1", token=token)
+    return HTMLResponse(html, headers=_NO_CACHE)

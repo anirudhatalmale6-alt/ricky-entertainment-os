@@ -125,6 +125,11 @@ class Booking(Base, TimestampMixin):
     # Token del QR que lleva a la página pública del pase. NO es el folio: el
     # folio es correlativo y quien tenga uno adivinaría los demás sumando uno.
     pase_token: Mapped[str | None] = mapped_column(String(40), unique=True, index=True)
+    # Token para que el proveedor acepte o rechace DESDE EL CORREO, sin entrar.
+    # Es otro distinto del pase a proposito: el pase lo ve el personal de
+    # seguridad al escanear, y poder abrir una puerta no puede ser lo mismo que
+    # poder comprometer una fecha y un importe (David, 08/10).
+    respuesta_token: Mapped[str | None] = mapped_column(String(40), unique=True, index=True)
     # Cuándo confirmó seguridad que el grupo llegó, y quién lo dijo. El nombre lo
     # teclea el de la caseta: no tiene cuenta en SHOWMA, y pedirle una para
     # apuntar que alguien llegó es la forma más rápida de que no lo apunte nadie.

@@ -49,6 +49,7 @@ _SQLITE_ADDED_COLUMNS = [
     ("bookings", "incidencia_por", "INTEGER"),
     # Pase de acceso con QR (David, 06/10).
     ("bookings", "pase_token", "VARCHAR(40)"),
+    ("bookings", "respuesta_token", "VARCHAR(40)"),
     ("bookings", "llegada_at", "DATETIME"),
     ("bookings", "llegada_por", "VARCHAR(120)"),
     ("artists", "auto_confirm_bookings", "BOOLEAN DEFAULT 0"),
@@ -142,6 +143,8 @@ _SQLITE_ADDED_INDEXES = [
      "CREATE UNIQUE INDEX IF NOT EXISTS ux_bookings_folio ON bookings(folio)"),
     ("ux_bookings_pase",
      "CREATE UNIQUE INDEX IF NOT EXISTS ux_bookings_pase ON bookings(pase_token)"),
+    ("ux_bookings_respuesta",
+     "CREATE UNIQUE INDEX IF NOT EXISTS ux_bookings_respuesta ON bookings(respuesta_token)"),
 ]
 
 
@@ -179,6 +182,8 @@ def _apply_additive_columns(sync_conn) -> None:
         # es la misma forma que genera services/pase.nuevo_token().
         "UPDATE bookings SET pase_token = lower(hex(randomblob(16))) "
         "WHERE pase_token IS NULL",
+        "UPDATE bookings SET respuesta_token = lower(hex(randomblob(16))) "
+        "WHERE respuesta_token IS NULL",
     ):
         try:
             sync_conn.exec_driver_sql(ddl)

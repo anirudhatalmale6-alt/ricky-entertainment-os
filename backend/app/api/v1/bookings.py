@@ -926,6 +926,9 @@ async def notify_artists(payload: NotifyIn, db: DbSession, bg: BackgroundTasks):
                 # El saludo del correo es "Hola, <nombre del artista>:" (texto de
                 # David). Sin esto saldria "Hola:" a secas.
                 artista=(artist.stage_name if artist else "") or "",
+                # Enlace para aceptar o rechazar desde el propio correo.
+                url_respuesta=(f"{settings.public_root}/responder/{booking.respuesta_token}"
+                               if booking.respuesta_token else ""),
                 hotel=company.name if company else "",
                 cuando=st,
                 # Sin importe si el artista cuelga de una productora: el aviso le

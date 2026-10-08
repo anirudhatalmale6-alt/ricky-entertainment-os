@@ -261,7 +261,8 @@ _FIRMA_PLANO = "SHOWMA\nPeople Create Experiences"
 
 def actuacion(kind: str, *, show: str, venue: str, hotel: str, cuando: datetime | None,
               importe: str = "", motivo: str = "", artista: str = "",
-              termina: datetime | None = None) -> tuple[str, str, str]:
+              termina: datetime | None = None,
+              url_respuesta: str = "") -> tuple[str, str, str]:
     """(asunto, texto, html) del aviso al MÚSICO sobre una actuación.
 
     kind: new_booking | confirmed | reschedule | cancelled
@@ -334,7 +335,9 @@ def actuacion(kind: str, *, show: str, venue: str, hotel: str, cuando: datetime 
             "actuación. Entra en tu perfil de SHOWMA para revisar todos los "
             "detalles y confirmar o rechazar la solicitud.",
             filas,
-            "Revisar la solicitud", url,
+            # Si hay enlace de respuesta, el boton lleva ahi: contesta sin
+            # entrar a la cuenta (David, 08/10). Si no, al panel de siempre.
+            "Revisar la solicitud", url_respuesta or url,
             "Recuerda que tu disponibilidad no quedará confirmada hasta que "
             "aceptes la solicitud.<br><br>Gracias por formar parte de SHOWMA.",
         )

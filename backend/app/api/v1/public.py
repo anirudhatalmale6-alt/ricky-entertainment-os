@@ -14,7 +14,7 @@ hotel puede comprobar por dentro.
 """
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -390,3 +390,112 @@ async def confirmar_llegada(token: str, payload: LlegadaIn, db: DbSession) -> di
         "llegada_at": b.llegada_at.isoformat() if b.llegada_at else None,
         "llegada_por": b.llegada_por,
     }
+
+
+# ---------------------------------------------------------------------------
+# RESPONDER UNA ACTUACION DESDE EL CORREO (David, 08/10). Publico y sin cuenta:
+# la proteccion es el token, que no se adivina.
+#
+# Abrir el enlace NO acepta nada: solo pinta la pagina. Lo que decide es el
+# POST del boton. Es deliberado -ver services/respuesta-: los filtros de correo
+# abren los enlaces entrantes para analizarlos, y un GET que aceptara dejaria la
+# actuacion comprometida por un antivirus antes de que el musico la leyera.
+# ---------------------------------------------------------------------------
+
+class RespuestaIn(BaseModel):
+    motivo: str | None = Field(None, max_length=300)
+
+
+@router.get("/responder/{token}")
+async def responder_datos(token: str, db: DbSession) -> dict:
+    from app.services import respuesta as resp
+
+    b = await resp.por_token(db, token)
+    if b is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enlace no válido")
+    return await resp.datos_para_pantalla(db, b)
+
+
+@router.post("/responder/{token}/aceptar")
+async def responder_aceptar(token: str, db: DbSession, bg: BackgroundTasks) -> dict:
+    from app.services import avisos, respuesta as resp
+
+    b = await resp.por_token(db, token)
+    if b is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enlace no válido")
+    abierta, motivo = resp.puede_contestar(b)
+    if not abierta:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=motivo)
+
+    await resp.aceptar(db, b, origen="correo")
+    correos = await _correos_tras_aceptar(db, b)
+    await db.commit()
+    avisos.despachar(bg, correos)
+    return {"ok": True, "estado": "confirmed",
+            "mensaje": "Actuación confirmada. Te mandamos tu pase de acceso por correo."}
+
+
+@router.post("/responder/{token}/rechazar")
+async def responder_rechazar(token: str, payload: RespuestaIn, db: DbSession,
+                             bg: BackgroundTasks) -> dict:
+    from app.models.artist import Artist
+    from app.models.company import Company
+    from app.models.show import Show
+    from app.models.venue import Venue
+    from app.services import avisos, respuesta as resp
+
+    b = await resp.por_token(db, token)
+    if b is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enlace no válido")
+    abierta, motivo = resp.puede_contestar(b)
+    if not abierta:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=motivo)
+
+    await resp.rechazar(db, b, origen="correo", motivo=payload.motivo)
+
+    # Al hotel SI se le avisa de un rechazo: le deja una fecha descubierta y
+    # tiene que buscar a otro. (De una aceptacion no se le avisa: la ve en verde.)
+    show = await db.get(Show, b.show_id) if b.show_id else None
+    venue = await db.get(Venue, b.venue_id) if b.venue_id else None
+    artista = await db.get(Artist, b.artist_id) if b.artist_id else None
+    empresa = await db.get(Company, b.company_id) if b.company_id else None
+    asunto, texto, html = avisos.cancelacion_musico(
+        show=(show.show_name if show else None) or "la actuación",
+        artista=(artista.stage_name if artista else None) or "El artista",
+        venue=(venue.name if venue else "") or "",
+        cuando=b.starts_at,
+        motivo=(payload.motivo or "El proveedor rechazó la actuación"),
+    )
+    correos = [avisos.Aviso(to=d, subject=asunto, text=texto, html=html)
+               for d in await avisos.correos_hotel(db, b.company_id)]
+    await db.commit()
+    avisos.despachar(bg, correos)
+    return {"ok": True, "estado": "cancelled",
+            "mensaje": "Avisamos al hotel de que no puedes. Gracias por contestar."}
+
+
+async def _correos_tras_aceptar(db, booking) -> list:
+    """El pase al proveedor, igual que cuando acepta desde el panel."""
+    from app.models.artist import Artist
+    from app.models.company import Company
+    from app.models.show import Show
+    from app.models.venue import Venue
+    from app.services import avisos, pase as pase_svc
+
+    artista = await db.get(Artist, booking.artist_id) if booking.artist_id else None
+    destino = await avisos.correo_artista(db, artista) if artista else None
+    if not destino or not booking.pase_token:
+        return []
+    show = await db.get(Show, booking.show_id) if booking.show_id else None
+    venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
+    empresa = await db.get(Company, booking.company_id) if booking.company_id else None
+    url = pase_svc.url_pase(booking.pase_token, settings.public_root)
+    asunto, texto, html = avisos.pase_actuacion(
+        show=(show.show_name if show else None) or "tu actuación",
+        artista=artista.stage_name or "",
+        venue=(venue.name if venue else "") or "",
+        hotel=(empresa.name if empresa else "") or "",
+        cuando=booking.starts_at, folio=booking.folio,
+        integrantes=getattr(show, "members", None), url_pase=url)
+    return [avisos.Aviso(to=destino, subject=asunto, text=texto, html=html,
+                         imagenes={"qrpase": pase_svc.png_qr(url, escala=6)})]

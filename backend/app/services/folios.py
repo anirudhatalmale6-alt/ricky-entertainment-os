@@ -67,6 +67,9 @@ async def asignar_orden(db, booking) -> str:
     if not getattr(booking, "pase_token", None):
         from app.services import pase
         booking.pase_token = pase.nuevo_token()
+    if not getattr(booking, "respuesta_token", None):
+        from app.services import pase
+        booking.respuesta_token = pase.nuevo_token()
     if getattr(booking, "folio", None):
         return booking.folio
     booking.folio = folio_orden(booking.id, booking.created_at)
