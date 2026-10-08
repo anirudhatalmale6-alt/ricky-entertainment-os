@@ -746,16 +746,26 @@ async def artist_respond(
         venue=(venue.name if venue else "") or "",
         cuando=_naive(booking.starts_at) if booking.starts_at else None,
     )
-    if action == "accept":
-        asunto, texto, html = avisos.confirmacion_musico(**datos)
-    else:
+    # Al hotel SOLO se le escribe cuando hay algo que hacer.
+    #
+    # David, 08/10: "el hotel ya va a ver la actuacion en verde como
+    # confirmacion, la idea es no saturar con correos si podemos hacerlo de otra
+    # manera". Asi que una aceptacion NO manda correo: la actuacion se pone
+    # verde en su calendario y ahi esta la confirmacion.
+    #
+    # Un RECHAZO si lo manda, y la diferencia no es de volumen sino de accion:
+    # una aceptacion no le pide nada al hotel, un rechazo le deja una fecha
+    # descubierta y tiene que buscar a otro. Un correo que no pide nada es el
+    # que ensena a la gente a ignorar los que si piden algo.
+    correos = []
+    if action != "accept":
         asunto, texto, html = avisos.cancelacion_musico(
             **datos, motivo="El artista rechazó la actuación"
         )
-    correos = [
-        avisos.Aviso(to=d, subject=asunto, text=texto, html=html)
-        for d in await avisos.correos_hotel(db, booking.company_id)
-    ]
+        correos = [
+            avisos.Aviso(to=d, subject=asunto, text=texto, html=html)
+            for d in await avisos.correos_hotel(db, booking.company_id)
+        ]
 
     # ACEPTADA = la orden toma vida, y es cuando sale el pase (David, 06/10).
     #

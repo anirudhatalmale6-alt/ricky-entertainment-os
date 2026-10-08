@@ -303,11 +303,13 @@ def actuacion(kind: str, *, show: str, venue: str, hotel: str, cuando: datetime 
             ("Horario", _horario(cuando, termina)),
             ("Propuesta", show),
         ]
+        # Su texto, tal cual, y me quito el "Motivo indicado" que yo habia
+        # añadido: lo mando dos veces sin el. Y es coherente, porque el propio
+        # correo manda al perfil a ver los detalles.
         cierre = (
             "La cancelación ha sido solicitada por el cliente y ya se encuentra "
             "registrada en SHOWMA."
-            + (f"<br><br>Motivo indicado: {_e(motivo)}" if motivo else "")
-            + "<br><br><b>No es necesario que te presentes en la propiedad.</b>"
+            "<br><b>No es necesario que te presentes en la propiedad.</b>"
             "<br><br>Puedes consultar los detalles de la cancelación y, si "
             "corresponde, las condiciones económicas aplicables desde tu perfil."
             "<br><br>Lamentamos los inconvenientes que este cambio pueda "
