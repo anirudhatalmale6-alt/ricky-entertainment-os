@@ -2,7 +2,7 @@
 import qrcode
 import qrcode.image.svg
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import CurrentScope, CurrentUser, DbSession
 from app.core import security
@@ -32,6 +32,30 @@ from app.services import folios, mailer, passwords
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _normaliza(correo: str) -> str:
+    """El correo tal como hay que guardarlo y buscarlo: sin espacios, en minusculas.
+
+    El dominio de una direccion es insensible a mayusculas por norma, y en la
+    practica la parte de delante tambien lo es en Gmail, Outlook y Hotmail. Pero
+    la base guardaba lo que cada uno tecleo al registrarse y la busqueda
+    comparaba caracter por caracter.
+
+    Que rompia (David, 08/10): en produccion hay tres cuentas guardadas con
+    mayusculas. Esas personas escriben su correo en minusculas -lo normal- y NO
+    entraban; y al pedir contrasena nueva tampoco les llegaba, porque la consulta
+    no encontraba a nadie y este endpoint contesta lo mismo exista o no la
+    cuenta, para no revelar quien esta registrado. Fallo silencioso perfecto.
+    """
+    return (correo or "").strip().lower()
+
+
+async def _buscar_usuario(db: DbSession, correo: str) -> User | None:
+    """El usuario de ese correo, comparando en minusculas por los dos lados."""
+    return (await db.execute(
+        select(User).where(func.lower(User.email) == _normaliza(correo))
+    )).scalar_one_or_none()
+
+
 async def _get_role(db: DbSession, name: str) -> Role | None:
     res = await db.execute(select(Role).where(Role.name == name))
     return res.scalar_one_or_none()
@@ -39,13 +63,12 @@ async def _get_role(db: DbSession, name: str) -> Role | None:
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: DbSession):
-    existing = await db.execute(select(User).where(User.email == payload.email))
-    if existing.scalar_one_or_none():
+    if await _buscar_usuario(db, payload.email):
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
 
     role = await _get_role(db, payload.role)
     user = User(
-        email=payload.email,
+        email=_normaliza(payload.email),
         full_name=payload.full_name,
         hashed_password=security.hash_password(payload.password),
         role_id=role.id if role else None,
@@ -57,7 +80,7 @@ async def register(payload: RegisterRequest, db: DbSession):
 
 
 async def _email_taken(db: DbSession, email: str) -> bool:
-    return (await db.execute(select(User).where(User.email == email))).scalar_one_or_none() is not None
+    return await _buscar_usuario(db, email) is not None
 
 
 @router.post("/register/artist", response_model=LoginResult, status_code=status.HTTP_201_CREATED)
@@ -69,7 +92,7 @@ async def register_artist(payload: ArtistRegisterRequest, db: DbSession):
 
     role = await _get_role(db, "artist")
     user = User(
-        email=payload.email,
+        email=_normaliza(payload.email),
         full_name=payload.full_name,
         hashed_password=security.hash_password(payload.password),
         role_id=role.id if role else None,
@@ -116,7 +139,7 @@ async def register_contratante(payload: ContratanteRegisterRequest, db: DbSessio
 
     role = await _get_role(db, "booker")
     user = User(
-        email=payload.email,
+        email=_normaliza(payload.email),
         full_name=payload.full_name,
         hashed_password=security.hash_password(payload.password),
         role_id=role.id if role else None,
@@ -175,8 +198,7 @@ async def me(scope: CurrentScope, db: DbSession):
 
 @router.post("/login", response_model=LoginResult)
 async def login(payload: LoginRequest, db: DbSession):
-    res = await db.execute(select(User).where(User.email == payload.email))
-    user = res.scalar_one_or_none()
+    user = await _buscar_usuario(db, payload.email)
     if not user or not security.verify_password(payload.password, user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password")
     if not user.is_active:
@@ -214,9 +236,7 @@ async def forgot_password(payload: ForgotPasswordRequest, db: DbSession):
     if not mailer.is_configured():
         return ForgotPasswordResult(email_sent=False, message=sin_correo)
 
-    user = (
-        await db.execute(select(User).where(User.email == payload.email))
-    ).scalar_one_or_none()
+    user = await _buscar_usuario(db, payload.email)
     if user is None or not user.is_active:
         return ForgotPasswordResult(email_sent=True, message=generic)
 
