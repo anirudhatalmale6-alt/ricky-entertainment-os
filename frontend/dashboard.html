@@ -1490,6 +1490,7 @@
   .lg-vis{align-items:flex-start;margin:4px 0 12px;font-size:12.5px;
     line-height:1.45;text-align:left}
   .lg-vis input{margin-top:2px}
+  .lg-nota{margin:4px 0 12px;font-size:12.5px;line-height:1.45;color:#9aa0b8;text-align:left}
   .lg-vis b{display:block;font-weight:600;color:#9b7bff;margin-top:3px}
   .lg-btn{width:100%;border:0;border-radius:10px;padding:13px;font-weight:700;font-size:14px;cursor:pointer;
       color:#fff;background:linear-gradient(135deg,#7c5cfc,#9b6bff);box-shadow:0 8px 24px rgba(124,92,252,.34);transition:.15s;margin-top:4px}
@@ -2249,15 +2250,14 @@
             <li data-r="spec">Un carácter especial</li>
           </ul>
           <input id="a_city" class="lg-hide">
-          <!-- La pregunta de visibilidad. Marcada que SÍ por defecto: quien se
-               da de alta por su cuenta viene a que le encuentren. Quien entra
-               invitado por un hotel puede desmarcarla y seguir trabajando con
-               quien le invitó, que es justo lo que pidió David. -->
-          <label class="lg-chk lg-vis" id="a_pub_row">
-            <input type="checkbox" id="a_public" checked>
-            <span>Quiero que cualquier hotel pueda encontrarme y contratarme.
-              <b id="a_pub_inv" style="display:none"></b></span>
+          <!-- Visibilidad. Depende de si llega invitado por un hotel o por su
+               cuenta, y lo decide pintaInvitacion(): quien no tiene quien le
+               invite NO puede ser privado, porque no le vería nadie. -->
+          <label class="lg-chk lg-vis" id="a_pub_row" style="display:none">
+            <input type="checkbox" id="a_public">
+            <span id="a_pub_txt"></span>
           </label>
+          <div class="lg-nota" id="a_pub_nota" style="display:none"></div>
           <button class="lg-btn" onclick="regArtist()">Crear cuenta</button>
         </div>
 
@@ -2717,16 +2717,36 @@ let INVITACION = null;
   }catch(e){}
 })();
 async function pintaInvitacion(){
-  if(!INVITACION) return;
-  const row=document.getElementById('a_pub_inv'); if(!row) return;
+  const row=document.getElementById('a_pub_row');
+  const txt=document.getElementById('a_pub_txt');
+  const nota=document.getElementById('a_pub_nota');
+  const chk=document.getElementById('a_public');
+  if(!row||!txt||!nota||!chk) return;
+
+  // Sin invitación no hay a quién quedarse visible: un perfil privado sin
+  // hotel detrás no lo encuentra NADIE, ni siquiera para contratarle una vez.
+  // Así que en el alta por cuenta propia no se ofrece la opción, se explica.
+  if(!INVITACION){
+    chk.checked = true;
+    nota.style.display='block';
+    nota.textContent='Tu perfil será visible para las empresas que buscan en SHOWMA. '
+      +'Cuando quieras puedes cambiarlo desde tu perfil.';
+    return;
+  }
+
+  let empresa=null;
   try{
     const r=await fetch(API+'/public/empresa/'+INVITACION);
-    if(!r.ok) return;
-    const d=await r.json();
-    if(!d || !d.name) return;
-    row.style.display='block';
-    row.textContent='Si lo desmarcas, seguirás saliendo para '+d.name+', que te invitó.';
+    if(r.ok){ const d=await r.json(); empresa=(d&&d.name)||null; }
   }catch(e){}
+
+  // Invitado: entra PRIVADO y decide él si quiere salir para los demás. Es el
+  // texto de David, y el orden importa: primero lo que pasa si no hace nada.
+  chk.checked = false;
+  row.style.display='flex';
+  txt.innerHTML = 'Tu perfil será privado y solo visible para <b>'
+    + esc(empresa || 'la empresa que te invitó') + '</b>.<br>'
+    + 'Marca aquí si quieres que tu perfil sea público y te vean más empresas.';
 }
 async function regArtist(){
   const el=document.getElementById('lerr'); el.textContent="";
