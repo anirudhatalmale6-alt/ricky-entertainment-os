@@ -5968,23 +5968,41 @@ function apAfinidadHTML(a, shows){
    La liga que el hotel le manda a su músico de siempre. Lleva su empresa, y
    por eso al registrarse queda apuntado quién le trajo: si el proveedor elige
    no ser público, este hotel lo sigue viendo y el resto no. */
-function ligaInvitacion(){
-  const cid = ME && ME.company_id;
+function ligaInvitacion(cid){
   if(!cid) return '';
   return location.origin + (window.RICKY_API||'') + '/?inv=' + cid;
 }
 function invitarHTML(){
-  const url = ligaInvitacion();
-  if(!url) return '';
+  // Un administrador NO cuelga de ningún hotel, así que para él la liga no
+  // puede salir sola: tiene que decir de qué propiedad es la invitación. Sin
+  // esto la caja sencillamente no le aparecía, que es como no existir.
+  const cid = ME && ME.company_id;
+  const comps = (CACHE.compsInv && CACHE.compsInv.length)
+    ? CACHE.compsInv
+    : (CACHE.venues||[]).reduce((a,v)=>{
+        if(v.company_id && !a.some(c=>c.id===v.company_id))
+          a.push({id:v.company_id, name:v.company_name||('Propiedad '+v.company_id)});
+        return a;}, []);
+  if(!cid && !(ME && ME.is_admin && comps.length)) return '';
+  const sel = !cid
+    ? `<select id="invComp" onchange="pintaLigaInv()" style="min-width:190px">
+         ${comps.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>`
+    : '';
+  const url = ligaInvitacion(cid || (comps[0]&&comps[0].id));
   return `<div class="box" style="margin-bottom:16px">
     <h3 style="margin:0 0 4px">🤝 Invitar a un proveedor</h3>
-    <div class="hint" style="margin:0 0 11px">Mándale esta liga a un músico o show con el que ya trabajas para que se dé de alta. Queda registrado que lo invitaste tú, así que lo verás en tu catálogo aunque él prefiera no salir para el resto de los hoteles.</div>
+    <div class="hint" style="margin:0 0 11px">Mándale esta liga a un músico o show con el que ya trabajas para que se dé de alta. Queda registrado quién lo invitó, así que ese hotel lo verá en su catálogo aunque el proveedor prefiera no salir para el resto.</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      ${sel}
       <input id="invUrl" value="${esc(url)}" readonly
         style="flex:1;min-width:220px;border:1px solid var(--line);background:var(--inp);
                border-radius:9px;padding:9px 11px;font-size:12.5px;color:var(--mut)">
       <button class="btn ghost" onclick="copiaInvitacion()">Copiar liga</button>
     </div></div>`;
+}
+function pintaLigaInv(){
+  const s=document.getElementById('invComp'), i=document.getElementById('invUrl');
+  if(s && i) i.value = ligaInvitacion(s.value);
 }
 function copiaInvitacion(){
   const i=document.getElementById('invUrl'); if(!i) return;
@@ -8971,6 +8989,18 @@ const RENDER = {
 
   async artists(box){
     await cargarMatchPropiedad();
+    // Empresas para la liga de invitacion. CACHE.venues solo existe si antes
+    // se abrio el tablero, y a Proveedores se puede entrar directo.
+    if(!CACHE.compsInv){
+      try{
+        const todas = (await api('/companies')||[]).map(c=>({id:c.id,name:c.name,g:c.group_id}));
+        // Se prefieren las de la cadena abierta, pero si el filtro deja la
+        // lista vacía se usan todas: mejor elegir entre las que hay que no
+        // poder invitar a nadie. (Las empresas sueltas tienen group_id nulo.)
+        const dela = GID ? todas.filter(c=>c.g===GID) : [];
+        CACHE.compsInv = (dela.length?dela:todas).map(c=>({id:c.id,name:c.name}));
+      }catch(e){ CACHE.compsInv = []; }
+    }
     // La barra se inserta al final del render, cuando ya existe el grid.
     // Referencia para la distancia: el hotel del usuario o, si es administrador
     // (que no tiene hotel propio), el primero de la cadena.
