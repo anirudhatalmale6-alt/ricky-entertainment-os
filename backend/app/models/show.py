@@ -56,6 +56,11 @@ class Show(Base, TimestampMixin):
     # Tarifas base - one price per event type (MXN, all optional)
     base_price: Mapped[float | None] = mapped_column(Numeric(12, 2))
     price_hotel: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    # Escalón con el que el show sale al catálogo: habitual / recomendado /
+    # impulso. El precio rebajado NO se guarda, se calcula desde price_hotel
+    # (ver services/pricing), así que cambiar la tarifa habitual arrastra a los
+    # tres y nunca quedan descuadrados.
+    price_tier: Mapped[str] = mapped_column(String(16), default="habitual")
     price_corporate: Mapped[float | None] = mapped_column(Numeric(12, 2))
     price_wedding: Mapped[float | None] = mapped_column(Numeric(12, 2))
     price_private: Mapped[float | None] = mapped_column(Numeric(12, 2))

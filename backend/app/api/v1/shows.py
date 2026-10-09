@@ -15,6 +15,7 @@ from app.models.artist import Artist
 from app.models.review import Review
 from app.models.artist_client_rate import ArtistClientRate
 from app.models.company import Company
+from app.models.enums import RISK_COMMISSION
 from app.models.media import ShowImage
 from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
@@ -207,6 +208,8 @@ async def list_shows(
             recurrent_price=tarifa_rec if s.recurrent_active else None,
         )
         s.effective_price = info["price"]
+        s.precio_habitual = info["habitual"]
+        s.has_tier = info["has_tier"]
         s.has_recurrent = info["has_recurrent"]
         s.has_special_rate = info["has_special_rate"]
         s.season_label = info["season_label"]
@@ -300,6 +303,85 @@ async def price_benchmark(
         min_price=float(mn) if mn is not None else None,
         max_price=float(mx) if mx is not None else None,
     )
+
+
+@router.get("/shows/config-precios")
+async def config_precios(_: CurrentUser):
+    """Los porcentajes de cada escalón, para que el deslizador pueda pintarse
+    antes de que el show exista (en el alta todavía no hay id al que preguntar).
+    Vienen del servidor para que no haya dos sitios donde cambiarlos."""
+    return {
+        "recomendado_pct": pricing.descuento_tier(pricing.RECOMENDADO),
+        "impulso_pct": pricing.descuento_tier(pricing.IMPULSO),
+        "nombres": pricing.TIER_NOMBRES,
+    }
+
+
+@router.get("/shows/{show_id}/escalones")
+async def escalones_de_precio(show_id: int, db: DbSession, scope: CurrentScope):
+    """Los tres escalones de precio del show y lo que supone cada uno.
+
+    Alimenta el deslizador del proveedor. Las dos cifras de dinero NO se
+    calculan aquí: salen de `facturacion.compute_desglose`, el mismo código que
+    emite el CFDI. Si alguna vez se reimplementara la fórmula en esta pantalla,
+    el proveedor vería un número al elegir su precio y otro distinto al cobrar.
+    """
+    from app.models.tax_figure import TaxFigure
+    from app.services import facturacion
+
+    show = await _get_show_or_404(db, show_id)
+    if not scope.is_admin and show.artist_id != scope.artist_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Ese show no es tuyo.")
+
+    artist = await db.get(Artist, show.artist_id) if show.artist_id else None
+    figura = (await db.get(TaxFigure, artist.tax_figure_id)
+              if artist and artist.tax_figure_id else None)
+
+    # Comisión del hotel: depende de su banda de riesgo y el proveedor no sabe
+    # qué hotel le va a contratar. Se mira la banda REAL de las empresas
+    # activas; si todas coinciden es un número, si no es un rango honesto.
+    bandas = [b for (b,) in (await db.execute(
+        select(Company.risk_tier).distinct()
+    )).all() if b]
+    pcts = sorted({RISK_COMMISSION.get(b, 0.0) for b in bandas}) or [0.0]
+    com_hotel_min, com_hotel_max = pcts[0], pcts[-1]
+
+    habitual = float(show.price_hotel) if show.price_hotel is not None else None
+    salida = []
+    for esc in pricing.escalones(habitual):
+        p = esc["precio"]
+        fila = dict(esc, activo=(esc["tier"] == pricing.tier_de(show)))
+        if p is not None:
+            fila["hotel_paga_min"] = round(p * (1 + com_hotel_min), 2)
+            fila["hotel_paga_max"] = round(p * (1 + com_hotel_max), 2)
+            # Sin figura fiscal NO se afirma cuánto recibe: sin ella el cálculo
+            # omite las retenciones y saldría muy por encima de su pago real.
+            # Un número optimista que luego se desmiente es peor que no darlo.
+            if figura is not None:
+                d = facturacion.compute_desglose(p, figura)
+                fila["recibe"] = d["total"]
+                fila["desglose"] = d
+            else:
+                fila["recibe"] = None
+        salida.append(fila)
+
+    return {
+        "show_id": show.id,
+        "price_tier": pricing.tier_de(show),
+        "precio_habitual": habitual,
+        "escalones": salida,
+        "comision_hotel_pct": round(com_hotel_min * 100, 2),
+        "comision_hotel_pct_max": round(com_hotel_max * 100, 2),
+        "tiene_figura_fiscal": figura is not None,
+        "figura_fiscal": figura.name if figura is not None else None,
+        "aviso_sin_figura": (
+            None if figura is not None else
+            "Falta tu figura fiscal, así que todavía no podemos decirte el neto "
+            "exacto: sin ella no se calculan tus retenciones de IVA e ISR. "
+            "Captura tu régimen en Documentación y aquí aparece tu pago real."
+        ),
+    }
 
 
 @router.get("/shows/novedades")

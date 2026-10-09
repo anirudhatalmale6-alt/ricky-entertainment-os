@@ -61,6 +61,9 @@ _SQLITE_ADDED_COLUMNS = [
     # importe, y poner "lista" en todas sería inventarlo. Queda NULL = se
     # desconoce, y se sella de aquí en adelante.
     ("bookings", "price_source", "VARCHAR(20)"),
+    # Escalón de precio del show (David, 09/10). Los shows que ya existen
+    # arrancan en su tarifa habitual: nadie eligió rebajarlos.
+    ("shows", "price_tier", "VARCHAR(16) DEFAULT 'habitual'"),
     ("bookings", "invoice_paid", "BOOLEAN DEFAULT 0"),
     ("bookings", "payout_paid", "BOOLEAN DEFAULT 0"),
     ("tax_figures", "iva_traslado_pct", "FLOAT DEFAULT 16"),

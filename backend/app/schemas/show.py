@@ -78,7 +78,10 @@ class ShowBase(BaseModel):
 
     # pricing - one price per event type (all MXN, all optional)
     base_price: float | None = None
+    # price_hotel es la tarifa HABITUAL del proveedor. El precio con el que
+    # sale al catálogo es esa tarifa menos el escalón que haya elegido.
     price_hotel: float | None = None
+    price_tier: str = "habitual"   # habitual | recomendado | impulso
     price_corporate: float | None = None
     price_wedding: float | None = None
     price_private: float | None = None
@@ -137,6 +140,7 @@ class ShowUpdate(BaseModel):
     audio_url: str | None = None
     base_price: float | None = None
     price_hotel: float | None = None
+    price_tier: str | None = None
     price_corporate: float | None = None
     price_wedding: float | None = None
     price_private: float | None = None
@@ -191,6 +195,10 @@ class ShowOut(ShowBase):
     # Precio efectivo para el hotel que consulta (aplica la tarifa especial del
     # músico para ese cliente/cadena si existe); si no, es el precio público.
     effective_price: float | None = None
+    # La tarifa habitual sin rebajar, para enseñarla tachada al lado del precio
+    # con escalón. Si el show está en "habitual" coincide con effective_price.
+    precio_habitual: float | None = None
+    has_tier: bool = False
     has_special_rate: bool = False
     # Tarifa de temporada del propio show aplicada a la fecha consultada
     # (parámetro ?on=): "Navidad +300 %", "Temporada baja −10 %"…

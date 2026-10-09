@@ -31,6 +31,69 @@ from __future__ import annotations
 from datetime import date, datetime
 
 
+# --- Escalón de precio elegido por el proveedor ---------------------------
+#
+# El proveedor fija su tarifa HABITUAL y decide con cuál de los tres escalones
+# sale al catálogo. Los dos de abajo no se guardan: se calculan siempre desde la
+# habitual, para que no puedan quedar descuadrados si cambia su tarifa. Los
+# porcentajes son configurables (ver core/config) porque un 20 % sobre un show
+# de 40,000 y un 20 % sobre uno de 1,200 no son la misma conversación.
+HABITUAL = "habitual"
+RECOMENDADO = "recomendado"
+IMPULSO = "impulso"
+TIERS = (HABITUAL, RECOMENDADO, IMPULSO)
+
+TIER_NOMBRES = {
+    HABITUAL: "Mi tarifa habitual",
+    RECOMENDADO: "Precio recomendado",
+    IMPULSO: "Precio de impulso",
+}
+
+
+def descuento_tier(tier: str | None) -> float:
+    """Porcentaje de descuento de cada escalón. 0 para la tarifa habitual."""
+    from app.core.config import settings
+
+    if tier == RECOMENDADO:
+        return float(settings.PRECIO_RECOMENDADO_PCT or 0)
+    if tier == IMPULSO:
+        return float(settings.PRECIO_IMPULSO_PCT or 0)
+    return 0.0
+
+
+def tier_de(show) -> str:
+    """El escalón del show, con la tarifa habitual como valor por defecto.
+
+    Un valor desconocido se trata como habitual: ante la duda se cobra el
+    precio completo, nunca un descuento que el proveedor no eligió.
+    """
+    v = getattr(show, "price_tier", None)
+    return v if v in TIERS else HABITUAL
+
+
+def precio_de_tier(habitual: float | None, tier: str | None) -> float | None:
+    """La tarifa habitual rebajada según el escalón."""
+    if habitual is None:
+        return None
+    pct = descuento_tier(tier)
+    if pct <= 0:
+        return float(habitual)
+    return round(float(habitual) * (1 - pct / 100.0), 2)
+
+
+def escalones(habitual: float | None) -> list[dict]:
+    """Los tres escalones de un precio, para pintar el deslizador.
+
+    Van de menor a mayor, como en el diseño: el impulso a la izquierda y la
+    tarifa habitual al final, que es la que debe quedar como referencia alta.
+    """
+    return [
+        {"tier": t, "nombre": TIER_NOMBRES[t],
+         "pct": descuento_tier(t), "precio": precio_de_tier(habitual, t)}
+        for t in (IMPULSO, RECOMENDADO, HABITUAL)
+    ]
+
+
 def _as_date(when) -> date | None:
     if when is None:
         return None
@@ -87,9 +150,18 @@ def effective_price(show, when=None, client_rate=None, distance_km=None,
     activada para ese hotel y esa fecha; esta función no la calcula, porque para
     saberlo hay que mirar las otras actuaciones y eso es una consulta.
     """
-    base = float(show.price_hotel) if getattr(show, "price_hotel", None) is not None else None
+    habitual = float(show.price_hotel) if getattr(show, "price_hotel", None) is not None else None
+    # Escalón elegido por el proveedor sobre su tarifa habitual. Es parte de su
+    # precio público, así que se aplica ANTES que todo lo demás: lo que un hotel
+    # negocia o acumula por volumen se calcula sobre el precio que ve anunciado.
+    tier = tier_de(show)
+    base = precio_de_tier(habitual, tier)
     out = {
         "price": base, "base": base,
+        # La tarifa habitual se devuelve aparte: es el ancla que la pantalla
+        # tacha al lado del precio rebajado, y no se pierde al aplicar el escalón.
+        "habitual": habitual, "tier": tier,
+        "has_tier": bool(base is not None and habitual is not None and base != habitual),
         "season_label": None, "season_pct": None,
         "has_season": False, "has_special_rate": False,
         "has_recurrent": False,
@@ -156,6 +228,8 @@ FUENTES = {
     ESPECIAL: "Tarifa pactada con el hotel",
     RECURRENTE: "Tarifa por volumen",
     MANUAL: "Importe escrito a mano",
+    RECOMENDADO: TIER_NOMBRES[RECOMENDADO],
+    IMPULSO: TIER_NOMBRES[IMPULSO],
 }
 
 
@@ -164,6 +238,8 @@ def fuente_precio(info: dict | None) -> str:
 
     El orden importa y es el mismo en que las aplica effective_price: la
     recurrente se evalúa al final y sólo marca su bandera si de verdad ganó.
+    El escalón va el último porque es el más débil: sólo se le atribuye el
+    precio si ninguna otra capa lo movió después.
     """
     if not info:
         return MANUAL
@@ -173,4 +249,7 @@ def fuente_precio(info: dict | None) -> str:
         return ESPECIAL
     if info.get("has_season"):
         return TEMPORADA
+    if info.get("has_tier"):
+        # recomendado / impulso: el propio nombre del escalón.
+        return info.get("tier") or LISTA
     return LISTA

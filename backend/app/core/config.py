@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     # aplique sola al agendar. El dia que lo decida, es cambiar esto a true.
     RECURRENTE_ENABLED: bool = False
 
+    # --- Escalones de precio del proveedor (David, 09/10) --------------
+    # Descuento de cada escalón sobre la tarifa habitual del show. Salen del
+    # mockup de David (10,000 → 9,200 → 8,900). Configurables a propósito: un
+    # 20 % sobre un paquete de 40,000 son 8,000 pesos y sobre un show de 1,200
+    # son 240, así que el mismo número en pantalla son dos conversaciones muy
+    # distintas y va a querer afinarlo por categoría.
+    PRECIO_RECOMENDADO_PCT: float = 8.0
+    PRECIO_IMPULSO_PCT: float = 11.0
+
     # --- Mailgun (David, 07/10) ---------------------------------------
     # El correo sale por la API HTTPS de Mailgun y no por SMTP, porque
     # DigitalOcean bloquea los puertos de correo de salida en el droplet

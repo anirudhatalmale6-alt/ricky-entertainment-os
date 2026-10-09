@@ -491,6 +491,28 @@
   .showcard{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--ov)}
   .seasbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
   .tfbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
+  /* Escalones de precio: el proveedor elige con cuál sale al catálogo. */
+  .escbox{margin:16px 0 4px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--ov1)}
+  .esch{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+  .escopts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .escopt{position:relative;border:1.5px solid var(--line);border-radius:12px;padding:11px 10px;
+    background:var(--bg);cursor:pointer;text-align:center;transition:border-color .12s,background .12s}
+  .escopt:hover{border-color:var(--acc)}
+  .escopt.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+  .escopt .en{font-size:11.5px;color:var(--mut);line-height:1.25}
+  .escopt .ep{font-size:18px;font-weight:800;margin-top:3px;letter-spacing:-.3px}
+  .escopt .ed{font-size:11px;color:var(--mut);margin-top:2px}
+  .escopt.on .ed{color:var(--acc);font-weight:650}
+  /* La habitual queda siempre a la derecha y marcada como la referencia alta. */
+  .escopt.alta .ep{color:var(--tinta)}
+  .escres{display:flex;gap:10px;margin-top:11px;padding:11px 12px;border-radius:11px;
+    background:var(--bg);border:1px solid var(--line);flex-wrap:wrap}
+  .escres div{flex:1;min-width:104px}
+  .escres .k{font-size:11px;color:var(--mut)}
+  .escres .v{font-size:15.5px;font-weight:750;margin-top:2px}
+  .escavi{margin-top:9px;font-size:12px;line-height:1.5;padding:9px 11px;border-radius:10px;
+    background:#fef3c7;color:#92400e}
+  @media(max-width:560px){.escopts{grid-template-columns:1fr}}
   .tfbox .tfh{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
   .tfbox .tfh b{font-size:13px}
   .seash b{display:block;font-size:13px;margin-bottom:3px}
@@ -10507,6 +10529,18 @@ function showEditor(s){
 // id del show ('new' en el alta) y prefija todos los campos.
 function showFields(s){
   const k = s ? s.id : 'new';
+  // El escalón de precio con el que vive este show. Se pinta en cuanto el
+  // formulario está en el DOM, y se repinta cada vez que cambia la tarifa.
+  ESC_TIER[k] = (s && s.price_tier) || 'habitual';
+  if(s && s.id) delete ESC_CACHE[s.id];   // que no se queden cifras viejas
+  setTimeout(()=>{
+    const inp=document.getElementById('f_'+k+'_price');
+    if(inp && !inp.dataset.escOn){
+      inp.dataset.escOn='1';
+      inp.addEventListener('input',()=>pintaEscalones(k));
+    }
+    pintaEscalones(k);
+  },0);
   const tax = CACHE.tax||{};
   const cats = Object.keys(tax);
   const cat = (s && s.category) || cats[0] || '';
@@ -10532,6 +10566,7 @@ function showFields(s){
     <div class="shsec">Tarifas base por tipo de evento (MXN)</div>
     <div class="fgrid fg3">
       ${num('price','Hotel','price_hotel','18000')}
+      ${''/* El deslizador de escalones cuelga de esta tarifa: ver pintaEscalones */}
       ${num('pw','Boda','price_wedding','')}
       ${num('pp','Evento privado','price_private','')}
       ${num('pr','Restaurante / lounge','price_restaurant','')}
@@ -10539,6 +10574,12 @@ function showFields(s){
       ${num('peh','Hora adicional','extra_hour_price','')}
       ${num('ptr','Traslado (desde)','transport_from_price','')}
       ${num('plo','Hospedaje / viáticos','lodging_price','A acordar')}
+    </div>
+
+    <div class="escbox" id="f_${k}_escbox">
+      <div class="esch"><b>Define el precio de tu show</b>
+        <span class="hint" style="margin:0">Elige con qué precio sales al catálogo. Tu tarifa habitual es la referencia; los dos de abajo te hacen más competitivo frente a quien contrata directo, sin tocar tu tarifa.</span></div>
+      <div id="f_${k}_esc"></div>
     </div>
 
     <div class="tfbox">
@@ -10635,7 +10676,9 @@ function collectShowForm(k){
     members:i('members')||1, duration_minutes:i('dur'), setup_minutes:i('setup'), teardown_minutes:i('teardown'),
     space_required:g('space')||null, power_required:g('power')||null, requirements:g('req')||null,
     video_url:g('video')||null, audio_url:g('audio')||null,
-    base_price:hotel, price_hotel:hotel, price_corporate:n('pc'), price_wedding:n('pw'), price_private:n('pp'),
+    base_price:hotel, price_hotel:hotel,
+    price_tier:ESC_TIER[k]||'habitual',
+    price_corporate:n('pc'), price_wedding:n('pw'), price_private:n('pp'),
     price_restaurant:n('pr'), price_festival:n('pf'), extra_hour_price:n('peh'),
     transport_from_price:n('ptr'), lodging_price:n('plo'),
     travel_fee:n('tfee'), travel_fee_km:i('tkm')||30,
@@ -10647,6 +10690,82 @@ function collectShowForm(k){
     ...(k==='new' ? {afinidad: Object.keys(AF_NUEVO).length ? AF_NUEVO : null} : {})
   };
 }
+/* ---- Escalones de precio del proveedor ----------------------------------
+   El proveedor fija su tarifa habitual y elige con cuál de los tres escalones
+   sale al catálogo. Los dos rebajados NO se guardan: se calculan desde la
+   habitual, aquí y en el servidor con los mismos porcentajes, que vienen de
+   /shows/config-precios para que no haya dos sitios donde cambiarlos.       */
+const ESC_TIER={};            // k -> escalón elegido
+let ESC_CFG=null;             // porcentajes, una sola vez por sesión
+const ESC_CACHE={};           // show_id -> cifras de dinero del servidor
+
+async function escCfg(){
+  if(ESC_CFG) return ESC_CFG;
+  try{ ESC_CFG=await api('/shows/config-precios'); }
+  catch(e){ ESC_CFG=null; }   // sin config no se pinta nada inventado
+  return ESC_CFG;
+}
+function escPrecio(habitual,tier,cfg){
+  if(habitual==null||!cfg) return null;
+  const pct = tier==='recomendado' ? cfg.recomendado_pct
+            : tier==='impulso'     ? cfg.impulso_pct : 0;
+  return pct>0 ? Math.round(habitual*(1-pct/100)*100)/100 : habitual;
+}
+async function pintaEscalones(k){
+  const caja=document.getElementById('f_'+k+'_esc'); if(!caja) return;
+  const cfg=await escCfg();
+  const inp=document.getElementById('f_'+k+'_price');
+  const habitual=inp?(parseFloat((inp.value||'').replace(/[^0-9.]/g,''))||null):null;
+  if(!cfg||habitual==null||habitual<=0){
+    caja.innerHTML='<div class="hint" style="margin:0">Pon tu tarifa para hotel y aquí '
+      +'aparecen los tres precios con los que puedes salir al catálogo.</div>';
+    return;
+  }
+  const actual=ESC_TIER[k]||'habitual';
+  const ord=[['impulso',cfg.impulso_pct],['recomendado',cfg.recomendado_pct],['habitual',0]];
+  const nombres=cfg.nombres||{};
+  caja.innerHTML=`<div class="escopts">${ord.map(([t,pct])=>{
+    const p=escPrecio(habitual,t,cfg);
+    return `<div class="escopt${t===actual?' on':''}${t==='habitual'?' alta':''}"
+      onclick="eligeEscalon('${k}','${t}')">
+      <div class="en">${esc(nombres[t]||t)}</div>
+      <div class="ep">${MXN(p)}</div>
+      <div class="ed">${pct>0?('−'+pct+'% sobre tu tarifa'):'tu tarifa'}</div></div>`;
+  }).join('')}</div><div id="f_${k}_escres"></div>`;
+  pintaCifras(k,habitual,cfg);
+}
+async function pintaCifras(k,habitual,cfg){
+  const caja=document.getElementById('f_'+k+'_escres'); if(!caja) return;
+  const sid=(k!=='new')?k:null;   // la clave del formulario ES el id del show
+  const tier=ESC_TIER[k]||'habitual';
+  const precio=escPrecio(habitual,tier,cfg);
+  if(!sid){
+    // Show nuevo: todavía no hay a quién preguntarle las retenciones, y no se
+    // inventa un neto. El precio sí se puede enseñar porque es aritmética.
+    caja.innerHTML=`<div class="escres"><div><div class="k">Tu tarifa</div>
+      <div class="v">${MXN(precio)}</div></div></div>
+      <div class="hint" style="margin:8px 0 0">Al guardar el show verás también lo que paga el hotel y lo que recibes tú.</div>`;
+    return;
+  }
+  let d=ESC_CACHE[sid];
+  if(!d){ try{ d=ESC_CACHE[sid]=await api(`/shows/${sid}/escalones`); }catch(e){ d=null; } }
+  if(!d){ caja.innerHTML=''; return; }
+  const fila=(d.escalones||[]).find(e=>e.tier===tier)||{};
+  // El precio manda el cliente (es lo que el proveedor está tecleando ahora);
+  // las dos cifras de dinero vienen del servidor, del mismo código que factura.
+  const mismaBase=Math.abs((d.precio_habitual||0)-habitual)<0.01;
+  const paga=mismaBase?fila.hotel_paga_min:null;
+  const recibe=mismaBase?fila.recibe:null;
+  caja.innerHTML=`<div class="escres">
+      <div><div class="k">🏷️ Tu tarifa</div><div class="v">${MXN(precio)}</div></div>
+      <div><div class="k">🏨 El hotel paga</div><div class="v">${paga!=null?MXN(paga):'—'}</div></div>
+      <div><div class="k">👛 Tú recibes</div><div class="v">${recibe!=null?MXN(recibe):'—'}</div></div>
+    </div>`
+    +(!mismaBase?'<div class="hint" style="margin:8px 0 0">Guarda el show para recalcular lo que paga el hotel y lo que recibes con la tarifa nueva.</div>':'')
+    +(d.aviso_sin_figura&&mismaBase?`<div class="escavi">${esc(d.aviso_sin_figura)}</div>`:'');
+}
+function eligeEscalon(k,t){ ESC_TIER[k]=t; pintaEscalones(k); }
+
 // --- Tarifas por temporada del show (suplementos / descuentos) ---
 function seasRow(r){
   const d=v=>v?String(v).slice(0,10):'';
