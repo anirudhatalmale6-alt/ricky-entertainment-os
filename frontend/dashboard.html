@@ -513,13 +513,6 @@
   .escopt.on .ed{color:var(--acc);font-weight:650}
   /* La habitual queda siempre a la derecha y marcada como la referencia alta. */
   .escopt.alta .ep{color:var(--tinta)}
-  .escres{display:flex;gap:10px;margin-top:11px;padding:11px 12px;border-radius:11px;
-    background:var(--bg);border:1px solid var(--line);flex-wrap:wrap}
-  .escres div{flex:1;min-width:104px}
-  .escres .k{font-size:11px;color:var(--mut)}
-  .escres .v{font-size:15.5px;font-weight:750;margin-top:2px}
-  .escavi{margin-top:9px;font-size:12px;line-height:1.5;padding:9px 11px;border-radius:10px;
-    background:#fef3c7;color:#92400e}
   @media(max-width:560px){.escopts{grid-template-columns:1fr}}
   .tfbox .tfh{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
   .tfbox .tfh b{font-size:13px}
@@ -10652,7 +10645,6 @@ function showFields(s){
   // El escalón de precio con el que vive este show. Se pinta en cuanto el
   // formulario está en el DOM, y se repinta cada vez que cambia la tarifa.
   ESC_TIER[k] = (s && s.price_tier) || 'habitual';
-  if(s && s.id) delete ESC_CACHE[s.id];   // que no se queden cifras viejas
   setTimeout(()=>{
     const inp=document.getElementById('f_'+k+'_price');
     if(inp && !inp.dataset.escOn){
@@ -10697,8 +10689,8 @@ function showFields(s){
     </div>
 
     <div class="escbox" id="f_${k}_escbox">
-      <div class="esch"><b>Define el precio de tu show</b>
-        <span class="hint" style="margin:0">Elige con qué precio sales al catálogo. Tu tarifa habitual es la referencia; los dos de abajo te hacen más competitivo frente a quien contrata directo, sin tocar tu tarifa.</span></div>
+      <div class="esch"><b>Tu precio puede abrir más puertas</b>
+        <span class="hint" style="margin:0">El precio correcto puede hacer que tu show sea más popular para más empresas.</span></div>
       <div id="f_${k}_esc"></div>
     </div>
 
@@ -10817,7 +10809,6 @@ function collectShowForm(k){
    /shows/config-precios para que no haya dos sitios donde cambiarlos.       */
 const ESC_TIER={};            // k -> escalón elegido
 let ESC_CFG=null;             // porcentajes, una sola vez por sesión
-const ESC_CACHE={};           // show_id -> cifras de dinero del servidor
 
 async function escCfg(){
   if(ESC_CFG) return ESC_CFG;
@@ -10851,38 +10842,7 @@ async function pintaEscalones(k){
       <div class="en">${esc(nombres[t]||t)}</div>
       <div class="ep">${MXN(p)}</div>
       <div class="ed">${pct>0?('−'+pct+'% sobre tu tarifa'):'tu tarifa'}</div></div>`;
-  }).join('')}</div><div id="f_${k}_escres"></div>`;
-  pintaCifras(k,habitual,cfg);
-}
-async function pintaCifras(k,habitual,cfg){
-  const caja=document.getElementById('f_'+k+'_escres'); if(!caja) return;
-  const sid=(k!=='new')?k:null;   // la clave del formulario ES el id del show
-  const tier=ESC_TIER[k]||'habitual';
-  const precio=escPrecio(habitual,tier,cfg);
-  if(!sid){
-    // Show nuevo: todavía no hay a quién preguntarle las retenciones, y no se
-    // inventa un neto. El precio sí se puede enseñar porque es aritmética.
-    caja.innerHTML=`<div class="escres"><div><div class="k">Tu tarifa</div>
-      <div class="v">${MXN(precio)}</div></div></div>
-      <div class="hint" style="margin:8px 0 0">Al guardar el show verás también lo que paga el hotel y lo que recibes tú.</div>`;
-    return;
-  }
-  let d=ESC_CACHE[sid];
-  if(!d){ try{ d=ESC_CACHE[sid]=await api(`/shows/${sid}/escalones`); }catch(e){ d=null; } }
-  if(!d){ caja.innerHTML=''; return; }
-  const fila=(d.escalones||[]).find(e=>e.tier===tier)||{};
-  // El precio manda el cliente (es lo que el proveedor está tecleando ahora);
-  // las dos cifras de dinero vienen del servidor, del mismo código que factura.
-  const mismaBase=Math.abs((d.precio_habitual||0)-habitual)<0.01;
-  const paga=mismaBase?fila.hotel_paga_min:null;
-  const recibe=mismaBase?fila.recibe:null;
-  caja.innerHTML=`<div class="escres">
-      <div><div class="k">🏷️ Tu tarifa</div><div class="v">${MXN(precio)}</div></div>
-      <div><div class="k">🏨 El hotel paga</div><div class="v">${paga!=null?MXN(paga):'—'}</div></div>
-      <div><div class="k">👛 Tú recibes</div><div class="v">${recibe!=null?MXN(recibe):'—'}</div></div>
-    </div>`
-    +(!mismaBase?'<div class="hint" style="margin:8px 0 0">Guarda el show para recalcular lo que paga el hotel y lo que recibes con la tarifa nueva.</div>':'')
-    +(d.aviso_sin_figura&&mismaBase?`<div class="escavi">${esc(d.aviso_sin_figura)}</div>`:'');
+  }).join('')}</div>`;
 }
 function eligeEscalon(k,t){ ESC_TIER[k]=t; pintaEscalones(k); }
 
