@@ -79,6 +79,10 @@ class BookingOut(BaseModel):
     commission_pct: float | None
     headcount_start: int | None
     headcount_end: int | None
+    # notified_at marca el momento en que al proveedor se le mandó la solicitud.
+    # A partir de ahí la actuación ya no se puede quitar del tablero sin más:
+    # hay alguien que apartó la fecha y tiene que enterarse si se cae.
+    notified_at: datetime | None = None
     confirmed_at: datetime | None
     cancelled_at: datetime | None
     cancellation_reason: str | None

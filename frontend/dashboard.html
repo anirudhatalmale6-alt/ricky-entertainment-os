@@ -3757,7 +3757,7 @@ function maestroCard(b,vi){
   return `<div class="mcard ${b.status}${fixed?' fixed':''}" ${fixed?'':'draggable="true"'} data-bid="${b.id}" data-vid="${b.venue_id||''}" style="--mc-bg:${th.bg};--mc-bd:${th.bd}">
     <span class="mdot"></span>
     ${fixed?'':`<button class="med" title="Cambiar fecha y hora" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();openEditAct(${b.id})">✎</button>`}
-    <button class="mx" title="Quitar del calendario" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();delBooking(${b.id},'${nm}')">✕</button>
+    ${fixed?'':`<button class="mx" title="Quitar del calendario" draggable="false" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();delBooking(${b.id},'${nm}')">✕</button>`}
     <div class="mtime">${hh}</div>
     <div class="mch2">${av}<span class="mnm">${esc(nombre)}</span></div>
     <div class="mstyle">${esc(estilo)}</div></div>`;
@@ -4195,14 +4195,42 @@ async function submitVenue(btn){
     renderMaestro();   // el nuevo lugar aparece como fila vacía, lista para agregar actuaciones con "+"
   }catch(e){ btn.disabled=false; btn.textContent='Guardar venue'; toast('No se pudo guardar: '+(e.message||''),true); }
 }
+// La ✕ del tablero hace dos cosas distintas según quién sepa de la actuación.
+// Si al proveedor todavía no se le ha dicho nada, es un borrón y cuenta nueva.
+// Si ya se le notificó, apartó la fecha: quitarla es CANCELARLA, y se le avisa.
+function yaNotificada(b){
+  return !!(b && (b.notified_at || b.confirmed_at ||
+                  ['confirmed','completed','cancelled'].includes(b.status)));
+}
 async function delBooking(id,name){
-  if(!confirm(`¿Quitar "${name}" del calendario?\n\nSe eliminará esta actuación del tablero.`)) return;
+  const b=(CACHE.homeBk||[]).find(x=>x.id===id)||{};
+  if(yaNotificada(b)) return cancelarDesdeTablero(id,name);
+  if(!confirm(`¿Quitar "${name}" del calendario?\n\nTodavía no se le ha notificado `
+    +`al proveedor, así que se elimina sin avisos.`)) return;
   try{
     await del('/bookings/'+id);
-    CACHE.homeBk=(CACHE.homeBk||[]).filter(b=>b.id!==id);
+    CACHE.homeBk=(CACHE.homeBk||[]).filter(x=>x.id!==id);
     renderMaestro();
     toast('Actuación eliminada ✓');
-  }catch(e){ toast('No se pudo eliminar: '+(e.message||''),true); }
+  }catch(e){
+    // El servidor tiene la última palabra: si ya se notificó, no la borra.
+    if(/comunic/i.test(e.message||'')) return cancelarDesdeTablero(id,name);
+    toast('No se pudo eliminar: '+(e.message||''),true);
+  }
+}
+async function cancelarDesdeTablero(id,name){
+  const motivo=prompt(`"${name}" ya se le notificó al proveedor, que apartó la fecha.\n\n`
+    +`Para quitarla hay que cancelarla y se le manda el correo de cancelación.\n\n`
+    +`¿Motivo? (lo verá el proveedor; puedes dejarlo vacío)`,'');
+  if(motivo===null) return;   // se arrepintió: no se toca nada
+  const q=motivo.trim() ? '?reason='+encodeURIComponent(motivo.trim()) : '';
+  try{
+    await post(`/bookings/${id}/cancel${q}`);
+    const row=(CACHE.homeBk||[]).find(x=>x.id===id);
+    if(row){ row.status='cancelled'; row.cancelled_at=new Date().toISOString(); }
+    renderMaestro();
+    toast('Actuación cancelada. El proveedor fue avisado por correo ✓');
+  }catch(e){ toast('No se pudo cancelar: '+(e.message||''),true); }
 }
 
 /* ---- "+" Agregar actuación: buscar artista desde el venue y agendarlo ---- */

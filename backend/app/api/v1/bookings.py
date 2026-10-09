@@ -15,13 +15,14 @@ from datetime import date as date_cls, datetime, time as dtime, timedelta, timez
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentScope, DbSession, require_permission
 from app.core.config import settings
 from app.models.artist import Artist
 from app.models.booking import Booking
+from app.models.booking_evento import BookingEvento
 from app.models.company import Company
 from app.models.notification import ArtistNotification
 from app.models.enums import (
@@ -825,13 +826,65 @@ async def register_attendance(booking_id: int, payload: AttendanceIn, db: DbSess
     return _decorate(booking, venue, show)
 
 
+async def _ya_lo_sabe_el_proveedor(db: DbSession, booking: Booking) -> bool:
+    """¿Se le comunicó esta actuación al proveedor?
+
+    Si la respuesta es sí, borrarla es inaceptable: el proveedor se queda con
+    una fecha apartada que ya no existe y nadie se lo dice. Tiene que pasar por
+    cancelación, que deja constancia y manda el aviso.
+    """
+    if booking.notified_at or booking.confirmed_at:
+        return True
+    if booking.status != BookingStatus.PENDING:
+        return True
+    # Ojo: respuesta_token y pase_token NO sirven de señal. Se emiten al crear
+    # la orden, no al notificarla, así que los tiene incluso una actuación que
+    # nadie ha visto todavía.
+    enviada = (
+        await db.execute(
+            select(ArtistNotification.id)
+            .where(
+                ArtistNotification.booking_id == booking.id,
+                ArtistNotification.email_sent_at.is_not(None),
+            )
+            .limit(1)
+        )
+    ).first()
+    return enviada is not None
+
+
 @router.delete(
     "/{booking_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
 async def delete_booking(booking_id: int, db: DbSession):
+    """Quitar del tablero una actuación que NADIE conoce todavía.
+
+    El borrado existe para deshacer un error de captura, no para cancelar. En
+    cuanto el proveedor sabe de la actuación hay un compromiso de por medio y
+    un folio emitido, y ninguno de los dos se puede hacer desaparecer: el
+    folio viaja en un correo, y una orden que se borra deja su número libre
+    para la siguiente, que acabaría reutilizándolo.
+    """
     booking = await _get_or_404(db, booking_id)
+    if await _ya_lo_sabe_el_proveedor(db, booking):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Esta actuación ya se le comunicó al proveedor, así que no se "
+                "puede borrar sin avisarle. Cancélala para que reciba el correo "
+                "de cancelación y quede constancia."
+            ),
+        )
+    # Nadie la conoce: se va entera, sin dejar avisos ni bitácora apuntando a
+    # una actuación que ya no existe.
+    await db.execute(
+        sa_delete(ArtistNotification).where(ArtistNotification.booking_id == booking.id)
+    )
+    await db.execute(
+        sa_delete(BookingEvento).where(BookingEvento.booking_id == booking.id)
+    )
     await db.delete(booking)
     await db.commit()
 
