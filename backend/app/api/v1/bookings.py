@@ -34,7 +34,7 @@ from app.models.enums import (
 from app.models.show import Show
 from app.models.venue import Venue
 from app.services import availability, avisos
-from app.services import folios, historial, recurrente, tarifa
+from app.services import folios, historial, pricing, recurrente, tarifa
 from app.schemas.booking import (
     AttendanceIn,
     BookingCreate,
@@ -201,10 +201,14 @@ async def create_booking(payload: BookingCreate, db: DbSession):
     # línea calculaba el precio por su cuenta y se dejaba fuera la tarifa
     # pactada, así que el catálogo enseñaba un número y aquí se guardaba otro.
     agreed_price = payload.agreed_price
+    # Y de qué capa salió, que se sella aquí o se pierde para siempre.
+    price_source = pricing.MANUAL
     if agreed_price is None:
-        agreed_price = (await tarifa.precio_para(
+        info = await tarifa.precio_para(
             db, show=show, company_id=venue.company_id,
-            fecha=payload.starts_at))["price"]
+            fecha=payload.starts_at)
+        agreed_price = info["price"]
+        price_source = pricing.fuente_precio(info)
 
     # A booking added on the Calendario Maestro starts as a DRAFT (borrador):
     # notified_at is NULL, so the artist doesn't see it yet. The hotel keeps
@@ -221,6 +225,7 @@ async def create_booking(payload: BookingCreate, db: DbSession):
         ends_at=payload.ends_at,
         event_type=payload.event_type,
         agreed_price=agreed_price,
+        price_source=price_source,
         currency=payload.currency,
         commission_pct=commission_pct,
         notes=payload.notes,
@@ -1099,6 +1104,7 @@ async def repetir_actuacion(payload: RepetirIn, db: DbSession):
         inicio = datetime.combine(f, dtime(hh, mm))
         fin = inicio + timedelta(minutes=dur)
         precio = payload.agreed_price
+        fuente = pricing.MANUAL
         if precio is None:
             # Las de la propia tanda cuentan para la tarifa de volumen aunque
             # todavía no existan en la base: quien programa cinco de golpe debe
@@ -1106,9 +1112,11 @@ async def repetir_actuacion(payload: RepetirIn, db: DbSession):
             ini_v, fin_v = recurrente.ventana(inicio)
             en_tanda = sum(1 for g in fechas
                            if ini_v <= datetime.combine(g, dtime(hh, mm)) < fin_v)
-            precio = (await tarifa.precio_para(
+            info = await tarifa.precio_para(
                 db, show=show, company_id=venue.company_id, fecha=inicio,
-                cuenta_extra=max(0, en_tanda - 1)))["price"]
+                cuenta_extra=max(0, en_tanda - 1))
+            precio = info["price"]
+            fuente = pricing.fuente_precio(info)
         precio = float(precio or 0)
 
         motivo = None
@@ -1157,7 +1165,8 @@ async def repetir_actuacion(payload: RepetirIn, db: DbSession):
             show_id=show.id, venue_id=venue.id, company_id=venue.company_id,
             artist_id=show.artist_id, booker_id=payload.booker_id,
             starts_at=inicio, ends_at=fin, event_type=payload.event_type,
-            agreed_price=precio, currency="MXN", commission_pct=commission_pct,
+            agreed_price=precio, price_source=fuente,
+            currency="MXN", commission_pct=commission_pct,
             status=BookingStatus.PENDING, confirmed_at=None,
         )
         db.add(nueva)

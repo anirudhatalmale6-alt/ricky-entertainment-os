@@ -75,6 +75,9 @@ class BookingOut(BaseModel):
     status: BookingStatus
     event_type: str | None
     agreed_price: float | None
+    # Qué capa fijó el importe: lista / temporada / especial / recurrente /
+    # manual. NULL en las actuaciones anteriores al campo, donde se desconoce.
+    price_source: str | None = None
     currency: str
     commission_pct: float | None
     headcount_start: int | None

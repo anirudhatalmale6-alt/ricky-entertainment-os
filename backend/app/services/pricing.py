@@ -137,3 +137,40 @@ def effective_price(show, when=None, client_rate=None, distance_km=None,
 
     out["price"] = price
     return out
+
+
+# Qué capa dejó el precio final. Se guarda en la actuación al crearla porque
+# DESPUÉS ya no se puede averiguar: la actuación sólo conserva el importe, y un
+# importe suelto no dice si fue precio de lista, una tarifa pactada con ese
+# hotel o una promoción. Sin esto no hay forma de saber qué cobra normalmente un
+# proveedor, que es justo lo que no se quiere ensuciar con los descuentos.
+LISTA = "lista"
+TEMPORADA = "temporada"
+ESPECIAL = "especial"        # tarifa pactada con ese hotel
+RECURRENTE = "recurrente"    # tarifa por volumen
+MANUAL = "manual"            # lo escribió una persona a mano
+
+FUENTES = {
+    LISTA: "Precio de lista",
+    TEMPORADA: "Ajuste de temporada",
+    ESPECIAL: "Tarifa pactada con el hotel",
+    RECURRENTE: "Tarifa por volumen",
+    MANUAL: "Importe escrito a mano",
+}
+
+
+def fuente_precio(info: dict | None) -> str:
+    """El nombre de la capa que fijó el precio que devolvió effective_price.
+
+    El orden importa y es el mismo en que las aplica effective_price: la
+    recurrente se evalúa al final y sólo marca su bandera si de verdad ganó.
+    """
+    if not info:
+        return MANUAL
+    if info.get("has_recurrent"):
+        return RECURRENTE
+    if info.get("has_special_rate"):
+        return ESPECIAL
+    if info.get("has_season"):
+        return TEMPORADA
+    return LISTA

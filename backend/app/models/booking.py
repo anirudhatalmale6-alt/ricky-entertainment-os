@@ -80,6 +80,12 @@ class Booking(Base, TimestampMixin):
     # restaurant / festival) and the amount agreed - snapshotted at booking time.
     event_type: Mapped[str | None] = mapped_column(String(40))
     agreed_price: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    # De dónde salió ese importe: lista / temporada / especial / recurrente /
+    # manual (ver services/pricing.FUENTES). Se sella al crear la actuación,
+    # porque más tarde es imposible de reconstruir: el importe por sí solo no
+    # distingue lo que un proveedor cobra de normal de lo que cobró con
+    # descuento, y eso es lo que no se quiere perder.
+    price_source: Mapped[str | None] = mapped_column(String(20))
     currency: Mapped[str] = mapped_column(String(3), default="MXN")
     # Platform commission % charged to the company, snapshotted from its risk
     # tier at the moment of booking (so later re-tiering does not rewrite money).

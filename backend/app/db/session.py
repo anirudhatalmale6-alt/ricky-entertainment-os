@@ -56,6 +56,11 @@ _SQLITE_ADDED_COLUMNS = [
     ("artists", "profile_image_url", "VARCHAR(500)"),
     ("request_proposals", "images", "JSON"),
     ("bookings", "notified_at", "DATETIME"),
+    # Procedencia del precio (David, 09/10). Sin relleno hacia atrás a propósito:
+    # de las actuaciones que ya existen no se puede saber qué capa fijó el
+    # importe, y poner "lista" en todas sería inventarlo. Queda NULL = se
+    # desconoce, y se sella de aquí en adelante.
+    ("bookings", "price_source", "VARCHAR(20)"),
     ("bookings", "invoice_paid", "BOOLEAN DEFAULT 0"),
     ("bookings", "payout_paid", "BOOLEAN DEFAULT 0"),
     ("tax_figures", "iva_traslado_pct", "FLOAT DEFAULT 16"),
