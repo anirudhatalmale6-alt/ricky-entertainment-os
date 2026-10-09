@@ -111,6 +111,10 @@ class ArtistUpdate(BaseModel):
     """Partial update - only provided fields are changed."""
     model_config = ConfigDict(extra="forbid")
 
+    # Visibilidad en el catálogo: True = lo ve cualquier hotel; False = sólo
+    # los que ya le conocen. NO es is_public, que es la tarjeta pública de
+    # fuera y se cambia por su propio endpoint.
+    catalogo_publico: bool | None = None
     stage_name: str | None = None
     first_name: str | None = None
     last_name: str | None = None
@@ -185,6 +189,10 @@ class ArtistOut(ArtistBase):
     codigo: str | None = None
     is_verified: bool
     is_active: bool
+    # Visibilidad dentro del catalogo de SHOWMA (otra cosa que is_public).
+    catalogo_publico: bool = True
+    # Que hotel lo invito a entrar, si alguien lo hizo.
+    invitado_por_company_id: int | None = None
     # Estado de la tarjeta publica (para pintar el interruptor y la liga).
     is_public: bool = False
     public_slug: str | None = None

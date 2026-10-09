@@ -491,6 +491,14 @@
   .showcard{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--ov)}
   .seasbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
   .tfbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
+  /* Visibilidad en el catálogo: dos opciones, nunca un interruptor suelto. Un
+     switch sin etiqueta deja al proveedor adivinando qué pasa si lo apaga. */
+  .vsopt{display:flex;gap:11px;align-items:flex-start;padding:12px;margin-top:8px;
+    border:1.5px solid var(--line);border-radius:12px;cursor:pointer;background:var(--bg)}
+  .vsopt:hover{border-color:var(--acc)}
+  .vsopt.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+  .vsopt input{width:auto;margin:3px 0 0;flex:none}
+  .vsopt b{font-size:14px}
   /* Escalones de precio: el proveedor elige con cuál sale al catálogo. */
   .escbox{margin:16px 0 4px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--ov1)}
   .esch{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
@@ -1484,6 +1492,12 @@
   .lg-chk input:checked{background:#7c5cfc;border-color:#7c5cfc}
   .lg-chk input:checked::after{content:"✓";position:absolute;color:#fff;font-size:11px;left:2.5px;top:-2px}
   .lg-link{color:#9b7bff;cursor:pointer}
+  /* Hereda la casilla dibujada de .lg-chk y sólo cambia la disposición: el
+     texto es largo y tiene que ir arriba, no centrado con la casilla. */
+  .lg-vis{align-items:flex-start;margin:4px 0 12px;font-size:12.5px;
+    line-height:1.45;text-align:left}
+  .lg-vis input{margin-top:2px}
+  .lg-vis b{display:block;font-weight:600;color:#9b7bff;margin-top:3px}
   .lg-btn{width:100%;border:0;border-radius:10px;padding:13px;font-weight:700;font-size:14px;cursor:pointer;
       color:#fff;background:linear-gradient(135deg,#7c5cfc,#9b6bff);box-shadow:0 8px 24px rgba(124,92,252,.34);transition:.15s;margin-top:4px}
   .lg-btn:hover{filter:brightness(1.07)}
@@ -2242,6 +2256,15 @@
             <li data-r="spec">Un carácter especial</li>
           </ul>
           <input id="a_city" class="lg-hide">
+          <!-- La pregunta de visibilidad. Marcada que SÍ por defecto: quien se
+               da de alta por su cuenta viene a que le encuentren. Quien entra
+               invitado por un hotel puede desmarcarla y seguir trabajando con
+               quien le invitó, que es justo lo que pidió David. -->
+          <label class="lg-chk lg-vis" id="a_pub_row">
+            <input type="checkbox" id="a_public" checked>
+            <span>Quiero que cualquier hotel pueda encontrarme y contratarme.
+              <b id="a_pub_inv" style="display:none"></b></span>
+          </label>
           <button class="lg-btn" onclick="regArtist()">Crear cuenta</button>
         </div>
 
@@ -2689,11 +2712,36 @@ async function login(){
     await afterAuth(d.access_token);
   }catch(e){el.textContent="No se pudo conectar al servidor";}
 }
+/* Invitación de un hotel: showma.mx/?inv=<id de la empresa>. Queda escrita en
+   la ficha para que, si el proveedor elige NO ser público, su hotel lo siga
+   viendo. Sin esto un invitado que dice que no desaparece hasta para quien le
+   trajo, porque todavía no tiene ninguna actuación con nadie. */
+let INVITACION = null;
+(function(){
+  try{
+    const v = new URLSearchParams(location.search).get('inv');
+    INVITACION = v && /^\d+$/.test(v) ? +v : null;
+  }catch(e){}
+})();
+async function pintaInvitacion(){
+  if(!INVITACION) return;
+  const row=document.getElementById('a_pub_inv'); if(!row) return;
+  try{
+    const r=await fetch(API+'/public/empresa/'+INVITACION);
+    if(!r.ok) return;
+    const d=await r.json();
+    if(!d || !d.name) return;
+    row.style.display='block';
+    row.textContent='Si lo desmarcas, seguirás saliendo para '+d.name+', que te invitó.';
+  }catch(e){}
+}
 async function regArtist(){
   const el=document.getElementById('lerr'); el.textContent="";
   try{
     const r = await fetch(API+"/auth/register/artist",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({full_name:val('a_name'),stage_name:val('a_stage'),phone:val('a_phone')||null,base_city:val('a_city')||null,email:val('a_email'),password:val('a_pass')})});
+      body:JSON.stringify({full_name:val('a_name'),stage_name:val('a_stage'),phone:val('a_phone')||null,base_city:val('a_city')||null,email:val('a_email'),password:val('a_pass'),
+        catalogo_publico:(document.getElementById('a_public')||{checked:true}).checked,
+        invitacion:INVITACION})});
     const d=await r.json().catch(()=>({}));
     if(!r.ok){el.textContent=regErr(d);return;}
     // New artist: save session and go complete the registration hoja (fotos,
@@ -2806,6 +2854,8 @@ function pwRules(id,listId){
   document.querySelectorAll('#'+listId+' li').forEach(li=>li.classList.toggle('ok',!!t[li.dataset.r]));
 }
 let AUD='artist';
+// Si se llega con ?inv=, se enseña de quién es la invitación junto a la casilla.
+try{ document.addEventListener('DOMContentLoaded', pintaInvitacion); }catch(e){}
 function toggleAudience(){
   AUD = AUD==='artist' ? 'hotel' : 'artist';
   const h = AUD==='hotel';
@@ -5921,6 +5971,74 @@ function apAfinidadHTML(a, shows){
   </div>`;
 }
 
+/* ---- Invitar a un proveedor ----------------------------------------------
+   La liga que el hotel le manda a su músico de siempre. Lleva su empresa, y
+   por eso al registrarse queda apuntado quién le trajo: si el proveedor elige
+   no ser público, este hotel lo sigue viendo y el resto no. */
+function ligaInvitacion(){
+  const cid = ME && ME.company_id;
+  if(!cid) return '';
+  return location.origin + (window.RICKY_API||'') + '/?inv=' + cid;
+}
+function invitarHTML(){
+  const url = ligaInvitacion();
+  if(!url) return '';
+  return `<div class="box" style="margin-bottom:16px">
+    <h3 style="margin:0 0 4px">🤝 Invitar a un proveedor</h3>
+    <div class="hint" style="margin:0 0 11px">Mándale esta liga a un músico o show con el que ya trabajas para que se dé de alta. Queda registrado que lo invitaste tú, así que lo verás en tu catálogo aunque él prefiera no salir para el resto de los hoteles.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="invUrl" value="${esc(url)}" readonly
+        style="flex:1;min-width:220px;border:1px solid var(--line);background:var(--inp);
+               border-radius:9px;padding:9px 11px;font-size:12.5px;color:var(--mut)">
+      <button class="btn ghost" onclick="copiaInvitacion()">Copiar liga</button>
+    </div></div>`;
+}
+function copiaInvitacion(){
+  const i=document.getElementById('invUrl'); if(!i) return;
+  i.select(); i.setSelectionRange(0,99999);
+  try{ navigator.clipboard.writeText(i.value); }catch(e){ try{document.execCommand('copy');}catch(_){} }
+  toast('Liga copiada ✓');
+}
+
+/* ---- Visibilidad en el catálogo ------------------------------------------
+   Distinta de la tarjeta pública de abajo: esto no es salir en internet, es a
+   qué HOTELES de SHOWMA le sale al buscar. Quien dice que no sigue siendo
+   visible para los que ya le conocen, incluido el que le invitó a entrar.   */
+function visibilidadHTML(p){
+  const on = p.catalogo_publico !== false;
+  return `<div class="box vsbox" id="vsBox" style="margin-bottom:16px">
+    <h3 style="margin:0 0 4px">${on?'🌎':'🔒'} Quién puede encontrarte</h3>
+    <div class="hint" style="margin:0 0 12px">Esto no cambia tus precios ni tus datos. Sólo decide a qué hoteles les apareces cuando buscan en el catálogo.</div>
+    <label class="vsopt${on?' on':''}" onclick="cambiaVisibilidad(true)">
+      <input type="radio" name="vsvis" ${on?'checked':''}>
+      <div><b>Cualquier hotel puede encontrarme</b>
+        <div class="hint" style="margin:3px 0 0">Sales en el catálogo para todos los hoteles de SHOWMA. Es la forma de que te contraten los que todavía no te conocen.</div></div>
+    </label>
+    <label class="vsopt${on?'':' on'}" onclick="cambiaVisibilidad(false)">
+      <input type="radio" name="vsvis" ${on?'':'checked'}>
+      <div><b>Sólo los hoteles con los que ya trabajo</b>
+        <div class="hint" style="margin:3px 0 0">No sales en las búsquedas del resto. Te siguen viendo los hoteles con los que ya tienes actuaciones o tarifa pactada, y el que te invitó a entrar.</div></div>
+    </label>
+  </div>`;
+}
+async function cambiaVisibilidad(publico){
+  const p=CACHE.profile||{};
+  if((p.catalogo_publico!==false)===publico) return;   // ya estaba así
+  const box=document.getElementById('vsBox'); if(box) box.style.opacity='.5';
+  try{
+    await patch('/me/artist',{catalogo_publico:publico});
+    if(CACHE.profile) CACHE.profile.catalogo_publico=publico;
+    toast(publico?'Ahora te encuentra cualquier hotel ✓'
+                 :'Listo: sólo te ven los hoteles que ya te conocen.');
+    // Con force: show() NO repinta un panel ya cargado, y sin esto la opción
+    // elegida se quedaba pintada la vieja aunque el servidor ya tuviera la nueva.
+    show('profile', true);
+  }catch(e){
+    toast('No se pudo cambiar: '+(e.message||''),true);
+    if(box) box.style.opacity='';
+  }
+}
+
 /* ---- Tarjeta de presentación pública -------------------------------------
    La liga que se le pasa a un hotel por WhatsApp: el perfil del proveedor
    visto desde fuera, sin cuenta. Sólo la ve el administrador porque publicar
@@ -8886,6 +9004,7 @@ const RENDER = {
     const catCount={}; items.forEach(i=>{catCount[i.cat]=(catCount[i.cat]||0)+1;});
     const cats=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
     box.innerHTML=`
+      ${invitarHTML()}
       <div class="filters">
         <div class="filtrow">
           <div class="field" style="margin:0"><label>Buscar</label><input id="af_q" oninput="applyArtistFilters()" placeholder="Nombre, tipo de show, instrumento…"></div>
@@ -9283,6 +9402,7 @@ const RENDER = {
         </div>
         <button class="btn" onclick="vistaPreviaFicha(${p.id})">Ver mi ficha</button>
       </div>
+      ${visibilidadHTML(p)}
       <div style="margin-bottom:16px">${partner}</div>
       <div class="box" style="margin-bottom:16px">
         <h3>📸 Foto de perfil</h3><div class="hint">Es la imagen que ven los hoteles en el catálogo. Con foto tu perfil se ve mucho más profesional que solo con iniciales.</div>

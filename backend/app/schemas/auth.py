@@ -18,6 +18,13 @@ class ArtistRegisterRequest(BaseModel):
     artist_type: str | None = None
     phone: str | None = None
     base_city: str | None = None
+    # ¿Quiere salir para cualquier hotel, o sólo para los que ya le conocen?
+    # Por defecto sí: quien se da de alta por su cuenta viene a que le vean.
+    catalogo_publico: bool = True
+    # Código de invitación del hotel que le pidió entrar, si viene por esa vía.
+    # Es el id de la empresa; se valida contra la base antes de guardarlo, que
+    # un número en una URL lo escribe cualquiera.
+    invitacion: int | None = None
 
 
 class ContratanteRegisterRequest(BaseModel):

@@ -64,6 +64,11 @@ _SQLITE_ADDED_COLUMNS = [
     # Escalón de precio del show (David, 09/10). Los shows que ya existen
     # arrancan en su tarifa habitual: nadie eligió rebajarlos.
     ("shows", "price_tier", "VARCHAR(16) DEFAULT 'habitual'"),
+    # Visibilidad en el catálogo (David, 09/10). Arranca en 1 a propósito: los
+    # proveedores que ya están dentro entraron sabiendo que se les ve, y
+    # apagarlo en bloque dejaría el catálogo vacío para todos los hoteles.
+    ("artists", "catalogo_publico", "BOOLEAN DEFAULT 1"),
+    ("artists", "invitado_por_company_id", "INTEGER"),
     ("bookings", "invoice_paid", "BOOLEAN DEFAULT 0"),
     ("bookings", "payout_paid", "BOOLEAN DEFAULT 0"),
     ("tax_figures", "iva_traslado_pct", "FLOAT DEFAULT 16"),

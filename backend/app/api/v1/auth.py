@@ -100,6 +100,15 @@ async def register_artist(payload: ArtistRegisterRequest, db: DbSession):
     db.add(user)
     await db.flush()
 
+    # El hotel que le invitó, sólo si existe de verdad: el código viaja en una
+    # URL y ahí cualquiera escribe un número. Si no existe, se entra igual pero
+    # sin invitación, que es peor que nada sólo si además pidió no ser público.
+    invitador = None
+    if payload.invitacion is not None:
+        invitador = (await db.execute(
+            select(Company.id).where(Company.id == payload.invitacion)
+        )).scalar_one_or_none()
+
     artist = Artist(
         user_id=user.id,
         stage_name=payload.stage_name,
@@ -107,6 +116,8 @@ async def register_artist(payload: ArtistRegisterRequest, db: DbSession):
         phone=payload.phone,
         base_city=payload.base_city,
         email=payload.email,
+        catalogo_publico=payload.catalogo_publico,
+        invitado_por_company_id=invitador,
     )
     db.add(artist)
     await db.flush()

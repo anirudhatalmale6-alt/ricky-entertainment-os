@@ -279,6 +279,24 @@ async def tarjeta_data(db: AsyncSession, slug: str) -> dict | None:
     }
 
 
+@router.get("/empresa/{company_id}")
+async def empresa_que_invita(company_id: int, db: DbSession):
+    """Sólo el NOMBRE de la empresa, para la pantalla de alta por invitación.
+
+    Es un endpoint sin sesión, así que no devuelve nada más: ni correo, ni
+    teléfono, ni RFC, ni cuántas propiedades tiene. Quien pruebe ids a mano
+    sólo obtiene una lista de nombres comerciales, que ya son públicos.
+    """
+    from app.models.company import Company
+
+    nombre = (await db.execute(
+        select(Company.name).where(Company.id == company_id)
+    )).scalar_one_or_none()
+    if nombre is None:
+        raise HTTPException(status_code=404, detail="No existe esa empresa")
+    return {"id": company_id, "name": nombre}
+
+
 @router.get("/artist/{slug}")
 async def public_artist(slug: str, db: DbSession) -> dict:
     data = await tarjeta_data(db, slug)

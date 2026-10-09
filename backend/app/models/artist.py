@@ -186,6 +186,25 @@ class Artist(Base, TimestampMixin):
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     public_slug: Mapped[str | None] = mapped_column(String(80), index=True)
 
+    # --- Visibilidad DENTRO del catálogo (David, 09/10) -------------------
+    # Ojo, no confundir con is_public, que es la tarjeta pública de fuera, en
+    # /p/<slug>. Esto decide qué HOTELES ven al proveedor al buscar en SHOWMA.
+    #
+    #   True  = cualquier hotel puede encontrarlo y contratarlo.
+    #   False = sólo los hoteles con los que ya tiene relación.
+    #
+    # Por defecto True: los 53 que ya están dentro entraron sabiendo que se les
+    # ve, y apagarlo en bloque vaciaría el catálogo de golpe. La pregunta se le
+    # hace a quien se registra de ahora en adelante.
+    catalogo_publico: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Qué hotel lo trajo. Sin esto, un proveedor que elige NO ser público queda
+    # invisible hasta para quien lo invitó, porque todavía no tiene ninguna
+    # actuación con nadie: hoy 36 de 53 están en ese caso. La invitación ES la
+    # primera relación, y por eso hay que dejarla escrita al registrarse.
+    invitado_por_company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"), index=True
+    )
+
     # Status / verification
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

@@ -21,7 +21,7 @@ from app.models.seasonal_rate import ShowSeasonalRate
 from app.models.show import Show
 from app.models.venue import Venue
 from app.schemas.show import PriceBenchmarkOut, ShowCreate, ShowOut, ShowUpdate
-from app.services import availability, geo, pricing, recurrente
+from app.services import availability, geo, pricing, recurrente, visibilidad
 
 router = APIRouter(tags=["shows"])
 
@@ -70,6 +70,16 @@ async def list_shows(
         stmt = stmt.where(Show.is_active.is_(True))
     res = await db.execute(stmt)
     shows = list(res.scalars().unique().all())
+
+    # Proveedores que pidieron no salir para todo el mundo: sólo los ve el
+    # hotel con el que ya tienen relación (ver services/visibilidad).
+    ids_art = [s.artist_id for s in shows if s.artist_id]
+    if ids_art:
+        visibles = await visibilidad.artistas_visibles(
+            db, ids_art, company_id=scope.company_id,
+            group_id=getattr(scope, "group_id", None), es_admin=scope.is_admin,
+        )
+        shows = [s for s in shows if not s.artist_id or s.artist_id in visibles]
 
     # Enriquecer con nombre del artista + una imagen: foto del show (la marcada como
     # perfil, o la primera) y, si el show no tiene fotos, la foto de perfil del artista.
