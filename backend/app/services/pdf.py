@@ -8,10 +8,11 @@ navegador.
 from __future__ import annotations
 
 import io
+from xml.sax.saxutils import escape as _xml
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import (
@@ -58,6 +59,62 @@ def _s(value) -> str:
     return "" if value is None else str(value)
 
 
+def _celda(value) -> str:
+    """Texto de una celda listo para Paragraph: escapado, y con los saltos de
+    línea convertidos (Paragraph los ignora). Los nombres de show y de
+    proveedor los escribe la gente, y un "Rock & <b>Blues" rompía el PDF."""
+    return _xml(_s(value)).replace("\n", "<br/>")
+
+
+def _tabla(st: dict, width: float, table: dict):
+    """Una tabla de renglones a partir de {head, rows, align, first_col, total}.
+
+    ``total`` marca el último renglón como fila de totales (negrita y raya).
+    Devuelve None si no hay cabecera o no hay renglones.
+    """
+    head_row = [_s(h) for h in (table.get("head") or [])]
+    body_rows = table.get("rows") or []
+    if not head_row or not body_rows:
+        return None
+    align = [str(a or "l").lower() for a in (table.get("align") or [])]
+    align += ["l"] * (len(head_row) - len(align))
+    n = len(head_row)
+    # Con muchas columnas la letra baja un punto para que quepan importes.
+    if n > 9:
+        st = dict(st, **{k: ParagraphStyle(k + "_c", parent=st[k], fontSize=7.3, leading=9.4)
+                         for k in ("cell", "cellc", "cellr")})
+    cs = [{"r": st["cellr"], "c": st["cellc"]}.get(a, st["cell"]) for a in align]
+    con_total = bool(table.get("total"))
+    data = [[Paragraph(f"<b>{_celda(h)}</b>", cs[i]) for i, h in enumerate(head_row)]]
+    for k, r in enumerate(body_rows):
+        cells = list(r) + [""] * (len(head_row) - len(r))
+        fuerte = con_total and k == len(body_rows) - 1
+        fmt = "<b>%s</b>" if fuerte else "%s"
+        data.append([Paragraph(fmt % _celda(c), cs[i]) for i, c in enumerate(cells[:len(head_row)])])
+    # La primera columna se lleva el espacio sobrante; el resto se reparte.
+    try:
+        fc = float(table.get("first_col") or 0)
+    except (TypeError, ValueError):
+        fc = 0
+    first = width * (fc if 0.05 < fc < 0.9 else (0.16 if n > 9 else 0.30 if n > 3 else 0.40))
+    rest = (width - first) / max(n - 1, 1)
+    lt = Table(data, colWidths=[first] + [rest] * (n - 1), repeatRows=1)
+    style = [
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.4, LINE),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ]
+    if con_total:
+        style.append(("LINEABOVE", (0, -1), (-1, -1), 1.2, BRAND))
+    for i, a in enumerate(align[:n]):
+        style.append(("ALIGN", (i, 0), (i, -1), _ALIGN.get(a, "LEFT")))
+    lt.setStyle(TableStyle(style))
+    return lt
+
+
 def build_document_pdf(doc: dict) -> bytes:
     """Arma el PDF a partir del documento genérico que manda el frontend.
 
@@ -71,8 +128,11 @@ def build_document_pdf(doc: dict) -> bytes:
     """
     st = _styles()
     buf = io.BytesIO()
+    # Horizontal para las tablas anchas: el reparto por mes son 14 columnas y el
+    # calendario semanal 8 con varias líneas por celda; en vertical no caben.
+    apaisado = _s(doc.get("orientation")).lower() == "landscape"
     pdf = SimpleDocTemplate(
-        buf, pagesize=letter,
+        buf, pagesize=landscape(letter) if apaisado else letter,
         leftMargin=18 * mm, rightMargin=18 * mm,
         topMargin=16 * mm, bottomMargin=14 * mm,
         title=_s(doc.get("title") or doc.get("kind") or "Documento"),
@@ -119,34 +179,22 @@ def build_document_pdf(doc: dict) -> bytes:
         flow += [mt, Spacer(1, 12)]
 
     # --- Renglones ---
-    table = doc.get("table") or {}
-    head_row = [_s(h) for h in (table.get("head") or [])]
-    body_rows = table.get("rows") or []
-    if head_row and body_rows:
-        align = [str(a or "l").lower() for a in (table.get("align") or [])]
-        align += ["l"] * (len(head_row) - len(align))
-        cs = [{"r": st["cellr"], "c": st["cellc"]}.get(a, st["cell"]) for a in align]
-        data = [[Paragraph(f"<b>{h}</b>", cs[i]) for i, h in enumerate(head_row)]]
-        for r in body_rows:
-            cells = [_s(c) for c in r] + [""] * (len(head_row) - len(r))
-            data.append([Paragraph(c, cs[i]) for i, c in enumerate(cells[:len(head_row)])])
-        # La primera columna se lleva el espacio sobrante; el resto se reparte.
-        n = len(head_row)
-        first = width * (0.30 if n > 3 else 0.40)
-        rest = (width - first) / max(n - 1, 1)
-        lt = Table(data, colWidths=[first] + [rest] * (n - 1), repeatRows=1)
-        style = [
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LINEBELOW", (0, 0), (-1, -1), 0.4, LINE),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ]
-        for i, a in enumerate(align[:n]):
-            style.append(("ALIGN", (i, 0), (i, -1), _ALIGN.get(a, "LEFT")))
-        lt.setStyle(TableStyle(style))
-        flow += [lt, Spacer(1, 10)]
+    t = _tabla(st, width, doc.get("table") or {})
+    if t is not None:
+        flow += [t, Spacer(1, 10)]
+
+    # --- Secciones extra: más tablas con su título (p. ej. el reparto por
+    #     categoría y el control anual del panel de Presupuesto) ---
+    for sec in (doc.get("sections") or []):
+        if not isinstance(sec, dict):
+            continue
+        tt = _tabla(st, width, sec)
+        if tt is None:
+            continue
+        titulo = _s(sec.get("title")).strip()
+        if titulo:
+            flow += [Spacer(1, 4), Paragraph(f"<b>{_celda(titulo)}</b>", st["meta"]), Spacer(1, 4)]
+        flow += [tt, Spacer(1, 10)]
 
     # --- Totales (bloque a la derecha) ---
     summary = [s for s in (doc.get("summary") or []) if s]

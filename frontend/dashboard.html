@@ -491,6 +491,7 @@
   .showcard{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--ov)}
   .seasbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
   .tfbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
+  .pdfbar{display:flex;justify-content:flex-end;gap:8px;margin:0 0 12px}
   /* Visibilidad en el catálogo: dos opciones, nunca un interruptor suelto. Un
      switch sin etiqueta deja al proveedor adivinando qué pasa si lo apaga. */
   .vsopt{display:flex;gap:11px;align-items:flex-start;padding:12px;margin-top:8px;
@@ -717,6 +718,13 @@
   /* Fila de filtros: búsqueda + ubicación (con miras a operar a nivel nacional) */
   .amod.actpick .afilters{display:flex;gap:8px;margin:14px 18px 8px;align-items:center;flex-wrap:wrap}
   .amod.actpick .afilters .asrch{margin:0;flex:1;min-width:180px}
+  .acats{display:flex;flex-wrap:wrap;gap:6px;margin:0 18px 10px}   /* mismo sangrado que .afilters */
+  .acchip{border:1px solid var(--line);background:var(--inp);color:var(--txt);border-radius:999px;
+    padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600}
+  .acchip i{font-style:normal;color:var(--mut);font-weight:500;margin-left:2px}
+  .acchip:hover{border-color:var(--acc)}
+  .acchip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  .acchip.on i{color:rgba(255,255,255,.75)}
   .afsel{border:1px solid var(--line);background:var(--inp);border-radius:10px;padding:9px 11px;font-size:12.5px;color:var(--txt);cursor:pointer;max-width:230px;flex:none}
   /* auto-fill en vez de "1fr 1fr": las tarjetas mandan su ancho mínimo y el
      número de columnas sale del espacio que haya. Y el padding de abajo evita
@@ -2377,7 +2385,9 @@
     <div class="navlbl">Inteligencia · Partner</div>
     <div class="nav" data-p="market"><span class="ic">📈</span> Market Intelligence <span class="pro">PRO</span></div>
     <div class="nav" data-p="demand"><span class="ic">🔥</span> Tendencias <span class="pro">PRO</span></div>
-    <div class="nav" data-p="news"><span class="ic">📰</span> Noticias <span class="pro">PRO</span></div>
+    <!-- Noticias: retirada (David, 13/10, "no está interesando"). El panel
+         sigue en el código por si vuelve; sólo se deja de ofrecer. -->
+    <div class="nav" data-p="news" style="display:none"><span class="ic">📰</span> Noticias <span class="pro">PRO</span></div>
     <div class="nav" data-p="ziggy" style="display:none"><span class="ic">🧪</span> ZIGGY · Laboratorio</div>
     <div class="promo" id="sidePromo" style="display:none"></div>
     <button class="help-btn" id="helpBtn" onclick="openHelp()">🆘 Ayuda · escríbele a MASTER</button>
@@ -3203,7 +3213,7 @@ function applyRole(){
   // (es el add-on de pago que se les cobra por su plan Partner).
   const isPartnerArtist = isArtist && !!ME.is_partner;
   const canIntel = canPartner || isPartnerArtist;
-  show('news', canIntel); show('market', canIntel); show('demand', canIntel);
+  show('news', false); show('market', canIntel); show('demand', canIntel);
   // La barra de ZIGGY enseña el botón de Market Intelligence sólo a quien puede
   // entrar. Es un add-on de pago: un botón que lleva a una pantalla cerrada es
   // peor que no tenerlo.
@@ -3847,6 +3857,18 @@ function maestroCard(b,vi){
     <div class="mch2">${av}<span class="mnm">${esc(nombre)}</span></div>
     <div class="mstyle">${esc(estilo)}</div></div>`;
 }
+/* Los salones que salen en una semana. Una sola regla para el tablero y para
+   su PDF: si cada uno la calculara por su lado, el día que cambie el papel y la
+   pantalla dejarían de enseñar lo mismo. */
+function maestroVisibles(venues,bk,days){
+  const diasSemana=days.map(d=>ymd(d));
+  return venues.filter(v=>!v.inactivo || bk.some(b=>
+    (b.venue_id||0)===(v.id||0) && diasSemana.includes(ymd(new Date(b.starts_at)))));
+}
+function maestroDias(){
+  const mon=mondayOf(MAESTRO_REF||new Date());
+  return [...Array(7)].map((_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+}
 function renderMaestro(){
   const grid=document.getElementById('maestroGrid'); if(!grid) return;
   const bk=CACHE.homeBk||[]; const venues=maestroVenues(bk);
@@ -3859,9 +3881,7 @@ function renderMaestro(){
   // actuaciones que enseñar. En el resto desaparece, que es lo que espera quien
   // acaba de darle a quitar. Esconderlo SIEMPRE borraría de la vista historia
   // real; dejarlo siempre es lo que le chirriaba a David.
-  const diasSemana=days.map(d=>ymd(d));
-  const visibles=venues.filter(v=>!v.inactivo || bk.some(b=>
-    (b.venue_id||0)===(v.id||0) && diasSemana.includes(ymd(new Date(b.starts_at)))));
+  const visibles=maestroVisibles(venues,bk,days);
   visibles.forEach((v,vi)=>{
     const vc=bk.filter(b=>(b.venue_id||0)===(v.id||0)).length;
     const capTxt=(v.capacity!=null&&v.capacity!=='')?('Cap. '+v.capacity):`${vc} ${vc===1?'actuación':'actuaciones'}`;
@@ -4340,6 +4360,25 @@ async function ensureShows(on,venueId){
 // Radio de búsqueda del selector de artistas (km desde el hotel). 0 = sin límite.
 let ACT_KM=100;
 function actKmSet(v){ ACT_KM=+v||0; actRender(); }
+// Filtro por categoría en el selector del calendario (David, 13/10). Se queda
+// elegido mientras el hotel programa la semana, como la distancia.
+let ACT_CAT='';
+function actCatSet(c){ ACT_CAT=c||''; actRender(); }
+function actCatsRender(lista){
+  const box=document.getElementById('actCats'); if(!box) return;
+  // Sólo las categorías que tienen shows: así Wellness o Actividades aparecen
+  // solas en cuanto alguien publique uno, sin tocar esto. El número es el de
+  // la lista con los DEMÁS filtros ya puestos (distancia, disponibilidad,
+  // búsqueda): si dijera 15 y al pulsar salieran 13, el chip mentiría.
+  const base=lista||CACHE.shows||[];
+  const todas={}; (CACHE.shows||[]).forEach(s=>{ if(s.category) todas[s.category]=1; });
+  const cuenta={}; base.forEach(s=>{ if(s.category) cuenta[s.category]=(cuenta[s.category]||0)+1; });
+  const cats=Object.keys(todas).sort((a,b)=>(cuenta[b]||0)-(cuenta[a]||0));
+  if(ACT_CAT && !todas[ACT_CAT]) ACT_CAT='';
+  if(cats.length<2){ box.innerHTML=''; return; }
+  const chip=(v,txt)=>`<button class="acchip${ACT_CAT===v?' on':''}" onclick="actCatSet('${esc(v).replace(/'/g,"\\'")}')">${txt}</button>`;
+  box.innerHTML=chip('',`Todas <i>${base.length}</i>`)+cats.map(c=>chip(c,`${esc(pretty(c))} <i>${cuenta[c]||0}</i>`)).join('');
+}
 async function openAddAct(venueId,dateStr){
   if(!venueId){ toast('Este bloque no tiene venue asignado.',true); return; }
   if(dateStr<ymd(new Date())){ toast('No se pueden agendar actuaciones en fechas pasadas.',true); return; }
@@ -4367,6 +4406,7 @@ async function openAddAct(venueId,dateStr){
         <option value="0"${ACT_KM===0?' selected':''}>📏 Sin límite de distancia</option>
       </select>
     </div>
+    <div class="acats" id="actCats"></div>
     <div class="alist artgrid" id="actList"><div class="muted" style="padding:16px;text-align:center">Cargando artistas…</div></div>
     <div class="af">
       <div class="fld"><label>Hora</label><input id="actTime" type="time" value="20:00"></div>
@@ -4402,6 +4442,8 @@ function actRender(){
   if(ACT_KM) items=items.filter(s=>s.distance_km!=null&&s.distance_km<=ACT_KM);
   const nd=items.filter(s=>s.is_available===false).length;
   items=items.filter(s=>s.is_available!==false);
+  actCatsRender(items);
+  if(ACT_CAT) items=items.filter(s=>s.category===ACT_CAT);
   // Ordenar ANTES de recortar: si se corta a 60 y luego se ordena, el mejor
   // match puede quedarse fuera de la lista sin que nadie lo sepa.
   const notaV = s => { const m=(MATCH_VENUE||{})[String(s.id)]; return m&&m.match!=null?m.match:null; };
@@ -4443,7 +4485,7 @@ function actRender(){
       else if(s.recurrent_count) tags.push(`<span class="atag recu">🔁 Llevas ${s.recurrent_count} de ${rm} · a la ${rm}ª ${rp}</span>`);
       else tags.push(`<span class="atag recu">🔁 ${rm} o más en ${rd} días: ${rp}</span>`);
     }
-    if(s.travel_fee_applied) tags.push(`<span class="atag km">🚗 Incluye ${MXN(s.travel_fee_applied)} de traslado (a más de ${s.travel_fee_km_applied} km)</span>`);
+    // El extra de gasolina se suma al precio pero NO se enseña (David, 13/10).
     const mv = (MATCH_VENUE||{})[String(s.id)];
     if(s.artist_partner) tags.push('<span class="atag part">✓ Partner</span>');
     if(s.offers_audition) tags.push('<span class="atag aud">🎤 Acepta audiciones</span>');
@@ -4451,7 +4493,7 @@ function actRender(){
     // canal se abre fuera, porque un canal no se puede reproducir.
     if(s.video_url && videoEtiqueta(s.video_url)) tags.push(
       `<span class="atag vid" onclick="event.stopPropagation();videoAbrir(${esc(JSON.stringify(s.video_url))},${esc(JSON.stringify(s.show_name||'Video'))})">${videoEtiqueta(s.video_url)}</span>`);
-    const priceHtml=eff!=null?(((s.has_special_rate||s.has_season||s.travel_fee_applied||s.has_recurrent)&&s.price_hotel&&s.price_hotel!=eff)?`<span class="ac3-price"><s style="color:var(--mut);font-weight:400">${MXN(s.price_hotel)}</s> ${MXN(eff)}</span>`:`<span class="ac3-price">${MXN(eff)}</span>`):'';
+    const priceHtml=eff!=null?(((s.has_special_rate||s.has_season||s.has_recurrent)&&s.price_hotel&&s.price_hotel!=eff)?`<span class="ac3-price"><s style="color:var(--mut);font-weight:400">${MXN(s.price_hotel)}</s> ${MXN(eff)}</span>`:`<span class="ac3-price">${MXN(eff)}</span>`):'';
     // Disponibilidad del día: el artista pudo bloquearlo o ya tener actuación.
     const nd=s.is_available===false;
     const disp=nd?`<span class="ac3-disp no">✕ No disponible</span>`
@@ -5449,7 +5491,6 @@ function artistCard(i){
       <div class="arow"><h4>${esc(i.show||i.name)}</h4>${i.rating?`<span class="rt">★ ${i.rating.toFixed(1)}</span>`:(i.partner?'<span class="rt">✓ Partner</span>':'')}</div>
       <div class="ty">${esc(i.name)} · ${esc(pretty(i.cat))}</div>
       ${i.price?`<div class="from">${i.specialRate&&i.publicPrice&&i.publicPrice!=i.price?`Desde <s style="color:var(--mut);font-weight:400">${MXN(i.publicPrice)}</s> ${MXN(i.price)} <span class="spbadge">🏷️ Tarifa especial</span>`:`Desde ${MXN(i.price)}`}</div>`:''}
-      ${i.travelFee?`<div class="tfnote">🚗 Incluye ${MXN(i.travelFee)} de traslado · el hotel está a más de ${i.travelFeeKm} km</div>`:''}
       ${apDistCard(i.artistId)}
       <div class="tgs">${tags.map(g=>`<span>${esc(g)}</span>`).join('')}</div>
       <div class="loc"><span>📍 ${esc(i.city||'México')}${i.km!=null?` · ${i.km<1?'<1':Math.round(i.km)} km`:''}</span>${i.langs&&i.langs.length?`<span>🗣 ${esc(i.langs.slice(0,2).join(', '))}</span>`:''}</div>
@@ -7147,6 +7188,80 @@ async function dlPdf(doc, filename, btn){
   }catch(e){ return false; }
   finally{ if(btn){ btn.textContent=old; btn.style.pointerEvents=''; } }
 }
+/* PDF del panel de Presupuesto (David, 13/10). Sale de CACHE.budPdf, que se
+   llena al pintar el panel: así el documento y la pantalla no pueden diferir. */
+async function pdfPresupuesto(btn){
+  const d=CACHE.budPdf; if(!d){ toast('Abre primero el panel de Presupuesto.',true); return; }
+  const m0=v=>{ v=Math.round(+v||0); return (v<0?'-':'')+'$'+Math.abs(v).toLocaleString('es-MX'); };
+  const MN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const reparto=d.cats.map(c=>[c.name, ...c.meses.map(v=>v>0?m0(v):'—'), m0(c.total)]);
+  if(reparto.length) reparto.push(['Total', ...d.monthAct.map(v=>v>0?m0(v):'—'), m0(d.yearSpend)]);
+  const control=MESES.map((mn,i)=>{
+    const bd=d.budByMonth[i], sp=d.monthAct[i]; if(!bd&&!sp) return null;
+    const dif=bd-sp, pct=bd>0?Math.round(sp/bd*100)+'%':(sp>0?'s/ppto':'0%');
+    return [mn, bd?m0(bd):'—', sp?m0(sp):'—', (dif>=0?'+':'')+m0(dif), pct];
+  }).filter(Boolean);
+  if(control.length) control.push(['Total '+d.year, m0(d.yearBudget), m0(d.yearSpend),
+    ((d.yearBudget-d.yearSpend)>=0?'+':'')+m0(d.yearBudget-d.yearSpend),
+    d.yearBudget>0?Math.round(d.yearSpend/d.yearBudget*100)+'%':'—']);
+  const fname='Presupuesto_'+d.year+'.pdf';
+  const ok=await dlPdf({
+    kind:'Presupuesto '+d.year, number:d.scope||'', title:'Presupuesto '+d.year,
+    filename:fname, orientation:'landscape',
+    meta:[['Presupuesto anual',m0(d.budget)],['Utilizado (realizado)',m0(d.gastado)],
+          ['Comprometido',m0(d.comprometido)],['Disponible',m0(d.disp)+' · '+d.usadoPct+'% usado']],
+    table:{head:['Categoría',...MN,'Total'], rows:reparto.length?reparto:[['Aún no hay gasto registrado','']],
+           align:['l',...Array(13).fill('r')], total:reparto.length>0},
+    sections:[{title:'Control anual '+d.year+' · presupuesto cargado vs. gasto agendado',
+      head:['Mes','Presupuesto','Gasto','Diferencia','% Utilizado'],
+      rows:control.length?control:[['Sin presupuesto cargado','','','','']],
+      align:['l','r','r','r','r'], first_col:0.28, total:control.length>0}],
+    note:'Distribución de gastos por categoría: gasto real (comprometido + realizado) del año '+d.year+'.'
+  },fname,btn);
+  if(!ok) toast('No se pudo generar el PDF. Intenta de nuevo.',true);
+}
+
+/* PDF de la semana del Calendario Maestro (David, 13/10). Salones en filas y
+   días en columnas, igual que en pantalla, y con las MISMAS reglas: los salones
+   que salen los decide maestroVisibles y la semana maestroDias. Sin precios,
+   como las tarjetas del tablero. */
+async function pdfCalendario(btn){
+  const bk=CACHE.homeBk||[];
+  const days=maestroDias();
+  const venues=maestroVisibles(maestroVenues(bk),bk,days);
+  const DN=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const mes=d=>d.toLocaleDateString('es-MX',{month:'short'}).replace('.','');
+  const ESTADO={pending:'pendiente', cancelled:'CANCELADA', completed:'realizada'};
+  const hora=iso=>{ const d=new Date(iso); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+  const rows=venues.map(v=>[v.name||'Sin venue', ...days.map(d=>{
+    const ds=ymd(d);
+    return bk.filter(b=>(b.venue_id||0)===(v.id||0)&&ymd(new Date(b.starts_at))===ds)
+      .sort((a,b)=>a.starts_at.localeCompare(b.starts_at))
+      .map(b=>{
+        const quien=b.artist_name||b.show_name||'Actuación';
+        const estilo=b.show_subcategory||b.show_category||'';
+        const est=ESTADO[b.status]?' · '+ESTADO[b.status]:'';
+        return hora(b.starts_at)+' '+quien
+          +((estilo||b.folio)?'\n'+[estilo&&pretty(estilo),b.folio].filter(Boolean).join(' · '):'')+est;
+      }).join('\n\n');
+  })]);
+  const ini=days[0], fin=days[6];
+  const rango=`${ini.getDate()} ${mes(ini)} – ${fin.getDate()} ${mes(fin)} ${fin.getFullYear()}`;
+  const total=rows.reduce((a,r)=>a+r.slice(1).reduce((x,c)=>x+(c?c.split('\n\n').length:0),0),0);
+  const fname='Calendario_'+ymd(ini)+'.pdf';
+  const ok=await dlPdf({
+    kind:'Calendario semanal', number:rango, title:'Calendario '+rango,
+    filename:fname, orientation:'landscape',
+    meta:[['Propiedad',((document.getElementById('hotelName')||{}).textContent||'').trim()||'—'],
+          ['Actuaciones en la semana',String(total)]],
+    table:{head:['Venue', ...days.map((d,i)=>DN[i]+' '+d.getDate())],
+           rows:rows.length?rows:[['Sin venues','','','','','','','']], first_col:0.12},
+    note:'Las actuaciones sin marca están confirmadas.'
+  },fname,btn);
+  if(!ok) toast('No se pudo generar el PDF. Intenta de nuevo.',true);
+}
+
 // Factura del hotel (panel de Facturación del hotel/cadena)
 async function dlHotelInvoice(btn){
   const inv=(CACHE.invoices||[])[CACHE.selInvIdx||0]; if(!inv){ toast('Selecciona una factura primero'); return; }
@@ -8918,6 +9033,7 @@ const RENDER = {
             <h3 style="margin:0;flex:1">Calendario Maestro</h3>
             <div class="mnav"><button class="mbtn" onclick="maestroWeek(-1)">‹</button><button class="mbtn today" onclick="maestroWeek(0)">Hoy</button><button class="mbtn" onclick="maestroWeek(1)">›</button></div>
             <div class="mtabs"><button class="on">Semana</button><button onclick="show('cal')">Agenda</button></div>
+            <button class="mbtn" onclick="pdfCalendario(this)" title="Descargar en PDF la semana que estás viendo">⬇️ PDF</button>
             <button class="addvenue" onclick="openAddVenue()">+ Añadir venue</button>
             <button class="notifybtn" id="notifyBtn" onclick="saveAndNotify()" title="Notifica a los artistas los cambios que hiciste" disabled>Guardar y notificar<span class="nb-badge" id="notifyCount" style="display:none">0</span></button>
           </div>
@@ -9110,8 +9226,16 @@ const RENDER = {
     const yearBudget=budByMonth.reduce((a,b)=>a+b,0);
     const yearSpend=monthAct.reduce((a,b)=>a+b,0);
     const maxBar=Math.max(...budByMonth,...monthAct,1);
-    const money0=v=>'$'+Math.round(v).toLocaleString('es-MX');
+    // El signo va ANTES del peso: "-$1,066,700", no "$-1,066,700".
+    const money0=v=>(v<0?'-':'')+'$'+Math.abs(Math.round(v)).toLocaleString('es-MX');
+    CACHE.budPdf={year:PERIOD.year, budget, gastado, comprometido, disp, usadoPct,
+      cats:orderedCats.map(c=>({name:pretty(c), meses:cell[c].slice(), total:catTot(c)})),
+      monthAct:monthAct.slice(), yearSpend, budByMonth:budByMonth.slice(), yearBudget,
+      // El mismo nombre que enseña la barra lateral (cadena u hotel), ya resuelto
+      // por syncHotelCard para cualquier rol.
+      scope:((document.getElementById('hotelName')||{}).textContent||'').trim()};
     box.innerHTML=`
+      <div class="pdfbar"><button class="btn ghost" onclick="pdfPresupuesto(this)">⬇️ Exportar PDF</button></div>
       <div class="kpis">
         <div class="kpi"><div class="kh"><div><div class="k">Presupuesto anual</div><div class="v">${MXN(budget)}</div><div class="d">de toda la cadena</div></div><div class="kc violet">📦</div></div></div>
         <div class="kpi"><div class="kh"><div><div class="k">Utilizado (realizado)</div><div class="v">${MXN(gastado)}</div><div class="d">${budget>0?Math.round(gastado/budget*100):0}% del anual</div></div><div class="kc green">✅</div></div></div>
@@ -9132,7 +9256,7 @@ const RENDER = {
         </tbody></table></div>
       </div>
       <div class="box" style="margin-bottom:16px">
-        <div class="bhead"><h3 style="margin:0">Presupuesto por categoría y mes</h3><span class="hint" style="margin:0">Gasto real (comprometido + realizado) · ${PERIOD.year}</span></div>
+        <div class="bhead"><h3 style="margin:0">Distribución de gastos por categoría</h3><span class="hint" style="margin:0">Gasto real (comprometido + realizado) · ${PERIOD.year}</span></div>
         <div class="bmatrix"><table><thead><tr><th>Categoría</th>${MN.map(m=>`<th>${m}</th>`).join('')}<th>Total</th></tr></thead><tbody>
           ${orderedCats.map(c=>`<tr><td>${esc(pretty(c))}</td>${cell[c].map(v=>`<td class="${v>0?'hot':''}">${v>0?money0(v):'—'}</td>`).join('')}<td>${money0(catTot(c))}</td></tr>`).join('')||`<tr><td colspan="14" class="muted" style="text-align:center;padding:20px">Aún no hay gasto registrado.</td></tr>`}
           ${orderedCats.length?`<tr class="tot"><td>Total</td>${monthAct.map(v=>`<td>${v>0?money0(v):'—'}</td>`).join('')}<td>${money0(yearSpend)}</td></tr>`:''}
@@ -10752,7 +10876,7 @@ function showFields(s){
     </div>
 
     <div class="tfbox">
-      <div class="tfh"><b>🚗 Extra por larga distancia</b><span class="hint" style="margin:0">Monto fijo para gasolina y casetas. Si el hotel está más lejos del límite, se suma solo a tu tarifa y el hotel lo ve desglosado. Déjalo vacío si no cobras extra.</span></div>
+      <div class="tfh"><b>🚗 Extra por larga distancia</b><span class="hint" style="margin:0">Monto fijo para gasolina y casetas. Si el hotel está más lejos del límite, se suma solo a tu tarifa. El hotel ve el precio final, sin el extra por separado. Déjalo vacío si no cobras extra.</span></div>
       <div class="fgrid">
         <div class="field"><label>Extra (MXN)</label><input id="f_${k}_tfee" type="number" min="0" step="50" value="${val('travel_fee')}" placeholder="p. ej. 500"></div>
         <div class="field"><label>A partir de (km)</label><input id="f_${k}_tkm" type="number" min="1" step="5" value="${(s&&s.travel_fee_km)||30}"></div>

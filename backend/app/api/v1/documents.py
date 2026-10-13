@@ -23,6 +23,14 @@ class DocTable(BaseModel):
     head: list[str] = Field(default_factory=list)
     rows: list[list[str]] = Field(default_factory=list)
     align: list[str] = Field(default_factory=list)
+    # Fraccion del ancho para la primera columna (opcional).
+    first_col: float | None = None
+    # El ultimo renglon es la fila de totales (negrita y raya encima).
+    total: bool = False
+
+
+class DocSection(DocTable):
+    title: str | None = None
 
 
 class DocIn(BaseModel):
@@ -34,6 +42,10 @@ class DocIn(BaseModel):
     table: DocTable | None = None
     summary: list[list[str]] = Field(default_factory=list)
     note: str | None = None
+    # "landscape" para tablas anchas (reparto por mes, calendario semanal).
+    orientation: str | None = None
+    # Mas tablas, cada una con su titulo, despues de la principal.
+    sections: list[DocSection] = Field(default_factory=list)
 
 
 def _safe_filename(name: str | None, fallback: str) -> str:
@@ -46,7 +58,9 @@ def _safe_filename(name: str | None, fallback: str) -> str:
 
 @router.post("/pdf", dependencies=[Depends(get_current_user)])
 async def document_pdf(payload: DocIn):
-    if payload.table and len(payload.table.rows) > _MAX_ROWS:
+    total_rows = (len(payload.table.rows) if payload.table else 0) + sum(
+        len(sec.rows) for sec in payload.sections)
+    if total_rows > _MAX_ROWS or len(payload.sections) > 20:
         raise HTTPException(status_code=413, detail="El documento tiene demasiados renglones.")
     data = payload.model_dump()
     if payload.table is not None:
