@@ -29,6 +29,20 @@ no sale un correo ni se timbra una factura.
 La semilla es fija: dos corridas dan exactamente los mismos números, así que una
 captura de pantalla vieja sigue coincidiendo con lo que se ve en vivo.
 
+## Que no parezca abandonada: refrescar las semanas de hoy
+
+`seed_demo.py` está anclada al 16/08/2026, así que con el tiempo la semana
+actual sale casi vacía. Antes de enseñar la demo:
+
+    cd /opt/ricky_demo && PYTHONPATH=/opt/ricky_demo /opt/ricky_app/.venv/bin/python \
+        scripts/demo_refrescar.py /opt/ricky_demo/ricky_demo.db
+    systemctl restart showma-demo      # rellena folios y tokens de las nuevas
+
+Rellena de hace 3 semanas a dentro de 6, sólo en la cadena de demo, sin tocar
+noches que ya tengan actuación, y ajusta los presupuestos de esos meses para que
+el uso salga creíble. Se puede repetir: borra lo suyo (marca `[demo-refresco]`)
+antes de volver a generar.
+
 ## Al actualizar el frontend o el backend
 
 La demo NO se actualiza sola. Después de desplegar a producción:
