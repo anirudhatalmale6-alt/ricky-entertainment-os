@@ -76,9 +76,11 @@ def _pct(parte: float, total: float) -> float | None:
 # el ranking, el perfil dice "130 actuaciones" y la medalla se calcula sobre
 # otro número. Nadie lo notaría hasta que un hotel preguntara.
 def es_agendada(b) -> bool:
-    """Llegó a existir para el músico. Lo que cancela el hotel no cuenta en su
-    contra: no fue él quien falló."""
-    return b.cancelled_by != "hotel"
+    """Llegó a existir para el músico. Lo que cancela el hotel o SHOWMA no cuenta
+    en su contra: no fue él quien falló. (David, 14/10: al cerrar 119 actuaciones
+    de prueba como canceladas por SHOWMA, con "admin" contando como agendada a
+    14 proveedores les habría salido que no cumplieron.)"""
+    return b.cancelled_by not in ("hotel", "admin")
 
 
 def es_cumplida(b, ahora: datetime) -> bool:
