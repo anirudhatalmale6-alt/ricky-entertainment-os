@@ -90,6 +90,9 @@ class BookingOut(BaseModel):
     cancelled_at: datetime | None
     cancellation_reason: str | None
     cancelled_by: str | None = None
+    # Cancelada con menos de 3 h siendo ya confirmada: se cobra y se paga entera.
+    cargo_cancelacion: bool = False
+    cargo_exento_motivo: str | None = None
     notes: str | None
     invoice_paid: bool = False
     payout_paid: bool = False

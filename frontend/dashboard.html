@@ -491,6 +491,11 @@
   .showcard{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--ov)}
   .seasbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
   .tfbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
+  .cgbox{margin-top:12px;padding:11px 13px;border-radius:11px;background:#fef3c7;color:#92400e;font-size:12.5px;line-height:1.5}
+  .cgbox.ok{background:#dcfce7;color:#166534}
+  .cgbox b{display:block;font-size:13px;margin-bottom:2px}
+  .cgact{display:flex;gap:8px;margin-top:9px;align-items:flex-start;flex-wrap:wrap}
+  .cgact textarea{flex:1;min-width:180px;font-size:12.5px}
   .pdfbar{display:flex;justify-content:flex-end;gap:8px;margin:0 0 12px}
   /* Visibilidad en el catálogo: dos opciones, nunca un interruptor suelto. Un
      switch sin etiqueta deja al proveedor adivinando qué pasa si lo apaga. */
@@ -4323,18 +4328,37 @@ async function delBooking(id,name){
     toast('No se pudo eliminar: '+(e.message||''),true);
   }
 }
+// Política de cancelación (David, 13/10). La decide el servidor; esto sólo
+// avisa ANTES, para que el hotel no se entere del cargo en la factura.
+const CANCEL_CARGO_H=3;
+/* ¿Cuenta como dinero? Confirmada o realizada, o cancelada TARDE por el hotel
+   (se cobra y se paga entera). Un solo sitio: factura del hotel, facturación del
+   tablero, presupuesto y lo que cobra el proveedor tienen que decir lo mismo. */
+// En una factura, una cancelación tardía tiene que decir por qué se cobra.
+const nombreFactura=b=>(b.show_name||'—')+((b.status==='cancelled'&&b.cargo_cancelacion)?' · cancelada con menos de 3 h (100%)':'');
+const cobrable=b=>['confirmed','completed'].includes(b.status)||(b.status==='cancelled'&&!!b.cargo_cancelacion);
 async function cancelarDesdeTablero(id,name){
+  const b=(CACHE.homeBk||[]).find(x=>x.id===id)||{};
+  const faltanH=b.starts_at?(new Date(b.starts_at)-new Date())/36e5:99;
+  if(b.status==='confirmed' && faltanH<CANCEL_CARGO_H){
+    if(!confirm(`Faltan menos de ${CANCEL_CARGO_H} horas para "${name}".\n\n`
+      +`Según la política de cancelación, si la cancelas se le paga el 100% al proveedor `
+      +`y no hay reembolso, salvo causa justificada que valide SHOWMA.\n\n¿Cancelar de todos modos?`)) return;
+  }
   const motivo=prompt(`"${name}" ya se le notificó al proveedor, que apartó la fecha.\n\n`
     +`Para quitarla hay que cancelarla y se le manda el correo de cancelación.\n\n`
     +`¿Motivo? (lo verá el proveedor; puedes dejarlo vacío)`,'');
   if(motivo===null) return;   // se arrepintió: no se toca nada
   const q=motivo.trim() ? '?reason='+encodeURIComponent(motivo.trim()) : '';
   try{
-    await post(`/bookings/${id}/cancel${q}`);
+    const r=await post(`/bookings/${id}/cancel${q}`);
     const row=(CACHE.homeBk||[]).find(x=>x.id===id);
-    if(row){ row.status='cancelled'; row.cancelled_at=new Date().toISOString(); }
+    if(row){ row.status='cancelled'; row.cancelled_at=new Date().toISOString();
+             row.cargo_cancelacion=!!(r&&r.cargo_cancelacion); }
     renderMaestro();
-    toast('Actuación cancelada. El proveedor fue avisado por correo ✓');
+    toast(r&&r.cargo_cancelacion
+      ? 'Cancelada con cargo: se paga el 100% al proveedor. Ya fue avisado por correo.'
+      : 'Actuación cancelada. El proveedor fue avisado por correo ✓');
   }catch(e){ toast('No se pudo cancelar: '+(e.message||''),true); }
 }
 
@@ -4884,7 +4908,7 @@ function avisaSiRebasa(importe){
 function updateBudgetKpi(){
   const usadoV=document.getElementById('kUsadoV'); if(!usadoV) return;   // sólo en el Dashboard
   const bk=CACHE.homeBk||[]; const budget=+CACHE.homeBudget||0; const num=x=>+x||0;
-  const gastado=bk.filter(b=>b.status==='completed'&&inPeriodMonth(b.starts_at)).reduce((a,b)=>a+num(b.agreed_price),0);
+  const gastado=bk.filter(b=>(b.status==='completed'||(b.status==='cancelled'&&b.cargo_cancelacion))&&inPeriodMonth(b.starts_at)).reduce((a,b)=>a+num(b.agreed_price),0);
   const comprometido=bk.filter(b=>(b.status==='confirmed'||b.status==='pending')&&inPeriodMonth(b.starts_at)).reduce((a,b)=>a+num(b.agreed_price),0);
   const usado=gastado+comprometido;
   const disponible=Math.max(0,budget-usado);
@@ -6828,6 +6852,7 @@ async function openHistorial(bid){
         [b.artist_name&&esc(b.artist_name), b.venue_name&&esc(b.venue_name),
          b.starts_at&&fmtDate(b.starts_at)].filter(Boolean).join(' · ')}</div>
       ${b.folio?`<div class="rtfolio">${esc(b.folio)}</div>`:''}
+      <div id="hsCargo"></div>
       <div id="hsBody" style="margin-top:14px"><div class="muted">Cargando…</div></div>
     </div>
     <div class="af"><button class="btn ghost" onclick="histClose()">Cerrar</button></div>
@@ -6836,10 +6861,41 @@ async function openHistorial(bid){
   try{
     const r=await api(`/bookings/${bid}/historial`);
     histPintar(r.eventos||[]);
+    pintaCargo(bid);
   }catch(e){
     const c=document.getElementById('hsBody');
     if(c) c.innerHTML=`<div class="muted">No se pudo cargar: ${esc(e.message||'')}</div>`;
   }
+}
+/* Cancelación tardía: el aviso del cargo, y para SHOWMA la exención por causa
+   justificada. Se lee la actuación del servidor, no de la caché del tablero,
+   porque el cargo lo decide el servidor al cancelar. */
+async function pintaCargo(bid){
+  const box=document.getElementById('hsCargo'); if(!box) return;
+  let bk=null; try{ bk=await api('/bookings/'+bid); }catch(e){ return; }
+  if(!bk) return;
+  if(bk.status==='cancelled' && bk.cargo_cancelacion){
+    box.innerHTML=`<div class="cgbox">
+      <b>Cancelada con menos de 3 horas</b>
+      <div>Se paga el 100% al proveedor y no hay reembolso.</div>
+      ${ME&&ME.is_admin?`<div class="cgact"><textarea id="cgMotivo" rows="2" placeholder="Causa justificada (la verá contabilidad)"></textarea>
+        <button class="btn ghost" onclick="eximirCargo(${bid},this)">Eximir el cargo</button></div>`:''}
+    </div>`;
+  }else if(bk.status==='cancelled' && bk.cargo_exento_motivo){
+    box.innerHTML=`<div class="cgbox ok"><b>Cargo eximido por SHOWMA</b><div>${esc(bk.cargo_exento_motivo)}</div></div>`;
+  }
+}
+async function eximirCargo(bid,btn){
+  const m=(document.getElementById('cgMotivo')||{}).value||'';
+  if(m.trim().length<3){ toast('Escribe la causa justificada.',true); return; }
+  if(!confirm('Se dejará de cobrar al hotel y de pagar al proveedor esta actuación. ¿Eximir el cargo?')) return;
+  btn.disabled=true;
+  try{
+    await post(`/bookings/${bid}/exentar-cargo`,{motivo:m.trim()});
+    [CACHE.homeBk,CACHE.agenda].forEach(l=>{ const x=(l||[]).find(y=>y.id===bid); if(x) x.cargo_cancelacion=false; });
+    toast('Cargo eximido ✓');
+    openHistorial(bid);
+  }catch(e){ btn.disabled=false; toast('No se pudo: '+(e.message||''),true); }
 }
 function histPintar(evs){
   const c=document.getElementById('hsBody'); if(!c) return;
@@ -6857,12 +6913,16 @@ function histPintar(evs){
       </div></div>`;
   }).join('')}</div>`;
 }
+// Los momentos del historial llegan marcados en UTC y se enseñan en hora de
+// Cancún, la misma de los shows: si no, una cancelación de las 22:44 salía a
+// las 03:44 y parecía hecha cuando el show ya había empezado.
 function histFecha(iso){
   if(!iso) return '';
   const d=new Date(iso);
   if(isNaN(d)) return '';
-  return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'2-digit'})
-    +' · '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  const z={timeZone:'America/Cancun'};
+  return d.toLocaleDateString('es-MX',{...z,day:'2-digit',month:'short',year:'2-digit'})
+    +' · '+d.toLocaleTimeString('es-MX',{...z,hour:'2-digit',minute:'2-digit'});
 }
 function histClose(){ const ov=document.getElementById('hsMov'); if(ov) ov.style.display='none'; }
 window.openHistorial=openHistorial; window.histClose=histClose;
@@ -6969,7 +7029,7 @@ async function hotelBill(box){
   const bk=await api(`/bookings${scope}`);
   let AMAP={}; try{ (await api('/artists')||[]).forEach(a=>{AMAP[a.id]=a.stage_name;}); }catch(e){}
   const num=x=>+x||0; const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null; const today=new Date();
-  const invb=bk.filter(b=>['confirmed','completed'].includes(b.status));
+  const invb=bk.filter(cobrable);
   const g={};
   // Agrupado por hotel + QUINCENA, igual que el recibo del músico, para que las
   // dos partes vean exactamente el mismo corte.
@@ -7049,7 +7109,7 @@ function selectInvoice(i){
     </div>`;
   document.getElementById('invLines').innerHTML=`
     <table><thead><tr><th>Fecha</th><th>Show</th><th>Artista</th><th>Venue</th><th>Importe</th><th>Servicios de gestión</th></tr></thead><tbody>
-    ${inv.rows.map(b=>`<tr><td class="muted">${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td>
+    ${inv.rows.map(b=>`<tr><td class="muted">${fmtDate(b.starts_at)}</td><td>${esc(nombreFactura(b))}</td>
       <td class="muted">${esc(b.artist_name||AMAP[b.artist_id]||'—')}</td><td class="muted">${esc(b.venue_name||'—')}</td>
       <td style="font-weight:600">${MXN(b.agreed_price)}</td><td class="muted">${MXN((+b.agreed_price||0)*(b.commission_pct||inv.feePct)/100)}</td></tr>`).join('')}
     <tr class="tot" style="font-weight:800"><td colspan="4" style="text-align:right">Subtotal</td><td>${MXN(inv.subtotal)}</td><td></td></tr>
@@ -7266,7 +7326,7 @@ async function pdfCalendario(btn){
 async function dlHotelInvoice(btn){
   const inv=(CACHE.invoices||[])[CACHE.selInvIdx||0]; if(!inv){ toast('Selecciona una factura primero'); return; }
   const AMAP=CACHE.AMAP||{};
-  const rows=(inv.rows||[]).map(b=>[fmtDate(b.starts_at), b.show_name||'—',
+  const rows=(inv.rows||[]).map(b=>[fmtDate(b.starts_at), nombreFactura(b),
     b.artist_name||AMAP[b.artist_id]||'—', b.venue_name||'—', MXN2(b.agreed_price)]);
   const ok=await dlPdf({
     kind:'Factura', number:inv.no, title:'Factura '+inv.no,
@@ -7279,7 +7339,7 @@ async function dlHotelInvoice(btn){
              ['Total',MXN2(inv.total)+' MXN','1']]
   },'Factura_'+inv.no+'.pdf',btn);
   if(ok) return;
-  const lines=(inv.rows||[]).map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.show_name||'—')}</td><td>${esc(b.artist_name||AMAP[b.artist_id]||'—')}</td><td>${esc(b.venue_name||'—')}</td><td class="num">${MXN2(b.agreed_price)}</td></tr>`).join('');
+  const lines=(inv.rows||[]).map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(nombreFactura(b))}</td><td>${esc(b.artist_name||AMAP[b.artist_id]||'—')}</td><td>${esc(b.venue_name||'—')}</td><td class="num">${MXN2(b.agreed_price)}</td></tr>`).join('');
   printDoc('Factura '+inv.no, _docHead('Factura', inv.no)
     +`<table class="meta"><tr><td><b>Hotel:</b> ${esc(inv.company)}</td><td style="text-align:right"><b>Periodo:</b> ${esc(inv.period)}</td></tr>`
     +`<tr><td><b>Fecha de corte:</b> ${esc(inv.issue)}</td><td style="text-align:right"><b>Pago:</b> ${esc(inv.due)}</td></tr></table>`
@@ -8969,7 +9029,7 @@ const RENDER = {
       const o=am.get(nm)||{name:nm,count:0,sum:0}; o.count++; o.sum+=num(b.agreed_price); am.set(nm,o); });
     const topArt=[...am.values()].sort((a,b)=>b.count-a.count).slice(0,5);
     // facturación (mes más reciente con actuaciones facturables)
-    const invb = bk.filter(b=>['confirmed','completed'].includes(b.status));
+    const invb = bk.filter(cobrable);
     const bm={}; invb.forEach(b=>{const d=new Date(b.starts_at);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');(bm[k]=bm[k]||[]).push(b);});
     const latestK=Object.keys(bm).sort().reverse()[0]; const latestRows=latestK?bm[latestK]:[];
     const facTot=latestRows.reduce((a,b)=>a+num(b.agreed_price),0);
@@ -9205,14 +9265,15 @@ const RENDER = {
     const comps = gb.comps, brows = gb.rows;
     const num=x=>+x||0; const scat={}; (shows||[]).forEach(s=>{scat[s.id]=s.category;});
     const budget=gb.total;
-    const gastado=bk.filter(b=>b.status==='completed').reduce((a,b)=>a+num(b.agreed_price),0);
+    // Una cancelación tardía también es gasto: se paga entera (política 13/10).
+    const gastado=bk.filter(b=>b.status==='completed'||(b.status==='cancelled'&&b.cargo_cancelacion)).reduce((a,b)=>a+num(b.agreed_price),0);
     // igual que el Dashboard: comprometido = agendado no realizado (confirmadas + pendientes)
     const comprometido=bk.filter(b=>b.status==='confirmed'||b.status==='pending').reduce((a,b)=>a+num(b.agreed_price),0);
     const usado=gastado+comprometido; const disp=Math.max(0,budget-usado);
     const usadoPct=budget>0?Math.round(usado/budget*100):0;
     // "gasto agendado" = todo lo no cancelado (realizado + comprometido + pendiente),
     // así el total de la matriz y del comparativo coincide con Utilizado + Comprometido.
-    const inv=bk.filter(b=>b.status!=='cancelled');
+    const inv=bk.filter(b=>b.status!=='cancelled'||b.cargo_cancelacion);
     const catset=[...new Set(inv.map(b=>scat[b.show_id]||'Otros'))];
     const cell={}; catset.forEach(c=>cell[c]=Array(12).fill(0));
     const monthAct=Array(12).fill(0);
@@ -10687,7 +10748,7 @@ async function artistHome(box){
   CACHE.profile = p; setSelfAvatar(p.profile_image_url, p.stage_name);
   const now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const calRef=new Date(PERIOD.year, PERIOD.month-1, 1);   // el calendario sigue el mes elegido arriba a la derecha
-  const isRev=b=>['confirmed','completed'].includes(b.status);
+  const isRev=cobrable;
   const done=bk.filter(b=>b.status==='completed');
   const upcoming=bk.filter(b=>['pending','confirmed'].includes(b.status)&&new Date(b.starts_at)>=today).sort((a,b)=>a.starts_at.localeCompare(b.starts_at));
   const totalRev=bk.filter(isRev).reduce((a,b)=>a+(b.agreed_price||0),0);
@@ -11457,7 +11518,7 @@ async function exportInvoices(btn){
   try{
     if(btn){btn.disabled=true;btn.dataset.t=btn.textContent;btn.textContent='Generando…';}
     const bk=await api('/bookings/mine');
-    const inv=bk.filter(b=>['confirmed','completed'].includes(b.status))
+    const inv=bk.filter(cobrable)
                 .sort((a,b)=>b.starts_at.localeCompare(a.starts_at));
     const invNo=b=>{const d=new Date(b.starts_at);return 'INV-'+d.getFullYear()+'-'+String(b.id).padStart(4,'0');};
     const iso=b=>{const d=new Date(b.starts_at);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};

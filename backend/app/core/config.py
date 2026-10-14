@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     # aplique sola al agendar. El dia que lo decida, es cambiar esto a true.
     RECURRENTE_ENABLED: bool = False
 
+    # Zona de las propiedades. Las actuaciones se guardan con su hora de pared
+    # ("20:00" = ocho de la noche en Cancún) y el servidor va en UTC; ver
+    # app/core/hora.py. Quintana Roo no cambia de horario en verano.
+    ZONA_HORARIA: str = "America/Cancun"
+
     # --- Escalones de precio del proveedor (David, 09/10) --------------
     # Descuento de cada escalón sobre la tarifa habitual del show. David pasó
     # primero una tabla por segmento (músicos 8/10, shows 8/…) y acto seguido

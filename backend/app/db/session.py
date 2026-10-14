@@ -68,6 +68,10 @@ _SQLITE_ADDED_COLUMNS = [
     # proveedores que ya están dentro entraron sabiendo que se les ve, y
     # apagarlo en bloque dejaría el catálogo vacío para todos los hoteles.
     ("artists", "catalogo_publico", "BOOLEAN DEFAULT 1"),
+    # Cancelación tardía con cargo (David, 13/10).
+    ("bookings", "cargo_cancelacion", "BOOLEAN DEFAULT 0"),
+    ("bookings", "cargo_exento_motivo", "TEXT"),
+    ("bookings", "cargo_exento_por", "VARCHAR(120)"),
     ("artists", "invitado_por_company_id", "INTEGER"),
     ("bookings", "invoice_paid", "BOOLEAN DEFAULT 0"),
     ("bookings", "payout_paid", "BOOLEAN DEFAULT 0"),

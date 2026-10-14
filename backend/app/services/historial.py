@@ -116,7 +116,15 @@ def diferencias(antes: dict, despues: dict) -> list[str]:
 
 
 def _fmt(dt: datetime | None) -> str | None:
-    return dt.isoformat() if dt else None
+    """Los momentos de la bitácora son SELLOS en UTC (created_at, cancelled_at,
+    llegada_at…). Se mandan marcados como UTC para que la pantalla los pase a la
+    hora de Cancún: sin marca, el navegador los leía como hora local y la
+    cancelación de las 22:44 salía a las 03:44."""
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        return dt.isoformat() + "+00:00"
+    return dt.isoformat()
 
 
 async def linea_de_tiempo(db: AsyncSession, booking) -> list[dict]:

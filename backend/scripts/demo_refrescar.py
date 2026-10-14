@@ -35,7 +35,8 @@ from __future__ import annotations
 
 import random
 import sys
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import Session, selectinload
@@ -66,12 +67,21 @@ COMENTARIOS = {
 }
 
 
+# Los sellos (enviada, aceptada, calificada) se guardan en UTC como en la
+# aplicación real; la hora del show, en hora de pared de Cancún.
+_ZONA = ZoneInfo("America/Cancun")
+
+
+def _utc(local: datetime) -> datetime:
+    return local.replace(tzinfo=_ZONA).astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def _lunes(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 
 def main() -> None:
-    hoy = datetime.now()
+    hoy = datetime.now(_ZONA).replace(tzinfo=None)     # hora de pared, como starts_at
     ini = _lunes(hoy.date()) - timedelta(weeks=3)
     fin = _lunes(hoy.date()) + timedelta(weeks=6, days=6)
     # Semilla por ventana: dos corridas la misma semana dan lo mismo.
@@ -142,21 +152,21 @@ def main() -> None:
                     ends_at=inicio + timedelta(minutes=sh.duration_minutes or 90),
                     event_type="hotel", agreed_price=precio, price_source=fuente,
                     currency="MXN", commission_pct=15, notes=MARCA,
-                    notified_at=avisado, invoice_paid=False, payout_paid=False,
+                    notified_at=_utc(avisado), invoice_paid=False, payout_paid=False,
                 )
                 if ya_paso:
                     cap = v.capacity or 120
                     gente = max(20, int(cap * min(1.0, max(0.3, R.gauss(0.68, 0.14)))))
                     ret = min(1.0, max(0.45, R.gauss(0.82, 0.08)))
                     b.status = "completed"
-                    b.confirmed_at = avisado + timedelta(hours=R.randint(2, 30))
+                    b.confirmed_at = _utc(avisado + timedelta(hours=R.randint(2, 30)))
                     b.headcount_start, b.headcount_end = gente, int(gente * ret)
                     pasadas += 1
                 else:
                     confirmada = R.random() < 0.75
                     b.status = "confirmed" if confirmada else "pending"
                     if confirmada:
-                        b.confirmed_at = min(hoy, avisado + timedelta(hours=R.randint(2, 30)))
+                        b.confirmed_at = _utc(min(hoy, avisado + timedelta(hours=R.randint(2, 30))))
                 s.add(b)
                 s.flush()
                 ocupado.add((v.id, d))
@@ -174,7 +184,7 @@ def main() -> None:
                         afluencia="alta" if ret > 0.85 else "media",
                         retencion="alta" if ret > 0.85 else "media",
                         author_name=firma[0], author_position=firma[1],
-                        created_at=inicio + timedelta(days=R.randint(1, 3)),
+                        created_at=_utc(inicio + timedelta(days=R.randint(1, 3))),
                     ))
                     resenas += 1
             d += timedelta(days=1)

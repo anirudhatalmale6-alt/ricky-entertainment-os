@@ -86,6 +86,13 @@ class Booking(Base, TimestampMixin):
     # distingue lo que un proveedor cobra de normal de lo que cobró con
     # descuento, y eso es lo que no se quiere perder.
     price_source: Mapped[str | None] = mapped_column(String(20))
+    # Cancelación tardía: el hotel canceló una actuación confirmada con menos de
+    # CANCELACION_CON_CARGO_HORAS de antelación. Se paga entera al proveedor y no
+    # hay reembolso, así que cuenta en la factura y en el pago aunque esté
+    # cancelada. SHOWMA puede eximirla por causa justificada (motivo y quién).
+    cargo_cancelacion: Mapped[bool] = mapped_column(Boolean, default=False)
+    cargo_exento_motivo: Mapped[str | None] = mapped_column(Text)
+    cargo_exento_por: Mapped[str | None] = mapped_column(String(120))
     currency: Mapped[str] = mapped_column(String(3), default="MXN")
     # Platform commission % charged to the company, snapshotted from its risk
     # tier at the moment of booking (so later re-tiering does not rewrite money).

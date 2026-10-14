@@ -12,7 +12,7 @@ from datetime import date as date_cls, datetime, timedelta
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
-from sqlalchemy import delete as sa_delete, select, update
+from sqlalchemy import and_, delete as sa_delete, or_, select, update
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, CurrentScope, DbSession
@@ -270,7 +270,10 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
         select(Booking)
         .where(
             Booking.artist_id == artist_id,
-            Booking.status.in_((BookingStatus.CONFIRMED, BookingStatus.COMPLETED)),
+            or_(Booking.status.in_((BookingStatus.CONFIRMED, BookingStatus.COMPLETED)),
+                # cancelada tarde por el hotel: se le paga entera (política 13/10)
+                and_(Booking.status == BookingStatus.CANCELLED,
+                     Booking.cargo_cancelacion.is_(True))),
         )
         .order_by(Booking.starts_at)
     )
@@ -360,7 +363,11 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
             "total_recibir": total_recibir,
             "rows": [{
                 "fecha": b.starts_at.isoformat() if b.starts_at else None,
-                "show": (shows.get(b.show_id).show_name if shows.get(b.show_id) else None),
+                "show": ((shows.get(b.show_id).show_name if shows.get(b.show_id) else "Actuación")
+                         # Cancelada tarde por el hotel: se le paga igual y tiene que
+                         # saber por qué cobra un show que no hizo.
+                         + (" · cancelada con menos de 3 h (se paga completa)"
+                            if b.status == BookingStatus.CANCELLED and b.cargo_cancelacion else "")),
                 "venue": (venues.get(b.venue_id).name if venues.get(b.venue_id) else None),
                 "importe": float(b.agreed_price or 0),
             } for b in rows],
@@ -396,7 +403,10 @@ async def mark_payout(payload: PayoutMarkIn, scope: CurrentScope, db: DbSession)
             select(Booking).where(
                 Booking.artist_id == artist_id,
                 Booking.company_id == payload.company_id,
-                Booking.status.in_((BookingStatus.CONFIRMED, BookingStatus.COMPLETED)),
+                or_(Booking.status.in_((BookingStatus.CONFIRMED, BookingStatus.COMPLETED)),
+                # cancelada tarde por el hotel: se le paga entera (política 13/10)
+                and_(Booking.status == BookingStatus.CANCELLED,
+                     Booking.cargo_cancelacion.is_(True))),
             )
         )
     ).scalars().all()

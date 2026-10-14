@@ -226,7 +226,8 @@ async def repreciar_ventana(db: AsyncSession, *, show_id: int | None,
     if show is None or precio_recurrente(show) is None:
         return 0
 
-    ahora = datetime.now()
+    from app.core.hora import ahora_local
+    ahora = ahora_local()          # se compara con starts_at, hora de pared
     # Se repasa hacia los DOS lados: una actuacion anterior a la que acaba de
     # nacer tambien forma parte del grupo de cinco. `hasta` existe para la tanda
     # del boton de repetir, que puede abarcar meses: con una sola fecha de

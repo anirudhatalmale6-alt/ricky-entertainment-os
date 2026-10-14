@@ -59,7 +59,10 @@ def _naive(dt: datetime | None) -> datetime | None:
 
 
 def _ahora() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    # Se compara con starts_at (hora de pared de la propiedad), no con UTC:
+    # si no, una actuación contaba como cumplida cinco horas antes de empezar.
+    from app.core.hora import ahora_local
+    return ahora_local()
 
 
 def _pct(parte: float, total: float) -> float | None:

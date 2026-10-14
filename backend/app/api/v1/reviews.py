@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentScope, DbSession
+from app.core.hora import ahora_local
 from app.models.artist import Artist
 from app.models.booker import Booker
 from app.models.booking import Booking
@@ -80,7 +81,7 @@ async def _actuacion_calificable(db: DbSession, booking_id: int, scope: CurrentS
         )
     # 3. Y no se califica por adelantado.
     inicio = _naive(booking.starts_at)
-    if inicio and inicio > _now():
+    if inicio and inicio > ahora_local():   # hora de la propiedad, no UTC
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "Todavía no ocurre. Podrás calificarla cuando termine.",
@@ -473,7 +474,7 @@ async def pendientes_de_calificar(scope: CurrentScope, db: DbSession):
         # que había que decir, y si siguieran apareciendo aquí el hotel vería
         # para siempre un "te falta calificar" que no puede quitar.
         Booking.status.notin_([BookingStatus.CANCELLED, BookingStatus.NO_SHOW]),
-        Booking.starts_at < _now(),
+        Booking.starts_at < ahora_local(),
     )
     if empresas:
         q = q.where(Booking.company_id.in_(empresas))

@@ -61,8 +61,17 @@ def _dia_relativo(iso: str | None, hoy: datetime) -> str:
     return f"FALTAN {dias} DÍAS"
 
 
+def _local_iso(v):
+    from app.core.hora import utc_a_local
+    x = utc_a_local(v)
+    return x.isoformat() if x else None
+
+
 def pagina(d: dict, *, qr_uri: str, api_base: str, token: str, hoy: datetime | None = None) -> str:
-    hoy = hoy or datetime.now()
+    # Hora de Cancún: con la del servidor (UTC) el pase decía "FUE AYER" a
+    # partir de las 19:00, justo cuando el vigilante lo escanea en la puerta.
+    from app.core.hora import ahora_local
+    hoy = hoy or ahora_local()
     pasa = bool(d.get("puede_pasar"))
     rel = _dia_relativo(d.get("cuando"), hoy)
     # Un pase válido de otro día NO es un pase para hoy. Se avisa fuerte, porque
@@ -92,7 +101,8 @@ def pagina(d: dict, *, qr_uri: str, api_base: str, token: str, hoy: datetime | N
     if llegada:
         quien = d.get("llegada_por")
         bloque_llegada = (
-            f'<div class="ok2">✓ Llegada confirmada a las {_e(_hora(llegada))}'
+            # llegada_at es un sello UTC; el vigilante lee hora de Cancún.
+            f'<div class="ok2">✓ Llegada confirmada a las {_e(_hora(_local_iso(llegada)))}'
             + (f' por {_e(quien)}' if quien else "")
             + "</div>"
         )

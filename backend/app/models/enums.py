@@ -140,7 +140,11 @@ class ProposalStatus(str, enum.Enum):
 
 # How close (in hours before the show starts) a booking may still be cancelled
 # without penalty. David's rule: 2h.
-CANCELLATION_CUTOFF_HOURS = 2
+CANCELLATION_CUTOFF_HOURS = 2   # histórico: ya no bloquea, ver CANCELACION_CON_CARGO_HORAS
+# Política de cancelación (David, 13/10): si el hotel cancela una actuación YA
+# CONFIRMADA con menos de estas horas de antelación, al proveedor se le paga el
+# 100 % y el hotel no tiene reembolso, salvo causa justificada que exime SHOWMA.
+CANCELACION_CON_CARGO_HORAS = 3
 
 # Minimum gap the same artist needs between two shows, to account for travel /
 # teardown before the next actuacion. David's rule: 1h buffer.

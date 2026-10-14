@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -363,9 +363,16 @@ async def pending_bookings_for_period(
     from app.models.review import Review
 
     stmt = select(Booking).where(
-        Booking.status == BookingStatus.COMPLETED,
         Booking.cfdi_id.is_(None),
-        Booking.id.in_(select(Review.booking_id)),
+        or_(
+            and_(Booking.status == BookingStatus.COMPLETED,
+                 Booking.id.in_(select(Review.booking_id))),
+            # Cancelación tardía (política del 13/10): se cobra entera aunque no
+            # haya ocurrido, y por eso mismo no puede llevar calificación. Exigir
+            # la reseña aquí la dejaría fuera de la factura para siempre.
+            and_(Booking.status == BookingStatus.CANCELLED,
+                 Booking.cargo_cancelacion.is_(True)),
+        ),
         Booking.starts_at >= _dt.combine(ini, _dt.min.time()),
         Booking.starts_at <= _dt.combine(fin, _dt.max.time()),
     )

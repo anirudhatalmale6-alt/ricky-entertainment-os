@@ -5,7 +5,8 @@ run it, register attendance. Business rules baked in (David's calls):
 
   * 1h travel buffer  - the same artist cannot hold two overlapping actuaciones;
                         a 1h gap is required around each one.
-  * 2h cancellation   - an actuacion cannot be cancelled inside 2h of its start.
+  * cancellation      - allowed until it starts; a CONFIRMED one cancelled inside
+                        3h (property time) is paid in full to the artist, no refund.
 
 company_id / artist_id / commission_pct are derived server-side from the chosen
 venue and show, and the commission is snapshotted so later re-tiering never
@@ -20,12 +21,14 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentScope, DbSession, require_permission
 from app.core.config import settings
+from app.core.hora import ahora_local
 from app.models.artist import Artist
 from app.models.booking import Booking
 from app.models.booking_evento import BookingEvento
 from app.models.company import Company
 from app.models.notification import ArtistNotification
 from app.models.enums import (
+    CANCELACION_CON_CARGO_HORAS,
     CANCELLATION_CUTOFF_HOURS,
     RISK_COMMISSION,
     TRAVEL_BUFFER_HOURS,
@@ -54,6 +57,40 @@ def _naive(dt: datetime) -> datetime:
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+# --- Quién puede tocar qué actuación ---------------------------------------
+# Hasta el 14/10 ninguna ruta de aquí comprobaba de QUIÉN era la actuación: un
+# usuario de un hotel podía leer, cambiar, cancelar o borrar las de otro hotel
+# con sólo cambiar el número, y el listado sin filtros devolvía la agenda y los
+# precios de TODOS. Son negocios distintos, a veces competencia directa.
+#   * administrador (SHOWMA): todo;
+#   * director de cadena: las propiedades de su cadena;
+#   * usuario de un hotel: su hotel.
+# Si no es suya se responde 404, no 403: no se confirma que exista.
+async def _empresas_de(db: DbSession, scope) -> set[int] | None:
+    """Empresas cuyas actuaciones puede tocar este usuario. None = todas."""
+    if scope.is_admin:
+        return None
+    ids: set[int] = set()
+    if scope.company_id:
+        ids.add(scope.company_id)
+    if scope.group_id:
+        ids |= set((await db.execute(
+            select(Company.id).where(Company.group_id == scope.group_id))).scalars().all())
+    return ids
+
+
+async def _exigir_empresa(db: DbSession, scope, company_id: int | None) -> None:
+    permitidas = await _empresas_de(db, scope)
+    if permitidas is not None and company_id not in permitidas:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+
+
+async def _propia_o_404(db: DbSession, scope, booking_id: int) -> Booking:
+    booking = await _get_or_404(db, booking_id)
+    await _exigir_empresa(db, scope, booking.company_id)
+    return booking
 
 
 async def _get_or_404(db: DbSession, booking_id: int) -> Booking:
@@ -175,7 +212,7 @@ async def _check_travel_buffer(db: DbSession, artist_id: int, starts_at: datetim
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def create_booking(payload: BookingCreate, db: DbSession):
+async def create_booking(payload: BookingCreate, scope: CurrentScope, db: DbSession):
     show = (await db.execute(
         select(Show).options(selectinload(Show.seasonal_rates)).where(Show.id == payload.show_id)
     )).scalar_one_or_none()
@@ -183,6 +220,10 @@ async def create_booking(payload: BookingCreate, db: DbSession):
         raise HTTPException(status_code=404, detail="Show not found")
     venue = await db.get(Venue, payload.venue_id)
     if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    try:
+        await _exigir_empresa(db, scope, venue.company_id)
+    except HTTPException:
         raise HTTPException(status_code=404, detail="Venue not found")
 
     company = await db.get(Company, venue.company_id) if venue.company_id else None
@@ -253,6 +294,7 @@ async def create_booking(payload: BookingCreate, db: DbSession):
 )
 async def list_bookings(
     db: DbSession,
+    scope: CurrentScope,
     company_id: int | None = None,
     group_id: int | None = None,
     venue_id: int | None = None,
@@ -264,6 +306,10 @@ async def list_bookings(
     """Calendar / agenda feed. Filter by property, chain, venue, artist, status
     or a date window - the same endpoint powers every calendar view."""
     stmt = select(Booking)
+    permitidas = await _empresas_de(db, scope)
+    if permitidas is not None:
+        # Los filtros de abajo acotan DENTRO de lo suyo; nunca lo amplían.
+        stmt = stmt.where(Booking.company_id.in_(permitidas or {-1}))
     if group_id is not None:
         # all properties of the chain
         sub = select(Company.id).where(Company.group_id == group_id)
@@ -371,7 +417,9 @@ async def hotel_alerts(scope: CurrentScope, db: DbSession):
     stmt = select(Booking).where(
         Booking.status == BookingStatus.CANCELLED,
         Booking.cancelled_by == "artist",
-        Booking.starts_at >= _now(),
+        # Hora de la propiedad: con UTC el aviso se escondía justo en las
+        # cinco horas previas al show, cuando más falta hace el reemplazo.
+        Booking.starts_at >= ahora_local(),
     ).order_by(Booking.cancelled_at.desc()).limit(50)
     if not scope.is_admin:
         if scope.group_id is not None:
@@ -406,8 +454,8 @@ async def hotel_alerts(scope: CurrentScope, db: DbSession):
     response_model=BookingOut,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def get_booking(booking_id: int, db: DbSession):
-    booking = await _get_or_404(db, booking_id)
+async def get_booking(booking_id: int, scope: CurrentScope, db: DbSession):
+    booking = await _propia_o_404(db, scope, booking_id)
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
     show = await db.get(Show, booking.show_id) if booking.show_id else None
     return _decorate(booking, venue, show)
@@ -418,8 +466,8 @@ async def get_booking(booking_id: int, db: DbSession):
     response_model=BookingOut,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def update_booking(booking_id: int, payload: BookingUpdate, db: DbSession):
-    booking = await _get_or_404(db, booking_id)
+async def update_booking(booking_id: int, payload: BookingUpdate, scope: CurrentScope, db: DbSession):
+    booking = await _propia_o_404(db, scope, booking_id)
     if booking.status in (BookingStatus.CANCELLED, BookingStatus.COMPLETED):
         raise HTTPException(status_code=409, detail="No se puede editar una actuacion finalizada o cancelada")
     data = payload.model_dump(exclude_unset=True)
@@ -501,8 +549,8 @@ async def historial_de_actuacion(booking_id: int, scope: CurrentScope, db: DbSes
     response_model=BookingOut,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def confirm_booking(booking_id: int, db: DbSession):
-    booking = await _get_or_404(db, booking_id)
+async def confirm_booking(booking_id: int, scope: CurrentScope, db: DbSession):
+    booking = await _propia_o_404(db, scope, booking_id)
     if booking.status != BookingStatus.PENDING:
         raise HTTPException(status_code=409, detail="Solo se confirma una actuacion pendiente")
     booking.status = BookingStatus.CONFIRMED
@@ -561,31 +609,84 @@ async def _notify_artist_cancel(db: DbSession, booking: Booking, reason: str | N
     dependencies=[Depends(require_permission("booking.manage"))],
 )
 async def cancel_booking(booking_id: int, scope: CurrentScope, db: DbSession, bg: BackgroundTasks, reason: str | None = None):
-    booking = await _get_or_404(db, booking_id)
+    booking = await _propia_o_404(db, scope, booking_id)
     if booking.status in (BookingStatus.CANCELLED, BookingStatus.COMPLETED):
         raise HTTPException(status_code=409, detail="La actuacion ya esta finalizada o cancelada")
-    # 2h cancellation cut-off
-    if _naive(booking.starts_at) - _now() < timedelta(hours=CANCELLATION_CUTOFF_HOURS):
+    # Política de cancelación (David, 13/10). Ya no se bloquea a las 2 h: se
+    # puede cancelar hasta que empiece, pero si la actuación estaba CONFIRMADA y
+    # faltan menos de CANCELACION_CON_CARGO_HORAS, se le paga entera al
+    # proveedor y el hotel no tiene reembolso. Una pendiente no: el proveedor
+    # todavía no se había comprometido con esa fecha.
+    # La resta se hace con la hora de la propiedad (starts_at es hora de pared
+    # de Cancún). Con UTC, que va 5 h por delante, el cargo saltaba hasta 8 h
+    # antes y el viejo bloqueo de 2 h actuaba en realidad a las 7 h.
+    restan = _naive(booking.starts_at) - ahora_local()
+    if restan <= timedelta(0):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"No se puede cancelar dentro de las {CANCELLATION_CUTOFF_HOURS}h "
-                f"previas al inicio de la actuacion."
-            ),
+            detail=("Esta actuación ya empezó. Si no se realizó, márcala como "
+                    "no completada al calificarla."),
         )
+    con_cargo = (booking.status == BookingStatus.CONFIRMED
+                 and restan < timedelta(hours=CANCELACION_CON_CARGO_HORAS))
     booking.status = BookingStatus.CANCELLED
     booking.cancelled_at = _now()
     booking.cancellation_reason = reason
     booking.cancelled_by = "admin" if scope.is_admin else "hotel"
+    booking.cargo_cancelacion = con_cargo
     # Si esta cancelacion deja al hotel por debajo de cinco, las que quedan
     # vuelven a su precio normal (solo futuras y sin facturar).
     historial.registrar(db, booking, historial.CANCELADA,
                         "Cancelada por " + ("SHOWMA" if scope.is_admin else "el hotel"),
                         scope=scope, detalle=reason)
+    if con_cargo:
+        historial.registrar(
+            db, booking, historial.CAMBIO,
+            f"Cancelación con menos de {CANCELACION_CON_CARGO_HORAS} h: se paga el 100 % "
+            "al proveedor y no hay reembolso", scope=scope)
     await recurrente.recalcular_tras_cancelar(db, booking)
     correos = await _notify_artist_cancel(db, booking, reason)   # avisar al músico
     await db.commit()
     avisos.despachar(bg, correos)
+    await db.refresh(booking)
+    venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
+    show = await db.get(Show, booking.show_id) if booking.show_id else None
+    return _decorate(booking, venue, show)
+
+
+class ExentarCargoIn(BaseModel):
+    motivo: str
+
+
+@router.post("/{booking_id}/exentar-cargo", response_model=BookingOut)
+async def exentar_cargo(booking_id: int, payload: ExentarCargoIn, scope: CurrentScope, db: DbSession):
+    """Quitar el cargo de una cancelación tardía por causa justificada.
+
+    Sólo SHOWMA, y siempre con motivo: es dinero que deja de cobrarse al hotel y
+    de pagarse al proveedor, y alguien tiene que poder explicarlo después.
+    """
+    if not scope.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Sólo SHOWMA puede eximir el cargo de una cancelación.")
+    motivo = (payload.motivo or "").strip()
+    if len(motivo) < 3:
+        raise HTTPException(status_code=422, detail="Escribe la causa justificada.")
+    booking = await _get_or_404(db, booking_id)
+    if not booking.cargo_cancelacion:
+        raise HTTPException(status_code=409, detail="Esta actuación no tiene cargo por cancelación.")
+    # Si ya se facturó o ya se pagó, el dinero se movió: quitar la marca aquí
+    # dejaría la base diciendo una cosa y la contabilidad otra.
+    if booking.cfdi_id or booking.invoice_paid or booking.payout_paid:
+        raise HTTPException(status_code=409, detail=(
+            "Ya está facturada o pagada. La exención hay que resolverla con "
+            "contabilidad, no desde aquí."))
+    booking.cargo_cancelacion = False
+    booking.cargo_exento_motivo = motivo[:500]
+    booking.cargo_exento_por = (scope.user.full_name or scope.user.email or "SHOWMA")[:120]
+    historial.registrar(db, booking, historial.CAMBIO,
+                        "SHOWMA eximió el cargo de la cancelación por causa justificada",
+                        scope=scope, detalle=motivo[:500])
+    await db.commit()
     await db.refresh(booking)
     venue = await db.get(Venue, booking.venue_id) if booking.venue_id else None
     show = await db.get(Show, booking.show_id) if booking.show_id else None
@@ -653,7 +754,7 @@ async def booking_replacements(booking_id: int, scope: CurrentScope, db: DbSessi
     más ahora: cada músico de una productora tiene su propia cuenta, así que una
     empresa de 200 son 200 sesiones nuevas que podrían pedirlo.
     """
-    booking = await _get_or_404(db, booking_id)
+    booking = await _propia_o_404(db, scope, booking_id)
     orig_show = await db.get(Show, booking.show_id) if booking.show_id else None
     category = orig_show.category if orig_show else None
     slot = _naive(booking.starts_at)
@@ -809,10 +910,10 @@ async def artist_respond(
     response_model=BookingOut,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def register_attendance(booking_id: int, payload: AttendanceIn, db: DbSession):
+async def register_attendance(booking_id: int, payload: AttendanceIn, scope: CurrentScope, db: DbSession):
     """Register the headcount at start/end. Marks the actuacion COMPLETED so its
     occupancy / retention / abandonment metrics roll into the analytics."""
-    booking = await _get_or_404(db, booking_id)
+    booking = await _propia_o_404(db, scope, booking_id)
     if booking.status == BookingStatus.CANCELLED:
         raise HTTPException(status_code=409, detail="No se registra asistencia de una actuacion cancelada")
     if payload.headcount_start is not None:
@@ -863,7 +964,7 @@ async def _ya_lo_sabe_el_proveedor(db: DbSession, booking: Booking) -> bool:
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def delete_booking(booking_id: int, db: DbSession):
+async def delete_booking(booking_id: int, scope: CurrentScope, db: DbSession):
     """Quitar del tablero una actuación que NADIE conoce todavía.
 
     El borrado existe para deshacer un error de captura, no para cancelar. En
@@ -872,7 +973,7 @@ async def delete_booking(booking_id: int, db: DbSession):
     folio viaja en un correo, y una orden que se borra deja su número libre
     para la siguiente, que acabaría reutilizándolo.
     """
-    booking = await _get_or_404(db, booking_id)
+    booking = await _propia_o_404(db, scope, booking_id)
     if await _ya_lo_sabe_el_proveedor(db, booking):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -907,7 +1008,7 @@ class NotifyIn(BaseModel):
     "/notify",
     dependencies=[Depends(require_permission("booking.manage"))],
 )
-async def notify_artists(payload: NotifyIn, db: DbSession, bg: BackgroundTasks):
+async def notify_artists(payload: NotifyIn, scope: CurrentScope, db: DbSession, bg: BackgroundTasks):
     """"Guardar y notificar": create an in-app aviso for each affected artist.
 
     Called from the Calendario Maestro when the hotel finishes arranging the
@@ -921,10 +1022,13 @@ async def notify_artists(payload: NotifyIn, db: DbSession, bg: BackgroundTasks):
     # (ArtistNotification, correo, asunto, texto, html) — el correo se manda al
     # final, cuando el commit ya guardó las actuaciones.
     pendientes: list[tuple] = []
+    permitidas = await _empresas_de(db, scope)
     for item in payload.items:
         booking = await db.get(Booking, item.booking_id)
         if booking is None or not booking.artist_id:
             continue
+        if permitidas is not None and booking.company_id not in permitidas:
+            continue          # no es suya: igual que si no existiera
         if booking.status in (BookingStatus.CANCELLED, BookingStatus.COMPLETED):
             continue
         show = await db.get(Show, booking.show_id) if booking.show_id else None
@@ -1048,7 +1152,7 @@ def _fechas_de(dias: list[int], desde: date_cls, hasta: date_cls,
 
 
 @router.post("/repetir", dependencies=[Depends(require_permission("booking.manage"))])
-async def repetir_actuacion(payload: RepetirIn, db: DbSession):
+async def repetir_actuacion(payload: RepetirIn, scope: CurrentScope, db: DbSession):
     """Crea la misma actuación en todas las fechas elegidas, o las simula.
 
     Con `simular` (por defecto) NO escribe nada: devuelve las fechas, el precio
@@ -1071,6 +1175,10 @@ async def repetir_actuacion(payload: RepetirIn, db: DbSession):
         raise HTTPException(status_code=404, detail="Show not found")
     venue = await db.get(Venue, payload.venue_id)
     if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    try:
+        await _exigir_empresa(db, scope, venue.company_id)
+    except HTTPException:
         raise HTTPException(status_code=404, detail="Venue not found")
     if not payload.dias:
         raise HTTPException(status_code=422, detail="Elige al menos un día de la semana.")
