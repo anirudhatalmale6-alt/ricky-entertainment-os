@@ -443,6 +443,13 @@
   .cal .cell:hover{border-color:var(--acc);background:#382ca108}
   .cal .cell.out{opacity:.28;cursor:default;pointer-events:none}
   .cal .cell.today{border-color:var(--acc);background:#382ca112}
+  .cal .cell.blkp{background:repeating-linear-gradient(45deg,#f871710a,#f871710a 4px,transparent 4px,transparent 14px)}
+  .cal .cell .cblk.parc{font-size:9.5px;font-weight:700;color:#b91c1c;white-space:nowrap}
+  .dmblk{margin:10px 0 2px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px}
+  .dmblk label{display:flex;gap:8px;align-items:center;margin:3px 0;cursor:pointer}
+  .dmblk label input{width:auto;margin:0}
+  .dmhoras{gap:8px;align-items:center;margin:8px 0 2px}
+  .dmhoras input{width:auto}
   .cal .cell.blk{background:repeating-linear-gradient(45deg,#f871710e,#f871710e 6px,transparent 6px,transparent 12px);border-color:#f8717155}
   .cal .cell .cd{font-weight:600}
   .cal .cell .cc{position:absolute;top:4px;right:5px;background:var(--acc);color:#fff;font-size:9.5px;font-weight:700;min-width:15px;height:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px}
@@ -2452,7 +2459,10 @@ const API = (window.RICKY_API ?? "http://localhost:8000") + "/api/v1";  // "" = 
 const PERIOD = (()=>{ const d=new Date(); return {year:d.getFullYear(), month:d.getMonth()+1}; })();
 let TOKEN=null, GROUPS=[], GID=null, CACHE={}, ME=null, SELF=false, SENDER="company", NOTIF_CACHE=[];
 let NAV_INTEL=false;   // ¿este usuario puede entrar a Market Intelligence?
-let BLOCKED=new Set();   // fechas 'YYYY-MM-DD' que el artista bloqueó (vacaciones/enfermedad)
+// 'YYYY-MM-DD' -> {hora_desde, hora_hasta, reason}. Sin horas = el día entero;
+// con horas, sólo ese rango (14/10: un bolo de mañana no tiene por qué cerrar la noche).
+let BLOCKED=new Map();
+const bloqueoParcial=b=>!!(b&&b.hora_desde&&b.hora_hasta);
 // Normaliza para buscar: minúsculas y sin acentos. NFD separa la letra de su
 // tilde y el rango \u0300-\u036f borra la tilde suelta.
 const sinTildes = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
@@ -10680,11 +10690,13 @@ function artistCal(bk, ref){
   for(let dd=1;dd<=days;dd++){
     const key=ymdStr(y,m,dd);
     const isToday=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===dd;
-    const blocked=BLOCKED.has(key);
+    const bq=BLOCKED.get(key), blocked=!!bq, parcial=bloqueoParcial(bq);
     const evs=(byDay[dd]||[]).slice().sort((a,b)=>String(a.starts_at).localeCompare(String(b.starts_at)));
     let inner=`<span class="cd">${dd}</span>`;
     if(evs.length) inner+=`<span class="cc">${evs.length}</span>`;
-    if(blocked) inner+=`<span class="cblk" title="Fecha bloqueada">🚫</span>`;
+    if(blocked) inner+=parcial
+      ? `<span class="cblk parc" title="Bloqueado de ${bq.hora_desde} a ${bq.hora_hasta}">🚫 ${bq.hora_desde}–${bq.hora_hasta}</span>`
+      : `<span class="cblk" title="Día bloqueado">🚫</span>`;
     if(evs.length){
       inner+=`<div class="evs">`+evs.slice(0,2).map(b=>{
         const t=new Date(b.starts_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
@@ -10692,7 +10704,7 @@ function artistCal(bk, ref){
         return `<span class="ev e-${b.status}" title="${esc(t+' · '+nm)}">${esc(nm)}</span>`;
       }).join('')+(evs.length>2?`<span class="evmore">+${evs.length-2} más</span>`:'')+`</div>`;
     }
-    cells.push(`<div class="cell${isToday?' today':''}${blocked?' blk':''}" data-day="${key}" onclick="dayMenu('${key}',${evs.length})">${inner}</div>`);
+    cells.push(`<div class="cell${isToday?' today':''}${blocked?(parcial?' blkp':' blk'):''}" data-day="${key}" onclick="dayMenu('${key}',${evs.length})">${inner}</div>`);
   }
   const head=['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM'].map(h=>`<span>${h}</span>`).join("");
   return `<div class="cal"><div class="hd">${head}</div><div class="gr">${cells.join("")}</div>
@@ -10704,7 +10716,7 @@ function dayMenu(key){
   const [Y,M,D]=key.split('-').map(Number);
   const evs=(CACHE.artistBk||[]).filter(b=>{const d=new Date(b.starts_at);return d.getFullYear()===Y&&d.getMonth()===M-1&&d.getDate()===D;})
     .sort((a,b)=>String(a.starts_at).localeCompare(String(b.starts_at)));
-  const blocked=BLOCKED.has(key);
+  const bq=BLOCKED.get(key), blocked=!!bq, parcial=bloqueoParcial(bq);
   const nice=new Date(Y,M-1,D).toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   let ov=document.getElementById('dmMov');
   if(!ov){ ov=document.createElement('div'); ov.id='dmMov'; ov.className='mov'; document.body.appendChild(ov);
@@ -10714,13 +10726,27 @@ function dayMenu(key){
         return `<div class="dm-ev e-${b.status}"><div><b>${esc(b.company_name||showLabel(b)||'Actuación')}</b><span>${t} · ${esc(showLabel(b))}</span></div>${chip(b.status)}</div>`;}).join('')
     : `<div class="muted" style="padding:6px 0">Sin actuaciones este día.</div>`;
   const blockBtn = blocked
-    ? `<button class="btn ghost" onclick="unblockDate('${key}')">✅ Desbloquear día</button>`
-    : `<button class="btn danger" ${evs.length?'title="Este día ya tiene actuaciones"':''} onclick="blockDate('${key}')">🚫 Bloquear día</button>`;
+    ? `<button class="btn ghost" onclick="unblockDate('${key}')">✅ ${parcial?'Quitar el bloqueo':'Desbloquear día'}</button>`
+    : `<button class="btn danger" onclick="blockDate('${key}')">🚫 Bloquear</button>`;
+  // Qué bloquear: el día entero o sólo unas horas. Por defecto el día entero,
+  // que es lo que se hacía siempre; las horas aparecen al elegir "Solo unas horas".
+  const formBloqueo = blocked ? '' : `<div class="dmblk">
+      <label><input type="radio" name="dmTipo" value="dia" checked onchange="dmTipo(this.value)"> Todo el día</label>
+      <label><input type="radio" name="dmTipo" value="horas" onchange="dmTipo(this.value)"> Solo unas horas</label>
+      <div class="dmhoras" id="dmHoras" style="display:none">
+        <span>De</span><input type="time" id="dmDesde" value="09:00">
+        <span>a</span><input type="time" id="dmHasta" value="14:00">
+      </div>
+      <div class="hint" style="margin:6px 0 0">Los hoteles no podrán agendarte en lo que bloquees. Si necesitas tiempo para llegar, inclúyelo en el rango.</div>
+    </div>`;
   ov.innerHTML=`<div class="amod" style="max-width:400px;position:relative">
     <button class="ax" onclick="dmClose()" aria-label="Cerrar">✕</button>
     <div class="ah" style="padding:18px 20px 4px;text-transform:capitalize"><b>${esc(nice)}</b></div>
     <div class="rqbody" style="padding:8px 20px 4px">
-      ${blocked?`<div class="dm-note">🚫 Día bloqueado — los hoteles te ven como no disponible.</div>`:''}
+      ${blocked?(parcial
+        ?`<div class="dm-note">🚫 Bloqueado de ${bq.hora_desde} a ${bq.hora_hasta}. El resto del día los hoteles te pueden agendar.</div>`
+        :`<div class="dm-note">🚫 Día bloqueado. Los hoteles te ven como no disponible.</div>`):''}
+      ${formBloqueo}
       <h4 style="margin:6px 0 4px;font-size:12.5px;color:var(--mut)">Actuaciones</h4>
       ${evHtml}
     </div>
@@ -10728,22 +10754,35 @@ function dayMenu(key){
   ov.style.display='flex';
 }
 function dmClose(){ const ov=document.getElementById('dmMov'); if(ov) ov.style.display='none'; }
+function dmTipo(v){ const h=document.getElementById('dmHoras'); if(h) h.style.display=(v==='horas')?'flex':'none'; }
 async function blockDate(key){
-  try{ await post('/me/blocked-dates',{date:key}); BLOCKED.add(key); toast('Día bloqueado 🚫'); dmClose(); show('home',true); }
-  catch(e){ toast('No se pudo bloquear: '+(e.message||''),true); }
+  const horas=(document.querySelector('input[name="dmTipo"]:checked')||{}).value==='horas';
+  const body={date:key};
+  if(horas){
+    const d=(document.getElementById('dmDesde')||{}).value, h=(document.getElementById('dmHasta')||{}).value;
+    if(!d||!h){ toast('Pon la hora de inicio y la de fin.',true); return; }
+    if(h<=d){ toast('La hora de fin tiene que ser después de la de inicio.',true); return; }
+    body.hora_desde=d; body.hora_hasta=h;
+  }
+  try{
+    const r=await post('/me/blocked-dates',body);
+    BLOCKED.set(key, r||body);
+    toast(horas?`Bloqueado de ${body.hora_desde} a ${body.hora_hasta} 🚫`:'Día bloqueado 🚫');
+    dmClose(); show('home',true);
+  }catch(e){ toast('No se pudo bloquear: '+(e.message||''),true); }
 }
 async function unblockDate(key){
   try{ await del('/me/blocked-dates/'+key); BLOCKED.delete(key); toast('Día liberado ✓'); dmClose(); show('home',true); }
   catch(e){ toast('No se pudo desbloquear: '+(e.message||''),true); }
 }
-window.dayMenu=dayMenu;window.blockDate=blockDate;window.unblockDate=unblockDate;window.dmClose=dmClose;
+window.dayMenu=dayMenu;window.blockDate=blockDate;window.dmTipo=dmTipo;window.unblockDate=unblockDate;window.dmClose=dmClose;
 
 async function artistHome(box){
   const [p, bk, convs, openReqs, blk] = await Promise.all([
     api('/me/artist'), api('/bookings/mine'), api('/conversations/mine'), api('/requests?status=open'),
     api('/me/blocked-dates').catch(()=>[])
   ]);
-  BLOCKED = new Set((blk||[]).map(x=>typeof x==='string'?x:x.date));
+  BLOCKED = new Map((blk||[]).map(x=>typeof x==='string'?[x,{}]:[x.date,x]));
   CACHE.artistBk = bk;   // lo usa dayMenu() para listar las actuaciones de un día
   CACHE.profile = p; setSelfAvatar(p.profile_image_url, p.stage_name);
   const now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());

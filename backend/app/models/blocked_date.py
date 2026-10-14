@@ -6,9 +6,9 @@ simple per-day flag on the artist's own calendar; it does NOT touch bookings.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, time
 
-from sqlalchemy import Date, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Date, ForeignKey, String, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -27,5 +27,11 @@ class ArtistBlockedDate(Base, TimestampMixin):
     )
     blocked_on: Mapped[date] = mapped_column(Date, index=True)
     reason: Mapped[str | None] = mapped_column(String(120))
+    # Bloqueo por horas (David, 14/10: "por una actuación en la mañana tendría
+    # que bloquear todo el día"). Las dos vacías = el día entero, que es como
+    # funcionaban todos los bloqueos anteriores. Hora de pared de Cancún, igual
+    # que starts_at.
+    hora_desde: Mapped[time | None] = mapped_column(Time)
+    hora_hasta: Mapped[time | None] = mapped_column(Time)
 
     artist: Mapped["Artist"] = relationship()  # noqa: F821

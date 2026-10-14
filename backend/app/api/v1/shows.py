@@ -230,29 +230,35 @@ async def list_shows(
         # Disponibilidad. Un día bloqueado por el artista es definitivo: no se
         # puede contratar. Tener ya otra actuación ese día sólo se avisa — el
         # choque real (con 1 h de margen) se revisa al guardar, con la hora.
-        if day:
-            if s.artist_id in blocked:
-                s.is_available = False
-                motivo = blocked[s.artist_id]
-                s.unavailable_reason = (
-                    f"El artista bloqueó ese día en su calendario ({motivo})" if motivo
-                    else "El artista bloqueó ese día en su calendario"
-                )
-            else:
-                s.is_available = True
-                # Una productora se mira POR SHOW: que uno de sus grupos esté
-                # tocando no deja sin fecha a los demás. Quien actúa él mismo se
-                # sigue mirando por artista, que es lo que impide contratar al
-                # mismo guitarrista en dos hoteles a la misma hora.
-                if getattr(s, "_es_productora", False):
-                    if s.id in busy_show:
-                        s.busy_note = f"No disponible {busy_show[s.id]:%H:%M}"
-                elif s.artist_id in busy:
-                    # David, 19/09: "pongamos No Disponible 20:00". El texto
-                    # largo no cabía en la tarjeta nueva, y su primer intento
-                    # ("Solo hoy 20:00") se leía al revés, como si ESTUVIERA
-                    # libre a esa hora.
-                    s.busy_note = f"No disponible {busy[s.artist_id]:%H:%M}"
+        bq = blocked.get(s.artist_id) if day else None
+        if day and bq is not None and availability.es_dia_entero(bq):
+            s.is_available = False
+            motivo = bq.reason
+            s.unavailable_reason = (
+                f"El artista bloqueó ese día en su calendario ({motivo})" if motivo
+                else "El artista bloqueó ese día en su calendario"
+            )
+        elif day:
+            s.is_available = True
+            notas = []
+            # Una productora se mira POR SHOW: que uno de sus grupos esté
+            # tocando no deja sin fecha a los demás. Quien actúa él mismo se
+            # sigue mirando por artista, que es lo que impide contratar al
+            # mismo guitarrista en dos hoteles a la misma hora.
+            # David, 19/09: "pongamos No Disponible 20:00". El texto largo no
+            # cabía en la tarjeta nueva, y su primer intento ("Solo hoy 20:00")
+            # se leía al revés, como si ESTUVIERA libre a esa hora.
+            if getattr(s, "_es_productora", False):
+                if s.id in busy_show:
+                    notas.append(f"No disponible {busy_show[s.id]:%H:%M}")
+            elif s.artist_id in busy:
+                notas.append(f"No disponible {busy[s.artist_id]:%H:%M}")
+            # Bloqueo por horas (14/10): el día sigue contratable fuera de ese
+            # rango. Se avisa aquí; el choque real se revisa al guardar.
+            if bq is not None:
+                notas.append(f"No disponible de {bq.hora_desde:%H:%M} a {bq.hora_hasta:%H:%M}")
+            if notas:
+                s.busy_note = " · ".join(notas)
 
     # Reseñas reales por artista. David, 19/09: su diseño ponía "4.8 (32)" en
     # todas las tarjetas y en la plataforma hay 13 reseñas entre 4 proveedores.

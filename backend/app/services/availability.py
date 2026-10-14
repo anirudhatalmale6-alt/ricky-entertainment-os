@@ -37,19 +37,51 @@ def as_date(when) -> date | None:
         return None
 
 
-async def blocked_on(db, day: date) -> dict[int, str | None]:
-    """{artist_id: motivo} de quienes bloquearon ese día."""
+def _rango(b) -> str:
+    """'de 10:00 a 13:00' para un bloqueo por horas; '' si es el día entero."""
+    if b.hora_desde and b.hora_hasta:
+        return f"de {b.hora_desde:%H:%M} a {b.hora_hasta:%H:%M}"
+    return ""
+
+
+def es_dia_entero(b) -> bool:
+    return not (b.hora_desde and b.hora_hasta)
+
+
+def choca(b, inicio: datetime, fin: datetime | None) -> bool:
+    """¿La actuación [inicio, fin) cae dentro del bloqueo?
+
+    Día entero: sí, sin más. Por horas: sólo si se solapan. Sin hora de fin
+    se toma una hora de actuación, que es lo mínimo que dura cualquier show.
+    No se añade margen de traslado: lo que el músico bloquea es exactamente lo
+    que no puede, y si necesita llegar con tiempo lo incluye en el rango.
+    """
+    if es_dia_entero(b):
+        return True
+    ini = _naive(inicio)
+    fin = _naive(fin) if fin else ini + timedelta(hours=1)
+    d = b.blocked_on
+    b_ini = datetime.combine(d, b.hora_desde)
+    b_fin = datetime.combine(d, b.hora_hasta)
+    return ini < b_fin and fin > b_ini
+
+
+async def blocked_on(db, day: date) -> dict[int, ArtistBlockedDate]:
+    """{artist_id: bloqueo} de quienes bloquearon algo ese día (entero o por horas)."""
     if day is None:
         return {}
     rows = (await db.execute(
-        select(ArtistBlockedDate.artist_id, ArtistBlockedDate.reason)
-        .where(ArtistBlockedDate.blocked_on == day)
-    )).all()
-    return {aid: reason for aid, reason in rows}
+        select(ArtistBlockedDate).where(ArtistBlockedDate.blocked_on == day)
+    )).scalars().all()
+    return {r.artist_id: r for r in rows}
 
 
-async def is_blocked(db, artist_id: int, when) -> tuple[bool, str | None]:
-    """¿El artista bloqueó el día de esa fecha? Devuelve (sí/no, motivo)."""
+async def is_blocked(db, artist_id: int, when, ends=None) -> tuple[bool, str | None]:
+    """¿El artista bloqueó la hora de esa actuación? Devuelve (sí/no, explicación).
+
+    La explicación ya trae las horas si el bloqueo es parcial, para que el
+    hotel entienda por qué no puede contratarlo a esa hora y sí a otra.
+    """
     day = as_date(when)
     if day is None or artist_id is None:
         return False, None
@@ -59,7 +91,12 @@ async def is_blocked(db, artist_id: int, when) -> tuple[bool, str | None]:
             ArtistBlockedDate.blocked_on == day,
         )
     )).scalar_one_or_none()
-    return (row is not None), (row.reason if row else None)
+    if row is None:
+        return False, None
+    if isinstance(when, datetime) and not choca(row, when, ends):
+        return False, None
+    partes = [p for p in (_rango(row), row.reason) if p]
+    return True, (" · ".join(partes) or None)
 
 
 async def busy_on(db, day: date) -> tuple[dict[int, datetime], dict[int, datetime]]:

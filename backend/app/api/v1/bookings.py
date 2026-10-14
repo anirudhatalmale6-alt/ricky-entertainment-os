@@ -139,11 +139,12 @@ def _sin_importes(out: BookingOut, scope) -> BookingOut:
     return out
 
 
-async def _check_blocked_day(db: DbSession, artist_id: int | None, starts_at: datetime):
-    """Reject if the artist marked that day as unavailable (vacaciones, etc.)."""
+async def _check_blocked_day(db: DbSession, artist_id: int | None, starts_at: datetime,
+                             ends_at: datetime | None = None):
+    """Reject if the artist blocked that day, or those hours of it (14/10)."""
     if not artist_id:
         return
-    blocked, reason = await availability.is_blocked(db, artist_id, starts_at)
+    blocked, reason = await availability.is_blocked(db, artist_id, starts_at, ends_at)
     if blocked:
         day = availability.as_date(starts_at)
         raise HTTPException(
@@ -151,7 +152,7 @@ async def _check_blocked_day(db: DbSession, artist_id: int | None, starts_at: da
             detail=(
                 f"El artista tiene bloqueado el {day:%d/%m/%Y} en su calendario"
                 + (f" ({reason})" if reason else "")
-                + ". Elige otra fecha u otro proveedor."
+                + ". Elige otra hora, otra fecha u otro proveedor."
             ),
         )
 
@@ -231,7 +232,7 @@ async def create_booking(payload: BookingCreate, scope: CurrentScope, db: DbSess
         round(RISK_COMMISSION[company.risk_tier] * 100, 2) if company else None
     )
 
-    await _check_blocked_day(db, show.artist_id, payload.starts_at)
+    await _check_blocked_day(db, show.artist_id, payload.starts_at, payload.ends_at)
     await _check_travel_buffer(db, show.artist_id, payload.starts_at, payload.ends_at,
                                show_id=show.id)
 
@@ -478,7 +479,7 @@ async def update_booking(booking_id: int, payload: BookingUpdate, scope: Current
         if new_end is not None and new_end <= new_start:
             raise HTTPException(status_code=422, detail="ends_at must be after starts_at")
         if booking.artist_id:
-            await _check_blocked_day(db, booking.artist_id, new_start)
+            await _check_blocked_day(db, booking.artist_id, new_start, new_end)
             await _check_travel_buffer(db, booking.artist_id, new_start, new_end,
                                        exclude_id=booking.id, show_id=booking.show_id)
     # moving to another venue (drag on the Calendario Maestro): re-derive the property scope
@@ -1231,7 +1232,7 @@ async def repetir_actuacion(payload: RepetirIn, scope: CurrentScope, db: DbSessi
         if f < hoy:
             motivo = "Fecha pasada"
         elif show.artist_id:
-            bloqueado, razon = await availability.is_blocked(db, show.artist_id, inicio)
+            bloqueado, razon = await availability.is_blocked(db, show.artist_id, inicio, fin)
             if bloqueado:
                 motivo = "El artista bloqueó ese día" + (f" ({razon})" if razon else "")
             else:

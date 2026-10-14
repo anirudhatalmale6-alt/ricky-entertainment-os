@@ -8,7 +8,7 @@ what powers the "Mi Perfil" screen where a musician edits their tarifas,
 descripciones and gestiona sus publicaciones (shows).
 """
 import uuid
-from datetime import date as date_cls, datetime, timedelta
+from datetime import date as date_cls, datetime, time as time_cls, timedelta
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
@@ -51,6 +51,9 @@ from app.schemas.show import ShowCreate, ShowOut, ShowUpdate
 class BlockedDateIn(BaseModel):
     date: date_cls
     reason: str | None = None
+    # Por horas (14/10). Las dos vacías = el día entero.
+    hora_desde: time_cls | None = None
+    hora_hasta: time_cls | None = None
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -1387,13 +1390,24 @@ async def list_blocked_dates(scope: CurrentScope, db: DbSession):
         .where(ArtistBlockedDate.artist_id == artist_id)
         .order_by(ArtistBlockedDate.blocked_on)
     )).scalars().all()
-    return [{"date": r.blocked_on.isoformat(), "reason": r.reason} for r in rows]
+    return [{"date": r.blocked_on.isoformat(), "reason": r.reason,
+             "hora_desde": r.hora_desde.strftime("%H:%M") if r.hora_desde else None,
+             "hora_hasta": r.hora_hasta.strftime("%H:%M") if r.hora_hasta else None}
+            for r in rows]
 
 
 @router.post("/blocked-dates", status_code=status.HTTP_201_CREATED)
 async def block_date(payload: BlockedDateIn, scope: CurrentScope, db: DbSession):
-    """Block one day (idempotent: re-blocking just refreshes the reason)."""
+    """Bloquea un día entero o unas horas de ese día. Volver a bloquear el mismo
+    día reemplaza lo anterior (un bloqueo por día)."""
     artist_id = await _require_artist(scope)
+    desde, hasta = payload.hora_desde, payload.hora_hasta
+    if (desde is None) != (hasta is None):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "Indica la hora de inicio y la de fin, o ninguna para el día entero.")
+    if desde is not None and hasta <= desde:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "La hora de fin tiene que ser después de la de inicio.")
     existing = (await db.execute(
         select(ArtistBlockedDate).where(
             ArtistBlockedDate.artist_id == artist_id,
@@ -1402,10 +1416,14 @@ async def block_date(payload: BlockedDateIn, scope: CurrentScope, db: DbSession)
     )).scalar_one_or_none()
     if existing:
         existing.reason = payload.reason
+        existing.hora_desde, existing.hora_hasta = desde, hasta
     else:
-        db.add(ArtistBlockedDate(artist_id=artist_id, blocked_on=payload.date, reason=payload.reason))
+        db.add(ArtistBlockedDate(artist_id=artist_id, blocked_on=payload.date,
+                                 reason=payload.reason, hora_desde=desde, hora_hasta=hasta))
     await db.commit()
-    return {"date": payload.date.isoformat(), "reason": payload.reason}
+    return {"date": payload.date.isoformat(), "reason": payload.reason,
+            "hora_desde": desde.strftime("%H:%M") if desde else None,
+            "hora_hasta": hasta.strftime("%H:%M") if hasta else None}
 
 
 @router.delete("/blocked-dates/{day}", status_code=status.HTTP_204_NO_CONTENT)

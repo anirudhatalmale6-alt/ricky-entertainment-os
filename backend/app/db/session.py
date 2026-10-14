@@ -72,6 +72,9 @@ _SQLITE_ADDED_COLUMNS = [
     ("bookings", "cargo_cancelacion", "BOOLEAN DEFAULT 0"),
     ("bookings", "cargo_exento_motivo", "TEXT"),
     ("bookings", "cargo_exento_por", "VARCHAR(120)"),
+    # Bloqueo de disponibilidad por horas (David, 14/10). Vacías = día entero.
+    ("artist_blocked_dates", "hora_desde", "TIME"),
+    ("artist_blocked_dates", "hora_hasta", "TIME"),
     ("artists", "invitado_por_company_id", "INTEGER"),
     ("bookings", "invoice_paid", "BOOLEAN DEFAULT 0"),
     ("bookings", "payout_paid", "BOOLEAN DEFAULT 0"),
