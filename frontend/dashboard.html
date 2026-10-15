@@ -1374,6 +1374,40 @@
   @media(max-width:1000px){.filtrow{grid-template-columns:1fr 1fr}}
   .filtrow2{display:flex;align-items:center;gap:16px;margin-top:13px;flex-wrap:wrap}
   .artlayout{display:grid;grid-template-columns:1fr 250px;gap:18px;align-items:start}
+  /* Catálogo de proveedores, diseño del 15/10 */
+  .pvtop{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+  .pvctx{flex:1;min-width:0}
+  .pvctx .ctxbar{margin:0}
+  .btn.ghost.pvinv{margin-left:auto;flex:none;white-space:nowrap;border:1px solid var(--acc);color:var(--acc);background:var(--card);font-weight:650}
+  .btn.ghost.pvinv:hover{background:color-mix(in srgb,var(--acc) 8%,var(--card))}
+  .pvf .pvrow1{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+  .pvf .pvq{flex:1;min-width:240px;margin:0}
+  .pvf .pvcatsf{margin:0}
+  .pvcats{display:flex;gap:8px;flex-wrap:wrap}
+  .pvchip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);
+    color:var(--txt);border-radius:9px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .pvchip i{font-style:normal;font-size:11px;font-weight:600;background:var(--inp);color:var(--mut);border-radius:6px;padding:1px 7px}
+  .pvchip:hover{border-color:var(--acc)}
+  .pvchip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  .pvchip.on i{background:rgba(255,255,255,.22);color:#fff}
+  .pvf .pvrow2{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr)) auto auto;gap:12px;align-items:end}
+  .pvmax{display:flex;align-items:center;gap:6px}
+  .pvmax input{flex:1;min-width:0}
+  .pvmax span{font-size:12px;color:var(--mut)}
+  .pvf .afchk.pvexp{align-self:center;margin:0 0 10px;white-space:nowrap;border:0;background:none;padding:0;height:auto;gap:8px;display:flex;align-items:center;font-size:12.5px}
+  .pvf .afchk.pvexp input{margin:0}
+  .pvclear{align-self:center;margin:0 0 6px 6px;font-size:12.5px;font-weight:650;color:var(--acc);cursor:pointer;white-space:nowrap}
+  .pvcount{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:4px 0 13px;flex-wrap:wrap}
+  .pvsort{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mut)}
+  .pvsort select{width:auto;border:1px solid var(--line);background:var(--inp);border-radius:9px;padding:7px 10px;font-size:12.5px;color:var(--txt)}
+  @media(min-width:1700px){.pvgrid{grid-template-columns:repeat(4,1fr)}}
+  @media(max-width:1000px){.pvf .pvrow2{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){
+    .pvtop{flex-wrap:wrap}.pvinv{margin-left:0;width:100%}
+    .pvctx .ctxbar{flex-wrap:wrap}.pvctx .ctxsel{max-width:100%}
+    .pvf .pvq{min-width:0;flex-basis:100%}
+    .pvf .pvrow2{grid-template-columns:1fr}
+    .pvf .pvrow2 .field select,.pvf .pvrow2 .field input{width:100%;min-width:0}}
   @media(max-width:1000px){.artlayout{grid-template-columns:1fr}}
   .agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
   @media(max-width:1250px){.agrid{grid-template-columns:repeat(2,1fr)}}
@@ -3387,7 +3421,7 @@ async function reload(){
 
 const TITLES={home:["Dashboard Ejecutivo","Resumen de entretenimiento"],cal:["Órdenes de Servicio","Actuaciones programadas por venue · cada una con su folio"],
   master:["Master","Panel de control interno · resumen general de operaciones"],
-  artists:["Buscar Proveedores","Encuentra y contrata proveedores para tu hotel y eventos"],
+  artists:["Catálogo de proveedores","Encuentra y contrata proveedores para tu hotel y eventos"],
   reqs:["Solicitudes","Tablero de pedidos abiertos"],chat:["Chat","Conversaciones hotel · artista"],
   leads:["Prospectos","Hoteles que solicitaron acceso"],
   budget:["Presupuesto","Planifica y controla el gasto de entretenimiento"],
@@ -5534,13 +5568,13 @@ function applyArtistFilters(){
   const items=CACHE.artistItems||[];
   const q=((document.getElementById('af_q')||{}).value||'').toLowerCase().trim();
   const sort=((document.getElementById('af_sort')||{}).value)||'best';
-  const maxEl=document.getElementById('af_max'); const max=maxEl?+maxEl.value:60000;
+  // Presupuesto máximo: un importe escrito; vacío o 0 = sin límite.
+  const max=+(((document.getElementById('af_max')||{}).value)||0)||0;
   let r=items.filter(i=>{
-    if(AF.cat && i.cat!==AF.cat) return false;
     if(AF.loc && (i.city||'')!==AF.loc) return false;
     // Radio desde el hotel: sólo pasa quien está dentro y tiene ciudad.
     if(AF.km && (i.km==null || i.km>AF.km)) return false;
-    if(max<60000 && i.price && i.price>max) return false;
+    if(max>0 && i.price && i.price>max) return false;
     if(AF.exp && EXP_TODOS){
       const e = EXP_TODOS[String(i.artistId)];
       if(!e || !e.completo) return false;
@@ -5548,6 +5582,10 @@ function applyArtistFilters(){
     if(q){ const hay=(i.name+' '+i.show+' '+i.cat+' '+(i.sub||'')+' '+(i.genres||[]).join(' ')).toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
   });
+  // Los chips cuentan con los DEMÁS filtros puestos: el número es lo que sale
+  // al pulsarlo (igual que en el selector del calendario).
+  pintaCatsProv(r, items);
+  if(AF.cat) r=r.filter(i=>i.cat===AF.cat);
   if(sort==='price') r.sort((a,b)=>(a.price||1e9)-(b.price||1e9));
   else {
     // "Mejor coincidencia" ordena por afinidad, de mayor a menor. Antes no
@@ -5580,6 +5618,23 @@ function applyArtistFilters(){
   document.querySelectorAll('.catrow').forEach(el=>el.classList.toggle('on', (el.dataset.cat||'')===AF.cat));
 }
 function pickArtCat(c){ AF.cat=c; applyArtistFilters(); }
+function pintaCatsProv(base, todos){
+  const box=document.getElementById('af_cats'); if(!box) return;
+  const n={}; base.forEach(i=>{ n[i.cat]=(n[i.cat]||0)+1; });
+  // Se listan todas las categorías que existen, aunque el filtro deje alguna a 0,
+  // para que los botones no bailen de sitio al escribir en el buscador.
+  const cats=[...new Set((todos||[]).map(i=>i.cat).filter(Boolean))].sort((a,b)=>(n[b]||0)-(n[a]||0));
+  const chip=(c,t,k)=>`<button class="pvchip${(AF.cat||'')===c?' on':''}" onclick="pickArtCat('${esc(c).replace(/'/g,"\\'")}')">${t}<i>${k}</i></button>`;
+  box.innerHTML=chip('','Todas',base.length)+cats.map(c=>chip(c,esc(pretty(c)),n[c]||0)).join('');
+}
+function limpiarFiltrosProv(){
+  ['af_q','af_max'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  const l=document.getElementById('af_loc'); if(l) l.value='';
+  const k=document.getElementById('af_km'); if(k) k.value='100';
+  const x=document.getElementById('af_exp'); if(x) x.checked=false;
+  AF={cat:'',loc:'',km:100,exp:false};
+  applyArtistFilters();
+}
 
 /* ---- Perfil del artista (ventana emergente desde Buscar Artistas) ---- */
 const SOCNAME={instagram:'Instagram',facebook:'Facebook',youtube:'YouTube',tiktok:'TikTok',spotify:'Spotify',twitter:'X',x:'X',soundcloud:'SoundCloud'};
@@ -6078,7 +6133,9 @@ function invitarHTML(){
         if(v.company_id && !a.some(c=>c.id===v.company_id))
           a.push({id:v.company_id, name:v.company_name||('Propiedad '+v.company_id)});
         return a;}, []);
-  if(!cid && !(ME && ME.is_admin && comps.length)) return '';
+  // Un director de cadena tampoco cuelga de un hotel concreto: elige cuál de
+  // los suyos invita, igual que el administrador. Antes no le salía nada.
+  if(!cid && !(ME && (ME.is_admin || ME.group_id) && comps.length)) return '';
   const sel = !cid
     ? `<select id="invComp" onchange="pintaLigaInv()" style="min-width:190px">
          ${comps.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>`
@@ -6094,6 +6151,18 @@ function invitarHTML(){
                border-radius:9px;padding:9px 11px;font-size:12.5px;color:var(--mut)">
       <button class="btn ghost" onclick="copiaInvitacion()">Copiar liga</button>
     </div></div>`;
+}
+// Se pinta el botón sólo si hay de quién invitar: un hotel siempre; un
+// administrador si hay propiedades a las que asignar la invitación.
+function ligaInvitacionDisponible(){ return !!invitarHTML(); }
+function abrirInvitar(){
+  let ov=document.getElementById('invMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='invMov'; ov.className='mov'; document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) ov.style.display='none'; }); }
+  ov.innerHTML=`<div class="amod" style="max-width:620px;position:relative">
+    <button class="ax" onclick="document.getElementById('invMov').style.display='none'" aria-label="Cerrar">✕</button>
+    <div class="rqbody" style="padding:18px 20px 6px">${invitarHTML()}</div></div>`;
+  ov.style.display='flex';
 }
 function pintaLigaInv(){
   const s=document.getElementById('invComp'), i=document.getElementById('invUrl');
@@ -9232,38 +9301,36 @@ const RENDER = {
     const locs=[...new Set(items.map(i=>i.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     const catCount={}; items.forEach(i=>{catCount[i.cat]=(catCount[i.cat]||0)+1;});
     const cats=Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
+    // Diseño de David (15/10): la invitación pasa a ser un botón, las categorías
+    // suben junto al buscador y se quita la columna de la derecha ("Ir a
+    // Solicitudes"), para que las tarjetas ocupen todo el ancho.
     box.innerHTML=`
-      ${invitarHTML()}
-      <div class="filters">
-        <div class="filtrow">
-          <div class="field" style="margin:0"><label>Buscar</label><input id="af_q" oninput="applyArtistFilters()" placeholder="Nombre, tipo de show, instrumento…"></div>
-          <div class="field" style="margin:0"><label>Locación</label><select id="af_loc" onchange="AF.loc=this.value;applyArtistFilters()"><option value="">Todas las locaciones</option>${locs.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div>
+      <div class="pvtop">
+        <div id="ctxBar" class="pvctx"></div>
+        ${ligaInvitacionDisponible()?`<button class="btn ghost pvinv" onclick="abrirInvitar()">＋ Invitar proveedor</button>`:''}
+      </div>
+      <div class="filters pvf">
+        <div class="pvrow1">
+          <div class="field pvq"><label>Buscar proveedor</label><input id="af_q" oninput="applyArtistFilters()" placeholder="Nombre, show o instrumento"></div>
+          <div class="field pvcatsf"><label>Categorías</label><div class="pvcats" id="af_cats"></div></div>
+        </div>
+        <div class="pvrow2">
+          <div class="field" style="margin:0"><label>Ubicación</label><select id="af_loc" onchange="AF.loc=this.value;applyArtistFilters()"><option value="">Todas las ubicaciones</option>${locs.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div>
           <div class="field" style="margin:0"><label>Distancia desde el hotel</label><select id="af_km" onchange="AF.km=+this.value;applyArtistFilters()">
             <option value="50">Hasta 50 km</option><option value="100" selected>Hasta 100 km</option>
             <option value="300">Hasta 300 km</option><option value="0">Sin límite</option></select></div>
-          <div class="field" style="margin:0"><label>Presupuesto máx.</label><input id="af_max" type="range" min="5000" max="60000" step="1000" value="60000" oninput="document.getElementById('af_maxv').textContent=(+this.value>=60000?'Sin límite':MXN(+this.value));applyArtistFilters()"><span id="af_maxv" class="hint" style="margin-top:4px">Sin límite</span></div>
-          <div class="field" style="margin:0"><label>Ordenar por</label><select id="af_sort" onchange="applyArtistFilters()"><option value="best">Mejor coincidencia</option><option value="price">Menor precio</option></select></div>
-          <div class="field afexp" style="margin:0"><label>Documentación</label>
-            <label class="afchk"><input type="checkbox" id="af_exp" onchange="AF.exp=this.checked;applyArtistFilters()">Expediente completo</label></div>
+          <div class="field" style="margin:0"><label>Presupuesto máximo</label>
+            <div class="pvmax"><input id="af_max" type="number" min="0" step="1000" placeholder="Sin límite" oninput="applyArtistFilters()"><span>MXN</span></div></div>
+          <label class="afchk pvexp"><input type="checkbox" id="af_exp" onchange="AF.exp=this.checked;applyArtistFilters()">Solo con expediente completo</label>
+          <a class="pvclear" onclick="limpiarFiltrosProv()">Limpiar filtros</a>
         </div>
       </div>
-      <div class="artlayout">
-        <div>
-          <div id="zigBan"></div>
-          <div id="ctxBar"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px"><b id="af_count"></b></div>
-          <div class="agrid" id="af_grid"></div>
-        </div>
-        <div>
-          <div class="catbox"><h4>Categorías</h4>
-            <div class="catrow" data-cat="" onclick="pickArtCat('')">Todas<span>${items.length}</span></div>
-            ${cats.map(([c,n])=>`<div class="catrow" data-cat="${esc(c)}" onclick="pickArtCat('${esc(c)}')">${esc(pretty(c))}<span>${n}</span></div>`).join('')}
-          </div>
-          <div class="catbox"><h4>¿No encuentras lo que buscas?</h4>
-            <div class="hint" style="margin-bottom:11px">Cuéntanos qué necesitas en Solicitudes y los proveedores te envían propuestas.</div>
-            <button class="btn ghost" style="width:100%" onclick="show('reqs')">Ir a Solicitudes →</button></div>
-        </div>
-      </div>`;
+      <div id="zigBan"></div>
+      <div class="pvcount"><b id="af_count"></b>
+        <div class="pvsort"><label for="af_sort">Ordenar por</label>
+          <select id="af_sort" onchange="applyArtistFilters()"><option value="best">Mejor coincidencia</option><option value="price">Menor precio</option></select></div>
+      </div>
+      <div class="agrid pvgrid" id="af_grid"></div>`;
     applyArtistFilters();
   },
 
