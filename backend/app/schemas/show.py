@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas.enlaces import Video
 from app.models.enums import ARTIST_CATEGORIES, ARTIST_SUBCATEGORIES, MAX_ARTIST_IMAGES
 
 
@@ -107,6 +108,8 @@ class ShowBase(BaseModel):
 
 
 class ShowCreate(ShowBase):
+    # YouTube o Vimeo (15/10). En la entrada: ShowOut hereda de ShowBase.
+    video_url: Video = None
     seasonal_rates: list[SeasonalRateCreate] = []
     images: list[ShowImageCreate] = Field(default=[], max_length=MAX_ARTIST_IMAGES)
     # Las diez respuestas del cuestionario de afinidad, para poder contestarlas
@@ -136,7 +139,7 @@ class ShowUpdate(BaseModel):
     equipment_required: str | None = None
     dressing_room: str | None = None
     requirements: str | None = None
-    video_url: str | None = None
+    video_url: Video = None             # YouTube o Vimeo (15/10)
     audio_url: str | None = None
     base_price: float | None = None
     price_hotel: float | None = None

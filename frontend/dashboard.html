@@ -2612,7 +2612,8 @@ window.rfcCheck=rfcCheck; window.rfcGate=rfcGate;
 async function _errMsg(r,path){
   try{ const d=await r.clone().json(); const dt=d&&d.detail;
     if(typeof dt==='string'&&dt) return dt;
-    if(Array.isArray(dt)&&dt[0]&&dt[0].msg) return dt[0].msg;
+    // pydantic antepone "Value error, " a los mensajes de los validadores: fuera.
+    if(Array.isArray(dt)&&dt[0]&&dt[0].msg) return String(dt[0].msg).replace(/^Value error,\s*/i,'');
   }catch(e){}
   return path+" "+r.status;
 }
@@ -5954,7 +5955,7 @@ async function openArtistProfile(artistId, showId, previo, nav){
   const langs=a.languages_spoken||[];
   const sl=a.social_links||{};
   // Solo dejamos YouTube (y las fotos/videos); se quitaron el resto de redes y las páginas web propias.
-  const socLinks=Object.entries(sl).filter(([k,v])=>v && k==='youtube').map(([k,v])=>
+  const socLinks=Object.entries(sl).filter(([k,v])=>v && k==='youtube' && esVideoPermitido(socialUrl(k,v)) && !/vimeo/i.test(socialUrl(k,v))).map(([k,v])=>
     `<a href="${esc(socialUrl(k,v))}" target="_blank" rel="noopener" title="${esc(SOCNAME[k]||_cap(k))}">${ico('play')}</a>`);
   if(a.website) socLinks.push(`<a href="${esc(a.website)}" target="_blank" rel="noopener" title="Sitio web">${ico('link')}</a>`);
   const sel = showId ? shows.find(s=>s.id===showId) : null;
@@ -6465,6 +6466,10 @@ const VID_PATRONES = [
 const VIMEO_PATRON = /vimeo\.com\/(?:video\/)?(\d+)/;
 
 /* Devuelve como se puede enseñar ese enlace: incrustado, o solo como liga. */
+function esVideoPermitido(u){
+  let h=''; try{ h=new URL(u).hostname.toLowerCase().replace(/^(www|m|music)\./,''); }catch(e){ return false; }
+  return ['youtube.com','youtu.be','youtube-nocookie.com','vimeo.com'].some(d=>h===d||h.endsWith('.'+d));
+}
 function videoInfo(url){
   const u = String(url||'').trim();
   if(!u) return null;
@@ -6480,7 +6485,10 @@ function videoInfo(url){
   // cosa. Se puede abrir, pero no reproducir aqui dentro.
   const externo = /^https?:\/\//i.test(u) ? u
                 : (u.startsWith('@') ? 'https://www.youtube.com/'+u : null);
-  return externo ? {tipo:'enlace', url:externo, embed:null} : null;
+  // Sólo canales de YouTube o Vimeo (15/10). Un Instagram o un TikTok guardado
+  // antes de la regla deja de salir como "Ver canal": no se puede ver aquí y
+  // es un contacto directo fuera de SHOWMA.
+  return (externo && esVideoPermitido(externo)) ? {tipo:'enlace', url:externo, embed:null} : null;
 }
 
 /* El texto del boton dice la verdad sobre lo que hay detras. */
@@ -10759,11 +10767,11 @@ const numOrNull=id=>{const v=gv(id);return v===''?null:Number(v);};
 function flash(id){const e=document.getElementById(id);if(!e)return;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1800);}
 async function patch(path,body){
   const r=await fetch(API+path,{method:'PATCH',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body||{})});
-  if(!r.ok) throw new Error(path+' '+r.status); return r.json();
+  if(!r.ok) throw new Error(await _errMsg(r,path)); return r.json();
 }
 async function del(path){
   const r=await fetch(API+path,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}});
-  if(!r.ok) throw new Error(path+' '+r.status);
+  if(!r.ok) throw new Error(await _errMsg(r,path));
   // Casi todos los borrados contestan 204 sin cuerpo; el de salones contesta
   // diciendo si lo borró o sólo lo desactivó. Quien no lo use, lo ignora.
   if(r.status===204) return null;

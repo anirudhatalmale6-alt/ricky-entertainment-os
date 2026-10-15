@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, computed_field
 
+from app.schemas.enlaces import Redes
 from app.models.enums import PAYOUT_COMMISSION, PayoutSpeed
 from app.schemas.fiscal import Rfc
 from app.schemas.show import ShowCreate, ShowOut
@@ -99,6 +100,9 @@ class ArtistBase(BaseModel):
 
 
 class ArtistCreate(ArtistBase):
+    # Sólo YouTube (15/10). En la entrada: ArtistOut hereda de ArtistBase y en
+    # la base hay enlaces viejos de Instagram que no deben tirar la lectura.
+    social_links: Redes = {}
     # `Rfc` sólo en la ENTRADA: los Out heredan de esta clase y en la base ya
     # hay RFC viejos mal capturados. Validarlos al LEER tiraría la pantalla
     # entera en vez de dejar corregir el dato.
@@ -124,7 +128,7 @@ class ArtistUpdate(BaseModel):
     profile_image_url: str | None = None
     years_experience: str | None = None
     languages_spoken: list[str] | None = None
-    social_links: dict[str, str] | None = None
+    social_links: Redes = None          # sólo YouTube (15/10)
     phone: str | None = None
     email: str | None = None
     website: str | None = None

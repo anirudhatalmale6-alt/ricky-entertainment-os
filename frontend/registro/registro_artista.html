@@ -263,7 +263,7 @@ textarea{resize:vertical;min-height:70px}
         <div class="tog"><div class="tt"><b>Pasaporte vigente</b></div><label class="sw"><input type="checkbox" id="t_passport"><i></i></label></div>
         <div class="tog"><div class="tt"><b>Visa USA</b></div><label class="sw"><input type="checkbox" id="t_visa"><i></i></label></div>
       </div>
-      <label class="f full" style="margin-top:14px"><span>Canal de YouTube</span><input id="s_youtube" placeholder="https://youtube.com/@tucanal"></label>
+      <label class="f full" style="margin-top:14px"><span>Canal de YouTube</span><input id="s_youtube" placeholder="https://youtube.com/@tucanal"><small style="color:var(--mut,#8a8a9a);font-size:11.5px;margin-top:4px;display:block">Solo YouTube. No se aceptan Instagram, Facebook ni TikTok.</small></label>
     </div>
     <div class="foot"><button class="btn" onclick="guardarParcial(this)" style="margin-right:auto">Guardar y seguir después</button><button class="btn next" onclick="avanzar(1)">Siguiente →</button></div>
   </section>
@@ -405,7 +405,7 @@ if(!TOKEN){ location.href = BASE + "/"; }
 
 function authHeaders(json){ const h={Authorization:'Bearer '+TOKEN}; if(json) h['Content-Type']='application/json'; return h; }
 async function errOf(r,p){ let d={}; try{ d=await r.json(); }catch(e){}
-  let m=''; if(d&&d.detail){ m = typeof d.detail==='string' ? d.detail : (Array.isArray(d.detail)&&d.detail[0] ? (d.detail[0].msg||'') : ''); }
+  let m=''; if(d&&d.detail){ m = typeof d.detail==='string' ? d.detail : (Array.isArray(d.detail)&&d.detail[0] ? String(d.detail[0].msg||'').replace(/^Value error,\s*/i,'') : ''); }
   return new Error(m || (p+' '+r.status)); }
 async function apiGet(p){ const r=await fetch(API+p,{headers:authHeaders()}); if(!r.ok) throw await errOf(r,p); return r.json(); }
 async function apiPatch(p,b){ const r=await fetch(API+p,{method:'PATCH',headers:authHeaders(true),body:JSON.stringify(b)}); if(!r.ok) throw await errOf(r,p); return r.json(); }
