@@ -498,6 +498,13 @@
   .showcard{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--ov)}
   .seasbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
   .tfbox{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line)}
+  .apback{position:absolute;left:16px;top:16px;z-index:3;padding:7px 13px;border-radius:999px;font-size:12.5px;font-weight:650;
+    color:#fff;background:rgba(15,15,25,.55);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.25);cursor:pointer;max-width:55%;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .apback:hover{background:rgba(15,15,25,.75)}
+  .apslink{cursor:pointer}
+  .apslink:hover{color:var(--acc);text-decoration:underline}
+  .apsver{margin-top:10px;font-size:12.5px;padding:7px 12px}
   .cgbox{margin-top:12px;padding:11px 13px;border-radius:11px;background:#fef3c7;color:#92400e;font-size:12.5px;line-height:1.5}
   .cgbox.ok{background:#dcfce7;color:#166534}
   .cgbox b{display:block;font-size:13px;margin-bottom:2px}
@@ -5824,7 +5831,7 @@ function apProveedorHTML(a){
       `<div class="apdato"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('')}</div>`:''}
   </div>`;
 }
-function apShowsHTML(shows, t, titulo){
+function apShowsHTML(shows, t, titulo, nav){
   if(!shows.length) return '';
   const st=(t&&t.shows)||{};
   return `<div class="apsec"><h4>${esc(titulo||'Shows disponibles')}</h4>${shows.map(s=>{
@@ -5842,12 +5849,15 @@ function apShowsHTML(shows, t, titulo){
       <div class="apsimg${img?' zoom':''}" ${img?`style="background-image:url('${esc(img)}')"
         onclick="lightbox(LBGAL['sh${s.id}'],0)" title="Ampliar"`:''}></div>
       <div class="apsbody">
-        <div class="apstitle"><b>${esc(s.show_name||'Show')}</b>
+        <div class="apstitle">${nav
+            ? `<b class="apslink" onclick="apIrShow(${nav.artistId},${s.id},${nav.previo?'true':'false'})">${esc(s.show_name||'Show')}</b>`
+            : `<b>${esc(s.show_name||'Show')}</b>`}
           ${s.price_hotel?`<span class="apsprice">${MXN(s.price_hotel)}</span>`:''}</div>
         <div class="apsmeta">${esc(meta)}</div>
         ${(s.price_corporate>0&&s.price_hotel>0&&s.price_corporate<s.price_hotel)?`<div class="apsrecu">🔁 Precio recurrente <b>${MXN(s.price_corporate)}</b> contratando 5 o más de este show en 45 días</div>`:''}
         ${s.description?`<div class="apsdesc">${esc(s.description)}</div>`:''}
         ${marcas.length?`<div class="apstats2">${marcas.join('')}</div>`:''}
+        ${nav?`<button class="btn ghost apsver" onclick="apIrShow(${nav.artistId},${s.id},${nav.previo?'true':'false'})">Ver este show →</button>`:''}
       </div></div>`;
   }).join('')}</div>`;
 }
@@ -5908,7 +5918,21 @@ function apReviewsHTML(rev){
    encabezado y el proveedor va debajo — igual que en la tarjeta del catálogo
    (David, 2026-08-14). El resto de su catálogo baja a "Otros shows del
    proveedor". Sin showId (perfil abierto desde otro lado) manda el proveedor. */
-async function openArtistProfile(artistId, showId, previo){
+/* Navegar entre los shows de un mismo proveedor sin salir de su perfil
+   (David, 15/10: "Otros shows del proveedor" era sólo informativo). Se guarda
+   por dónde se vino para poder volver. Abrir el perfil desde fuera empieza de
+   cero; pasar de un show a otro dentro del perfil apila el anterior. */
+let AP_PILA=[], AP_ACTUAL=null;
+function apIrShow(artistId, showId, previo){
+  if(AP_ACTUAL) AP_PILA.push(AP_ACTUAL);
+  openArtistProfile(artistId, showId, previo, true);
+}
+function apVolverShow(artistId, previo){
+  const ant=AP_PILA.pop(); if(!ant) return;
+  openArtistProfile(artistId, ant.showId, previo, true);
+}
+async function openArtistProfile(artistId, showId, previo, nav){
+  if(!nav) AP_PILA=[];
   if(!artistId){ toast('Perfil no disponible para este artista.',true); return; }
   let ov=document.getElementById('apMov');
   if(!ov){ ov=document.createElement('div'); ov.id='apMov'; ov.className='mov'; document.body.appendChild(ov);
@@ -5934,6 +5958,8 @@ async function openArtistProfile(artistId, showId, previo){
     `<a href="${esc(socialUrl(k,v))}" target="_blank" rel="noopener" title="${esc(SOCNAME[k]||_cap(k))}">${ico('play')}</a>`);
   if(a.website) socLinks.push(`<a href="${esc(a.website)}" target="_blank" rel="noopener" title="Sitio web">${ico('link')}</a>`);
   const sel = showId ? shows.find(s=>s.id===showId) : null;
+  AP_ACTUAL = {showId: sel?sel.id:null, nombre: sel?(sel.show_name||'Show'):(a.stage_name||'Perfil')};
+  const antes = AP_PILA[AP_PILA.length-1];
   const chips=[];
   if(a.base_city||a.city) chips.push(ico('pin')+' '+esc(a.base_city||a.city));
   if(langs.length) chips.push(ico('users')+' '+esc(langs.join(', ')));
@@ -5965,6 +5991,7 @@ async function openArtistProfile(artistId, showId, previo){
     <div class="aphero${cover?' zoom':''}" ${cover?`style="background-image:url('${cover}')"
       onclick="lightbox(LBGAL.perfilTodo,0)" title="Ampliar"`:''}>
       <div class="aphscrim"></div>
+      ${antes?`<a class="apback" onclick="event.stopPropagation();apVolverShow(${artistId},${previo?'true':'false'})">← Volver a “${esc(antes.nombre)}”</a>`:''}
       ${verificado?`<div class="apvbadge">${ico('medal')}<div>Perfil verificado por<b>SHOWMA</b></div></div>`:''}
       <div class="aphttl">
         <h2>${esc(sel?(sel.show_name||'Show'):(a.stage_name||'Artista'))}${(!sel&&verificado)?'<span class="apvchk" title="Perfil verificado por SHOWMA">✓</span>':''}</h2>
@@ -5991,8 +6018,8 @@ async function openArtistProfile(artistId, showId, previo){
       </div>
       ${apMediaHTML(socLinks,videos,photos)}
       ${sel
-        ? apShowsHTML(shows.filter(s=>s.id!==sel.id),tray,'Otros shows del proveedor')
-        : apShowsHTML(shows,tray)}
+        ? apShowsHTML(shows.filter(s=>s.id!==sel.id),tray,'Otros shows del proveedor',{artistId,previo})
+        : apShowsHTML(shows,tray,null,{artistId,previo})}
       ${apReviewsHTML(rev)}
       ${apProductoraHTML(a)}
       ${apAfinidadHTML(a,shows)}
