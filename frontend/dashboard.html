@@ -11034,6 +11034,10 @@ function showFields(s){
   const cat = (s && s.category) || cats[0] || '';
   const val = f => (s && s[f]!=null && s[f]!=='') ? s[f] : '';
   const num = (id,label,field,ph) => `<div class="field"><label>${label}</label><input id="f_${k}_${id}" type="number" min="0" value="${val(field)}" placeholder="${esc(ph||'')}"></div>`;
+  // Precios en texto, no type="number": en el iPhone un número escrito como
+  // "$ 3,500" (como lo pide el registro) se leía VACÍO y el alta decía "Pon la
+  // tarifa para hotel" con la tarifa puesta (Carlos Barradas, 20/10).
+  const money = (id,label,field,ph) => `<div class="field"><label>${label}</label><input id="f_${k}_${id}" class="money" type="text" inputmode="numeric" autocomplete="off" value="${val(field)===''?'':esc(fmtMoneda(val(field)))}" placeholder="${esc(ph?fmtMoneda(ph):'')}"></div>`;
   const txt = (id,label,field,ph) => `<div class="field"><label>${label}</label><input id="f_${k}_${id}" value="${esc(val(field))}" placeholder="${esc(ph||'')}"></div>`;
   return `
     <div class="fgrid">
@@ -11053,15 +11057,15 @@ function showFields(s){
 
     <div class="shsec">Tarifas base por tipo de evento (MXN)</div>
     <div class="fgrid fg3">
-      ${num('price','Hotel','price_hotel','18000')}
+      ${money('price','Hotel','price_hotel','18000')}
       ${''/* El deslizador de escalones cuelga de esta tarifa: ver pintaEscalones */}
-      ${num('pw','Boda','price_wedding','')}
-      ${num('pp','Evento privado','price_private','')}
-      ${num('pr','Restaurante / lounge','price_restaurant','')}
-      ${num('pf','Festival / público','price_festival','')}
-      ${num('peh','Hora adicional','extra_hour_price','')}
-      ${num('ptr','Traslado (desde)','transport_from_price','')}
-      ${num('plo','Hospedaje / viáticos','lodging_price','A acordar')}
+      ${money('pw','Boda','price_wedding','')}
+      ${money('pp','Evento privado','price_private','')}
+      ${money('pr','Restaurante / lounge','price_restaurant','')}
+      ${money('pf','Festival / público','price_festival','')}
+      ${money('peh','Hora adicional','extra_hour_price','')}
+      ${money('ptr','Traslado (desde)','transport_from_price','')}
+      ${money('plo','Hospedaje / viáticos','lodging_price','A acordar')}
     </div>
 
     <div class="escbox" id="f_${k}_escbox">
@@ -11073,14 +11077,14 @@ function showFields(s){
     <div class="tfbox">
       <div class="tfh"><b>🔁 Precio recurrente</b><span class="hint" style="margin:0">Tu tarifa cuando un mismo hotel contrata <b>5 actuaciones o más de este show en 45 días</b>. El hotel la ve en tu ficha antes de contratar, así que suele programar las 5 de una vez. Si cancela y bajan de 5, las que queden vuelven a tu precio hotel. Déjalo vacío si no das precio por volumen.</span></div>
       <div class="fgrid">
-        ${num('pc','Precio recurrente (MXN)','price_corporate','')}
+        ${money('pc','Precio recurrente (MXN)','price_corporate','')}
       </div>
     </div>
 
     <div class="tfbox">
       <div class="tfh"><b>🚗 Extra por larga distancia</b><span class="hint" style="margin:0">Monto fijo para gasolina y casetas. Si el hotel está más lejos del límite, se suma solo a tu tarifa. El hotel ve el precio final, sin el extra por separado. Déjalo vacío si no cobras extra.</span></div>
       <div class="fgrid">
-        <div class="field"><label>Extra (MXN)</label><input id="f_${k}_tfee" type="number" min="0" step="50" value="${val('travel_fee')}" placeholder="p. ej. 500"></div>
+        <div class="field"><label>Extra (MXN)</label><input id="f_${k}_tfee" class="money" type="text" inputmode="numeric" autocomplete="off" value="${val('travel_fee')===''?'':esc(fmtMoneda(val('travel_fee')))}" placeholder="p. ej. $ 500"></div>
         <div class="field"><label>A partir de (km)</label><input id="f_${k}_tkm" type="number" min="1" step="5" value="${(s&&s.travel_fee_km)||30}"></div>
       </div>
     </div>
@@ -11153,10 +11157,27 @@ function initShowForms(shows){
   renderShowPhotos('new');
 }
 // Lee la ficha completa de un formulario (alta o edición).
+/* Lee un precio como lo escribe la gente: "$ 18,000", "18,000", "18.000" o
+   "18000". El punto de miles ("18.000") se lee como 18000, no como 18. */
+function aNumero(t){
+  let x=String(t==null?'':t).replace(/[\s$]/g,'').replace(/MXN/ig,'').replace(/,/g,'');
+  if(/^\d{1,3}(\.\d{3})+$/.test(x)) x=x.replace(/\./g,'');
+  x=x.replace(/[^0-9.]/g,'');
+  const v=parseFloat(x); return isNaN(v)?null:v;
+}
+function fmtMoneda(v){
+  const n=aNumero(v); if(n==null) return '';
+  return '$ '+n.toLocaleString('es-MX',{maximumFractionDigits:2});
+}
+// Al salir de un campo de precio se ve como "$ 18,000": así el proveedor
+// comprueba que se leyó la cifra que quería.
+document.addEventListener('blur',e=>{
+  const t=e.target; if(t && t.classList && t.classList.contains('money')){ const f=fmtMoneda(t.value); if(f) t.value=f; }
+},true);
 function collectShowForm(k){
   const el=id=>document.getElementById('f_'+k+'_'+id);
   const g=id=>{ const n=el(id); return n?String(n.value).trim():''; };
-  const n=id=>{ const x=g(id).replace(/[^0-9.]/g,''); return x?parseFloat(x):null; };
+  const n=id=>aNumero(g(id));
   const i=id=>{ const x=g(id).replace(/[^0-9]/g,''); return x?parseInt(x,10):null; };
   const hotel=n('price');
   return {
@@ -11202,7 +11223,7 @@ async function pintaEscalones(k){
   const caja=document.getElementById('f_'+k+'_esc'); if(!caja) return;
   const cfg=await escCfg();
   const inp=document.getElementById('f_'+k+'_price');
-  const habitual=inp?(parseFloat((inp.value||'').replace(/[^0-9.]/g,''))||null):null;
+  const habitual=inp?aNumero(inp.value):null;
   if(!cfg||habitual==null||habitual<=0){
     caja.innerHTML='<div class="hint" style="margin:0">Pon tu tarifa para hotel y aquí '
       +'aparecen los tres precios con los que puedes salir al catálogo.</div>';

@@ -403,10 +403,18 @@ const BASE = (window.RICKY_API ?? "");
 const TOKEN = (function(){ try{ return localStorage.getItem('ricky_token'); }catch(e){ return null; } })();
 if(!TOKEN){ location.href = BASE + "/"; }
 
-function authHeaders(json){ const h={Authorization:'Bearer '+TOKEN}; if(json) h['Content-Type']='application/json'; return h; }
+// El token se lee en cada llamada: si la sesión caducó y el proveedor vuelve a
+// entrar en otra pestaña, esta hoja sigue guardando sin perder lo escrito.
+function tokenActual(){ try{ return localStorage.getItem('ricky_token')||TOKEN; }catch(e){ return TOKEN; } }
+function authHeaders(json){ const h={Authorization:'Bearer '+tokenActual()}; if(json) h['Content-Type']='application/json'; return h; }
 async function errOf(r,p){ let d={}; try{ d=await r.json(); }catch(e){}
   let m=''; if(d&&d.detail){ m = typeof d.detail==='string' ? d.detail : (Array.isArray(d.detail)&&d.detail[0] ? String(d.detail[0].msg||'').replace(/^Value error,\s*/i,'') : ''); }
-  return new Error(m || (p+' '+r.status)); }
+  // 401 = la sesión caducó (dura un día). Antes salía "Could not validate
+  // credentials" y el proveedor seguía llenando una hoja que no podía guardar.
+  if(r.status===401) m='Tu sesión se cerró por seguridad. Abre SHOWMA en otra pestaña, entra con tu correo y contraseña, y vuelve aquí a pulsar Guardar: lo que escribiste no se pierde.';
+  const e=new Error(m || (p+' '+r.status)); e.status=r.status;
+  if(d&&Array.isArray(d.detail)&&d.detail[0]&&Array.isArray(d.detail[0].loc)) e.campo=d.detail[0].loc[1];
+  return e; }
 async function apiGet(p){ const r=await fetch(API+p,{headers:authHeaders()}); if(!r.ok) throw await errOf(r,p); return r.json(); }
 async function apiPatch(p,b){ const r=await fetch(API+p,{method:'PATCH',headers:authHeaders(true),body:JSON.stringify(b)}); if(!r.ok) throw await errOf(r,p); return r.json(); }
 async function apiPost(p,b){ const r=await fetch(API+p,{method:'POST',headers:authHeaders(true),body:JSON.stringify(b)}); if(!r.ok) throw await errOf(r,p); return r.json(); }
@@ -451,7 +459,7 @@ async function uploadCSD(btn){
   try{
     const fd=new FormData();
     fd.append('cer',cer); fd.append('key',key); fd.append('password',pass); fd.append('rfc',cRfc.rfc);
-    const r=await fetch(API+'/me/fiscal/csd',{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
+    const r=await fetch(API+'/me/fiscal/csd',{method:'POST',headers:{Authorization:'Bearer '+tokenActual()},body:fd});
     if(!r.ok) throw await errOf(r,'sello digital');
     const d=await r.json();
     csdState('✅ Sello digital validado y activo'+(d&&d.csd_expires_at?' · vigente hasta '+String(d.csd_expires_at).slice(0,10):'')
@@ -519,9 +527,7 @@ function addStateChip(sel){
 }
 // ---- Formato de moneda en los campos de precio ($ 12,345) ----
 function fmtMoney(inp){
-  const raw=(inp.value||'').replace(/[^0-9.]/g,'');
-  if(raw==='' || raw==='.'){ inp.value=''; return; }
-  const n=parseFloat(raw); if(isNaN(n)){ inp.value=''; return; }
+  const n=numOf(inp.value); if(n==null) return;
   inp.value='$ '+n.toLocaleString('es-MX',{maximumFractionDigits:2});
 }
 // Delegación: cualquier input de precio (clase p-*) se formatea al salir del campo.
@@ -807,7 +813,8 @@ async function onDocPicked(input){
 }
 
 // ---- Collect + submit ----
-const numOf=s=>{ const x=(s||'').replace(/[^0-9.]/g,''); return x?parseFloat(x):null; };
+// "18.000" con punto de miles es 18000, no 18.
+const numOf=s=>{ let x=String(s||'').replace(/[\s$,]/g,''); if(/^\d{1,3}(\.\d{3})+$/.test(x)) x=x.replace(/\./g,''); x=x.replace(/[^0-9.]/g,''); const v=parseFloat(x); return isNaN(v)?null:v; };
 const intOf=s=>{ const x=(s||'').replace(/[^0-9]/g,''); return x?parseInt(x,10):null; };
 
 function collectProfile(){
@@ -995,6 +1002,16 @@ function openShow(el){ el.classList.add('open'); el.scrollIntoView({behavior:'sm
    avanzar y luego te rechaza al final, que es peor que bloquear.
 
    Devuelven null si la página está bien, o el primer problema encontrado. */
+// Misma regla que el servidor (app/schemas/enlaces.py): se avisa aquí, en su
+// página, y no al final con un error que no dice dónde está el campo.
+function esYoutube(u){
+  u=String(u||'').trim(); if(!u) return true;
+  if(u[0]==='@' && u.indexOf(' ')<0) return true;
+  if(u.indexOf('://')<0) u='https://'+u;
+  let h=''; try{ h=new URL(u).hostname.toLowerCase(); }catch(e){ return false; }
+  h=h.replace(/^(www\.|m\.|music\.)/,'');
+  return ['youtube.com','youtu.be','youtube-nocookie.com'].some(d=>h===d||h.endsWith('.'+d));
+}
 function revisaPerfil(prof){
   if(!prof.stage_name) return {msg:'Escribe tu nombre artístico o de proveedor.', foco:'p_stage'};
   if(!prof.phone) return {msg:'El teléfono es obligatorio para poder contactarte.', foco:'p_phone'};
@@ -1002,6 +1019,8 @@ function revisaPerfil(prof){
   if(!prof.region) return {msg:'Indica el estado donde estás basado.', foco:'p_state'};
   if(!prof.base_city) return {msg:'Indica tu ciudad base.', foco:'p_city'};
   if(!prof.bio || prof.bio.length<20) return {msg:'Agrega una biografía breve (mínimo 20 caracteres) para tu perfil profesional.', foco:'p_bio'};
+  if(prof.social_links && prof.social_links.youtube && !esYoutube(prof.social_links.youtube))
+    return {msg:'En "Canal de YouTube" solo va el enlace de tu canal de YouTube (por ejemplo youtube.com/@tucanal). Instagram, Facebook o TikTok no se aceptan. Si no tienes canal, déjalo vacío.', foco:'s_youtube'};
   if(!prof.artist_type) return {msg:'Elige tu tipo de perfil. Nos dice si eres una persona, un grupo, una agencia o un proveedor de servicios.', foco:'p_type'};
   return null;
 }
@@ -1113,7 +1132,7 @@ async function finalizar(btn){
     }
     btn.textContent='¡Listo! Entrando…';
     location.href = BASE + '/';
-  }catch(e){ btn.disabled=false; btn.textContent=t0; err('No se pudo guardar: '+e.message); }
+  }catch(e){ btn.disabled=false; btn.textContent=t0; if(e.campo==='social_links'){ go(0); focusId('s_youtube'); } err('No se pudo guardar: '+e.message); }
 }
 
 
@@ -1221,6 +1240,7 @@ async function subirShow(el, s){
 async function guardarParcial(btn){
   const prof = collectProfile();
   if(!prof.stage_name){ go(0); err('Escribe al menos tu nombre artístico para poder guardar.'); focusId('p_stage'); return; }
+  if(prof.social_links.youtube && !esYoutube(prof.social_links.youtube)){ go(0); err('En "Canal de YouTube" solo va el enlace de tu canal de YouTube. Instagram, Facebook o TikTok no se aceptan. Si no tienes canal, déjalo vacío.'); focusId('s_youtube'); return; }
   const t0 = btn.textContent; btn.disabled=true; btn.textContent='Guardando…';
   try{
     await apiPatch('/me/artist', prof);
@@ -1243,6 +1263,7 @@ async function guardarParcial(btn){
     setTimeout(()=>{ btn.disabled=false; btn.textContent=t0; }, 2200);
   }catch(e){
     btn.disabled=false; btn.textContent=t0;
+    if(e.campo==='social_links'){ go(0); focusId('s_youtube'); }
     err('No se pudo guardar: '+e.message);
   }
 }
@@ -1300,7 +1321,7 @@ window.guardarParcial = guardarParcial;
       if(s){ s.value=String(a.tax_figure_id); avisoFigura(); } }
     aplicaModo();
   }catch(e){
-    if(String(e).indexOf('401')>-1){ try{ localStorage.removeItem('ricky_token'); }catch(_){} location.href=BASE+'/'; }
+    if(e && e.status===401){ try{ localStorage.removeItem('ricky_token'); }catch(_){} location.href=BASE+'/'; }
   }
 })();
 </script>
