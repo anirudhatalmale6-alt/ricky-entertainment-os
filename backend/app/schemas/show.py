@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 from app.schemas.enlaces import Video
 from app.models.enums import ARTIST_CATEGORIES, ARTIST_SUBCATEGORIES, MAX_ARTIST_IMAGES
@@ -11,17 +12,51 @@ from app.models.enums import ARTIST_CATEGORIES, ARTIST_SUBCATEGORIES, MAX_ARTIST
 
 # --- Seasonal rates -------------------------------------------------------
 
+def _pct_temporada(v):
+    """El ajuste es un PORCENTAJE sobre la tarifa. En producción había -1000 y
+    +2000 (pesos escritos en el campo de %): -1000% deja el show en $0 o en
+    negativo. Sólo en la ENTRADA: SeasonalRateOut lo redeclara para que las
+    filas viejas se sigan pudiendo leer."""
+    if v is None or v == "":
+        return 0
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        raise ValueError("El ajuste de temporada debe ser un número (porcentaje).")
+    if n < PCT_MIN or n > PCT_MAX:
+        raise ValueError(
+            f"El ajuste de temporada es un porcentaje sobre tu tarifa, no pesos: "
+            f"+20 es un 20% más y -10 un 10% menos. Tiene que estar entre "
+            f"{PCT_MIN:g}% y +{PCT_MAX:g}%.")
+    return n
+
+
+PCT_MIN, PCT_MAX = -90, 300
+PctTemporada = Annotated[float, BeforeValidator(_pct_temporada)]
+
+
+def _precio_temporada(v):
+    if v is None or v == "":
+        return None
+    n = float(v)
+    if n <= 0:
+        raise ValueError("El precio de temporada tiene que ser mayor que 0.")
+    return n
+
+
 class SeasonalRateCreate(BaseModel):
     label: str
     start_date: date
     end_date: date
-    adjustment_pct: float = 0     # % over base (Navidad +300, baja -10). Open.
-    price: float | None = None    # optional absolute override, wins over %
+    adjustment_pct: PctTemporada = 0   # % sobre la tarifa (baja -10, alta +30)
+    price: Annotated[float | None, BeforeValidator(_precio_temporada)] = None  # absoluto, gana al %
 
 
 class SeasonalRateOut(SeasonalRateCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    adjustment_pct: float = 0     # sin validar: hay filas viejas fuera de rango
+    price: float | None = None
 
 
 # --- Images ---------------------------------------------------------------

@@ -729,12 +729,12 @@ function showTpl(n){
         <label class="f"><span>A partir de (km)</span><input class="p-travelkm" placeholder="30"></label>
       </div>
 
-      <div class="sec-t">Tarifas por temporada <span style="font-weight:400;text-transform:none;color:var(--text3)">(suplemento o descuento en % sobre tu precio base — el periodo necesita las dos fechas para poder aplicarse)</span></div>
+      <div class="sec-t">Tarifas por temporada <span style="font-weight:400;text-transform:none;color:var(--text3)">(opcional. Suplemento o descuento en PORCENTAJE sobre tu precio, no en pesos: +30 es un 30% más, -10 un 10% menos. Entre -90 y +300. Déjalo vacío si cobras lo mismo todo el año)</span></div>
       <table class="season">
         <thead><tr><th>Periodo</th><th>Desde</th><th>Hasta</th><th>Ajuste %</th><th></th></tr></thead>
         <tbody class="seasonBody">
-          <tr><td><input value="Navidad / Fin de año"></td><td><input type="date" value="${SEAS_Y}-12-15"></td><td><input type="date" value="${SEAS_Y}-12-31"></td><td><input value="+300"></td><td class="del" onclick="this.closest('tr').remove()">×</td></tr>
-          <tr><td><input value="Temporada baja"></td><td><input type="date" value="${SEAS_Y}-09-01"></td><td><input type="date" value="${SEAS_Y}-10-31"></td><td><input value="-10"></td><td class="del" onclick="this.closest('tr').remove()">×</td></tr>
+          <tr><td><input placeholder="Ej. Navidad / Fin de año"></td><td><input type="date"></td><td><input type="date"></td><td><input placeholder="+30"></td><td class="del" onclick="this.closest('tr').remove()">×</td></tr>
+          <tr><td><input placeholder="Ej. Temporada baja"></td><td><input type="date"></td><td><input type="date"></td><td><input placeholder="-10"></td><td class="del" onclick="this.closest('tr').remove()">×</td></tr>
         </tbody>
       </table>
       <button class="addrow" onclick="addRow(this)">＋ Añadir periodo</button>
@@ -751,7 +751,7 @@ function delShow(n){ const el=document.querySelector('.show[data-n="'+n+'"]'); i
 function renameShow(n,v){ document.querySelector('.show[data-n="'+n+'"] .sname').textContent=v||'Nuevo show'; }
 function fillSub(n,cat){ const el=document.querySelector('.show[data-n="'+n+'"]'); el.querySelector('.in-sub').innerHTML=opts(TAX[cat]); badge(n); }
 function badge(n){ const el=document.querySelector('.show[data-n="'+n+'"]'); const c=el.querySelector('.in-cat'), s=el.querySelector('.in-sub'); el.querySelector('.scat').textContent=pretty(c.value)+' · '+pretty(s.value); }
-function addRow(btn){ btn.previousElementSibling.querySelector('.seasonBody').insertAdjacentHTML('beforeend','<tr><td><input placeholder="Ej. Halloween"></td><td><input type="date"></td><td><input type="date"></td><td><input placeholder="+150"></td><td class="del" onclick="this.closest(\'tr\').remove()">×</td></tr>'); }
+function addRow(btn){ btn.previousElementSibling.querySelector('.seasonBody').insertAdjacentHTML('beforeend','<tr><td><input placeholder="Ej. Halloween"></td><td><input type="date"></td><td><input type="date"></td><td><input placeholder="+30"></td><td class="del" onclick="this.closest(\'tr\').remove()">×</td></tr>'); }
 
 // ---- Photo upload (client resize -> upload) ----
 function pickPhotos(n){ document.querySelector('.show[data-n="'+n+'"] .photo-input').click(); }

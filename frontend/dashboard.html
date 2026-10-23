@@ -11098,7 +11098,7 @@ function showFields(s){
     </div>
 
     <div class="seasbox">
-      <div class="seash"><b>Tarifas por temporada</b><span class="hint" style="margin:0">Suplemento o descuento en % sobre tu tarifa hotel. Se aplica solo si la fecha de la actuación cae dentro del periodo.</span></div>
+      <div class="seash"><b>Tarifas por temporada</b><span class="hint" style="margin:0">Suplemento o descuento en PORCENTAJE sobre tu tarifa hotel, no en pesos: +30 es un 30% más, -10 un 10% menos (entre -90 y +300). Se aplica solo si la fecha de la actuación cae dentro del periodo.</span></div>
       <table class="seast"><thead><tr><th>Periodo</th><th>Desde</th><th>Hasta</th><th>Ajuste %</th><th></th></tr></thead>
         <tbody id="f_${k}_seas">${((s&&s.seasonal_rates)||[]).map(seasRow).join('')||'<tr class="seas-empty"><td colspan="5" class="muted" style="font-size:12px;padding:6px 4px">Aún no tienes periodos. Añade uno para cobrar más en temporada alta o menos en temporada baja.</td></tr>'}</tbody></table>
       <button class="btn ghost mini" onclick="seasAdd('${k}')">＋ Añadir periodo</button>
@@ -11257,7 +11257,7 @@ function seasRow(r){
   return `<tr><td><input class="s-label" value="${esc((r&&r.label)||'')}" placeholder="Ej. Navidad"></td>
     <td><input class="s-from" type="date" value="${d(r&&r.start_date)}"></td>
     <td><input class="s-to" type="date" value="${d(r&&r.end_date)}"></td>
-    <td><input class="s-pct" type="number" step="1" value="${r&&r.adjustment_pct!=null?(+r.adjustment_pct):''}" placeholder="+150"></td>
+    <td><input class="s-pct" type="number" step="1" value="${r&&r.adjustment_pct!=null?(+r.adjustment_pct):''}" placeholder="+30"></td>
     <td class="s-del" onclick="this.closest('tr').remove()">×</td></tr>`;
 }
 function seasAdd(id){

@@ -115,8 +115,20 @@ def season_for(show, when) -> object | None:
     for rate in (getattr(show, "seasonal_rates", None) or []):
         start, end = _as_date(rate.start_date), _as_date(rate.end_date)
         if start and end and start <= d <= end:
+            if not _temporada_valida(rate):
+                continue
             return rate
     return None
+
+
+def _temporada_valida(rate) -> bool:
+    """Una temporada que deja el show en $0 o en negativo no se aplica.
+    Había filas de -1000% (pesos escritos en el campo de porcentaje) que ponían
+    el show a $0 en el catálogo: un hotel podía contratarlo gratis. Se ignora la
+    fila y vale la tarifa normal; la entrada ya no acepta esos valores."""
+    if rate.price is not None:
+        return float(rate.price) > 0
+    return float(rate.adjustment_pct or 0) > -100
 
 
 def travel_fee_for(show, distance_km) -> tuple[float, int] | None:
