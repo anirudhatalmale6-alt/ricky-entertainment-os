@@ -8413,6 +8413,7 @@ async function mCerrarPeriodo(period){
       <div style="font-size:13.5px;line-height:1.9">
         <div>Facturas emitidas: <b>${r.facturas_emitidas}</b></div>
         ${r.facturas_con_error?`<div>Con error: <b>${r.facturas_con_error}</b></div>`:''}
+        ${r.facturan_ellos&&r.facturan_ellos.length?`<div>Facturan ellos (suben su CFDI o no han elegido modo): <b>${r.facturan_ellos.length}</b></div>`:''}
         <div>Depósito programado: <b>${qDMY(r.payment_date)}</b></div>
       </div>
       ${r.errores&&r.errores.length?`<div class="hint" style="margin-top:9px">${r.errores.map(e=>'· '+esc(e.error||'')).join('<br>')}</div>`:''}

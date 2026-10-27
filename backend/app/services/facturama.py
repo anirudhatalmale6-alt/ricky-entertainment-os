@@ -39,6 +39,16 @@ class FacturamaError(Exception):
         self.status_code = status_code
 
 
+class FacturamaIncierto(FacturamaError):
+    """La petición SALIÓ hacia Facturama pero no sabemos qué pasó con ella.
+
+    Un timeout leyendo la respuesta, una conexión cortada a media respuesta o un
+    502/503/504 del lado de Facturama pueden llegar DESPUÉS de que el CFDI ya se
+    timbró. Reintentar a ciegas emitiría una segunda factura real por lo mismo,
+    así que quien llama no debe reintentar: tiene que comprobarlo en Facturama.
+    """
+
+
 class FacturamaNotConfigured(FacturamaError):
     """La integración de facturación aún no tiene credenciales configuradas."""
 
@@ -103,10 +113,21 @@ class FacturamaClient:
         async with self._client() as client:
             try:
                 resp = await client.request(method, path, json=json, params=params)
-            except httpx.HTTPError as exc:  # red/timeout
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
+                # No llegó a salir: es seguro volver a intentarlo.
                 raise FacturamaError(
                     "No se pudo conectar con el servicio de facturación. "
                     "Inténtalo de nuevo en un momento."
+                ) from exc
+            except httpx.HTTPError as exc:
+                # Salió y no sabemos si Facturama la procesó (ver FacturamaIncierto).
+                if method.upper() == "POST":
+                    raise FacturamaIncierto(
+                        "Facturama no contestó a tiempo y no se sabe si timbró la factura. "
+                        "Hay que comprobarlo en Facturama antes de volver a emitirla."
+                    ) from exc
+                raise FacturamaError(
+                    "El servicio de facturación no respondió. Inténtalo de nuevo en un momento."
                 ) from exc
 
         ctype = resp.headers.get("content-type", "").lower()
@@ -114,6 +135,12 @@ class FacturamaClient:
 
         if resp.status_code in (200, 201, 204):
             return body
+        if method.upper() == "POST" and resp.status_code in (502, 503, 504):
+            raise FacturamaIncierto(
+                f"Facturama respondió {resp.status_code} y no se sabe si timbró la factura. "
+                "Hay que comprobarlo en Facturama antes de volver a emitirla.",
+                detail=body, status_code=resp.status_code,
+            )
         raise FacturamaError(
             _extract_error_message(resp.status_code, body),
             detail=body,

@@ -66,7 +66,11 @@ async def run(period: str | None, dry_run: bool) -> int:
             log.warning("FACTURAMA_ENABLED está en false: no se puede timbrar todavía.")
             return 0
 
-        resumen = await facturacion.close_period(db, key)
+        try:
+            resumen = await facturacion.close_period(db, key)
+        except facturacion.CierreEnCurso as exc:
+            log.warning("%s", exc)
+            return 0
         log.info("Emitidas: %d · con error: %d · sin músico u hotel: %d",
                  resumen["facturas_emitidas"], resumen["facturas_con_error"],
                  len(resumen["sin_musico_u_hotel"]))

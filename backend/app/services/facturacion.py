@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -24,13 +24,24 @@ from app.models.cfdi import Cfdi
 from app.models.company import Company
 from app.models.show import Show
 from app.models.tax_figure import TaxFigure
-from app.services.facturama import FacturamaError, get_facturama
+from app.services.facturama import FacturamaError, FacturamaIncierto, get_facturama
 
 logger = logging.getLogger("showma.facturacion")
 
 _DEFAULT_COMMISSION_PCT = 3.7
-# Clave de producto/servicio SAT: "Servicios de entretenimiento" (espectáculos).
-_SAT_PROD_CODE = "90101800"
+# Clave de producto/servicio SAT. Era 90101800, que en el catálogo del SAT es
+# "Servicios de comida para llevar y a domicilio": todas las facturas habrían
+# salido como comida para llevar. 90131500 = "Actuaciones en vivo" (grupo 9013
+# Artes interpretativas: conciertos, teatro, danza y otras actuaciones).
+_SAT_PROD_CODE = "90131500"
+
+# Regímenes con los que NO se puede facturar un servicio: el SAT los rechaza o,
+# peor, el CFDI sale y no vale. 605 = sueldos y salarios (es un empleado),
+# 616 = sin obligaciones fiscales.
+_REGIMENES_SIN_FACTURA = {
+    "605": "Sueldos y Salarios",
+    "616": "Sin obligaciones fiscales",
+}
 
 
 def _round2(x: float) -> float:
@@ -165,11 +176,69 @@ def build_cfdi_payload(
     }
 
 
-async def _load_figura(db: AsyncSession, artist: Artist) -> TaxFigure | None:
-    figuras = (await db.execute(select(TaxFigure))).scalars().all()
+def _es_moral(figura: TaxFigure | None) -> bool | None:
+    if figura is None:
+        return None
+    return "moral" in (figura.name or "").lower()
+
+
+def elegir_figura(artist, figuras: list) -> TaxFigure | None:
+    """La figura fiscal con la que se calculan comisión, IVA y retenciones.
+
+    UNA sola regla para la factura, la pantalla de pagos del proveedor y los
+    reportes de MASTER; si cada uno eligiera a su manera, el CFDI y lo que ve el
+    proveedor no cuadrarían.
+
+    Orden: la asignada, salvo que contradiga al régimen (persona moral con una
+    figura de persona física o al revés: había una productora 601 cobrando con
+    retenciones de persona física). Sin figura, la que dicta su régimen; si el
+    régimen no lo dice, el RFC de 12 caracteres es persona moral. Sólo al final
+    la predeterminada.
+    """
+    from app.services import figura_fiscal
+
     by_id = {f.id: f for f in figuras}
     default_fig = next((f for f in figuras if f.is_default), (figuras[0] if figuras else None))
-    return by_id.get(artist.tax_figure_id) if artist.tax_figure_id else default_fig
+    if artist is None:
+        return default_fig
+    asignada = by_id.get(artist.tax_figure_id) if artist.tax_figure_id else None
+    por_regimen = by_id.get(figura_fiscal.figura_en_lista(figuras, artist.tax_regime))
+    if asignada is not None:
+        if por_regimen is not None and _es_moral(asignada) != _es_moral(por_regimen):
+            return por_regimen
+        return asignada
+    if por_regimen is not None:
+        return por_regimen
+    rfc = (artist.rfc or "").strip()
+    if len(rfc) == 12:
+        moral = next((f for f in figuras if _es_moral(f) and "general" in (f.name or "").lower()), None)
+        if moral is not None:
+            return moral
+    return default_fig
+
+
+async def _load_figura(db: AsyncSession, artist: Artist) -> TaxFigure | None:
+    figuras = (await db.execute(select(TaxFigure))).scalars().all()
+    return elegir_figura(artist, figuras)
+
+
+def _revisa_emisor(artist: Artist, bookings: list[Booking]) -> None:
+    """Lo que hay que saber ANTES de mandar nada a Facturama."""
+    from app.services import figura_fiscal
+
+    codigo = figura_fiscal.codigo_regimen(artist.tax_regime)
+    if codigo in _REGIMENES_SIN_FACTURA:
+        raise FiscalDataMissing(
+            f"El régimen fiscal del proveedor es {codigo} ({_REGIMENES_SIN_FACTURA[codigo]}), "
+            "con el que no se puede facturar un servicio. Tiene que darse de alta en una "
+            "actividad (612 o RESICO 626) o facturar a través de un tercero."
+        )
+    monedas = {(b.currency or "MXN").upper() for b in bookings}
+    if monedas != {"MXN"}:
+        raise FiscalDataMissing(
+            "Hay actuaciones en una moneda distinta de pesos (" + ", ".join(sorted(monedas)) +
+            "). Facturar en otra moneda exige tipo de cambio y todavía no está preparado."
+        )
 
 
 async def issue_cfdi_for_booking(db: AsyncSession, booking: Booking, *, force: bool = False) -> Cfdi:
@@ -408,7 +477,16 @@ async def issue_cfdi_for_period(
             await db.execute(select(Show).where(Show.id.in_(show_ids)))
         ).scalars().all()}
 
-    cfdi = Cfdi(artist_id=artist_id, company_id=company_id, period=period)
+    # Un intento fallido se REUTILIZA en vez de sumar otra fila: el cierre corre
+    # a diario y, sin esto, cada día dejaba un "error" nuevo por el mismo caso.
+    previo = (await db.execute(
+        select(Cfdi).where(Cfdi.period == period, Cfdi.artist_id == artist_id,
+                           Cfdi.company_id == company_id, Cfdi.status == "error",
+                           Cfdi.origen == "showma")
+        .order_by(Cfdi.id.desc())
+    )).scalars().first()
+    cfdi = previo or Cfdi(artist_id=artist_id, company_id=company_id, period=period)
+    folio = None
     try:
         if artist is None or company is None:
             raise FiscalDataMissing("El periodo no tiene músico u hotel asignado.")
@@ -416,8 +494,18 @@ async def issue_cfdi_for_period(
             raise FiscalDataMissing(
                 "El músico todavía no ha cargado (o validado) su CSD de facturación."
             )
+        _revisa_emisor(artist, bookings)
         figura = await _load_figura(db, artist)
+        # Una actuación calificada tarde entra en una SEGUNDA factura del mismo
+        # periodo; con el mismo folio habría dos CFDI distintos con igual número.
+        ya = await db.scalar(
+            select(func.count(Cfdi.id)).where(
+                Cfdi.period == period, Cfdi.artist_id == artist_id,
+                Cfdi.company_id == company_id, Cfdi.status.in_(("stamped", "verificar")))
+        ) or 0
         folio = f"{period.replace('-', '')}-{artist_id}-{company_id}"
+        if ya:
+            folio = f"{folio}-{ya + 1}"
         payload = build_period_cfdi_payload(
             bookings, artist, company, figura, shows, period, folio=folio
         )
@@ -443,6 +531,15 @@ async def issue_cfdi_for_period(
             except (ValueError, AttributeError):
                 cfdi.stamped_at = None
         cfdi.error = None
+    except FacturamaIncierto as exc:
+        # Puede que SÍ se haya timbrado. Las actuaciones quedan enlazadas a esta
+        # fila para que el cierre de mañana NO las vuelva a facturar; alguien
+        # tiene que comprobarlo en Facturama (por el folio) y resolverlo a mano.
+        cfdi.status = "verificar"
+        cfdi.folio = folio
+        cfdi.error = exc.message + f" Folio: {cfdi.folio}."
+        logger.error("Timbrado INCIERTO periodo %s (artista %s, hotel %s): %s",
+                     period, artist_id, company_id, exc.message)
     except FacturamaError as exc:
         cfdi.status = "error"
         cfdi.error = exc.message
@@ -453,11 +550,13 @@ async def issue_cfdi_for_period(
         cfdi.error = "Error inesperado al emitir el CFDI del periodo."
         logger.exception("Error inesperado timbrando periodo %s: %s", period, exc)
 
-    db.add(cfdi)
+    if cfdi.id is None:
+        db.add(cfdi)
     await db.flush()
-    # Sólo se marcan las actuaciones si el timbrado salió bien: si falló, quedan
-    # pendientes y el siguiente cierre las vuelve a intentar.
-    if cfdi.status == "stamped":
+    # Sólo se marcan las actuaciones si el timbrado salió bien (o si no se sabe:
+    # ver FacturamaIncierto). Si falló de seguro, quedan pendientes y el
+    # siguiente cierre las vuelve a intentar.
+    if cfdi.status in ("stamped", "verificar"):
         for b in bookings:
             b.cfdi_id = cfdi.id
     await db.commit()
@@ -465,17 +564,61 @@ async def issue_cfdi_for_period(
     return cfdi
 
 
+class CierreEnCurso(Exception):
+    """Ya hay otro cierre corriendo (el automático y el botón de MASTER a la vez)."""
+
+
+_LOCK_PATH = None
+
+
+def _lock_cierre():
+    """Candado entre PROCESOS: el timer y la API son procesos distintos. Si los
+    dos cierran la misma quincena a la vez, los dos ven las mismas actuaciones
+    pendientes y las facturan dos veces."""
+    import fcntl
+
+    from app.core.storage import _APP_ROOT
+
+    f = open(_APP_ROOT / ".cierre_facturas.lock", "w")
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        f.close()
+        raise CierreEnCurso("Ya hay un cierre de facturación en curso. Espera a que termine.")
+    return f
+
+
 async def close_period(db: AsyncSession, period: str) -> dict:
     """Cierra una quincena: una factura por cada par músico+hotel con actuaciones
     pendientes. Devuelve el resumen para la pantalla de MASTER y el log."""
+    candado = _lock_cierre()
+    try:
+        return await _close_period(db, period)
+    finally:
+        candado.close()
+
+
+async def _close_period(db: AsyncSession, period: str) -> dict:
     from app.services import periodos
 
     pendientes = await pending_bookings_for_period(db, period)
-    pares = sorted({
+    sin_asignar = [b.id for b in pendientes if not (b.artist_id and b.company_id)]
+    # Sólo se timbra a quien eligió que SHOWMA facture por él. Los de "propia" y
+    # "tercero" suben su CFDI; timbrarles aquí sería emitir una factura que no
+    # pidieron y que duplicaría la suya.
+    modos = {}
+    for aid in {b.artist_id for b in pendientes if b.artist_id}:
+        a = await db.get(Artist, aid)
+        modos[aid] = (a.facturacion_modo if a else None)
+    pares_todos = sorted({
         (b.artist_id, b.company_id) for b in pendientes
         if b.artist_id and b.company_id
     })
-    sin_asignar = [b.id for b in pendientes if not (b.artist_id and b.company_id)]
+    pares = [p for p in pares_todos if modos.get(p[0]) == "showma"]
+    sin_modo_showma = [
+        {"artist_id": a, "company_id": c, "modo": modos.get(a)}
+        for a, c in pares_todos if modos.get(a) != "showma"
+    ]
 
     emitidas, fallidas = [], []
     for artist_id, company_id in pares:
@@ -494,6 +637,8 @@ async def close_period(db: AsyncSession, period: str) -> dict:
         "facturas_emitidas": len(emitidas),
         "facturas_con_error": len(fallidas),
         "sin_musico_u_hotel": sin_asignar,
+        # Esperando que el proveedor suba su propia factura (o sin modo elegido).
+        "facturan_ellos": sin_modo_showma,
         "emitidas": emitidas,
         "errores": fallidas,
     }

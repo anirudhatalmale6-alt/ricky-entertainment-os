@@ -230,7 +230,8 @@ async def list_talents(
         if fac_max is not None and fac > fac_max:
             continue
         ubic = " / ".join([p for p in (a.city, a.region, a.country) if p]) or None
-        fig = by_id.get(a.tax_figure_id) or default_fig
+        from app.services.facturacion import elegir_figura
+        fig = elegir_figura(a, list(by_id.values()))
         out.append({
             "id": a.id,
             "nombre": a.stage_name,
@@ -909,7 +910,7 @@ async def listar_periodos(scope: CurrentScope, db: DbSession, ultimos: int = Que
             "actuaciones_pendientes": len(pend),
             "importe_pendiente": round(sum(float(b.agreed_price or 0) for b in pend), 2),
             "facturas_emitidas": sum(1 for c in cfdis if c.status == "stamped"),
-            "facturas_con_error": sum(1 for c in cfdis if c.status == "error"),
+            "facturas_con_error": sum(1 for c in cfdis if c.status in ("error", "verificar")),
             "importe_facturado": round(sum(float(c.total or 0) for c in cfdis if c.status == "stamped"), 2),
         })
     return {"periodos": filas}
@@ -985,7 +986,10 @@ async def cerrar_periodo(period: str, scope: CurrentScope, db: DbSession):
             "La facturación electrónica no está activada todavía "
             "(faltan las credenciales de Facturama).",
         )
-    return await facturacion.close_period(db, period)
+    try:
+        return await facturacion.close_period(db, period)
+    except facturacion.CierreEnCurso as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 # --- Correo saliente -------------------------------------------------------

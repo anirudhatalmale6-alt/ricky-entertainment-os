@@ -258,7 +258,9 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
     figuras = (await db.execute(select(TaxFigure))).scalars().all()
     by_id = {f.id: f for f in figuras}
     default_fig = next((f for f in figuras if f.is_default), (figuras[0] if figuras else None))
-    figura = by_id.get(artist.tax_figure_id) if artist and artist.tax_figure_id else default_fig
+    # La misma regla que la factura (facturacion.elegir_figura): si no, lo que
+    # ve el proveedor aquí y su CFDI podrían llevar retenciones distintas.
+    figura = facturacion.elegir_figura(artist, figuras)
 
     com_pct = float(getattr(figura, "commission_pct", 0) or 0) if figura else 0.0
     if not com_pct:

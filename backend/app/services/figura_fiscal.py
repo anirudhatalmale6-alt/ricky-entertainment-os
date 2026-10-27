@@ -54,7 +54,26 @@ def codigo_regimen(regimen: str | None) -> str | None:
     if not regimen:
         return None
     m = re.match(r"\s*(\d{3})", str(regimen))
-    return m.group(1) if m else None
+    if m:
+        return m.group(1)
+    # En producción hay un régimen guardado como "resico" a secas.
+    if "resico" in str(regimen).lower():
+        return "626"
+    return None
+
+
+def figura_en_lista(figuras, regimen: str | None) -> int | None:
+    """Como figura_para_regimen, pero sobre un catálogo ya cargado."""
+    codigo = codigo_regimen(regimen)
+    if codigo not in _POR_CODIGO:
+        return None
+    aguja = _POR_CODIGO[codigo]
+    es_moral = codigo in ("601", "603")
+    for f in figuras:
+        nombre = (f.name or "").lower()
+        if aguja in nombre and (("moral" in nombre) == es_moral):
+            return f.id
+    return None
 
 
 async def figura_para_regimen(db: AsyncSession, regimen: str | None) -> int | None:
@@ -85,9 +104,19 @@ async def asignar_figura(db: AsyncSession, artist) -> int | None:
     ajustaron para un caso raro (RESICO con ISR variable, por ejemplo), esa
     decisión manda sobre el automático.
     """
-    if artist.tax_figure_id:
-        return artist.tax_figure_id
     fid = await figura_para_regimen(db, artist.tax_regime)
+    if artist.tax_figure_id:
+        # Se respeta un ajuste a mano DENTRO del mismo tipo de persona (un RESICO
+        # con ISR variable, por ejemplo). Pero si el régimen ahora es de persona
+        # moral y la figura es de física, o al revés, la figura está mal: así
+        # quedó una productora 601 cobrando con retenciones de persona física.
+        if fid and fid != artist.tax_figure_id:
+            figuras = {f.id: f for f in (await db.execute(select(TaxFigure))).scalars().all()}
+            actual, nueva = figuras.get(artist.tax_figure_id), figuras.get(fid)
+            es_moral = lambda f: "moral" in ((f.name if f else "") or "").lower()
+            if actual is None or es_moral(actual) != es_moral(nueva):
+                artist.tax_figure_id = fid
+        return artist.tax_figure_id
     if fid:
         artist.tax_figure_id = fid
     return fid

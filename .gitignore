@@ -11,3 +11,4 @@ venv/
 # Runtime user uploads (created by the app)
 backend/static/uploads/
 static/uploads/
+backend/.cierre_facturas.lock
