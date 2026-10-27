@@ -15,10 +15,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import case, func, select
 
-from app.api.deps import DbSession, require_intelligence_access
+from app.api.deps import CurrentScope, DbSession, require_intelligence_access
 from app.models.booking import Booking
 from app.models.company import Company
 from app.models.enums import BookingStatus
@@ -102,6 +102,29 @@ async def _spend_by_category(db, company_ids, start, end) -> dict[str, float]:
     return {cat: float(total) for cat, total in rows if cat}
 
 
+def _grupo_permitido(scope, group_id: int | None) -> int | None:
+    """Revisión 27/10: con `?group_id=` cualquiera con acceso a inteligencia
+    (incluido un proveedor Partner) veía las cifras de una cadena AJENA. Sólo
+    MASTER elige cadena; los demás, la suya o el mercado entero (agregado)."""
+    if group_id is None or scope.is_admin or scope.group_id == group_id:
+        return group_id
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "Sólo puedes consultar los datos de tu propia cadena.")
+
+
+# Un promedio de "mercado" de 1 o 2 hoteles no es anónimo: es la cifra de ese
+# hotel (o se deduce restando la tuya). Por debajo de este número, a quien no es
+# MASTER se le ocultan los importes del grupo.
+_MIN_ANONIMO = 3
+
+
+def _es_mia(scope, company) -> bool:
+    if scope.is_admin:
+        return True
+    if scope.group_id is not None and company.group_id == scope.group_id:
+        return True
+    return scope.company_id is not None and company.id == scope.company_id
+
+
 @router.get(
     "/market",
     response_model=MarketIntelligenceOut,
@@ -109,11 +132,13 @@ async def _spend_by_category(db, company_ids, start, end) -> dict[str, float]:
 )
 async def market_intelligence(
     db: DbSession,
+    scope: CurrentScope,
     year: int | None = None,
     month: int | None = None,
     group_id: int | None = Query(default=None),
 ):
     """Consolidated market benchmarking for a given month (defaults to current)."""
+    group_id = _grupo_permitido(scope, group_id)
     now = datetime.now(timezone.utc)
     year = year or now.year
     month = month or now.month
@@ -124,6 +149,7 @@ async def market_intelligence(
     if group_id is not None:
         q = q.where(Company.group_id == group_id)
     companies = list((await db.execute(q)).scalars().all())
+    companies_by_id = {c.id: c for c in companies}
     company_ids = [c.id for c in companies]
 
     # monthly budget rows for this period
@@ -210,10 +236,13 @@ async def market_intelligence(
         members = star_groups[s]
         s_spend = round(sum(m.entertainment_spend for m in members), 2)
         s_int = [m.intensity_pct for m in members if m.intensity_pct is not None]
+        oculto = (not scope.is_admin and len(members) < _MIN_ANONIMO
+                  and not all(_es_mia(scope, companies_by_id[m.id]) for m in members))
         by_star.append(StarTierStat(
             star_rating=s, properties=len(members),
-            avg_intensity_pct=round(sum(s_int) / len(s_int), 2) if s_int else None,
-            total_spend=s_spend, spend_share_pct=_pct(s_spend, total_spend) or 0.0,
+            avg_intensity_pct=(round(sum(s_int) / len(s_int), 2) if s_int else None) if not oculto else None,
+            total_spend=s_spend if not oculto else 0.0,
+            spend_share_pct=(_pct(s_spend, total_spend) or 0.0) if not oculto else 0.0,
         ))
 
     # --- act-category trend (this month vs previous) ---
@@ -238,7 +267,11 @@ async def market_intelligence(
         market_avg_spend_per_room=mkt_per_room, market_avg_spend_per_guest=mkt_per_guest,
         guests_per_room=_GUESTS_PER_ROOM,
         total_entertainment_budget=total_budget, total_entertainment_spend=total_spend,
-        properties=props, by_star_rating=by_star, spend_by_category=cats,
+        # El detalle por hotel (nombre, presupuesto, gasto) sólo de los PROPIOS:
+        # los promedios de mercado sí salen de todos, pero ningún hotel ni
+        # proveedor ve el presupuesto de otro hotel con su nombre.
+        properties=[p for p in props if _es_mia(scope, companies_by_id[p.id])],
+        by_star_rating=by_star, spend_by_category=cats,
         note=("Intensidad = gasto de entretenimiento / facturacion estimada de "
               "habitaciones (tarifa * ocupacion * habitaciones). El comparativo "
               "de mercado (vs_market, vs pares, por estrellas) es la funcion "
@@ -322,6 +355,7 @@ def _demand_rows(req_cur, book_cur, req_prev, book_prev, limit=None) -> list[Dem
 )
 async def demand_intelligence(
     db: DbSession,
+    scope: CurrentScope,
     days: int = Query(default=90, ge=1, le=365),
     group_id: int | None = Query(default=None),
     category: str | None = Query(default=None, description="Filtra a una categoria (p.ej. Musica o Shows) para ver el crecimiento de sus subgeneros"),
@@ -336,7 +370,7 @@ async def demand_intelligence(
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     start = now - timedelta(days=days)
     prev_start = now - timedelta(days=2 * days)
-    cids = await _resolve_company_ids(db, group_id)
+    cids = await _resolve_company_ids(db, _grupo_permitido(scope, group_id))
 
     cat_req_cur = await _request_demand(db, ProductRequest.category, cids, start, now, category)
     cat_book_cur = await _booking_demand(db, Show.category, cids, start, now, category)
@@ -372,6 +406,7 @@ async def demand_intelligence(
 )
 async def zone_intelligence(
     db: DbSession,
+    scope: CurrentScope,
     days: int = Query(default=90, ge=1, le=365),
     group_id: int | None = Query(default=None),
 ):
@@ -403,6 +438,7 @@ async def zone_intelligence(
             Company.city.is_not(None),
         )
     )
+    group_id = _grupo_permitido(scope, group_id)
     if group_id is not None:
         q = q.where(Company.group_id == group_id)
     rows = (await db.execute(q.group_by(Company.city))).all()
@@ -439,6 +475,7 @@ async def zone_intelligence(
 )
 async def destination_study(
     db: DbSession,
+    scope: CurrentScope,
     year: int | None = None,
     month: int | None = None,
     days: int = Query(default=180, ge=1, le=365),
@@ -520,10 +557,20 @@ async def destination_study(
         vals = [r[idx] for r in rows if r[idx] is not None]
         return round(sum(vals) / len(vals), 2) if vals else None
 
+    propias_por_ciudad: dict[str, int] = {}
+    for c in companies:
+        if _es_mia(scope, c):
+            propias_por_ciudad[c.city] = propias_por_ciudad.get(c.city, 0) + 1
+
     dests: list[DestinationStat] = []
     for city in hotels_per_city:
         rows = by_city.get(city, [])
         n_book, spend, bc = book_by_city.get(city, (0, 0.0, 0))
+        if (not scope.is_admin and hotels_per_city[city] < _MIN_ANONIMO
+                and propias_por_ciudad.get(city, 0) < hotels_per_city[city]):
+            # Destino con 1 o 2 hoteles: sus "promedios" serían las cifras de un
+            # hotel concreto. Se enseña que existe y cuánto se contrata, sin importes.
+            rows, spend, bc = [], 0.0, 0
         dests.append(DestinationStat(
             zone=city, hotels=hotels_per_city[city],
             avg_spend_per_room=_avg(rows, 0), avg_spend_per_guest=_avg(rows, 1),
