@@ -18,7 +18,8 @@ Un "@usuario" suelto se entiende como canal de YouTube, que es como lo escriben.
 from __future__ import annotations
 
 from typing import Annotated
-from urllib.parse import urlparse
+import re
+from urllib.parse import parse_qs, urlparse
 
 from pydantic import BeforeValidator
 
@@ -33,10 +34,35 @@ MSG_YOUTUBE = ("Aquí va el enlace de tu canal de YouTube. Instagram, Facebook, 
                "través de SHOWMA.")
 
 
+_INVISIBLES = re.compile("[\u200b\u200c\u200d\u2060\ufeff]")
+_URL_DE_VIDEO = re.compile(
+    r"(?:https?://)?(?:[\w-]+\.)*(?:youtube\.com|youtu\.be|youtube-nocookie\.com|vimeo\.com)/\S*",
+    re.I)
+
+
+def _rescata(u: str) -> str:
+    """Lo que la gente pega de verdad desde el celular (28/10): "Mira mi video
+    https://youtu.be/…" compartido por WhatsApp, un enlace de Google que envuelve
+    al de YouTube, o caracteres invisibles. Se saca el enlace de video de dentro;
+    si no hay ninguno, se devuelve tal cual y la validación decide."""
+    u = _INVISIBLES.sub("", u).strip()
+    if "google." in u.lower():
+        q = parse_qs(urlparse(u if "://" in u else "https://" + u).query)
+        for k in ("q", "url"):
+            if q.get(k):
+                u = q[k][0]
+                break
+    if " " in u or "\n" in u:
+        m = _URL_DE_VIDEO.search(u)
+        if m:
+            u = m.group(0)
+    return u.strip()
+
+
 def _normaliza(v) -> str | None:
     if v is None:
         return None
-    u = str(v).strip()
+    u = _rescata(str(v))
     if not u:
         return None
     if u.startswith("@") and " " not in u:
