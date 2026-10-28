@@ -50,6 +50,7 @@ _SQLITE_ADDED_COLUMNS = [
     # Pase de acceso con QR (David, 06/10).
     ("bookings", "pase_token", "VARCHAR(40)"),
     ("bookings", "respuesta_token", "VARCHAR(40)"),
+    ("bookings", "serie", "VARCHAR(40)"),
     ("bookings", "llegada_at", "DATETIME"),
     ("bookings", "llegada_por", "VARCHAR(120)"),
     ("artists", "auto_confirm_bookings", "BOOLEAN DEFAULT 0"),
@@ -165,6 +166,8 @@ _SQLITE_ADDED_INDEXES = [
      "CREATE UNIQUE INDEX IF NOT EXISTS ux_bookings_pase ON bookings(pase_token)"),
     ("ux_bookings_respuesta",
      "CREATE UNIQUE INDEX IF NOT EXISTS ux_bookings_respuesta ON bookings(respuesta_token)"),
+    ("ix_bookings_serie",
+     "CREATE INDEX IF NOT EXISTS ix_bookings_serie ON bookings(serie)"),
 ]
 
 

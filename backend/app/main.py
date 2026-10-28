@@ -318,10 +318,35 @@ async def pase_qr(token: str, db: DbSession):
     from app.api.v1.public import pase_data
     from app.services import pase as pase_svc
 
-    if await pase_data(db, token) is None:
+    if await pase_data(db, token) is None and not await _pase_de_temporada(db, token):
         raise HTTPException(status_code=404, detail="Pase no valido")
     png = pase_svc.png_qr(pase_svc.url_pase(token, settings.public_root))
     return Response(png, media_type="image/png", headers=_NO_CACHE)
+
+
+async def _pase_de_temporada(db, token: str):
+    """(datos, token de la actuación, posición, total) si `token` es un pase de
+    TEMPORADA (una contratación de varias fechas, David 28/10); None si no.
+
+    El QR de temporada lleva el token de la serie. Al escanearlo se resuelve la
+    actuación de ESE día, o la próxima si hoy no le toca: la página de siempre
+    ya avisa en ámbar "FALTAN 3 DÍAS" cuando la fecha no es hoy.
+    """
+    from app.api.v1.public import pase_data
+    from app.core.hora import ahora_local
+    from app.services import serie as serie_svc
+
+    fechas = await serie_svc.de_la_serie(db, token)
+    if not fechas:
+        return None
+    b, pos = serie_svc.la_de_hoy(fechas, ahora_local().replace(tzinfo=None))
+    if b is None or not b.pase_token:
+        return None
+    data = await pase_data(db, b.pase_token)
+    if data is None:
+        return None
+    data["temporada"] = {"pos": pos, "total": len(fechas)}
+    return data, b.pase_token
 
 
 @app.get("/pase/{token}", include_in_schema=False)
@@ -330,6 +355,11 @@ async def pase_publico(token: str, db: DbSession):
     from app.services import pase as pase_svc, pase_html
 
     data = await pase_data(db, token)
+    token_llegada = token
+    if data is None:
+        temporada = await _pase_de_temporada(db, token)
+        if temporada:
+            data, token_llegada = temporada
     if data is None:
         # Mismo mensaje para un token invalido que para uno que no existe: decir
         # "caducado" o "cancelado" ya seria confirmar que la actuacion existe.
@@ -341,8 +371,10 @@ async def pase_publico(token: str, db: DbSession):
             status_code=404, headers=_NO_CACHE,
         )
     qr = pase_svc.qr_data_uri(pase_svc.url_pase(token, settings.public_root))
+    # El QR que se enseña es el que escanearon (el de temporada, si lo era); la
+    # llegada se apunta en la actuación concreta de hoy.
     html = pase_html.pagina(data, qr_uri=qr, api_base=f"{settings.ROOT_PATH}/api/v1",
-                            token=token)
+                            token=token_llegada)
     return HTMLResponse(html, headers=_NO_CACHE)
 
 

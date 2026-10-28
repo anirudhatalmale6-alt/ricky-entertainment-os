@@ -427,9 +427,65 @@ def prueba() -> tuple[str, str, str]:
     return asunto, texto, mailer.wrap(cuerpo, footer="Correo de prueba enviado desde Master.")
 
 
+def _lista_fechas(fechas: list[tuple[datetime | None, datetime | None]], tope: int = 40) -> tuple[str, str]:
+    """(html, texto) con una fecha por renglón: "jueves, 30 de octubre de 2026 · 20:00 - 21:00"."""
+    filas = [f"{_dia_largo(a)} · {_horario(a, b)}" for a, b in fechas if a]
+    extra = len(filas) - tope
+    vis = filas[:tope]
+    html = ('<div style="background:#f7f8fa;border-radius:10px;padding:10px 14px;margin:14px 0;'
+            'font-size:13.5px;line-height:1.8;color:#111827">'
+            + "<br>".join(_e(x) for x in vis)
+            + (f'<br><span style="color:#6b7280">y {extra} fechas más (las ves todas en tu panel)</span>'
+               if extra > 0 else "")
+            + "</div>")
+    texto = "\n".join(vis) + (f"\n... y {extra} fechas más" if extra > 0 else "")
+    return html, texto
+
+
+def temporada(*, show: str, venue: str, hotel: str, artista: str,
+              fechas: list[tuple[datetime | None, datetime | None]],
+              importe: str = "", url_respuesta: str = "") -> tuple[str, str, str]:
+    """(asunto, texto, html) de UNA contratación de varias fechas (David, 28/10).
+
+    Mismo tono que el aviso de una sola (texto de David del 08/10), pero con la
+    lista: 23 fechas en 23 correos es la forma segura de que no lea ninguno.
+    """
+    n = len(fechas)
+    saludo = f"Hola, {_e(artista)}:" if artista else "Hola:"
+    quien = f"<b>{_e(hotel)}</b>" if hotel else "Un hotel"
+    filas = [
+        ("Show", show),
+        ("Lugar", f"{venue} · {hotel}" if hotel and venue else (venue or hotel)),
+        ("Fechas", f"{n} actuaciones"),
+    ]
+    if importe:
+        filas.append(("Importe acordado", importe))
+    lista_html, lista_txt = _lista_fechas(fechas)
+    asunto = f"¡Tienes una nueva solicitud de {n} fechas!"
+    intro = (f"{saludo}<br><br>{quien} quiere contar contigo para <b>{n} actuaciones</b> "
+             f"de <b>{_e(show)}</b>. Puedes aceptarlas todas de una vez; si alguna "
+             "fecha no te encaja, recházala sola desde tu perfil y el resto sigue en pie.")
+    cierre = ("Recuerda que tu disponibilidad no quedará confirmada hasta que aceptes. "
+              "Al aceptar te llega UN pase de acceso que sirve para todas las fechas."
+              "<br><br>Gracias por formar parte de SHOWMA.")
+    url = url_respuesta or _panel_url()
+    html = (f"<p>{intro}</p>" + _ficha(filas) + lista_html
+            + f'<p style="color:#6b7280;font-size:13px">{cierre}</p>'
+            + _boton("Revisar las fechas", url))
+    plano = [_sin_marcas(intro), "", *[f"{k}: {v}" for k, v in filas if v], "",
+             lista_txt, "", _sin_marcas(cierre), "", f"Revisar: {url}", "", _FIRMA_PLANO]
+    return asunto, "\n".join(plano), mailer.wrap(html, footer=(
+        f"{_FIRMA}<br><br>"
+        "Recibes este correo porque tienes una cuenta en SHOWMA. "
+        "Puedes ver y responder todo desde tu panel."
+    ))
+
+
 def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
                    cuando: datetime | None, folio: str | None,
-                   integrantes: int | None, url_pase: str) -> tuple[str, str, str]:
+                   integrantes: int | None, url_pase: str,
+                   fechas: list[tuple[datetime | None, datetime | None]] | None = None,
+                   ) -> tuple[str, str, str]:
     """(asunto, texto, html) de la confirmación con el PASE DE ACCESO.
 
     David, 06/10: "una confirmación por mail ademas de la registrada en el web,
@@ -445,12 +501,14 @@ def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
     2015- tiene que seguir sirviendo. Por eso el enlace está a la vista y no
     sólo detrás del botón.
     """
+    temporada_n = len(fechas) if fechas and len(fechas) > 1 else 0
     filas = [
-        ("Orden", folio or ""),
+        ("Orden", "" if temporada_n else (folio or "")),
         ("Show", show),
         ("Proveedor", artista),
         ("Lugar", f"{venue} · {hotel}" if hotel and venue else (venue or hotel)),
-        ("Fecha y hora", _fmt(cuando)),
+        ("Fechas" if temporada_n else "Fecha y hora",
+         f"{temporada_n} actuaciones" if temporada_n else _fmt(cuando)),
         ("Personas que llegan", str(integrantes) if integrantes else ""),
     ]
 
@@ -467,6 +525,12 @@ def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
     donde = f"en <b>{_e(hotel)}</b>" if hotel else ""
     intro = (f"{saludo}<br><br>Tu actuación {donde} está confirmada y ya tienes "
              "disponible tu pase de acceso.")
+    if temporada_n:
+        # Un solo QR para todas las fechas: en la puerta enseña la de ESE día.
+        intro = (f"{saludo}<br><br>Tus <b>{temporada_n} actuaciones</b> {donde} están "
+                 "confirmadas y ya tienes tu <b>pase de temporada</b>: el mismo código "
+                 "sirve para todas las fechas. Al escanearlo, seguridad ve la actuación "
+                 "que te toca ese día.")
     cierre = (
         "Presenta este código cuando llegues a la propiedad, su lectura "
         "permitirá tu entrada y la hora de llegada."
@@ -484,18 +548,23 @@ def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
         '<div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#6b7280;margin-bottom:10px">TU PASE DE ACCESO</div>'
         '<img src="cid:qrpase" alt="Pase de acceso" '
         'style="width:190px;height:190px;border:1px solid #e6e8ec;border-radius:10px">'
-        f'<div style="font-size:12px;color:#6b7280;margin-top:6px">Pase {_e(folio or "")}</div>'
-        "</div>"
+        + (f'<div style="font-size:12px;color:#6b7280;margin-top:6px">Pase de temporada · {temporada_n} fechas</div>'
+           if temporada_n else
+           f'<div style="font-size:12px;color:#6b7280;margin-top:6px">Pase {_e(folio or "")}</div>')
+        + "</div>"
     )
     enlace_visible = (
         '<p style="font-size:12.5px;color:#6b7280;word-break:break-all;text-align:center">'
         f'Si el código no se ve: <a href="{url_pase}" style="color:#382ca1">{url_pase}</a></p>'
     )
 
-    asunto = "¡Todo listo para tu próxima actuación!"
+    asunto = ("¡Todo listo para tus actuaciones! Tu pase de temporada" if temporada_n
+              else "¡Todo listo para tu próxima actuación!")
+    lista_html, lista_txt = _lista_fechas(fechas) if temporada_n else ("", "")
     html = (
         f"<p>{intro}</p>"
         + _ficha(filas)
+        + lista_html
         + qr_html
         + _boton("Abrir el pase", url_pase)
         + enlace_visible
@@ -504,6 +573,7 @@ def pase_actuacion(*, show: str, artista: str, venue: str, hotel: str,
     plano = [
         _sin_marcas(intro), "",
         *[f"{k}: {v}" for k, v in filas if v],
+        *([ "", lista_txt] if temporada_n else []),
         "",
         f"Pase de acceso: {url_pase}",
         "",

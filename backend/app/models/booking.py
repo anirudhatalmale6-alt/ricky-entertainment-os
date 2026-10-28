@@ -143,6 +143,11 @@ class Booking(Base, TimestampMixin):
     # seguridad al escanear, y poder abrir una puerta no puede ser lo mismo que
     # poder comprometer una fecha y un importe (David, 08/10).
     respuesta_token: Mapped[str | None] = mapped_column(String(40), unique=True, index=True)
+    # Contratación de VARIAS fechas de una vez (/bookings/repetir). Todas las de
+    # la tanda llevan el mismo valor: es a la vez la clave que las agrupa y el
+    # token del PASE DE TEMPORADA, un solo QR que en la puerta resuelve la
+    # actuación de ese día (David, 28/10). Aleatorio de 128 bits, como el pase.
+    serie: Mapped[str | None] = mapped_column(String(40), index=True)
     # Cuándo confirmó seguridad que el grupo llegó, y quién lo dijo. El nombre lo
     # teclea el de la caseta: no tiene cuenta en SHOWMA, y pedirle una para
     # apuntar que alguien llegó es la forma más rápida de que no lo apunte nadie.

@@ -906,6 +906,55 @@ async def artist_respond(
     return _sin_importes(_decorate(booking, venue, show), scope)
 
 
+@router.post("/{booking_id}/artist-respond-serie")
+async def artist_respond_serie(
+    booking_id: int,
+    scope: CurrentScope,
+    db: DbSession,
+    bg: BackgroundTasks,
+    action: str = Query(..., pattern="^(accept|reject)$"),
+):
+    """Acepta o rechaza TODAS las fechas pendientes de la tanda de esa actuación.
+
+    David, 28/10: 23 fechas no se contestan una por una. Mismos permisos que
+    artist-respond (el titular o su productora) y misma lógica por fecha
+    (services/respuesta), pero un solo correo: el pase de temporada al aceptar,
+    un aviso al hotel al rechazar.
+    """
+    from app.services import respuesta as resp, serie as serie_svc
+
+    if scope.artist_id is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo artistas.")
+    booking = await _get_or_404(db, booking_id)
+    yo = await db.get(Artist, scope.artist_id)
+
+    async def es_mia(b: Booking) -> bool:
+        if b.artist_id == scope.artist_id:
+            return True
+        titular = await db.get(Artist, b.artist_id) if b.artist_id else None
+        return bool(titular and yo and titular.parent_id == scope.artist_id and yo.is_productora)
+
+    if not await es_mia(booking):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    todas = await serie_svc.hermanas(db, booking)
+    objetivo = [b for b in serie_svc.pendientes(todas) if await es_mia(b)]
+    if not objetivo:
+        raise HTTPException(status_code=409, detail="No quedan fechas pendientes en esta contratación.")
+    for b in objetivo:
+        if action == "accept":
+            await resp.aceptar(db, b, origen="panel")
+        else:
+            await resp.rechazar(db, b, origen="panel", motivo="Rechazada por el proveedor")
+    await db.flush()
+    if action == "accept":
+        correos = await serie_svc.correo_pase_temporada(db, todas)
+    else:
+        correos = await serie_svc.correo_rechazo_hotel(db, objetivo, "El proveedor rechazó la contratación")
+    await db.commit()
+    avisos.despachar(bg, correos)
+    return {"ok": True, "accion": action, "fechas": len(objetivo)}
+
+
 @router.post(
     "/{booking_id}/attendance",
     response_model=BookingOut,
@@ -1024,7 +1073,69 @@ async def notify_artists(payload: NotifyIn, scope: CurrentScope, db: DbSession, 
     # final, cuando el commit ya guardó las actuaciones.
     pendientes: list[tuple] = []
     permitidas = await _empresas_de(db, scope)
+
+    # Las fechas de una misma tanda (/repetir) van en UN aviso con la lista, no
+    # en uno por fecha (David, 28/10: 23 fechas = 23 correos). Una tanda de la
+    # que sólo se notifica una fecha (p.ej. la movieron) va como suelta.
+    tandas: dict[str, list[Booking]] = {}
+    sueltos: list[NotifyItem] = []
     for item in payload.items:
+        b = await db.get(Booking, item.booking_id) if item.kind == "new_booking" else None
+        if b is not None and b.serie:
+            tandas.setdefault(b.serie, []).append(b)
+        else:
+            sueltos.append(item)
+    for clave in list(tandas):
+        if len(tandas[clave]) < 2:
+            sueltos += [NotifyItem(booking_id=b.id, kind="new_booking") for b in tandas.pop(clave)]
+
+    for clave, lista in tandas.items():
+        lista = [b for b in lista
+                 if b.artist_id and (permitidas is None or b.company_id in permitidas)
+                 and b.status not in (BookingStatus.CANCELLED, BookingStatus.COMPLETED)]
+        if not lista:
+            continue
+        lista.sort(key=lambda b: (b.starts_at or _now(), b.id))
+        primera = lista[0]
+        show = await db.get(Show, primera.show_id) if primera.show_id else None
+        venue = await db.get(Venue, primera.venue_id) if primera.venue_id else None
+        artist = await db.get(Artist, primera.artist_id)
+        company = await db.get(Company, primera.company_id) if primera.company_id else None
+        show_name = (show.show_name if show else None) or "tu actuación"
+        venue_name = (venue.name if venue else None) or "el venue"
+        for b in lista:
+            b.notified_at = b.notified_at or _now()
+        n = len(lista)
+        d1 = _naive(lista[0].starts_at).strftime("%d/%m/%Y") if lista[0].starts_at else ""
+        dn = _naive(lista[-1].starts_at).strftime("%d/%m/%Y") if lista[-1].starts_at else ""
+        aviso = ArtistNotification(
+            artist_id=primera.artist_id, booking_id=primera.id, kind="new_booking",
+            title=f"Nueva temporada: {show_name} ({n} fechas)",
+            body=(f"Te agendaron {n} actuaciones en {venue_name}, del {d1} al {dn}. "
+                  "Quedan pendientes de tu confirmación: puedes aceptarlas todas de una vez."),
+            starts_at=primera.starts_at, is_read=False,
+        )
+        destino = await avisos.correo_artista(db, artist)
+        aviso.email_to = destino
+        db.add(aviso)
+        notified += n
+        artists.add(primera.artist_id)
+        if destino:
+            total = sum(float(b.agreed_price or 0) for b in lista)
+            asunto, texto, html = avisos.temporada(
+                show=show_name, venue=venue_name,
+                hotel=(company.name if company else "") or "",
+                artista=(artist.stage_name if artist else "") or "",
+                fechas=[(_naive(b.starts_at), _naive(b.ends_at)) for b in lista],
+                importe=("" if (artist and artist.parent_id) else
+                         (f"${total:,.2f} MXN en total" if total else "")),
+                url_respuesta=(f"{settings.public_root}/responder/{primera.respuesta_token}"
+                               if primera.respuesta_token else ""),
+            )
+            pendientes.append((aviso, destino, asunto, texto, html))
+            emails += 1
+
+    for item in sueltos:
         booking = await db.get(Booking, item.booking_id)
         if booking is None or not booking.artist_id:
             continue
@@ -1268,6 +1379,9 @@ async def repetir_actuacion(payload: RepetirIn, scope: CurrentScope, db: DbSessi
         return resumen
 
     nuevas = []
+    # Toda la tanda comparte un token: la agrupa y es el pase de temporada.
+    from app.services import pase as pase_svc
+    serie = pase_svc.nuevo_token() if len(crear) > 1 else None
     for inicio, fin in crear:
         precio = next(d["precio"] for d in detalle if d["fecha"] == inicio.date().isoformat())
         nueva = Booking(
@@ -1277,6 +1391,7 @@ async def repetir_actuacion(payload: RepetirIn, scope: CurrentScope, db: DbSessi
             agreed_price=precio, price_source=fuente,
             currency="MXN", commission_pct=commission_pct,
             status=BookingStatus.PENDING, confirmed_at=None,
+            serie=serie,
         )
         db.add(nueva)
         nuevas.append(nueva)
@@ -1292,4 +1407,8 @@ async def repetir_actuacion(payload: RepetirIn, scope: CurrentScope, db: DbSessi
     # Un solo commit: o entran las N o no entra ninguna.
     await db.commit()
     resumen["creadas"] = len(crear)
+    # Los ids, para que la pantalla los sume a "Guardar y notificar". Sin esto
+    # las fechas se quedaban sin avisar aunque el hotel pulsara el botón.
+    resumen["ids"] = [b.id for b in nuevas]
+    resumen["serie"] = serie
     return resumen

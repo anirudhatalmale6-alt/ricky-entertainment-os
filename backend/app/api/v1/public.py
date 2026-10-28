@@ -441,6 +441,22 @@ async def responder_aceptar(token: str, db: DbSession, bg: BackgroundTasks) -> d
     b = await resp.por_token(db, token)
     if b is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enlace no válido")
+    from app.services import serie as serie_svc
+
+    pend = serie_svc.pendientes(await serie_svc.hermanas(db, b)) if b.serie else []
+    if pend:
+        # Tanda de varias fechas: se aceptan todas las pendientes y sale UN pase
+        # de temporada (David, 28/10).
+        for x in pend:
+            await resp.aceptar(db, x, origen="correo")
+        await db.flush()
+        correos = await serie_svc.correo_pase_temporada(db, await serie_svc.hermanas(db, b))
+        await db.commit()
+        avisos.despachar(bg, correos)
+        return {"ok": True, "estado": "confirmed",
+                "mensaje": (f"{len(pend)} actuaciones confirmadas. Te mandamos por correo "
+                            "tu pase de temporada: un solo código para todas las fechas.")}
+
     abierta, motivo = resp.puede_contestar(b)
     if not abierta:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=motivo)
@@ -465,6 +481,20 @@ async def responder_rechazar(token: str, payload: RespuestaIn, db: DbSession,
     b = await resp.por_token(db, token)
     if b is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enlace no válido")
+    from app.services import serie as serie_svc
+
+    pend = serie_svc.pendientes(await serie_svc.hermanas(db, b)) if b.serie else []
+    if pend:
+        for x in pend:
+            await resp.rechazar(db, x, origen="correo", motivo=payload.motivo)
+        await db.flush()
+        correos = await serie_svc.correo_rechazo_hotel(
+            db, pend, payload.motivo or "El proveedor rechazó la contratación")
+        await db.commit()
+        avisos.despachar(bg, correos)
+        return {"ok": True, "estado": "cancelled",
+                "mensaje": "Avisamos al hotel de que no puedes. Gracias por contestar."}
+
     abierta, motivo = resp.puede_contestar(b)
     if not abierta:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=motivo)

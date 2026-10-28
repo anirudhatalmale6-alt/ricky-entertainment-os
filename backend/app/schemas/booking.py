@@ -104,6 +104,9 @@ class BookingOut(BaseModel):
     # QR. No es secreto frente a quien ya ve la actuación — es exactamente la
     # gente que va a repartir el pase.
     pase_token: str | None = None
+    # Contratación de varias fechas: misma serie = misma tanda, y es el token del
+    # pase de temporada (un QR para todas las fechas).
+    serie: str | None = None
     llegada_at: datetime | None = None
     llegada_por: str | None = None
     created_at: datetime

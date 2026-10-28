@@ -93,6 +93,10 @@ def pagina(d: dict, *, qr_uri: str, api_base: str, token: str, hoy: datetime | N
         ("Código de proveedor", d.get("codigo_proveedor")),
         ("Orden de actuación", d.get("folio")),
     ]
+    temp = d.get("temporada")
+    if temp:
+        # Pase de temporada: el mismo QR para todas las fechas de la contratación.
+        filas.insert(0, ("Pase de temporada", f"actuación {temp['pos']} de {temp['total']}"))
     cuerpo = "".join(
         f'<div class="f"><span>{_e(k)}</span><b>{_e(str(v))}</b></div>'
         for k, v in filas if v

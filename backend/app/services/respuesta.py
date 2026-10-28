@@ -112,7 +112,19 @@ async def datos_para_pantalla(db: AsyncSession, booking: Booking) -> dict:
     abierta, motivo = puede_contestar(booking)
     # Un musico de productora no ve importes: cobra su empresa (David, 02/09).
     oculta_precio = bool(artista and artista.parent_id)
+    # Contratación de varias fechas: el enlace contesta TODAS las pendientes.
+    from app.services import serie as serie_svc
+    tanda = None
+    if booking.serie:
+        pend = serie_svc.pendientes(await serie_svc.hermanas(db, booking))
+        if len(pend) > 1 or (pend and pend[0].id != booking.id):
+            r = serie_svc.resumen(pend)
+            tanda = {"pendientes": len(pend),
+                     "fechas": [f.isoformat() for f in r["fechas"]],
+                     "importe": None if oculta_precio else r["importe"]}
+            abierta, motivo = True, ""
     return {
+        "serie": tanda,
         "folio": booking.folio,
         "artista": artista.stage_name if artista else None,
         "show": show.show_name if show else None,

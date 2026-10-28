@@ -4800,13 +4800,18 @@ const fmtCorta = iso => { const d=new Date(iso+'T12:00:00');
 async function repetirCrear(){
   if(!REP||!REP.sim) return;
   if(!confirm(`Se van a crear ${REP.crean} actuaciones por un total de ${MXN2(REP.total)}.\n\n`
-    + `Quedan como borrador: no se avisa a nadie hasta que pulses "Guardar y notificar".\n\n¿Continuar?`)) return;
+    + `Quedan como borrador: el proveedor no se entera hasta que pulses "Guardar y notificar". `
+    + `Le llegará UN solo aviso con todas las fechas.\n\n¿Continuar?`)) return;
   const go=document.getElementById('repGo'); if(go){ go.disabled=true; go.textContent='Creando…'; }
   try{
     const res=await post('/bookings/repetir', repetirCuerpo(false));
+    // Sin esto las fechas nuevas no entraban en "Guardar y notificar" y el
+    // proveedor nunca se enteraba (David, 28/10: 23 fechas, ningún aviso).
+    (res.ids||[]).forEach(id=>notifyMark(id,'new_booking'));
     repetirCerrar();
     toast(`${res.creadas} actuaciones creadas ✓`
-      + (res.se_saltan? ` · ${res.se_saltan} saltadas por choques`:''));
+      + (res.se_saltan? ` · ${res.se_saltan} saltadas por choques`:'')
+      + ' · pulsa "Guardar y notificar" para avisar al proveedor');
     show('home', true);
   }catch(e){
     if(go){ go.disabled=false; go.textContent='Crear'; }
@@ -6705,8 +6710,13 @@ function renderAgenda(fromRange){
     // de algo que todavía no aceptó no abre ninguna puerta.
     const paseA = (b.pase_token && ['confirmed','completed'].includes(b.status))
       ? `<button class="mini" onclick="openPase(${b.id})" title="Enséñalo en la entrada de servicio">▣ Mi pase</button>` : '';
-    if(b.status==='pending')
-      return `<td><div class="agact"><button class="mini ok" onclick="artistRespond(${b.id},'accept')">Aceptar</button><button class="mini no" onclick="artistRespond(${b.id},'reject')">Rechazar</button></div></td>`;
+    if(b.status==='pending'){
+      // Varias fechas de la misma contratación: se aceptan todas de una vez.
+      const nSerie = b.serie ? bk.filter(x=>x.serie===b.serie && x.status==='pending').length : 0;
+      const todas = nSerie>1
+        ? `<button class="mini ok" onclick="artistRespondSerie(${b.id},'accept',${nSerie})" title="Acepta todas las fechas pendientes de esta contratación">✓ Aceptar las ${nSerie}</button>` : '';
+      return `<td><div class="agact">${todas}<button class="mini ${nSerie>1?'':'ok'}" onclick="artistRespond(${b.id},'accept')">${nSerie>1?'Sólo esta':'Aceptar'}</button><button class="mini no" onclick="artistRespond(${b.id},'reject')">Rechazar</button></div></td>`;
+    }
     if(b.status==='confirmed' && fut)
       return `<td><div class="agact"><button class="mini" onclick="notifyStatus(${b.id},'on_way')">🚗 En camino</button><button class="mini ok" onclick="notifyStatus(${b.id},'arrived')">📍 Llegué</button>${paseA}<button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></div></td>`;
     return `<td><div class="agact">${paseA}<button class="mini" onclick="openHistorial(${b.id})" title="Qué le ha pasado a esta orden">🕘 Historial</button></div></td>`; };
@@ -6920,10 +6930,15 @@ function paseUrl(token){
   // API termina en /api/v1; la raíz pública es lo de antes.
   return API.replace(/\/api\/v1$/,'') + '/pase/' + token;
 }
-function openPase(bid){
+function openPase(bid, soloEsta){
   const b=(CACHE.agenda||[]).find(x=>x.id===bid)||(CACHE.homeBk||[]).find(x=>x.id===bid)||{};
   if(!b.pase_token){ toast('Esta actuación todavía no tiene pase.',true); return; }
-  const url=paseUrl(b.pase_token);
+  // Contratación de varias fechas: por defecto el PASE DE TEMPORADA, un QR que
+  // en la puerta enseña la actuación de ese día (David, 28/10).
+  const temporada = !!(b.serie && !soloEsta);
+  const nFechas = b.serie ? [...(CACHE.agenda||[]),...(CACHE.homeBk||[])]
+    .filter((x,i,a)=>x.serie===b.serie && a.findIndex(y=>y.id===x.id)===i).length : 0;
+  const url=paseUrl(temporada ? b.serie : b.pase_token);
   let ov=document.getElementById('pzMov');
   if(!ov){ ov=document.createElement('div'); ov.id='pzMov'; ov.className='mov'; document.body.appendChild(ov);
     ov.addEventListener('click',e=>{ if(e.target===ov) paseClose(); }); }
@@ -6933,15 +6948,20 @@ function openPase(bid){
       <div style="font-size:13.5px;font-weight:700">${esc(b.artist_name||b.show_name||'Actuación')}</div>
       <div class="muted" style="font-size:12.5px;margin:2px 0 4px">${
         [b.venue_name&&esc(b.venue_name), b.starts_at&&fmtDate(b.starts_at)].filter(Boolean).join(' · ')}</div>
-      ${b.folio?`<div class="rtfolio" style="margin-bottom:12px">${esc(b.folio)}</div>`:''}
+      ${temporada
+        ? `<div class="rtfolio" style="margin-bottom:12px">Pase de temporada${nFechas>1?' · '+nFechas+' fechas':''}</div>`
+        : (b.folio?`<div class="rtfolio" style="margin-bottom:12px">${esc(b.folio)}</div>`:'')}
       <img src="${esc(url)}.png" alt="QR del pase" style="width:200px;height:200px;display:block;margin:4px auto 10px">
-      <div class="hint" style="margin:0 0 10px;text-align:left">Esto lo escanea el personal de
-        seguridad y ve quién llega, cuántos son, a qué hora y si la actuación está confirmada,
-        con un botón para registrar que llegaron.</div>
+      <div class="hint" style="margin:0 0 10px;text-align:left">${temporada
+        ? 'Un solo QR para todas las fechas de esta contratación. Al escanearlo, seguridad ve la actuación que toca ESE día (o cuándo es la próxima) y registra la llegada.'
+        : 'Esto lo escanea el personal de seguridad y ve quién llega, cuántos son, a qué hora y si la actuación está confirmada, con un botón para registrar que llegaron.'}</div>
       <div class="qact" style="text-align:left">
         <a href="${esc(url)}" target="_blank" rel="noopener">🔍 Abrir el pase como lo ve seguridad</a>
         <a href="${esc(url)}.png" download="pase-${esc(b.folio||b.id)}.png">⬇ Descargar el QR</a>
         <a onclick="paseCopiar('${esc(url)}',this)">🔗 Copiar la liga para mandarla</a>
+        ${b.serie ? (temporada
+          ? `<a onclick="openPase(${b.id},true)">📄 Ver sólo el pase de esta fecha</a>`
+          : `<a onclick="openPase(${b.id})">🎫 Ver el pase de temporada</a>`) : ''}
       </div>
     </div>
     <div class="af"><button class="btn ghost" onclick="paseClose()">Cerrar</button>
@@ -7098,6 +7118,19 @@ async function artistRespond(id,action){
   }catch(e){ toast('No se pudo procesar: '+(e.message||''),true); }
 }
 window.artistRespond=artistRespond;
+async function artistRespondSerie(id,action,n){
+  if(action==='accept' && !confirm(`¿Aceptar las ${n} fechas de esta contratación? Te llega un solo pase de acceso que sirve para todas.`)) return;
+  if(action==='reject' && !confirm(`¿Rechazar las ${n} fechas? Se avisa al hotel.`)) return;
+  try{
+    const r=await post(`/bookings/${id}/artist-respond-serie?action=${action}`);
+    const b=(CACHE.agenda||[]).find(x=>x.id===id);
+    if(b && b.serie) (CACHE.agenda||[]).forEach(x=>{ if(x.serie===b.serie && x.status==='pending')
+      x.status = action==='accept'?'confirmed':'cancelled'; });
+    toast(action==='accept'?`${r.fechas} actuaciones confirmadas ✓ · te enviamos tu pase de temporada`:`${r.fechas} fechas rechazadas`);
+    renderAgenda();
+  }catch(e){ toast('No se pudo procesar: '+(e.message||''),true); }
+}
+window.artistRespondSerie=artistRespondSerie;
 async function artistCancel(id){
   const reason=prompt('¿Por qué cancelas esta actuación? El hotel será notificado y podrá buscar un reemplazo.\nPor ejemplo: Enfermedad, imprevisto…');
   if(reason===null) return;   // cerró el prompt

@@ -47,6 +47,7 @@ def _js(v: str) -> str:
 
 
 def pagina(d: dict, *, api_base: str, token: str) -> str:
+    tanda = d.get("serie")
     horario = _hora(d.get("cuando")) + (f" a {_hora(d.get('termina'))}"
                                         if d.get("termina") else "")
     filas = [
@@ -59,16 +60,29 @@ def pagina(d: dict, *, api_base: str, token: str) -> str:
         ("Integrantes", str(d["integrantes"]) if d.get("integrantes") else ""),
         ("Importe acordado", _dinero(d.get("importe"), d.get("moneda", "MXN"))),
     ]
+    if tanda:
+        # Varias fechas (David, 28/10): la lista entera y el total, y los botones
+        # contestan TODAS las pendientes.
+        n = tanda["pendientes"]
+        filas = [("Show", d.get("show")), ("Hotel", d.get("hotel")), ("Salón", d.get("salon")),
+                 ("Fechas", f"{n} actuaciones"),
+                 ("Integrantes", str(d["integrantes"]) if d.get("integrantes") else ""),
+                 ("Importe total", _dinero(tanda.get("importe"), d.get("moneda", "MXN")))]
     cuerpo = "".join(
         f'<div class="f"><span>{_e(k)}</span><b>{_e(str(v))}</b></div>'
         for k, v in filas if v
     )
+    if tanda:
+        cuerpo += ('<div class="lista">' + "".join(
+            f'<div>{_e(_fecha(f))} · {_e(_hora(f))}</div>' for f in tanda["fechas"]) + '</div>')
 
+    txt_si = f"Aceptar las {tanda['pendientes']} fechas" if tanda else "Aceptar la actuación"
+    txt_no = "No puedo ninguna" if tanda else "No puedo"
     if d.get("puede_contestar"):
         acciones = (
             '<div class="acc">'
-            '<button class="si" id="bsi" onclick="responder(true)">Aceptar la actuación</button>'
-            '<button class="no" id="bno" onclick="pedirMotivo()">No puedo</button>'
+            f'<button class="si" id="bsi" onclick="responder(true)">{txt_si}</button>'
+            f'<button class="no" id="bno" onclick="pedirMotivo()">{txt_no}</button>'
             '<div id="motivo" class="motivo">'
             '<label for="txt">¿Por qué no puedes? (opcional, lo verá el hotel)</label>'
             '<textarea id="txt" rows="2" maxlength="300" '
@@ -78,7 +92,9 @@ def pagina(d: dict, *, api_base: str, token: str) -> str:
             '<div id="msg" class="msg"></div></div>'
         )
         pie = ("Al aceptar te mandamos por correo tu pase de acceso con el código QR "
-               "para entrar a la propiedad.")
+               "para entrar a la propiedad."
+               + (" Es un solo pase para todas las fechas. Si sólo te falla alguna fecha, "
+                  "acepta aquí y recházala suelta desde tu perfil." if tanda else ""))
     else:
         acciones = f'<div class="ya">{_e(d.get("motivo") or "Esta actuación ya no admite respuesta.")}</div>'
         pie = "Puedes ver el detalle en tu perfil de SHOWMA."
@@ -120,6 +136,8 @@ def pagina(d: dict, *, api_base: str, token: str) -> str:
     color:var(--mut);font-size:14px;text-align:center;line-height:1.5}}
   .ok{{margin:6px 20px 20px;padding:18px;border-radius:11px;background:#dcfce7;
     color:#166534;font-weight:700;font-size:15px;text-align:center;line-height:1.5}}
+  .lista{{margin-top:8px;max-height:220px;overflow:auto;background:#f7f8fb;border-radius:10px;
+    padding:8px 12px;font-size:13.5px;line-height:1.75}}
   .pie{{text-align:center;font-size:11.5px;color:var(--mut);padding:16px 10px;line-height:1.6}}
 </style>
 <div class="hoja">
@@ -127,7 +145,7 @@ def pagina(d: dict, *, api_base: str, token: str) -> str:
     <div class="cab"><div class="m">SHOWMA</div><div class="s">ENTERTAINMENT OS</div></div>
     <div class="ttl">¡Tienes una nueva solicitud!</div>
     <div class="sub">Hola{(", " + _e(d["artista"])) if d.get("artista") else ""}:<br>
-      <b>{_e(d.get("hotel") or "Un hotel")}</b> quiere contar contigo para esta actuación.</div>
+      <b>{_e(d.get("hotel") or "Un hotel")}</b> quiere contar contigo para {("estas " + str(tanda["pendientes"]) + " actuaciones") if tanda else "esta actuación"}.</div>
     <div class="datos">{cuerpo}</div>
     {acciones}
   </div>
@@ -156,7 +174,7 @@ async function responder(acepta){{
     document.querySelector('.acc').outerHTML='<div class="ok">'+j.mensaje+'</div>';
   }}catch(e){{
     document.querySelectorAll('.acc button').forEach(function(b){{b.disabled=false;}});
-    if(acepta) si.textContent='Aceptar la actuación';
+    if(acepta) si.textContent={_js(txt_si)};
     msg.style.color='#b91c1c';
     msg.textContent=e.message||'No se pudo registrar. Revisa la señal e intenta otra vez.';
   }}
