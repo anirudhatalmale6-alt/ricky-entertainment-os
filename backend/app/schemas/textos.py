@@ -26,3 +26,17 @@ def _corta(v):
 
 
 Descripcion = Annotated[str | None, BeforeValidator(_corta)]
+
+
+def recorta(t: str | None, n: int = MAX_DESCRIPCION) -> str | None:
+    """Lo que ve un HOTEL de una descripción vieja más larga de 800 (David,
+    29/10: "justo por ellos los quise regular"). Se corta en el último espacio
+    antes del límite, con "…". El texto guardado no se toca: su dueño lo sigue
+    viendo entero para recortarlo como él quiera."""
+    if not t or len(t) <= n:
+        return t
+    corte = t[:n]
+    espacio = corte.rfind(" ")
+    if espacio > n * 0.8:
+        corte = corte[:espacio]
+    return corte.rstrip(" ,.;:-\n") + "…"

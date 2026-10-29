@@ -5840,7 +5840,7 @@ function apProveedorHTML(a){
   add('Ofrece audición', a.offers_audition?'Sí':'');
   if(!a.bio && !datos.length) return '';
   return `<div class="apsec"><h4>Sobre ${esc(a.stage_name||'el proveedor')}</h4>
-    ${a.bio?`<p>${esc(a.bio)}</p>`:''}
+    ${a.bio?`<p>${esc(corta800(a.bio))}</p>`:''}
     ${datos.length?`<div class="apdatos">${datos.map(([k,v])=>
       `<div class="apdato"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('')}</div>`:''}
   </div>`;
@@ -5869,7 +5869,7 @@ function apShowsHTML(shows, t, titulo, nav){
           ${s.price_hotel?`<span class="apsprice">${MXN(s.price_hotel)}</span>`:''}</div>
         <div class="apsmeta">${esc(meta)}</div>
         ${(s.price_corporate>0&&s.price_hotel>0&&s.price_corporate<s.price_hotel)?`<div class="apsrecu">🔁 Precio recurrente <b>${MXN(s.price_corporate)}</b> contratando 5 o más de este show en 45 días</div>`:''}
-        ${s.description?`<div class="apsdesc">${esc(s.description)}</div>`:''}
+        ${s.description?`<div class="apsdesc">${esc(corta800(s.description))}</div>`:''}
         ${marcas.length?`<div class="apstats2">${marcas.join('')}</div>`:''}
         ${nav?`<button class="btn ghost apsver" onclick="apIrShow(${nav.artistId},${s.id},${nav.previo?'true':'false'})">Ver este show →</button>`:''}
       </div></div>`;
@@ -10259,7 +10259,7 @@ async function teamEditar(id){
           <select id="tmeAuto"><option value="0"${p.auto_confirm_bookings?'':' selected'}>Las apruebas tú (quedan pendientes)</option>
             <option value="1"${p.auto_confirm_bookings?' selected':''}>Se confirman solas</option></select></div>
       </div>
-      <div class="field"><label>Descripción / bio</label><textarea id="tmeBio" placeholder="Cómo lo ven los hoteles en el catálogo…">${esc(p.bio||'')}</textarea></div>
+      <div class="field"><label>Descripción / bio</label><textarea id="tmeBio" data-max="800" placeholder="Cómo lo ven los hoteles en el catálogo…">${esc(p.bio||'')}</textarea></div>
       <div class="saverow"><button class="btn" onclick="teamGuardarFicha(${id},this)">Guardar ficha</button></div>
 
       <div style="border-top:1px dashed var(--line);margin:16px 0 12px;padding-top:14px">
@@ -11223,6 +11223,14 @@ document.addEventListener('blur',e=>{
 /* Contador de las descripciones (David, 29/10: máximo 800 caracteres, "para
    ofrecer perfiles fáciles de comparar"). No se corta lo que ya había: se avisa
    en rojo y el servidor no deja guardar hasta recortarlo. */
+// Lo que ve el HOTEL de una descripción vieja de más de 800: cortada en el
+// último espacio, con "…". El dueño sigue viendo y editando su texto entero.
+function corta800(t, n=800){
+  t=String(t||''); if(t.length<=n) return t;
+  let c=t.slice(0,n); const sp=c.lastIndexOf(' ');
+  if(sp>n*0.8) c=c.slice(0,sp);
+  return c.replace(/[\s,.;:-]+$/,'')+'…';
+}
 function cuentaTexto(el){
   const max=+el.dataset.max||800, n=(el.value||'').length;
   let c=el.nextElementSibling;

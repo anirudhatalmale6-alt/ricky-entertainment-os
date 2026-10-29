@@ -20,6 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.schemas.textos import recorta
 from app.api.deps import DbSession
 from app.models.artist import Artist
 from app.models.booking import Booking
@@ -191,7 +192,7 @@ async def tarjeta_data(db: AsyncSession, slug: str) -> dict | None:
             "categoria": s.category,
             "subcategoria": s.subcategory,
             "generos": _lista(s.genres),
-            "descripcion": s.description,
+            "descripcion": recorta(s.description),
             "idiomas": _lista(s.show_languages),
             "integrantes": s.members,
             "duracion_min": s.duration_minutes,
@@ -261,7 +262,7 @@ async def tarjeta_data(db: AsyncSession, slug: str) -> dict | None:
         "slug": a.public_slug,
         "nombre": a.stage_name,
         "tipo": a.artist_type,
-        "bio": a.bio,
+        "bio": recorta(a.bio),
         "portada": portada,
         "ciudad": a.base_city or a.city,
         "region": a.region,
