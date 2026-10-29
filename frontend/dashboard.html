@@ -2737,6 +2737,7 @@ async function afterAuth(token){
     }catch(e){ /* si falla la verificación no bloqueamos el acceso */ }
   }
   await boot();
+  avisoExpediente();
 }
 /* ---- Contrato: compuerta de aceptación (firma electrónica) ---- */
 function showContractGate(c){
@@ -2762,7 +2763,7 @@ async function acceptContractGate(){
   try{
     await post('/me/contract/accept',{});
     const g=document.getElementById('contractGate'); if(g) g.remove();
-    await boot();
+    await boot(); avisoExpediente();
   }catch(e){
     toast('No se pudo registrar la aceptación: '+e.message,true);
     if(btn){ btn.disabled=false; btn.textContent='Aceptar y continuar'; }
@@ -12074,6 +12075,55 @@ function expFecha(iso){
   if(!a||!m||!d) return iso;
   return new Date(a, m-1, d).toLocaleDateString('es-MX',
     {day:'numeric', month:'short', year:'numeric'});
+}
+
+/* ---- Aviso de expediente al iniciar sesión (David, 29/10) ------------------
+   "Las cadenas lo están pidiendo fuerte": a cada proveedor con menos de 7
+   documentos del expediente le sale SU diseño al entrar, una vez por sesión,
+   hasta que llegue a 7. "Completar expediente" lo lleva directo a la sección.
+   La imagen es la que mandó él; los botones son zonas sobre la imagen. */
+const AVISO_EXP_MIN = 7;
+const AVISO_EXP_IMG = (typeof BASE!=='undefined'?BASE:'') + '/uploads/aviso_expediente_v1.webp';
+async function avisoExpediente(){
+  if(!(ME && ME.artist_id) || ME.parent_id) return;     // el músico de productora no tiene expediente propio
+  try{ if(sessionStorage.getItem('avisoExp')) return; }catch(e){}
+  let d=null; try{ d = await api('/me/artist/expediente'); }catch(e){ return; }
+  if(!d || (d.cubiertos||0) >= AVISO_EXP_MIN) return;
+  const marcar=()=>{ try{ sessionStorage.setItem('avisoExp','1'); }catch(e){} };
+  let ov=document.getElementById('avExpMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='avExpMov'; ov.className='mov'; document.body.appendChild(ov); }
+  const falta = AVISO_EXP_MIN - (d.cubiertos||0);
+  ov.innerHTML=`<div id="avExpCaja" style="position:absolute;display:flex;flex-direction:column;align-items:center">
+    <div style="position:relative;width:100%;aspect-ratio:1168/1346">
+      <img src="${AVISO_EXP_IMG}" alt="Completa y mantén al día tu expediente de proveedor"
+        style="width:100%;height:100%;object-fit:contain;display:block;border-radius:18px">
+      <button aria-label="Cerrar" onclick="avisoExpCerrar()" style="position:absolute;left:90.5%;top:4.5%;width:5%;height:4.2%;background:transparent;border:0;cursor:pointer"></button>
+      <button aria-label="Completar expediente" onclick="avisoExpIr()" style="position:absolute;left:37%;top:82.6%;width:56%;height:5.7%;background:transparent;border:0;border-radius:40px;cursor:pointer"></button>
+      <button aria-label="Más tarde" onclick="avisoExpCerrar()" style="position:absolute;left:57%;top:89.7%;width:13.5%;height:3.6%;background:transparent;border:0;cursor:pointer"></button>
+    </div>
+    <div style="margin-top:8px;background:#fff;border-radius:20px;padding:7px 16px;font-size:13px;font-weight:650;color:#382ca1;box-shadow:0 2px 10px rgba(0,0,0,.15)">
+      Llevas ${d.cubiertos||0} de ${d.total||15} documentos · te ${falta===1?'falta 1':'faltan '+falta} para dejar de ver este aviso</div>
+  </div>`;
+  ov.onclick=e=>{ if(e.target===ov) avisoExpCerrar(); };
+  ov.style.display='flex';
+  // En el celular el panel es más ancho que la pantalla (539 px en un iPhone de
+  // 390): centrado "en la página" el aviso quedaba cortado a la derecha. Se
+  // coloca sobre lo que el usuario VE (visualViewport), no sobre la página.
+  const colocar=()=>{ const c=document.getElementById('avExpCaja'); if(!c) return;
+    const vv=window.visualViewport||{width:innerWidth,height:innerHeight,offsetLeft:0,offsetTop:0};
+    const w=Math.min(560, vv.width*0.94, (vv.height*0.94-46)*1168/1346);
+    c.style.width=w+'px';
+    c.style.left=(vv.offsetLeft+(vv.width-w)/2)+'px';
+    c.style.top=(vv.offsetTop+Math.max(8,(vv.height-(w*1346/1168+46))/2))+'px'; };
+  colocar();
+  if(window.visualViewport){ visualViewport.addEventListener('resize',colocar); visualViewport.addEventListener('scroll',colocar); }
+  window.addEventListener('resize',colocar);
+  window.avisoExpCerrar=()=>{ marcar(); ov.style.display='none'; };
+  window.avisoExpIr=()=>{ marcar(); ov.style.display='none'; show('profile',true);
+    const ir=()=>{ const b=document.getElementById('boxExpediente');
+      if(b){ b.scrollIntoView({behavior:'smooth',block:'start'}); b.style.outline='3px solid #7c5cff'; setTimeout(()=>b.style.outline='',3500); }
+      else setTimeout(ir,300); };
+    setTimeout(ir,500); };
 }
 
 async function expCargar(){
