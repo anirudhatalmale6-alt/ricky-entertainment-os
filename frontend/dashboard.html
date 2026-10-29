@@ -2819,9 +2819,9 @@ async function pintaInvitacion(){
   // texto de David, y el orden importa: primero lo que pasa si no hace nada.
   chk.checked = false;
   row.style.display='flex';
-  txt.innerHTML = 'Tu perfil será privado y solo visible para <b>'
-    + esc(empresa || 'la empresa que te invitó') + '</b>.<br>'
-    + 'Marca aquí si quieres que tu perfil sea público y te vean más empresas.';
+  // Texto de David (29/10), en lugar de las dos frases de antes. Sin marcar,
+  // el perfil sigue visible sólo para la empresa que invitó.
+  txt.textContent = 'Acepto que SHOWMA promueva mi perfil ante nuevos hoteles y empresas';
 }
 async function regArtist(){
   const el=document.getElementById('lerr'); el.textContent="";
@@ -9815,7 +9815,7 @@ const RENDER = {
           <div class="field"><label>Nombre artístico / proveedor</label><input id="pf_stage" value="${esc(p.stage_name||'')}"></div>
           <div class="field"><label>Ciudad base</label><input id="pf_city" value="${esc(p.base_city||'')}"></div>
         </div>
-        <div class="field"><label>Descripción / bio</label><textarea id="pf_bio" placeholder="Cuéntale a los hoteles quién eres, tu experiencia y qué te hace único…">${esc(p.bio||'')}</textarea></div>
+        <div class="field"><label>Descripción / bio</label><textarea id="pf_bio" data-max="800" placeholder="Cuéntale a los hoteles quién eres, tu experiencia y qué te hace único…">${esc(p.bio||'')}</textarea></div>
         <div class="fgrid">
           <div class="field"><label>Teléfono</label><input id="pf_phone" value="${esc(p.phone||'')}"></div>
           <div class="field"><label>Correo de contacto</label><input id="pf_email" value="${esc(p.email||'')}"></div>
@@ -9882,8 +9882,8 @@ const RENDER = {
            David pidio no llenar el menu de accesos. Lo pinta expPintar() con lo
            que devuelve /me/artist/expediente. -->
       <div class="box" id="boxExpediente">
-        <h3>📁 Expediente para cadenas</h3>
-        <div class="hint">Los documentos que piden las cadenas grandes. Súbelos una vez y aquí se te avisa cuando alguno esté por vencer.</div>
+        <h3>📁 Completa tu expediente documental</h3>
+        <div class="hint">Documentos requeridos. Un expediente completo genera confianza y seguridad en Hoteles y Empresas.</div>
         <div id="expCuerpo"><div class="muted" style="padding:10px 0">Cargando…</div></div>
       </div>
       <div class="box">
@@ -11091,7 +11091,7 @@ function showFields(s){
       <div class="field"><label>Subcategoría</label><select id="f_${k}_sub"></select></div>
       <div class="field"><label>Nº de integrantes</label><input id="f_${k}_members" type="number" min="1" value="${val('members')||1}"></div>
     </div>
-    <div class="field"><label>Descripción</label><textarea id="f_${k}_desc" placeholder="De qué trata el show, el ambiente que crea…">${esc(val('description'))}</textarea></div>
+    <div class="field"><label>Descripción</label><textarea id="f_${k}_desc" data-max="800" placeholder="De qué trata el show, el ambiente que crea…">${esc(val('description'))}</textarea></div>
 
     <div class="shsec">Fotos del show <span>· la primera es la portada que ven los hoteles</span></div>
     <div class="shph" id="f_${k}_ph"></div>
@@ -11220,6 +11220,23 @@ function fmtMoneda(v){
 document.addEventListener('blur',e=>{
   const t=e.target; if(t && t.classList && t.classList.contains('money')){ const f=fmtMoneda(t.value); if(f) t.value=f; }
 },true);
+/* Contador de las descripciones (David, 29/10: máximo 800 caracteres, "para
+   ofrecer perfiles fáciles de comparar"). No se corta lo que ya había: se avisa
+   en rojo y el servidor no deja guardar hasta recortarlo. */
+function cuentaTexto(el){
+  const max=+el.dataset.max||800, n=(el.value||'').length;
+  let c=el.nextElementSibling;
+  if(!(c && c.classList && c.classList.contains('cuenta'))){
+    c=document.createElement('div'); c.className='cuenta';
+    c.style.cssText='font-size:11.5px;text-align:right;margin-top:3px';
+    el.insertAdjacentElement('afterend',c);
+  }
+  c.textContent = n+' / '+max + (n>max ? ' · recorta '+(n-max)+' para poder guardar' : '');
+  c.style.color = n>max ? '#dc2626' : '#8a8fa3';
+}
+document.addEventListener('input',e=>{ const t=e.target; if(t && t.matches && t.matches('textarea[data-max]')) cuentaTexto(t); });
+new MutationObserver(()=>document.querySelectorAll('textarea[data-max]:not([data-cnt])')
+  .forEach(t=>{ t.dataset.cnt='1'; cuentaTexto(t); })).observe(document.documentElement,{childList:true,subtree:true});
 function collectShowForm(k){
   const el=id=>document.getElementById('f_'+k+'_'+id);
   const g=id=>{ const n=el(id); return n?String(n.value).trim():''; };

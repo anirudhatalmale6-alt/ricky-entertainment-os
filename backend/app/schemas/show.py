@@ -7,6 +7,7 @@ from typing import Annotated
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 from app.schemas.enlaces import Video
+from app.schemas.textos import Descripcion
 from app.models.enums import ARTIST_CATEGORIES, ARTIST_SUBCATEGORIES, MAX_ARTIST_IMAGES
 
 
@@ -145,6 +146,7 @@ class ShowBase(BaseModel):
 class ShowCreate(ShowBase):
     # YouTube o Vimeo (15/10). En la entrada: ShowOut hereda de ShowBase.
     video_url: Video = None
+    description: Descripcion = None   # máx. 800 (David, 29/10)
     seasonal_rates: list[SeasonalRateCreate] = []
     images: list[ShowImageCreate] = Field(default=[], max_length=MAX_ARTIST_IMAGES)
     # Las diez respuestas del cuestionario de afinidad, para poder contestarlas
@@ -162,7 +164,7 @@ class ShowUpdate(BaseModel):
     category: str | None = None
     subcategory: str | None = None
     genres: list[str] | None = None
-    description: str | None = None
+    description: Descripcion = None   # máx. 800 (David, 29/10)
     show_languages: list[str] | None = None
     members: int | None = None
     duration_minutes: int | None = None
