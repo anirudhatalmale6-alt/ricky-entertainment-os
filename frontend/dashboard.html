@@ -5973,6 +5973,7 @@ async function openArtistProfile(artistId, showId, previo, nav){
     `<a href="${esc(socialUrl(k,v))}" target="_blank" rel="noopener" title="${esc(SOCNAME[k]||_cap(k))}">${ico('play')}</a>`);
   if(a.website) socLinks.push(`<a href="${esc(a.website)}" target="_blank" rel="noopener" title="Sitio web">${ico('link')}</a>`);
   const sel = showId ? shows.find(s=>s.id===showId) : null;
+  AP_DATA = {a, shows, tray, sel};
   AP_ACTUAL = {showId: sel?sel.id:null, nombre: sel?(sel.show_name||'Show'):(a.stage_name||'Perfil')};
   const antes = AP_PILA[AP_PILA.length-1];
   const chips=[];
@@ -6026,6 +6027,8 @@ async function openArtistProfile(artistId, showId, previo, nav){
         ? `<div class="trbox"><div class="trnew"><b>Nuevo en SHOWMA.</b> Todavía no tiene actuaciones suficientes para mostrar historial. Lo que se muestra abajo sí está comprobado por la plataforma.</div>${checks.length?`<div class="trchecks">${checks.join('')}</div>`:''}</div>`
         : trayectoriaHTML(tray, checks)}
       ${sel?apShowsHTML([sel],tray,'El show'):''}
+      ${(!previo && !(ME&&ME.artist_id)) ? `<div style="text-align:right;margin:-4px 0 10px">
+        <button class="btn ghost sm" onclick="pdfFicha(this)" title="Un archivo por proveedor, para mandarlo a quien autoriza">📄 Descargar ficha (PDF)</button></div>` : ''}
       ${apProveedorHTML(a)}
       <div class="apcols">
         <div>${apHotelesHTML(tray)||`<div class="apsec"><h4>Experiencia en hoteles</h4><div class="muted" style="font-size:12.5px">Todavía no tiene actuaciones registradas en la plataforma.</div></div>`}</div>
@@ -6381,6 +6384,7 @@ async function rdRender(){
       ${meta.size?`<div class="spc">👥 <span>${esc(meta.size)}</span></div>`:''}
       ${meta.rest?`<div class="rdrest">${esc(meta.rest)}</div>`:''}
     </div>`;
+  RD_LAST = {r, props, meta};
   const body = det + (isArtist ? rdArtistSection(r, props.find(p=>p.artist_id===ME.artist_id), open) : rdHotelSection(r, props, open));
   ov.querySelector('.amod').innerHTML=`<button class="ax" onclick="rdClose()" aria-label="Cerrar">✕</button>
     <div class="ah" style="padding:18px 20px 6px"><b>${esc(r.title||'Solicitud')}</b> ${chip(r.status)}</div>
@@ -6388,6 +6392,78 @@ async function rdRender(){
     <div class="af"><button class="btn ghost" onclick="rdClose()">Cerrar</button></div>`;
   if(document.getElementById('pp_imgs')) renderPropImgs();
 }
+/* ---- Documentos para autorizar una contratación (David, 04/11) -----------
+   "Algunas cadenas deben presentar un comparativo para que autoricen la
+   contratación". Dos piezas con el mismo diseño: el comparativo de las
+   propuestas de una solicitud y la ficha suelta de un proveedor. Salen de lo
+   mismo que hay en pantalla, así que el documento no puede decir otra cosa. */
+let RD_LAST = null, AP_DATA = null;
+async function pdfComparativo(btn){
+  const d = RD_LAST; if(!d) return;
+  const {r, props, meta} = d;
+  const pres = (r.budget_min||r.budget_max)
+    ? [r.budget_min?MXN(r.budget_min):'', r.budget_max?MXN(r.budget_max):''].filter(Boolean).join(' – ') : '—';
+  const vivas = props.filter(p=>p.status!=='withdrawn');
+  const filas = vivas.slice()
+    .sort((x,y)=>(x.proposed_price??1e15)-(y.proposed_price??1e15))
+    .map((p,i)=>[String(i+1), p.artist_name||'Proveedor', p.artist_codigo||'—',
+                 p.proposed_price!=null?MXN(p.proposed_price):'Sin precio']);
+  const doc = {
+    kind:'Comparativo de propuestas', number:'Solicitud #'+r.id,
+    filename:`comparativo-solicitud-${r.id}.pdf`,
+    meta:[
+      ['Hotel', r.company_name||'—'], ['Solicitud', r.title||'—'],
+      ['Categoría', [pretty(r.category), r.subcategory?pretty(r.subcategory):''].filter(Boolean).join(' · ')||'—'],
+      ['Fecha del evento', r.event_date?fmtDate(r.event_date):'Por definir'],
+      ['Horario', meta.horario||'—'], ['Ciudad', r.city||'—'],
+      ['Espacio', (meta.loc||[]).join(', ')||'—'], ['Aforo', meta.size||'—'],
+      ['Presupuesto', pres], ['Propuestas', String(vivas.length)],
+      ['Generado', new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})],
+    ],
+    textos: meta.rest ? [['Descripción de la solicitud', meta.rest]] : [],
+    table:{head:['#','Proveedor','ID del proveedor','Precio propuesto'], rows:filas,
+           align:['c','l','l','r'], first_col:0.08},
+    note:'Ordenado de menor a mayor precio. Precios en MXN según la propuesta de cada proveedor.',
+    firmas:['Elaboró','Autorizó'],
+  };
+  if(!filas.length){ toast('Todavía no hay propuestas para comparar.',true); return; }
+  if(!await dlPdf(doc, doc.filename, btn)) toast('No se pudo generar el PDF. Intenta de nuevo.',true);
+}
+async function pdfFicha(btn){
+  const d = AP_DATA; if(!d) return;
+  const {a, shows, tray, sel} = d;
+  const lista = sel ? [sel] : shows;
+  const completo = [a.first_name, a.last_name].filter(Boolean).join(' ');
+  const cal = (tray&&tray.calificacion)
+    ? `${tray.calificacion.promedio.toFixed(1)} / 5 (${tray.calificacion.total} ${tray.calificacion.total===1?'hotel':'hoteles'})`
+    : 'Sin calificaciones todavía';
+  const hotel = ((CTX&&CTX.props)||[]).find(c=>String(c.id)===String(CTX.company));
+  const af = s=>{ const m = MATCH_PROP && MATCH_PROP[String(s.id)]; return (m && m.match!=null) ? Math.round(m.match)+'%' : '—'; };
+  const precio = s=>{ const p = s.effective_price!=null ? s.effective_price : s.price_hotel; return p!=null ? MXN(p) : 'A convenir'; };
+  const textos = [];
+  if(a.bio) textos.push(['Descripción del proveedor', corta800(a.bio)]);
+  if(sel && sel.description) textos.push(['Descripción del show', corta800(sel.description)]);
+  const doc = {
+    kind:'Ficha de proveedor', number:a.codigo||('#'+a.id),
+    filename:`ficha-${a.codigo||a.id}${sel?'-'+sel.id:''}.pdf`,
+    meta:[
+      ['Proveedor', a.stage_name||'—'], ['Nombre completo', completo||a.stage_name||'—'],
+      ['ID del proveedor', a.codigo||'—'], ['Ciudad base', a.base_city||a.city||'—'],
+      ['Calificación', cal], ['Actuaciones en SHOWMA', tray&&tray.actuaciones?String(tray.actuaciones):'—'],
+      ['Afinidad evaluada para', hotel?hotel.name:'—'],
+      ['Generado', new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})],
+    ],
+    textos,
+    table:{head:['Show','Categoría','Duración','Afinidad','Precio'],
+      rows: lista.map(s=>[s.show_name||'Show', [pretty(s.category), s.subcategory?pretty(s.subcategory):''].filter(Boolean).join(' · '),
+                          s.duration_minutes?s.duration_minutes+' min':'—', af(s), precio(s)]),
+      align:['l','l','c','c','r'], first_col:0.32},
+    note:'Precio hotel en MXN. La afinidad compara el perfil del hotel con el del show.',
+  };
+  if(!await dlPdf(doc, doc.filename, btn)) toast('No se pudo generar el PDF. Intenta de nuevo.',true);
+}
+window.pdfComparativo=pdfComparativo; window.pdfFicha=pdfFicha;
+
 function rdHotelSection(r, props, open){
   if(!props.length) return `<div class="apsec"><h4>Propuestas recibidas</h4><div class="muted" style="padding:8px 0">Aún no hay propuestas. Cuando un artista responda, aparecerá aquí.</div></div>`;
   const rows=props.map(p=>`<div class="prow">
@@ -6403,7 +6479,8 @@ function rdHotelSection(r, props, open){
         ${(open && p.status==='pending')?`<button class="btn sm" onclick="acceptProposal(${r.id},${p.id})">Aceptar</button>`:''}
       </div>
     </div>`).join('');
-  return `<div class="apsec"><h4>Propuestas recibidas (${props.length})</h4>${rows}
+  return `<div class="apsec"><h4 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Propuestas recibidas (${props.length})
+      <button class="btn ghost sm" style="margin-left:auto" onclick="pdfComparativo(this)" title="Para presentar a quien autoriza la contratación">📄 Descargar comparativo (PDF)</button></h4>${rows}
     ${r.status==='fulfilled'?'<div class="muted" style="font-size:12px;margin-top:2px">Solicitud adjudicada: la actuación ya se generó en la agenda.</div>':''}</div>`;
 }
 function rdArtistSection(r, mine, open){

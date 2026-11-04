@@ -46,6 +46,10 @@ class DocIn(BaseModel):
     orientation: str | None = None
     # Mas tablas, cada una con su titulo, despues de la principal.
     sections: list[DocSection] = Field(default_factory=list)
+    # Bloques de texto con título (descripción de una solicitud o de un show).
+    textos: list[list[str]] = Field(default_factory=list)
+    # Rayas de firma al pie: ["Elaboró", "Autorizó"] (comparativos, David 04/11).
+    firmas: list[str] = Field(default_factory=list)
 
 
 def _safe_filename(name: str | None, fallback: str) -> str:

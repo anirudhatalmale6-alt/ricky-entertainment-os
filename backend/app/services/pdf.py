@@ -178,6 +178,14 @@ def build_document_pdf(doc: dict) -> bytes:
         ]))
         flow += [mt, Spacer(1, 12)]
 
+    # --- Bloques de texto (descripción) ---
+    for bloque in (doc.get("textos") or [])[:6]:
+        if not bloque or len(bloque) < 2 or not _s(bloque[1]).strip():
+            continue
+        if _s(bloque[0]).strip():
+            flow += [Paragraph(f"<b>{_celda(bloque[0])}</b>", st["meta"]), Spacer(1, 3)]
+        flow += [Paragraph(_celda(_s(bloque[1])[:3000]), st["cell"]), Spacer(1, 10)]
+
     # --- Renglones ---
     t = _tabla(st, width, doc.get("table") or {})
     if t is not None:
@@ -223,6 +231,19 @@ def build_document_pdf(doc: dict) -> bytes:
     note = _s(doc.get("note")).strip()
     if note:
         flow += [Paragraph(note, st["foot"]), Spacer(1, 6)]
+    # --- Firmas (comparativos para autorizar una contratación) ---
+    firmas = [_s(f).strip() for f in (doc.get("firmas") or []) if _s(f).strip()][:3]
+    if firmas:
+        n = len(firmas)
+        celdas = [[Paragraph("<br/><br/><br/>", st["cell"]) for _ in firmas],
+                  [Paragraph(f"<i>{_celda(f)}</i>", st["cellc"]) for f in firmas]]
+        ft = Table(celdas, colWidths=[width / n] * n)
+        ft.setStyle(TableStyle([
+            ("LINEABOVE", (0, 1), (-1, 1), 0.8, INK),
+            ("LEFTPADDING", (0, 0), (-1, -1), 18),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 18),
+        ]))
+        flow += [Spacer(1, 26), ft, Spacer(1, 14)]
     flow.append(Paragraph(
         "SHOWMA · Entertainment OS — documento generado desde la plataforma.", st["foot"]))
 

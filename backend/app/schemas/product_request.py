@@ -103,5 +103,7 @@ class ProposalOut(BaseModel):
     status: ProposalStatus
     created_at: datetime
     artist_name: str | None = None
+    # ID del proveedor (PRV-00059) para el comparativo que piden las cadenas.
+    artist_codigo: str | None = None
     # set when accepting a proposal auto-generates the actuacion
     booking_id: int | None = None

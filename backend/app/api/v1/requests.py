@@ -270,11 +270,13 @@ async def delete_request(request_id: int, db: DbSession, scope: CurrentScope):
 # --- Propuestas -----------------------------------------------------------
 
 async def _decorate_proposal(db: DbSession, p: RequestProposal) -> ProposalOut:
-    name = None
+    name = codigo = None
     if p.artist_id:
         a = await db.get(Artist, p.artist_id)
         name = a.stage_name if a else None
-    return ProposalOut.model_validate(p).model_copy(update={"artist_name": name})
+        codigo = getattr(a, "codigo", None) if a else None
+    return ProposalOut.model_validate(p).model_copy(
+        update={"artist_name": name, "artist_codigo": codigo})
 
 
 @router.post(
@@ -343,11 +345,15 @@ async def list_proposals(request_id: int, db: DbSession, scope: CurrentScope):
     rows = list((await db.execute(q)).scalars().all())
     aids = {p.artist_id for p in rows if p.artist_id}
     names: dict[int, str] = {}
+    codigos: dict[int, str] = {}
     if aids:
-        nrows = (await db.execute(select(Artist.id, Artist.stage_name).where(Artist.id.in_(aids)))).all()
-        names = {aid: name for aid, name in nrows}
+        nrows = (await db.execute(
+            select(Artist.id, Artist.stage_name, Artist.codigo).where(Artist.id.in_(aids)))).all()
+        names = {aid: name for aid, name, _ in nrows}
+        codigos = {aid: cod for aid, _, cod in nrows}
     return [
-        ProposalOut.model_validate(p).model_copy(update={"artist_name": names.get(p.artist_id)})
+        ProposalOut.model_validate(p).model_copy(update={
+            "artist_name": names.get(p.artist_id), "artist_codigo": codigos.get(p.artist_id)})
         for p in rows
     ]
 
