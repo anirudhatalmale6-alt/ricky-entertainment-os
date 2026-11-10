@@ -1273,6 +1273,7 @@ async function guardarParcial(btn){
     }
     err('');
     btn.textContent='Guardado ✓';
+    invitacionDespues();
     const av=document.getElementById('avisoParcial');
     if(av) av.style.display='';
     // Se puede guardar desde cualquier página, así que el aviso se dice también
@@ -1289,6 +1290,39 @@ async function guardarParcial(btn){
   }
 }
 window.guardarParcial = guardarParcial;
+
+/* Invitación de un hotel a UN show (David, 10/11): "se registra show primero y
+   se completa perfil después". Quien llega con ella empieza en Mis Shows, con
+   el nombre del show ya escrito; al guardarlo, el show queda como show propio
+   de ese hotel y se le manda a completar su perfil. */
+let INV_PEND = null;
+function bannerInv(html){
+  let b=document.getElementById('invShowBanner');
+  if(!b){
+    const card=document.querySelector('.panel[data-p="1"] .card'); if(!card) return;
+    card.insertAdjacentHTML('afterbegin','<div id="invShowBanner" style="margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#efeaff;border:1px solid #cfc3ff;color:#2c2170;font-size:13.5px;line-height:1.5"></div>');
+    b=document.getElementById('invShowBanner');
+  }
+  b.innerHTML=html;
+}
+async function invitacionShow(){
+  try{ INV_PEND = ((await apiGet('/me/invitacion-show-pendiente'))||{}).pendiente || null; }catch(e){ INV_PEND=null; }
+  if(!INV_PEND) return;
+  bannerInv(`🎟️ <b>${esc(INV_PEND.hotel||'Un hotel')}</b> te invitó a registrar tu show <b>"${esc(INV_PEND.show_nombre)}"</b>.
+    Empieza por aquí: llena la ficha de ese show y dale a <b>Guardar y seguir después</b>. Tu perfil lo completas después.`);
+  const shows=[...document.querySelectorAll('.show')];
+  const vacio=shows.find(el=>!el.dataset.sid && !((el.querySelector('.in-name')||{}).value||'').trim());
+  if(vacio){ const n=vacio.querySelector('.in-name'); n.value=INV_PEND.show_nombre; renameShow(+vacio.dataset.n, INV_PEND.show_nombre); }
+  go(1);
+}
+async function invitacionDespues(){
+  if(!INV_PEND) return;
+  let sigue=null; try{ sigue=((await apiGet('/me/invitacion-show-pendiente'))||{}).pendiente||null; }catch(e){ return; }
+  if(sigue) return;                       // aún no hay show guardado con categoría
+  bannerInv(`✓ Listo: tu show quedó registrado como show propio de <b>${esc(INV_PEND.hotel||'el hotel')}</b>.
+    Ahora completa tu perfil para terminar el registro. <button class="btn next" style="margin-left:6px;padding:6px 12px" onclick="go(0)">Completar mi perfil →</button>`);
+  INV_PEND=null;
+}
 
 // ---- Init: prefill from the just-created profile ----
 (async function init(){
@@ -1342,6 +1376,7 @@ window.guardarParcial = guardarParcial;
       if(s){ s.value=String(a.tax_figure_id); avisoFigura(); } }
     aplicaModo();
     cuentaTodos();
+    await invitacionShow();
   }catch(e){
     if(e && e.status===401){ try{ localStorage.removeItem('ricky_token'); }catch(_){} location.href=BASE+'/'; }
   }

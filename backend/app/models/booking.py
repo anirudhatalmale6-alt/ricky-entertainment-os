@@ -148,6 +148,9 @@ class Booking(Base, TimestampMixin):
     # token del PASE DE TEMPORADA, un solo QR que en la puerta resuelve la
     # actuación de ese día (David, 28/10). Aleatorio de 128 bits, como el pase.
     serie: Mapped[str | None] = mapped_column(String(40), index=True)
+    # Show propio del hotel (ver models/show_propio): esa actuación no lleva fee
+    # de SHOWMA. Se fija al crear la actuación y se ve en agenda, factura y reportes.
+    show_propio: Mapped[bool] = mapped_column(Boolean, default=False)
     # Cuándo confirmó seguridad que el grupo llegó, y quién lo dijo. El nombre lo
     # teclea el de la caseta: no tiene cuenta en SHOWMA, y pedirle una para
     # apuntar que alguien llegó es la forma más rápida de que no lo apunte nadie.

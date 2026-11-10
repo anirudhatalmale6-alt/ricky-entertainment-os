@@ -36,7 +36,7 @@ from app.models.enums import (
 )
 from app.models.show import Show
 from app.models.venue import Venue
-from app.services import availability, avisos
+from app.services import availability, avisos, shows_propios
 from app.services import folios, historial, pricing, recurrente, tarifa
 from app.schemas.booking import (
     AttendanceIn,
@@ -275,6 +275,7 @@ async def create_booking(payload: BookingCreate, scope: CurrentScope, db: DbSess
         confirmed_at=None,
     )
     db.add(booking)
+    await shows_propios.aplicar(db, booking)
     await db.flush()
     await folios.asignar_orden(db, booking)
     historial.registrar(db, booking, historial.CREADA,
@@ -1394,6 +1395,7 @@ async def repetir_actuacion(payload: RepetirIn, scope: CurrentScope, db: DbSessi
             serie=serie,
         )
         db.add(nueva)
+        await shows_propios.aplicar(db, nueva)
         nuevas.append(nueva)
     # Las anteriores que ya tuviera ese hotel en la misma ventana tambien entran
     # en la tarifa si esta tanda completa las cinco. Se repasa de la primera a la

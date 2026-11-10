@@ -22,6 +22,7 @@ from app.api.v1 import (
     shows,
     support,
     users,
+    shows_propios,
 )
 
 api_router = APIRouter()
@@ -45,3 +46,4 @@ api_router.include_router(reviews.router)
 api_router.include_router(public.router)
 api_router.include_router(audiencia.router)
 api_router.include_router(afinidad.router)
+api_router.include_router(shows_propios.router)

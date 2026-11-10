@@ -544,6 +544,10 @@
   .seast .s-del{color:#dc2626;cursor:pointer;font-size:16px;text-align:center;width:26px}
   .btn.mini{padding:6px 11px;font-size:12px}
   .showcard .hh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  /* Etiquetas de shows propios e invitaciones (David, 10/11). */
+  .ptag{display:inline-block;font-size:10.5px;font-weight:600;color:#5b47d6;background:rgba(109,94,240,.12);
+    padding:2px 8px;border-radius:20px;white-space:nowrap}
+  .ptag.ok{color:#0f8a63;background:rgba(16,185,129,.13)}
   .showcard .tag2{font-size:10.5px;color:var(--mut);background:var(--ov2);padding:3px 9px;border-radius:20px}
   /* ficha completa del show (misma información que en el registro) */
   .shsec{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--mut);
@@ -1708,6 +1712,7 @@
   @media(max-width:640px){
     .lg-forms,.lg-cols,.lg-pane{min-width:0}
     .lg-pane{padding:34px 20px}
+    #invShowLg{margin:18px 20px 0 !important}
     .lg-trust{grid-template-columns:1fr;gap:14px;padding:18px 20px}
   }
   .err{color:var(--bad);font-size:12px;min-height:16px;margin-top:6px}
@@ -2242,6 +2247,8 @@
 
   <!-- FORMS -->
   <section class="lg-forms">
+    <div id="invShowLg" class="lg-hide" style="margin:22px 46px 0;padding:13px 16px;border-radius:13px;
+      background:rgba(124,92,255,.12);border:1px solid rgba(124,92,255,.35);color:#e7e5ff;font-size:13.5px;line-height:1.5"></div>
     <div class="lg-cols">
       <!-- LOGIN -->
       <div class="lg-pane">
@@ -2737,7 +2744,65 @@ async function afterAuth(token){
     }catch(e){ /* si falla la verificación no bloqueamos el acceso */ }
   }
   await boot();
+  if(INV_SHOW && ME.artist_id && !ME.parent_id){ if(await invShowProveedor()) return; }
   avisoExpediente();
+}
+/* Proveedor que ya tiene cuenta y abre una invitación a un show: elige cuál de
+   sus shows es, o la deja pendiente para el próximo show que dé de alta. */
+async function invShowProveedor(){
+  const d = await cargaInvShow(); if(!d) return false;
+  let shows=[]; try{ shows = (await api('/me/artist/shows'))||[]; }catch(e){}
+  let ov=document.getElementById('invShowMov');
+  if(!ov){ ov=document.createElement('div'); ov.id='invShowMov'; ov.className='mov'; document.body.appendChild(ov); }
+  const lista = shows.filter(s=>s.is_active!==false);
+  ov.innerHTML=`<div class="amod" style="max-width:520px;position:relative">
+    <div class="rqbody" style="padding:20px 22px 18px">
+      <h3 style="margin:0 0 6px">🎟️ Invitación de ${esc(d.hotel||'un hotel')}</h3>
+      <div class="hint" style="margin:0 0 14px">Te invitan con el show <b>"${esc(d.show_nombre)}"</b>. Ese show quedará como show propio del hotel: sus contrataciones con ellos no pagan fee.</div>
+      ${lista.length?`<div style="font-weight:600;margin:0 0 8px">¿Cuál de tus shows es?</div>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
+        ${lista.map((s,i)=>`<label style="display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer">
+          <input type="radio" name="invShowSel" value="${s.id}" ${i===0?'checked':''}> ${esc(s.show_name)}</label>`).join('')}
+        </div>
+        <button class="btn" id="invShowOk" onclick="invShowAsignar()">Asignar este show</button>`
+      :`<div class="hint" style="margin:0 0 14px">Todavía no tienes shows registrados.</div>`}
+      <button class="btn ghost" onclick="invShowNuevo()" style="margin-left:6px">Es un show nuevo, lo registro ahora</button>
+      <div style="margin-top:12px"><span class="lg-link" style="cursor:pointer;color:var(--mut);font-size:12.5px" onclick="invShowCerrar()">Ahora no</span></div>
+      <div id="invShowErr" style="color:#e5484d;font-size:12.5px;margin-top:8px"></div>
+    </div></div>`;
+  ov.style.display='flex';
+  return true;
+}
+function invShowCerrar(){ const ov=document.getElementById('invShowMov'); if(ov) ov.style.display='none'; avisoExpediente(); }
+async function invShowAsignar(){
+  const r=document.querySelector('input[name="invShowSel"]:checked'); if(!r) return;
+  const b=document.getElementById('invShowOk'); if(b){ b.disabled=true; b.textContent='Guardando…'; }
+  try{
+    const sp = await post('/me/invitaciones-show/'+encodeURIComponent(INV_SHOW)+'/asignar',{show_id:+r.value});
+    const hotel = INV_SHOW_INFO && INV_SHOW_INFO.hotel;
+    olvidaInvShow();
+    const ov=document.getElementById('invShowMov'); if(ov) ov.style.display='none';
+    toast(`Listo: "${sp.show_name}" quedó como show propio de ${hotel||'el hotel'}.`);
+    avisoExpediente();
+  }catch(e){
+    const x=document.getElementById('invShowErr'); if(x) x.textContent=e.message||'No se pudo asignar.';
+    if(b){ b.disabled=false; b.textContent='Asignar este show'; }
+  }
+}
+async function invShowNuevo(){
+  try{
+    await post('/me/invitaciones-show/'+encodeURIComponent(INV_SHOW)+'/pendiente',{});
+    const nombre = INV_SHOW_INFO && INV_SHOW_INFO.show_nombre;
+    olvidaInvShow();
+    const ov=document.getElementById('invShowMov'); if(ov) ov.style.display='none';
+    // Al formulario de "Publicar un nuevo show" de su perfil, con el nombre
+    // puesto: ese show nuevo es el que usará la invitación.
+    await show('profile',true);
+    const n=document.getElementById('f_new_name');
+    if(n){ if(!n.value && nombre) n.value=nombre;
+      n.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(()=>{ try{ n.focus(); }catch(e){} },350); }
+    toast('Publica aquí tu show nuevo: quedará como show propio del hotel que te invitó.');
+  }catch(e){ const x=document.getElementById('invShowErr'); if(x) x.textContent=e.message||'No se pudo guardar.'; }
 }
 /* ---- Contrato: compuerta de aceptación (firma electrónica) ---- */
 function showContractGate(c){
@@ -2763,7 +2828,9 @@ async function acceptContractGate(){
   try{
     await post('/me/contract/accept',{});
     const g=document.getElementById('contractGate'); if(g) g.remove();
-    await boot(); avisoExpediente();
+    await boot();
+    if(INV_SHOW && ME.artist_id && !ME.parent_id){ if(await invShowProveedor()) return; }
+    avisoExpediente();
   }catch(e){
     toast('No se pudo registrar la aceptación: '+e.message,true);
     if(btn){ btn.disabled=false; btn.textContent='Aceptar y continuar'; }
@@ -2792,7 +2859,40 @@ let INVITACION = null;
     INVITACION = v && /^\d+$/.test(v) ? +v : null;
   }catch(e){}
 })();
+/* Invitación a UN show (David, 10/11): showma.mx/?invshow=<token>. El show que
+   se registre con ella queda como show propio de ese hotel y sus actuaciones
+   con él no pagan fee. Se guarda en la pestaña porque un proveedor que ya
+   tiene cuenta inicia sesión y DESPUÉS elige cuál de sus shows es. */
+let INV_SHOW = null, INV_SHOW_INFO = null;
+(function(){
+  try{
+    const v = new URLSearchParams(location.search).get('invshow');
+    if(v && /^[A-Za-z0-9_-]{16,}$/.test(v)){ INV_SHOW = v; sessionStorage.setItem('showma_invshow', v); }
+    else INV_SHOW = sessionStorage.getItem('showma_invshow') || null;
+  }catch(e){}
+})();
+async function cargaInvShow(){
+  if(!INV_SHOW) return null;
+  if(INV_SHOW_INFO) return INV_SHOW_INFO;
+  try{
+    const r = await fetch(API+'/public/invitacion-show/'+encodeURIComponent(INV_SHOW));
+    if(!r.ok){ olvidaInvShow(); return null; }
+    INV_SHOW_INFO = await r.json();
+  }catch(e){ return null; }
+  if(INV_SHOW_INFO && INV_SHOW_INFO.usada){ olvidaInvShow(); return null; }
+  return INV_SHOW_INFO;
+}
+function olvidaInvShow(){ INV_SHOW=null; INV_SHOW_INFO=null; try{ sessionStorage.removeItem('showma_invshow'); }catch(e){} }
+async function pintaInvShowLogin(){
+  const d = await cargaInvShow(); if(!d) return;
+  const b = document.getElementById('invShowLg'); if(!b) return;
+  if(!INVITACION) INVITACION = d.company_id;
+  b.innerHTML = `🎟️ <b>${esc(d.hotel||'Un hotel')}</b> te invita a registrar tu show <b>"${esc(d.show_nombre)}"</b> en SHOWMA.
+    <div style="margin-top:5px;color:#b9b6e0;font-size:12.5px">Si eres nuevo, crea tu cuenta aquí abajo y empezarás por tu show. Si ya tienes cuenta, inicia sesión y elige cuál de tus shows es.</div>`;
+  b.classList.remove('lg-hide');
+}
 async function pintaInvitacion(){
+  await pintaInvShowLogin();
   const row=document.getElementById('a_pub_row');
   const txt=document.getElementById('a_pub_txt');
   const nota=document.getElementById('a_pub_nota');
@@ -2830,7 +2930,7 @@ async function regArtist(){
     const r = await fetch(API+"/auth/register/artist",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({full_name:val('a_name'),stage_name:val('a_stage'),phone:val('a_phone')||null,base_city:val('a_city')||null,email:val('a_email'),password:val('a_pass'),
         catalogo_publico:(document.getElementById('a_public')||{checked:true}).checked,
-        invitacion:INVITACION})});
+        invitacion:INVITACION, invitacion_show:INV_SHOW})});
     const d=await r.json().catch(()=>({}));
     if(!r.ok){el.textContent=regErr(d);return;}
     // New artist: save session and go complete the registration hoja (fotos,
@@ -6167,35 +6267,62 @@ function ligaInvitacion(cid){
   if(!cid) return '';
   return location.origin + (window.RICKY_API||'') + '/?inv=' + cid;
 }
-function invitarHTML(){
-  // Un administrador NO cuelga de ningún hotel, así que para él la liga no
-  // puede salir sola: tiene que decir de qué propiedad es la invitación. Sin
-  // esto la caja sencillamente no le aparecía, que es como no existir.
-  const cid = ME && ME.company_id;
-  const comps = (CACHE.compsInv && CACHE.compsInv.length)
+// Show propio del hotel (lo trajo el propio hotel): sus actuaciones con él no
+// pagan el fee de SHOWMA. Al proveedor no se le habla de fee del hotel.
+function propioTag(b){
+  if(!b || !b.show_propio) return '';
+  const txt = (ME && ME.artist_id) ? 'Show propio del hotel' : 'Show propio · sin fee';
+  return ` <span class="ptag" title="Show que trajo el propio hotel: sus actuaciones con él no pagan el fee de SHOWMA" style="vertical-align:1px">${txt}</span>`;
+}
+function compsInvitar(){
+  return (CACHE.compsInv && CACHE.compsInv.length)
     ? CACHE.compsInv
     : (CACHE.venues||[]).reduce((a,v)=>{
         if(v.company_id && !a.some(c=>c.id===v.company_id))
           a.push({id:v.company_id, name:v.company_name||('Propiedad '+v.company_id)});
         return a;}, []);
-  // Un director de cadena tampoco cuelga de un hotel concreto: elige cuál de
-  // los suyos invita, igual que el administrador. Antes no le salía nada.
+}
+// El hotel de la invitación: el del usuario, o el elegido en el selector
+// (administrador o director de cadena, que no cuelgan de un hotel concreto).
+function invCid(){
+  const s=document.getElementById('invComp');
+  if(s && s.value) return +s.value;
+  if(ME && ME.company_id) return ME.company_id;
+  const c=compsInvitar(); return c[0] ? c[0].id : null;
+}
+/* Invitar a UN show (David, 10/11). La liga de antes invitaba al proveedor sin
+   decir con qué show, y así no había forma de saber cuál era el show propio
+   del hotel (el que no paga fee). Ahora el hotel escribe el nombre del show,
+   el proveedor lo registra primero y su perfil lo completa después. */
+function invitarHTML(){
+  const cid = ME && ME.company_id;
+  const comps = compsInvitar();
   if(!cid && !(ME && (ME.is_admin || ME.group_id) && comps.length)) return '';
   const sel = !cid
-    ? `<select id="invComp" onchange="pintaLigaInv()" style="min-width:190px">
-         ${comps.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>`
+    ? `<div class="field" style="margin:0 0 10px"><label>Hotel que invita</label>
+       <select id="invComp" onchange="pintaLigaInv()" style="min-width:190px">
+         ${comps.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>`
     : '';
-  const url = ligaInvitacion(cid || (comps[0]&&comps[0].id));
-  return `<div class="box" style="margin-bottom:16px">
-    <h3 style="margin:0 0 4px">🤝 Invitar a un proveedor</h3>
-    <div class="hint" style="margin:0 0 11px">Mándale esta liga a un músico o show con el que ya trabajas para que se dé de alta. Queda registrado quién lo invitó, así que ese hotel lo verá en su catálogo aunque el proveedor prefiera no salir para el resto.</div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      ${sel}
-      <input id="invUrl" value="${esc(url)}" readonly
-        style="flex:1;min-width:220px;border:1px solid var(--line);background:var(--inp);
-               border-radius:9px;padding:9px 11px;font-size:12.5px;color:var(--mut)">
-      <button class="btn ghost" onclick="copiaInvitacion()">Copiar liga</button>
-    </div></div>`;
+  return `<div class="box" style="margin-bottom:14px">
+    <h3 style="margin:0 0 4px">🎟️ Invitar a un show</h3>
+    <div class="hint" style="margin:0 0 11px">Escribe el nombre del show que ya trabaja con tu hotel y mándale la liga al proveedor. Al registrarlo queda como <b>show propio</b> del hotel: sus contrataciones con ustedes no pagan fee. Si el proveedor ya está en SHOWMA, sólo inicia sesión y elige cuál de sus shows es.</div>
+    ${sel}
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="margin:0;flex:1;min-width:180px"><label>Nombre del show</label><input id="invShowNom" maxlength="160" placeholder="p. ej. Trío Caribe"></div>
+      <div class="field" style="margin:0;flex:1;min-width:160px"><label>Contacto (opcional)</label><input id="invShowCon" maxlength="160" placeholder="Nombre o teléfono"></div>
+      <button class="btn" onclick="crearInvShow(this)">Crear liga</button>
+    </div>
+    <div id="invShowRes"></div>
+  </div>
+  <div class="box" style="margin-bottom:14px">
+    <h3 style="margin:0 0 8px">Invitaciones a shows</h3>
+    <div id="invShowLista"><div class="muted">Cargando…</div></div>
+  </div>
+  <div class="box" id="invPrevBox" style="display:none;margin-bottom:14px">
+    <h3 style="margin:0 0 4px">Proveedores invitados por tu hotel</h3>
+    <div class="hint" style="margin:0 0 10px">Los que se dieron de alta con la liga anterior no dicen con qué show. Marca cuál es su show propio para que sus actuaciones con ustedes no paguen fee. Es uno por proveedor.</div>
+    <div id="invPrevLista"></div>
+  </div>`;
 }
 // Se pinta el botón sólo si hay de quién invitar: un hotel siempre; un
 // administrador si hay propiedades a las que asignar la invitación.
@@ -6204,14 +6331,76 @@ function abrirInvitar(){
   let ov=document.getElementById('invMov');
   if(!ov){ ov=document.createElement('div'); ov.id='invMov'; ov.className='mov'; document.body.appendChild(ov);
     ov.addEventListener('click',e=>{ if(e.target===ov) ov.style.display='none'; }); }
-  ov.innerHTML=`<div class="amod" style="max-width:620px;position:relative">
+  ov.innerHTML=`<div class="amod" style="max-width:680px;position:relative;max-height:92vh;overflow:auto">
     <button class="ax" onclick="document.getElementById('invMov').style.display='none'" aria-label="Cerrar">✕</button>
     <div class="rqbody" style="padding:18px 20px 6px">${invitarHTML()}</div></div>`;
   ov.style.display='flex';
+  cargaInvitaciones();
 }
-function pintaLigaInv(){
-  const s=document.getElementById('invComp'), i=document.getElementById('invUrl');
-  if(s && i) i.value = ligaInvitacion(s.value);
+function pintaLigaInv(){ const r=document.getElementById('invShowRes'); if(r) r.innerHTML=''; cargaInvitaciones(); }
+function ligaCopiable(url){
+  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+    <input value="${esc(url)}" readonly onclick="this.select()"
+      style="flex:1;min-width:220px;border:1px solid var(--line);background:var(--inp);
+             border-radius:9px;padding:8px 10px;font-size:12.5px;color:var(--mut)">
+    <button class="btn ghost mini" onclick="copiaTexto(this.previousElementSibling.value)">Copiar liga</button></div>`;
+}
+function copiaTexto(t){
+  try{ navigator.clipboard.writeText(t); }catch(e){}
+  toast('Liga copiada ✓');
+}
+async function crearInvShow(btn){
+  const nom=(document.getElementById('invShowNom')||{}).value||'';
+  const con=(document.getElementById('invShowCon')||{}).value||'';
+  if(nom.trim().length<2){ toast('Escribe el nombre del show.',true); return; }
+  const cid=invCid(); if(!cid) return;
+  btn.disabled=true;
+  try{
+    const r=await post(`/companies/${cid}/invitaciones-show`,{show_nombre:nom.trim(),contacto:con.trim()||null});
+    document.getElementById('invShowNom').value=''; document.getElementById('invShowCon').value='';
+    const res=document.getElementById('invShowRes');
+    if(res) res.innerHTML=`<div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(16,185,129,.13);color:#0f8a63;font-size:13px">
+      Liga para <b>"${esc(r.show_nombre)}"</b> lista. Mándasela al proveedor por WhatsApp o como prefieras.</div>${ligaCopiable(r.url)}`;
+    cargaInvitaciones();
+  }catch(e){ toast(e.message||'No se pudo crear la invitación.',true); }
+  btn.disabled=false;
+}
+async function cargaInvitaciones(){
+  const cid=invCid(); const caja=document.getElementById('invShowLista'); if(!cid||!caja) return;
+  let invs=[], prev=[];
+  try{ [invs, prev] = await Promise.all([api(`/companies/${cid}/invitaciones-show`), api(`/companies/${cid}/proveedores-invitados`)]); }
+  catch(e){ caja.innerHTML=`<div class="muted">No se pudieron cargar: ${esc(e.message||'')}</div>`; return; }
+  caja.innerHTML = (invs||[]).length ? (invs||[]).map(i=>`<div style="border-top:1px solid var(--line);padding:9px 0">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div><b>${esc(i.show_nombre)}</b>${i.contacto?` <span class="muted" style="font-size:12px">· ${esc(i.contacto)}</span>`:''}</div>
+        ${i.usada_at
+          ? `<span class="ptag ok">✓ Show propio: ${esc(i.show_name||'')}${i.artist_name?' · '+esc(i.artist_name):''}</span>`
+          : `<span class="ptag">Pendiente de registro</span>`}
+      </div>
+      ${i.usada_at?'':`<details style="margin-top:4px"><summary class="muted" style="font-size:12px;cursor:pointer">Ver liga</summary>${ligaCopiable(i.url)}</details>`}
+    </div>`).join('')
+    : '<div class="muted">Todavía no has invitado a ningún show.</div>';
+  const box=document.getElementById('invPrevBox'), lp=document.getElementById('invPrevLista');
+  const conShows=(prev||[]).filter(a=>a.shows && a.shows.length);
+  if(!box||!lp) return;
+  box.style.display = conShows.length ? '' : 'none';
+  lp.innerHTML = conShows.map(a=>{
+    const propio=a.shows.find(s=>s.propio);
+    return `<div style="border-top:1px solid var(--line);padding:9px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1;min-width:160px"><b>${esc(a.artist_name||'')}</b>${a.artist_codigo?` <span class="muted" style="font-size:12px">${esc(a.artist_codigo)}</span>`:''}</div>
+      ${propio
+        ? `<span class="ptag ok">✓ Show propio: ${esc(propio.show_name)}</span>`
+        : `<select id="prev_${a.artist_id}" style="min-width:170px">${a.shows.map(s=>`<option value="${s.id}">${esc(s.show_name)}</option>`).join('')}</select>
+           <button class="btn ghost mini" onclick="marcaPrevio(${a.artist_id},this)">Marcar como show propio</button>`}
+    </div>`;}).join('');
+}
+async function marcaPrevio(aid,btn){
+  const s=document.getElementById('prev_'+aid); const cid=invCid(); if(!s||!cid) return;
+  const nombre=s.options[s.selectedIndex].text;
+  if(!confirm(`¿Marcar "${nombre}" como show propio del hotel? Sus actuaciones con ustedes dejarán de pagar fee, también las que ya están programadas y sin facturar.`)) return;
+  btn.disabled=true;
+  try{ await post(`/companies/${cid}/shows-propios`,{show_id:+s.value}); toast('Marcado como show propio ✓'); cargaInvitaciones(); }
+  catch(e){ toast(e.message||'No se pudo marcar.',true); btn.disabled=false; }
 }
 function copiaInvitacion(){
   const i=document.getElementById('invUrl'); if(!i) return;
@@ -6798,7 +6987,7 @@ function renderAgenda(fromRange){
     if(b.status==='confirmed' && fut)
       return `<td><div class="agact"><button class="mini" onclick="notifyStatus(${b.id},'on_way')">🚗 En camino</button><button class="mini ok" onclick="notifyStatus(${b.id},'arrived')">📍 Llegué</button>${paseA}<button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></div></td>`;
     return `<td><div class="agact">${paseA}<button class="mini" onclick="openHistorial(${b.id})" title="Qué le ha pasado a esta orden">🕘 Historial</button></div></td>`; };
-  body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDateAg(b.starts_at)}</td><td>${esc(b.show_name||'—')}${b.folio?`<div class="agfolio">${esc(b.folio)}</div>`:''}</td>
+  body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDateAg(b.starts_at)}</td><td>${esc(b.show_name||'—')}${propioTag(b)}${b.folio?`<div class="agfolio">${esc(b.folio)}</div>`:''}</td>
       ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}${isArtist?mapsLink(b):''}</td>${ES_MUSICO?'':`<td>${MXN(b.agreed_price)}</td>`}
       <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
     : `<tr><td colspan="${cols}" class="muted" style="text-align:center;padding:22px">Sin actuaciones para este filtro.</td></tr>`;
@@ -7072,7 +7261,7 @@ async function openHistorial(bid){
       <div class="muted" style="font-size:12.5px;margin:2px 0 6px">${
         [b.artist_name&&esc(b.artist_name), b.venue_name&&esc(b.venue_name),
          b.starts_at&&fmtDate(b.starts_at)].filter(Boolean).join(' · ')}</div>
-      ${b.folio?`<div class="rtfolio">${esc(b.folio)}</div>`:''}
+      ${b.folio?`<div class="rtfolio">${esc(b.folio)}</div>`:''}${propioTag(b)}
       <div id="hsCargo"></div>
       <div id="hsBody" style="margin-top:14px"><div class="muted">Cargando…</div></div>
     </div>
@@ -7272,8 +7461,13 @@ async function hotelBill(box){
     (g[k]=g[k]||{company:b.company_name||'—',per,ym:per.slice(0,7),rows:[]}).rows.push(b);});
   const invoices=Object.entries(g).map(([k,v])=>{
     const subtotal=v.rows.reduce((a,b)=>a+num(b.agreed_price),0);
-    const feePct=avg(v.rows.map(b=>b.commission_pct).filter(x=>x!=null))||5.2;
-    const fee=subtotal*feePct/100, iva=subtotal*0.16, total=subtotal+iva;
+    // El fee se suma actuación por actuación: un show propio del hotel va al 0%
+    // y promediar porcentajes (o caer al 5.2% cuando el promedio es 0) cobraba
+    // fee a actuaciones que no lo pagan.
+    const pctDe=b=>b.commission_pct!=null?+b.commission_pct:5.2;
+    const fee=v.rows.reduce((a,b)=>a+num(b.agreed_price)*pctDe(b)/100,0);
+    const feePct=subtotal>0?fee/subtotal*100:0;
+    const iva=subtotal*0.16, total=subtotal+iva;
     const corte=qCutoff(v.per), deposito=qPayment(v.per);
     const cerrado=corte && corte<=today;
     const allPaid=v.rows.length && v.rows.every(b=>b.invoice_paid);
@@ -7345,7 +7539,7 @@ function selectInvoice(i){
     <table><thead><tr><th>Fecha</th><th>Show</th><th>Artista</th><th>Venue</th><th>Importe</th><th>Servicios de gestión</th></tr></thead><tbody>
     ${inv.rows.map(b=>`<tr><td class="muted">${fmtDate(b.starts_at)}</td><td>${esc(nombreFactura(b))}</td>
       <td class="muted">${esc(b.artist_name||AMAP[b.artist_id]||'—')}</td><td class="muted">${esc(b.venue_name||'—')}</td>
-      <td style="font-weight:600">${MXN(b.agreed_price)}</td><td class="muted">${MXN((+b.agreed_price||0)*(b.commission_pct||inv.feePct)/100)}</td></tr>`).join('')}
+      <td style="font-weight:600">${MXN(b.agreed_price)}</td><td class="muted">${b.show_propio?'<span class="ptag">Show propio · sin fee</span>':MXN((+b.agreed_price||0)*(b.commission_pct!=null?+b.commission_pct:5.2)/100)}</td></tr>`).join('')}
     <tr class="tot" style="font-weight:800"><td colspan="4" style="text-align:right">Subtotal</td><td>${MXN(inv.subtotal)}</td><td></td></tr>
     </tbody></table>`;
 }
@@ -7695,6 +7889,7 @@ const M_MENU = [
   {v:'talento',  ic:'🎤', label:'Músicos / Talento'},
   {v:'empresas', ic:'🏨', label:'Empresas asociadas'},
   {v:'eventos',  ic:'🎫', label:'Eventos / Shows'},
+  {v:'propios',  ic:'🎟️', label:'Shows propios'},
   {sec:'Contaduría'},
   {v:'ingresos', ic:'🧾', label:'Facturación Ingresos'},
   {v:'egresos',  ic:'🔻', label:'Facturación Egresos'},
@@ -7734,6 +7929,7 @@ async function mNav(v){
     else if(v==='prospectos') await mProspectos(body);
     else if(v==='talento')   await mTalentos(body);
     else if(v==='empresas')  await mEmpresas(body);
+    else if(v==='propios')   await mPropios(body);
     else if(v==='eventos')   await mEventos(body);
     else if(v==='ingresos')  await mIngresos(body);
     else if(v==='egresos')   await mEgresos(body);
@@ -8097,6 +8293,21 @@ async function mLoadEmpresa(){
       <td>${c.estatus==='Activo'?mEstChip('confirmed','Activo'):mEstChip('pending','Prospecto')}</td>
       <td><span class="mlink" onclick="mFichaEmpresa(${c.id})">💳 Financiero</span> · <span class="mlink" onclick="mFichaEmpresaContacto(${c.id})">👤 Contacto</span></td>
     </tr>`).join('')}</tbody></table></div>`;
+}
+/* Shows propios de cada hotel (David, 10/11): los que trajo el propio hotel y
+   cuyas actuaciones con él no pagan fee. Origen: invitación a un show nueva,
+   asignado por un proveedor que ya existía, o marcado por el hotel para los
+   que invitó con la liga de antes. */
+async function mPropios(box){
+  const d=await api('/admin/shows-propios')||[];
+  const ORI={invitacion:'Invitación (alta nueva)',asignado:'Invitación (ya tenía cuenta)',previo:'Marcado por el hotel'};
+  box.innerHTML = mHead('Shows propios','Shows que trajo cada hotel: sus actuaciones con ese hotel no pagan fee', d.length)
+    + (d.length ? `<div class="mtw"><table class="mt"><thead><tr>
+        <th>Hotel</th><th>Show</th><th>Proveedor</th><th>Origen</th><th>Desde</th></tr></thead><tbody>
+      ${d.map(x=>`<tr><td><b>${esc(x.hotel||'—')}</b></td><td>${esc(x.show_name||'—')}</td>
+        <td>${esc(x.artist_name||'—')}${x.artist_codigo?` <span class="muted" style="font-size:11.5px">${esc(x.artist_codigo)}</span>`:''}</td>
+        <td>${esc(ORI[x.origen]||x.origen)}</td><td>${mDay(x.created_at)}</td></tr>`).join('')}
+      </tbody></table></div>` : mEmpty('Todavía ningún hotel tiene shows propios.'));
 }
 function _mFindE(id){ return (MASTER.cache.empresa||[]).find(c=>c.id===id); }
 function mFichaEmpresa(id){
@@ -9463,7 +9674,7 @@ const RENDER = {
     box.innerHTML=`
       <div class="pvtop">
         <div id="ctxBar" class="pvctx"></div>
-        ${ligaInvitacionDisponible()?`<button class="btn ghost pvinv" onclick="abrirInvitar()">＋ Invitar proveedor</button>`:''}
+        ${ligaInvitacionDisponible()?`<button class="btn ghost pvinv" onclick="abrirInvitar()">＋ Invitar a un show</button>`:''}
       </div>
       <div class="filters pvf">
         <div class="pvrow1">

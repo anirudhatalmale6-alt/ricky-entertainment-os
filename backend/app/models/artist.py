@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date
 
 from sqlalchemy import (
+    Integer,
     Boolean,
     Date,
     Enum as SQLEnum,
@@ -204,6 +205,9 @@ class Artist(Base, TimestampMixin):
     invitado_por_company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id", ondelete="SET NULL"), index=True
     )
+    # Invitación a un show todavía sin usar: el primer show que registre queda
+    # como show propio de ese hotel (ver models/show_propio).
+    invitacion_show_id: Mapped[int | None] = mapped_column(Integer)
 
     # Status / verification
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)

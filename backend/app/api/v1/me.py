@@ -1246,8 +1246,21 @@ def _aplicar_show(show: Show, payload: ShowUpdate) -> None:
 
 @router.post("/artist/shows", response_model=ShowOut, status_code=status.HTTP_201_CREATED)
 async def add_my_show(payload: ShowCreate, scope: CurrentScope, db: DbSession):
-    show = _nuevo_show(await _require_ficha_propia(scope), payload)
+    artist_id = await _require_ficha_propia(scope)
+    show = _nuevo_show(artist_id, payload)
     db.add(show)
+    await db.flush()
+    # Invitación a un show pendiente (David, 10/11): el primer show que da de
+    # alta queda como show propio del hotel que le invitó. Los siguientes no.
+    artista = await db.get(Artist, artist_id)
+    if artista is not None and artista.invitacion_show_id:
+        from app.api.v1.shows_propios import usar_invitacion
+        from app.models.show_propio import InvitacionShow
+        inv = await db.get(InvitacionShow, artista.invitacion_show_id)
+        if inv is not None and inv.usada_at is None:
+            await usar_invitacion(db, inv, show, artista, "invitacion")
+        else:
+            artista.invitacion_show_id = None
     await db.commit()
     return await _load_show(db, show.id)
 

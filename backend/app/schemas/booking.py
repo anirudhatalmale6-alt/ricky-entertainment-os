@@ -107,6 +107,8 @@ class BookingOut(BaseModel):
     # Contratación de varias fechas: misma serie = misma tanda, y es el token del
     # pase de temporada (un QR para todas las fechas).
     serie: str | None = None
+    # Show propio del hotel: sin fee de SHOWMA (models/show_propio).
+    show_propio: bool = False
     llegada_at: datetime | None = None
     llegada_por: str | None = None
     created_at: datetime

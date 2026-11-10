@@ -109,6 +109,17 @@ async def register_artist(payload: ArtistRegisterRequest, db: DbSession):
             select(Company.id).where(Company.id == payload.invitacion)
         )).scalar_one_or_none()
 
+    # Invitación a un show: el hotel queda como invitador y la invitación
+    # pendiente hasta que dé de alta su primer show (me.create_my_show).
+    inv_show = None
+    if payload.invitacion_show:
+        from app.models.show_propio import InvitacionShow
+        inv_show = (await db.execute(select(InvitacionShow).where(
+            InvitacionShow.token == payload.invitacion_show,
+            InvitacionShow.usada_at.is_(None)))).scalar_one_or_none()
+        if inv_show is not None and invitador is None:
+            invitador = inv_show.company_id
+
     artist = Artist(
         user_id=user.id,
         stage_name=payload.stage_name,
@@ -118,6 +129,7 @@ async def register_artist(payload: ArtistRegisterRequest, db: DbSession):
         email=payload.email,
         catalogo_publico=payload.catalogo_publico,
         invitado_por_company_id=invitador,
+        invitacion_show_id=inv_show.id if inv_show is not None else None,
     )
     db.add(artist)
     await db.flush()

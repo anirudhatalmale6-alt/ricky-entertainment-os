@@ -51,6 +51,8 @@ _SQLITE_ADDED_COLUMNS = [
     ("bookings", "pase_token", "VARCHAR(40)"),
     ("bookings", "respuesta_token", "VARCHAR(40)"),
     ("bookings", "serie", "VARCHAR(40)"),
+    ("bookings", "show_propio", "BOOLEAN DEFAULT 0"),
+    ("artists", "invitacion_show_id", "INTEGER"),
     ("bookings", "llegada_at", "DATETIME"),
     ("bookings", "llegada_por", "VARCHAR(120)"),
     ("artists", "auto_confirm_bookings", "BOOLEAN DEFAULT 0"),

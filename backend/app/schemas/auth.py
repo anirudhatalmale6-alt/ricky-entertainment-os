@@ -25,6 +25,8 @@ class ArtistRegisterRequest(BaseModel):
     # Es el id de la empresa; se valida contra la base antes de guardarlo, que
     # un número en una URL lo escribe cualquiera.
     invitacion: int | None = None
+    # Invitación a un SHOW (token de la liga ?invshow=), ver models/show_propio.
+    invitacion_show: str | None = None
 
 
 class ContratanteRegisterRequest(BaseModel):

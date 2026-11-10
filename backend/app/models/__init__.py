@@ -23,6 +23,7 @@ from app.models.contract import ContractTemplate, ContractAcceptance
 from app.models.support import SupportMessage
 from app.models.artist_client_rate import ArtistClientRate
 from app.models.review import Review
+from app.models.show_propio import ShowPropio, InvitacionShow
 from app.models.enums import (
     PayoutSpeed,
     RiskTier,
