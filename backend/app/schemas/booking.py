@@ -10,7 +10,7 @@ computed attendance metrics David asked for so programming stops being decided
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, computed_field, model_validator
 
@@ -109,6 +109,11 @@ class BookingOut(BaseModel):
     serie: str | None = None
     # Show propio del hotel: sin fee de SHOWMA (models/show_propio).
     show_propio: bool = False
+    # Según la calificación de pago del hotel (services/periodos): cuándo paga
+    # el hotel la quincena de esta actuación y cuándo cobra el proveedor.
+    plazo_pago: str | None = None
+    fecha_cobro_hotel: date | None = None
+    fecha_pago: date | None = None
     llegada_at: datetime | None = None
     llegada_por: str | None = None
     created_at: datetime

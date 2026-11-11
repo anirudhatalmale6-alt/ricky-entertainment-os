@@ -92,6 +92,19 @@ async def rechazar(db: AsyncSession, booking: Booking, *, origen: str = "correo"
         detalle=motivo, actor_rol="proveedor")
 
 
+def _texto_pago(booking: Booking, empresa, tanda: dict | None) -> str | None:
+    from app.services import periodos
+    if empresa is None:
+        return None
+    cal = periodos.plazo(getattr(empresa, "plazo_pago", None))
+    fechas = (tanda or {}).get("fechas") or [booking.starts_at]
+    claves = sorted({k for k in (periodos.key_for(f) for f in fechas) if k})
+    pagos = [periodos.payment_date(k, cal).strftime("%d/%m/%Y") for k in claves]
+    if not pagos:
+        return None
+    return pagos[0] if len(pagos) == 1 else "Uno por quincena: " + ", ".join(pagos)
+
+
 async def datos_para_pantalla(db: AsyncSession, booking: Booking) -> dict:
     """Lo que se le enseña a quien abre el enlace.
 
@@ -136,6 +149,9 @@ async def datos_para_pantalla(db: AsyncSession, booking: Booking) -> dict:
         "importe": (None if oculta_precio or booking.agreed_price is None
                     else float(booking.agreed_price)),
         "moneda": booking.currency or "MXN",
+        # Cuándo cobra, según el plazo de pago del hotel (David, 10/11). No va
+        # al músico de productora: a él le paga su empresa.
+        "pago": (None if oculta_precio else _texto_pago(booking, empresa, tanda)),
         "estado": booking.status.value if hasattr(booking.status, "value") else str(booking.status),
         "puede_contestar": abierta,
         "motivo": motivo,

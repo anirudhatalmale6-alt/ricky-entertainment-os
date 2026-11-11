@@ -90,6 +90,7 @@ _SQLITE_ADDED_COLUMNS = [
     ("artists", "csd_expires_at", "DATE"),
     # Ficha de alta del prospecto (datos financieros/fiscales de la empresa)
     ("companies", "fiscal_constancia_url", "VARCHAR(500)"),
+    ("companies", "plazo_pago", "VARCHAR(1) DEFAULT 'A'"),
     ("companies", "bank_name", "VARCHAR(120)"),
     ("companies", "bank_clabe", "VARCHAR(20)"),
     ("companies", "preferred_currency", "VARCHAR(8) DEFAULT 'MXN'"),

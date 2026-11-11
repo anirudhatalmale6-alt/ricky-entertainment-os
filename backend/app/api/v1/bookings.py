@@ -100,6 +100,36 @@ async def _get_or_404(db: DbSession, booking_id: int) -> Booking:
     return booking
 
 
+def _texto_pagos(lista: list[Booking], company: Company | None) -> str:
+    """Para el correo: "15/01/2027" con una fecha, o la lista de depósitos por
+    quincena cuando la contratación abarca varias."""
+    from app.services import periodos
+    if company is None:
+        return ""
+    cal = periodos.plazo(getattr(company, "plazo_pago", None))
+    claves = sorted({k for k in (periodos.key_for(b.starts_at) for b in lista) if k})
+    fechas = [periodos.payment_date(k, cal).strftime("%d/%m/%Y") for k in claves]
+    if not fechas:
+        return ""
+    if len(fechas) == 1:
+        return fechas[0]
+    return "Uno por quincena: " + ", ".join(fechas)
+
+
+def _fechas_pago(booking: Booking, company: Company | None) -> dict:
+    """Cuándo paga el hotel y cuándo cobra el proveedor esta actuación, según
+    la calificación de pago del hotel (David, 10/11: "para que cada proveedor
+    sepa cuándo va a recibir cada pago")."""
+    from app.services import periodos
+    clave = periodos.key_for(booking.starts_at)
+    if clave is None or company is None:
+        return {}
+    cal = periodos.plazo(getattr(company, "plazo_pago", None))
+    return {"plazo_pago": cal,
+            "fecha_cobro_hotel": periodos.cobro_hotel(clave, cal),
+            "fecha_pago": periodos.payment_date(clave, cal)}
+
+
 def _decorate(
     booking: Booking,
     venue: Venue | None,
@@ -118,6 +148,7 @@ def _decorate(
         "show_category": show.category if show else None,
         "show_subcategory": show.subcategory if show else None,
         "company_name": company.name if company else None,
+        **_fechas_pago(booking, company),
         "artist_name": artist.stage_name if artist else None,
         "artist_image": artist.profile_image_url if artist else None,
     })
@@ -135,7 +166,8 @@ def _sin_importes(out: BookingOut, scope) -> BookingOut:
     saltar pidiendo la API a mano.
     """
     if scope.is_artist and scope.parent_id:
-        return out.model_copy(update={"agreed_price": None, "commission_pct": None})
+        return out.model_copy(update={"agreed_price": None, "commission_pct": None,
+                                       "fecha_pago": None, "fecha_cobro_hotel": None})
     return out
 
 
@@ -286,7 +318,7 @@ async def create_booking(payload: BookingCreate, scope: CurrentScope, db: DbSess
     await recurrente.recalcular_tras_crear(db, booking)
     await db.commit()
     await db.refresh(booking)
-    return _decorate(booking, venue, show)
+    return _decorate(booking, venue, show, company)
 
 
 @router.get(
@@ -1132,6 +1164,7 @@ async def notify_artists(payload: NotifyIn, scope: CurrentScope, db: DbSession, 
                          (f"${total:,.2f} MXN en total" if total else "")),
                 url_respuesta=(f"{settings.public_root}/responder/{primera.respuesta_token}"
                                if primera.respuesta_token else ""),
+                pago=("" if (artist and artist.parent_id) else _texto_pagos(lista, company)),
             )
             pendientes.append((aviso, destino, asunto, texto, html))
             emails += 1
@@ -1213,6 +1246,7 @@ async def notify_artists(payload: NotifyIn, scope: CurrentScope, db: DbSession, 
                 importe=("" if (artist and artist.parent_id) else
                          (f"${booking.agreed_price:,.2f} {booking.currency or 'MXN'}"
                           if booking.agreed_price else "")),
+                pago=("" if (artist and artist.parent_id) else _texto_pagos([booking], company)),
             )
             pendientes.append((aviso, destino, asunto, texto, html))
             emails += 1

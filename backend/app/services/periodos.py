@@ -3,7 +3,8 @@
 David, 2026-08-12: "al hotel se le van a enviar los 15 y los 30 de cada mes, y a
 los músicos igual… un atraso y tendremos que pagar dinero que aún no tenemos".
 De ahí sale todo este módulo: el mes se parte en dos quincenas, cada una cierra
-en su fecha de corte y el depósito sale 10 días después del corte.
+en su fecha de corte. El depósito al proveedor depende del plazo con que paga
+cada hotel (calificación A, B o C: ver PLAZOS_PAGO).
 
     Q1 = del 1 al 15   -> corta el día 15
     Q2 = del 16 al fin -> corta el ÚLTIMO día del mes
@@ -23,8 +24,6 @@ import calendar
 import re
 from datetime import date, datetime, timedelta
 
-# Días entre la fecha de corte y el depósito.
-PAYMENT_DELAY_DAYS = 10
 
 _KEY_RE = re.compile(r"^(\d{4})-(\d{2})-Q([12])$")
 
@@ -79,9 +78,39 @@ def cutoff(key: str) -> date:
     return range_of(key)[1]
 
 
-def payment_date(key: str) -> date:
-    """Fecha de depósito: 10 días naturales después del corte."""
-    return cutoff(key) + timedelta(days=PAYMENT_DELAY_DAYS)
+# Calificación de pago de cada hotel (David, 10/11): "unos a 30 días, otros a
+# 60, otros a 90... y no quieren negociar". El hotel paga la quincena a tantos
+# días del corte, y el proveedor cobra cuando ya entró ese dinero, con un
+# margen para que la transferencia del hotel esté acreditada.
+PLAZOS_PAGO = {"A": 30, "B": 60, "C": 90}
+PLAZO_DEFECTO = "A"
+MARGEN_PROVEEDOR_DIAS = 5
+
+
+def plazo(calificacion: str | None) -> str:
+    c = (calificacion or "").strip().upper()
+    return c if c in PLAZOS_PAGO else PLAZO_DEFECTO
+
+
+def cobro_hotel(key: str, calificacion: str | None) -> date:
+    """Cuándo paga el hotel la quincena: corte + 30, 60 o 90 días."""
+    return cutoff(key) + timedelta(days=PLAZOS_PAGO[plazo(calificacion)])
+
+
+def payment_date(key: str, calificacion: str | None = None) -> date:
+    """Fecha de depósito al proveedor.
+
+    Con la calificación del hotel: lo que tarda ese hotel en pagar más el
+    margen. Sin ella (tableros que no son de un hotel concreto) se toma la
+    calificación por defecto, para no prometer nunca una fecha anterior a la
+    que de verdad puede pagarse.
+    """
+    return cobro_hotel(key, calificacion) + timedelta(days=MARGEN_PROVEEDOR_DIAS)
+
+
+def pagos_por_plazo(key: str) -> dict[str, str]:
+    """Depósito al proveedor de esta quincena para cada calificación."""
+    return {c: payment_date(key, c).isoformat() for c in PLAZOS_PAGO}
 
 
 def label(key: str) -> str:
@@ -147,5 +176,6 @@ def info(key: str, today=None) -> dict:
         "end": fin.isoformat(),
         "cutoff": cutoff(key).isoformat(),
         "payment_date": payment_date(key).isoformat(),
+        "pagos_por_plazo": pagos_por_plazo(key),
         "closed": is_closed(key, today),
     }

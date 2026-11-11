@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime
 from urllib.parse import quote_plus
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, computed_field
 
 from app.models.enums import RISK_COMMISSION, RiskTier
@@ -104,6 +106,8 @@ class CompanyBase(BaseModel):
     # commercial
     risk_tier: RiskTier = RiskTier.A
     agreed_payment_days: int | None = None
+    # Calificación de pago: A 30 días, B 60, C 90 (services/periodos).
+    plazo_pago: Literal["A", "B", "C"] | None = "A"
 
 
 class CompanyCreate(CompanyBase):
@@ -144,6 +148,7 @@ class CompanyUpdate(BaseModel):
     is_partner: bool | None = None
     risk_tier: RiskTier | None = None
     agreed_payment_days: int | None = None
+    plazo_pago: Literal["A", "B", "C"] | None = None
 
 
 class CompanyOut(CompanyBase):

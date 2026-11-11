@@ -40,6 +40,7 @@ from app.models.contract import (
     ContractTemplate,
 )
 from app.models.venue import Venue
+from app.services import periodos as _periodos
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -366,6 +367,7 @@ async def list_companies(
             "estatus": est,
             "tarifa_promedio": (float(c.avg_daily_rate) if c.avg_daily_rate is not None else None),
             "habitaciones": c.rooms,
+            "plazo_pago": _periodos.plazo(c.plazo_pago),
             "financiero": {
                 "rfc": c.tax_id,
                 "regimen_fiscal": c.tax_regime,
@@ -943,6 +945,8 @@ async def preview_periodo(period: str, scope: CurrentScope, db: DbSession):
             "csd": (art.csd_status or "none") if art else "none",
             "company_id": b.company_id,
             "hotel": emp.name if emp else "— sin hotel —",
+            "plazo_pago": periodos.plazo(emp.plazo_pago if emp else None),
+            "deposito": periodos.payment_date(period, emp.plazo_pago if emp else None).isoformat(),
             "actuaciones": [], "importe": 0.0,
         })
         g["actuaciones"].append({

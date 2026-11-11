@@ -309,6 +309,7 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
         g = groups.setdefault(key, {
             "company_id": b.company_id,
             "company": comp.name if comp else "—",
+            "plazo": periodos.plazo(getattr(comp, "plazo_pago", None)),
             "period": per,
             "ym": per[:7],
             "rows": [],
@@ -330,7 +331,7 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
 
         per = g["period"]
         corte = periodos.cutoff(per)
-        deposito = periodos.payment_date(per)
+        deposito = periodos.payment_date(per, g["plazo"])
         issue = datetime.combine(corte, datetime.min.time())
         due = datetime.combine(deposito, datetime.min.time())
         cerrado = periodos.is_closed(per, today.date())
@@ -908,7 +909,8 @@ async def facturas_pendientes(scope: CurrentScope, db: DbSession):
                 "periodo": clave,
                 "periodo_label": periodos.label(clave),
                 "corte": periodos.cutoff(clave).isoformat(),
-                "pago_estimado": periodos.payment_date(clave).isoformat(),
+                "pago_estimado": periodos.payment_date(clave, getattr(company, "plazo_pago", None)).isoformat(),
+                "plazo_pago": periodos.plazo(getattr(company, "plazo_pago", None)),
                 "company_id": company_id,
                 "hotel": company.name if company else "—",
                 "hotel_rfc": company.tax_id if company else None,
@@ -1027,7 +1029,7 @@ async def subir_factura(
             "total": cfdi.total,
             "detalle": f"Factura recibida por ${cfdi.total:,.2f}, "
                        f"{len(bookings)} {'actuación' if len(bookings)==1 else 'actuaciones'}. "
-                       f"El pago sale el {periodos.payment_date(periodo).strftime('%d/%m/%Y')}."}
+                       f"El pago sale el {periodos.payment_date(periodo, getattr(company, 'plazo_pago', None)).strftime('%d/%m/%Y')}."}
 
 
 @router.post("/fiscal/csd")

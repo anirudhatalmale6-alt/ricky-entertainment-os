@@ -59,6 +59,7 @@ def pagina(d: dict, *, api_base: str, token: str) -> str:
         ("Horario", horario),
         ("Integrantes", str(d["integrantes"]) if d.get("integrantes") else ""),
         ("Importe acordado", _dinero(d.get("importe"), d.get("moneda", "MXN"))),
+        ("Fecha de pago", d.get("pago") or ""),
     ]
     if tanda:
         # Varias fechas (David, 28/10): la lista entera y el total, y los botones
@@ -67,7 +68,8 @@ def pagina(d: dict, *, api_base: str, token: str) -> str:
         filas = [("Show", d.get("show")), ("Hotel", d.get("hotel")), ("Salón", d.get("salon")),
                  ("Fechas", f"{n} actuaciones"),
                  ("Integrantes", str(d["integrantes"]) if d.get("integrantes") else ""),
-                 ("Importe total", _dinero(tanda.get("importe"), d.get("moneda", "MXN")))]
+                 ("Importe total", _dinero(tanda.get("importe"), d.get("moneda", "MXN"))),
+                 ("Pagos", d.get("pago") or "")]
     cuerpo = "".join(
         f'<div class="f"><span>{_e(k)}</span><b>{_e(str(v))}</b></div>'
         for k, v in filas if v

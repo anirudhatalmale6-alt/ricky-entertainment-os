@@ -80,6 +80,10 @@ class Company(Base, TimestampMixin):
     # Payment terms agreed at sign-up (days). Used before the 3-month behaviour
     # window has enough history to auto-classify the tier.
     agreed_payment_days: Mapped[int | None] = mapped_column(Integer)
+    # Calificación de pago (David, 10/11): A paga a 30 días, B a 60, C a 90.
+    # Los hoteles no negocian sus plazos, así que la fecha en que cobra el
+    # proveedor sale de aquí. Ver services/periodos.PLAZOS_PAGO.
+    plazo_pago: Mapped[str | None] = mapped_column(String(1), default="A")
 
     # --- Datos financieros / fiscales del prospecto (ficha de alta en MASTER) ---
     fiscal_constancia_url: Mapped[str | None] = mapped_column(String(500))  # Constancia SAT (PDF)

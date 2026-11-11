@@ -6269,6 +6269,12 @@ function ligaInvitacion(cid){
 }
 // Show propio del hotel (lo trajo el propio hotel): sus actuaciones con él no
 // pagan el fee de SHOWMA. Al proveedor no se le habla de fee del hotel.
+// Cuándo cobra el proveedor esta actuación: sale del plazo de pago del hotel
+// (A 30, B 60, C 90 días; David, 10/11). Sólo se le enseña al proveedor.
+function cobroLinea(b){
+  if(!(ME && ME.artist_id) || !b || !b.fecha_pago || b.status==='cancelled') return '';
+  return `<div class="agfolio" style="font-family:inherit" title="Fecha en que cobras esta actuación, según el plazo de pago del hotel">Cobro ${qDMY(b.fecha_pago)}</div>`;
+}
 function propioTag(b){
   if(!b || !b.show_propio) return '';
   const txt = (ME && ME.artist_id) ? 'Show propio del hotel' : 'Show propio · sin fee';
@@ -6988,7 +6994,7 @@ function renderAgenda(fromRange){
       return `<td><div class="agact"><button class="mini" onclick="notifyStatus(${b.id},'on_way')">🚗 En camino</button><button class="mini ok" onclick="notifyStatus(${b.id},'arrived')">📍 Llegué</button>${paseA}<button class="mini no" onclick="artistCancel(${b.id})">Cancelar</button></div></td>`;
     return `<td><div class="agact">${paseA}<button class="mini" onclick="openHistorial(${b.id})" title="Qué le ha pasado a esta orden">🕘 Historial</button></div></td>`; };
   body.innerHTML = r.length ? r.map(b=>`<tr><td>${fmtDateAg(b.starts_at)}</td><td>${esc(b.show_name||'—')}${propioTag(b)}${b.folio?`<div class="agfolio">${esc(b.folio)}</div>`:''}</td>
-      ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}${isArtist?mapsLink(b):''}</td>${ES_MUSICO?'':`<td>${MXN(b.agreed_price)}</td>`}
+      ${isArtist?`<td>${esc(b.company_name||'—')}</td>`:''}<td class="muted">${esc(b.venue_name||'—')}${isArtist?mapsLink(b):''}</td>${ES_MUSICO?'':`<td>${MXN(b.agreed_price)}${cobroLinea(b)}</td>`}
       <td class="muted">${b.occupancy_pct!=null?b.occupancy_pct.toFixed(0)+'%':'—'}</td><td>${chip(b.status)}</td>${actionCell(b)}</tr>`).join('')
     : `<tr><td colspan="${cols}" class="muted" style="text-align:center;padding:22px">Sin actuaciones para este filtro.</td></tr>`;
 }
@@ -7468,7 +7474,9 @@ async function hotelBill(box){
     const fee=v.rows.reduce((a,b)=>a+num(b.agreed_price)*pctDe(b)/100,0);
     const feePct=subtotal>0?fee/subtotal*100:0;
     const iva=subtotal*0.16, total=subtotal+iva;
-    const corte=qCutoff(v.per), deposito=qPayment(v.per);
+    // El hotel paga a 30, 60 o 90 días del corte según su calificación (10/11).
+    const fc=(v.rows.find(b=>b.fecha_cobro_hotel)||{}).fecha_cobro_hotel;
+    const corte=qCutoff(v.per), deposito=fc?new Date(fc+'T12:00:00'):qPayment(v.per);
     const cerrado=corte && corte<=today;
     const allPaid=v.rows.length && v.rows.every(b=>b.invoice_paid);
     // "Pagada" sólo si está marcada como pagada. Antes bastaba con que las
@@ -8091,7 +8099,8 @@ function mProspectoFicha(id){
         ${fld('pr_bank','Banco','','BBVA')}
         ${fld('pr_clabe','CLABE interbancaria','','18 dígitos')}
         <div>${lb('Moneda habitual')}<select id="pr_curr" style="${inS}"><option value="MXN">MXN</option><option value="USD">USD</option></select></div>
-        ${fld('pr_credit','Días de crédito solicitados','','30','number')}
+        <div>${lb('Calificación de pago')}<select id="pr_plazo" style="${inS}">
+          <option value="A">A · paga a 30 días</option><option value="B">B · paga a 60 días</option><option value="C">C · paga a 90 días</option></select></div>
         ${sec('Acceso')}
         ${fld('pr_pass','Contraseña (opcional)','','Se genera una si lo dejas vacío')}
       </div>
@@ -8139,7 +8148,7 @@ async function mConvertProspecto(id){
     whatsapp:gv('pr_wa')||null, contact_email:gv('pr_email')||null,
     company_type:gv('pr_type')||null, star_rating:numv('pr_stars'), rooms:numv('pr_rooms'),
     avg_daily_rate:numv('pr_adr'), bank_name:gv('pr_bank')||null, bank_clabe:clabe||null,
-    preferred_currency:gv('pr_curr')||null, agreed_payment_days:numv('pr_credit'),
+    preferred_currency:gv('pr_curr')||null, plazo_pago:gv('pr_plazo')||'A', agreed_payment_days:({A:30,B:60,C:90})[gv('pr_plazo')||'A'],
   };
   const btn=document.getElementById('pr_go'); if(btn){ btn.disabled=true; btn.textContent='Creando…'; }
   try{
@@ -8281,13 +8290,15 @@ async function mLoadEmpresa(){
   MASTER.cache.empresa=d.items;
   if(!d.items.length){ res.innerHTML=mEmpty('No hay empresas que coincidan con el filtro.'); return; }
   res.innerHTML = `<div class="mtw"><table class="mt"><thead><tr>
-      <th>Empresa</th><th>Alta</th><th>Tipo</th><th>Ciudad</th><th>Categoría</th><th class="num">Tarifa prom.</th><th class="num">Habs.</th><th>Estatus</th><th>Ficha</th></tr></thead><tbody>
+      <th>Empresa</th><th>Alta</th><th>Tipo</th><th>Ciudad</th><th>Categoría</th><th title="Calificación de pago: A paga a 30 días, B a 60, C a 90">Plazo de pago</th><th class="num">Tarifa prom.</th><th class="num">Habs.</th><th>Estatus</th><th>Ficha</th></tr></thead><tbody>
     ${d.items.map(c=>`<tr>
       <td><b>${esc(c.nombre)}</b></td>
       <td>${mDay(c.fecha_alta)}</td>
       <td style="text-transform:capitalize">${esc(c.tipo||'—')}</td>
       <td>${esc(c.ciudad||'—')}</td>
       <td>${c.categoria?('★'.repeat(c.categoria)):'—'}</td>
+      <td><select onchange="mPlazoPago(${c.id},this)" style="padding:4px 6px;border-radius:7px;border:1px solid var(--line);background:var(--inp);font-size:12.5px">
+        ${['A','B','C'].map(x=>`<option value="${x}"${(c.plazo_pago||'A')===x?' selected':''}>${x} · ${({A:30,B:60,C:90})[x]} días</option>`).join('')}</select></td>
       <td class="num">${c.tarifa_promedio!=null?MXN(c.tarifa_promedio):'—'}</td>
       <td class="num">${c.habitaciones!=null?c.habitaciones:'—'}</td>
       <td>${c.estatus==='Activo'?mEstChip('confirmed','Activo'):mEstChip('pending','Prospecto')}</td>
@@ -8308,6 +8319,16 @@ async function mPropios(box){
         <td>${esc(x.artist_name||'—')}${x.artist_codigo?` <span class="muted" style="font-size:11.5px">${esc(x.artist_codigo)}</span>`:''}</td>
         <td>${esc(ORI[x.origen]||x.origen)}</td><td>${mDay(x.created_at)}</td></tr>`).join('')}
       </tbody></table></div>` : mEmpty('Todavía ningún hotel tiene shows propios.'));
+}
+// Calificación de pago del hotel (David, 10/11): de ella sale la fecha en que
+// cobra el proveedor de cada actuación con ese hotel.
+async function mPlazoPago(id, sel){
+  const c=_mFindE(id); const antes=(c&&c.plazo_pago)||'A'; const nuevo=sel.value;
+  if(!confirm(`¿Cambiar la calificación de pago de ${c?c.nombre:'este hotel'} a ${nuevo} (${({A:30,B:60,C:90})[nuevo]} días)? Las fechas de pago de sus actuaciones se recalculan.`)){ sel.value=antes; return; }
+  sel.disabled=true;
+  try{ await patch('/companies/'+id,{plazo_pago:nuevo}); if(c) c.plazo_pago=nuevo; toast('Calificación de pago actualizada ✓'); }
+  catch(e){ sel.value=antes; toast(e.message||'No se pudo cambiar.',true); }
+  sel.disabled=false;
 }
 function _mFindE(id){ return (MASTER.cache.empresa||[]).find(c=>c.id===id); }
 function mFichaEmpresa(id){
@@ -8661,7 +8682,7 @@ function mExportAcceptances(){
 // fechas de depósito, esto es lo más riesgoso del sistema". Por eso antes de
 // emitir nada se puede ver exactamente qué se va a facturar y a quién.
 async function mPeriodos(box){
-  box.innerHTML = mHead('Cortes y quincenas','Cierres los días 15 y último de cada mes · el depósito sale 10 días después del corte')
+  box.innerHTML = mHead('Cortes y quincenas','Cierres los días 15 y último de cada mes · el depósito al proveedor depende del plazo de cada hotel (A 30, B 60, C 90 días + margen)')
     + `<div id="mres"><div class="load">Cargando…</div></div>`;
   const res=document.getElementById('mres');
   let d; try{ d=await api('/admin/facturacion/periodos'); }
@@ -8682,7 +8703,7 @@ async function mPeriodos(box){
         <td><b>${esc(p.short)}</b></td>
         <td class="sub">${qDM(p.start)} → ${qDM(p.end)}</td>
         <td>${qDMY(p.cutoff)}</td>
-        <td><b>${qDMY(p.payment_date)}</b>${p.payment_date===hoy?' <span class="pbadge">HOY</span>':''}</td>
+        <td style="white-space:nowrap">${Object.entries(p.pagos_por_plazo||{A:p.payment_date}).map(([c,f])=>`<div><span class="sub">${c}</span> <b>${qDMY(f)}</b>${f===hoy?' <span class="pbadge">HOY</span>':''}</div>`).join('')}</td>
         <td class="num">${pend?MXN(p.importe_pendiente):'—'}</td>
         <td class="num">${p.facturas_emitidas?MXN(p.importe_facturado)+' <span class="sub">('+p.facturas_emitidas+')</span>':'—'}</td>
         <td>${estado}</td>
@@ -8703,7 +8724,7 @@ async function mPeriodoPreview(period){
   catch(e){ document.getElementById('mpBody').innerHTML=mEmpty('No se pudo cargar: '+(e.message||'')); return; }
   const sinCsd=d.detalle.filter(x=>x.csd!=='active');
   document.getElementById('mpBody').innerHTML=`
-    <div class="hint" style="margin:0 0 10px">${esc(d.label)} · corte ${qDMY(d.cutoff)} · depósito ${qDMY(d.payment_date)}</div>
+    <div class="hint" style="margin:0 0 10px">${esc(d.label)} · corte ${qDMY(d.cutoff)} · depósito según el plazo de cada hotel</div>
     ${d.facturas_a_emitir?`
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
         <div><div class="hint" style="margin:0">Facturas a emitir</div><b style="font-size:19px">${d.facturas_a_emitir}</b></div>
@@ -8713,10 +8734,11 @@ async function mPeriodoPreview(period){
       ${sinCsd.length?`<div class="hint" style="color:#b45309;background:#f59e0b14;border-radius:8px;padding:8px 10px;margin:0 0 10px">
         ⚠️ ${sinCsd.length} músico(s) sin CSD activo: su factura no se podrá timbrar hasta que lo suban.</div>`:''}
       <div class="mtw" style="max-height:260px;overflow:auto"><table class="mt" style="min-width:0"><thead><tr>
-        <th>Músico</th><th>Hotel</th><th class="num">Actuaciones</th><th class="num">Importe</th></tr></thead><tbody>
+        <th>Músico</th><th>Hotel</th><th>Depósito</th><th class="num">Actuaciones</th><th class="num">Importe</th></tr></thead><tbody>
         ${d.detalle.map(x=>`<tr>
           <td>${esc(x.artista)}${x.csd!=='active'?' <span class="pbadge" style="background:#f59e0b1f;color:#b45309">sin CSD</span>':''}</td>
           <td>${esc(x.hotel)}</td>
+          <td style="white-space:nowrap">${x.deposito?qDMY(x.deposito):'—'} <span class="sub">${esc(x.plazo_pago||'')}</span></td>
           <td class="num">${x.actuaciones.length}</td>
           <td class="num">${MXN(x.importe)}</td></tr>`).join('')}
       </tbody></table></div>
@@ -8737,7 +8759,7 @@ async function mCerrarPeriodo(period){
         <div>Facturas emitidas: <b>${r.facturas_emitidas}</b></div>
         ${r.facturas_con_error?`<div>Con error: <b>${r.facturas_con_error}</b></div>`:''}
         ${r.facturan_ellos&&r.facturan_ellos.length?`<div>Facturan ellos (suben su CFDI o no han elegido modo): <b>${r.facturan_ellos.length}</b></div>`:''}
-        <div>Depósito programado: <b>${qDMY(r.payment_date)}</b></div>
+        <div>Depósitos: según el plazo de cada hotel (A ${qDMY((r.pagos_por_plazo||{}).A)}, B ${qDMY((r.pagos_por_plazo||{}).B)}, C ${qDMY((r.pagos_por_plazo||{}).C)})</div>
       </div>
       ${r.errores&&r.errores.length?`<div class="hint" style="margin-top:9px">${r.errores.map(e=>'· '+esc(e.error||'')).join('<br>')}</div>`:''}
       <button class="ago" style="width:100%;margin-top:12px" onclick="mpClose();mNav('periodos')">Listo</button></div>`;
@@ -10876,7 +10898,7 @@ const qDM =iso=>iso?iso.slice(8,10)+'/'+iso.slice(5,7):'—';           // 2026-
 const qDMY=iso=>iso?qDM(iso)+'/'+iso.slice(0,4):'—';                   // 2026-08-15 -> 15/08/2026
 
 // Aviso de periodización de facturas. Los cortes son los días 15 y 30 de cada
-// mes y el pago sale 10 días después del corte; la redacción cambia según quien
+// mes y el pago depende del plazo del hotel; la redacción cambia según quien
 // mire, porque el hotel PAGA y el músico COBRA.
 /* El texto es el que escribió David (18/09), con una corrección: él puso "las
    fechas de corte SERÁ" y son dos fechas.
@@ -11081,7 +11103,7 @@ function cutoffNotice(role){
              + 'correspondientes a cada periodo de facturación.';
   const linea = role==='artist'
     ? base + ' Las facturas recibidas después de la fecha límite se procesarán en el periodo de pago siguiente.'
-    : base + ' Tu factura se emite en cada corte y el pago se procesa 10 días posteriores.';
+    : base + ' Tu factura se emite en cada corte y se paga en el plazo de tu hotel (30, 60 o 90 días).';
   return `<div class="cutbar" id="cutbar">
     <span class="ci">ℹ️</span>
     <div class="cx">${linea}
@@ -11326,7 +11348,7 @@ async function artistHome(box){
     </div>`}
     <div class="box" style="margin-top:16px"><h3>🗓️ Próximas actuaciones</h3><div class="hint">Tu agenda inmediata</div>
       <table><thead><tr><th>Fecha</th><th>Hotel</th><th>Show</th>${ES_MUSICO?'':'<th>Monto</th>'}<th>Estado</th></tr></thead><tbody>
-      ${upcoming.length?upcoming.slice(0,8).map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.company_name||'—')}</td><td class="muted">${esc(showLabel(b))}</td>${ES_MUSICO?'':`<td>${MXN(b.agreed_price)}</td>`}<td>${chip(b.status)}</td></tr>`).join("")
+      ${upcoming.length?upcoming.slice(0,8).map(b=>`<tr><td>${fmtDate(b.starts_at)}</td><td>${esc(b.company_name||'—')}</td><td class="muted">${esc(showLabel(b))}</td>${ES_MUSICO?'':`<td>${MXN(b.agreed_price)}${cobroLinea(b)}</td>`}<td>${chip(b.status)}</td></tr>`).join("")
         :`<tr><td colspan="${ES_MUSICO?4:5}" class="muted">${ES_MUSICO?'No tienes actuaciones próximas.':'No tienes actuaciones próximas. Revisa el tablero de Solicitudes para conseguir nuevas.'}</td></tr>`}
       </tbody></table></div>`;
 }

@@ -262,7 +262,7 @@ _FIRMA_PLANO = "SHOWMA\nPeople Create Experiences"
 def actuacion(kind: str, *, show: str, venue: str, hotel: str, cuando: datetime | None,
               importe: str = "", motivo: str = "", artista: str = "",
               termina: datetime | None = None,
-              url_respuesta: str = "") -> tuple[str, str, str]:
+              url_respuesta: str = "", pago: str = "") -> tuple[str, str, str]:
     """(asunto, texto, html) del aviso al MÚSICO sobre una actuación.
 
     kind: new_booking | confirmed | reschedule | cancelled
@@ -274,6 +274,9 @@ def actuacion(kind: str, *, show: str, venue: str, hotel: str, cuando: datetime 
     ]
     if importe:
         filas.append(("Importe acordado", importe))
+    # Cuándo cobra, según el plazo con que paga ese hotel (David, 10/11).
+    if pago and kind in ("new_booking", "confirmed"):
+        filas.append(("Fecha de pago", pago))
     url = _panel_url()
 
     if kind == "reschedule":
@@ -444,7 +447,8 @@ def _lista_fechas(fechas: list[tuple[datetime | None, datetime | None]], tope: i
 
 def temporada(*, show: str, venue: str, hotel: str, artista: str,
               fechas: list[tuple[datetime | None, datetime | None]],
-              importe: str = "", url_respuesta: str = "") -> tuple[str, str, str]:
+              importe: str = "", url_respuesta: str = "",
+              pago: str = "") -> tuple[str, str, str]:
     """(asunto, texto, html) de UNA contratación de varias fechas (David, 28/10).
 
     Mismo tono que el aviso de una sola (texto de David del 08/10), pero con la
@@ -460,6 +464,8 @@ def temporada(*, show: str, venue: str, hotel: str, artista: str,
     ]
     if importe:
         filas.append(("Importe acordado", importe))
+    if pago:
+        filas.append(("Pagos", pago))
     lista_html, lista_txt = _lista_fechas(fechas)
     asunto = f"¡Tienes una nueva solicitud de {n} fechas!"
     intro = (f"{saludo}<br><br>{quien} quiere contar contigo para <b>{n} actuaciones</b> "

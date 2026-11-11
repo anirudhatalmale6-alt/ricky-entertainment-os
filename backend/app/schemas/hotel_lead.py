@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.fiscal import Rfc
@@ -72,6 +74,8 @@ class HotelLeadConvertIn(BaseModel):
     bank_clabe: str | None = Field(default=None, max_length=20)
     preferred_currency: str | None = Field(default=None, max_length=8)
     agreed_payment_days: int | None = None
+    # Calificación de pago: A 30 días, B 60, C 90 (services/periodos).
+    plazo_pago: Literal["A", "B", "C"] | None = None
 
 
 class HotelLeadConvertOut(BaseModel):

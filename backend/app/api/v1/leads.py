@@ -160,6 +160,7 @@ async def convert_hotel_lead(
         bank_clabe=payload.bank_clabe,
         preferred_currency=(payload.preferred_currency or "MXN"),
         agreed_payment_days=payload.agreed_payment_days,
+        plazo_pago=(payload.plazo_pago or "A"),
     )
     db.add(company)
     await db.flush()
