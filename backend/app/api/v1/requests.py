@@ -216,17 +216,22 @@ async def list_requests(
     cids = {r.company_id for r in reqs if r.company_id}
     names: dict[int, str] = {}
     logos: dict[int, str] = {}
+    plazos: dict[int, str] = {}
     if cids:
+        from app.services import periodos
         rows = (await db.execute(
-            select(Company.id, Company.name, Company.logo_url).where(Company.id.in_(cids)))).all()
-        names = {cid: name for cid, name, _ in rows}
-        logos = {cid: logo for cid, _, logo in rows}
+            select(Company.id, Company.name, Company.logo_url, Company.plazo_pago)
+            .where(Company.id.in_(cids)))).all()
+        names = {cid: name for cid, name, _, _ in rows}
+        logos = {cid: logo for cid, _, logo, _ in rows}
+        plazos = {cid: periodos.plazo(pl) for cid, _, _, pl in rows}
 
     out = []
     for r in reqs:
         out.append(ProductRequestOut.model_validate(r).model_copy(update={
             "company_name": names.get(r.company_id),
             "company_logo": logos.get(r.company_id),
+            "plazo_pago": plazos.get(r.company_id),
             "proposals_count": counts.get(r.id, 0),
         }))
     return out
