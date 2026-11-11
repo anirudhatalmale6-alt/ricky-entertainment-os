@@ -171,16 +171,13 @@ textarea{resize:vertical;min-height:64px}
   <section class="panel" data-p="2">
     <div class="card">
       <h2><span class="ic">🤝</span> Condiciones comerciales</h2>
-      <div class="sub">Categoría de riesgo de pago. Define la comisión que cobra la plataforma según el comportamiento de pago.</div>
+      <div class="sub">Plazo con el que la propiedad paga sus facturas. La comisión de la plataforma es la misma en los tres; el plazo define cuándo cobra el proveedor y se le muestra al proveedor.</div>
       <div class="plans">
-        <div class="plan" onclick="pick(this)"><div class="tag">Premio</div><div class="tier">A+</div><div class="d">Paga en menos de 15 días</div><div class="pct">5.6%</div></div>
-        <div class="plan sel" onclick="pick(this)"><div class="tag">Inicio</div><div class="tier">A</div><div class="d">Paga entre 15 y 30 días</div><div class="pct">7.4%</div></div>
-        <div class="plan" onclick="pick(this)"><div class="tier">B</div><div class="d">Paga en más de 30 días</div><div class="pct">11%</div></div>
-        <div class="plan" onclick="pick(this)"><div class="tier">B++</div><div class="d">Paga en más de 40 días</div><div class="pct">18%</div></div>
+        <div class="plan sel" onclick="pick(this)"><div class="tier">A</div><div class="d">Paga a 30 días</div></div>
+        <div class="plan" onclick="pick(this)"><div class="tier">B</div><div class="d">Paga a 60 días</div></div>
+        <div class="plan" onclick="pick(this)"><div class="tier">C</div><div class="d">Paga a 90 días</div></div>
       </div>
-      <div class="info">ℹ️ Todos los contratantes inician en categoría A. La categoría se ajusta sola con el comportamiento real de pago tras 3 meses, o se puede negociar desde el alta si la empresa ya sabe que pagará a plazos más largos.</div>
       <div class="grid" style="margin-top:16px">
-        <label class="f"><span>Días de pago acordados</span><input value="30"></label>
         <label class="f"><span>Método de pago preferido</span><select><option>Transferencia</option><option>Tarjeta</option><option>Crédito a plazo</option></select></label>
       </div>
     </div>

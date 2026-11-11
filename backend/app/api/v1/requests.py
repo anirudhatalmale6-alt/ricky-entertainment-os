@@ -48,18 +48,22 @@ async def _decorate(db: DbSession, req: ProductRequest) -> ProductRequestOut:
     out = ProductRequestOut.model_validate(req)
     company_name = None
     company_logo = None
+    plazo = None
     if req.company_id:
         c = await db.get(Company, req.company_id)
         if c:
             company_name = c.name
             company_logo = c.logo_url
+            from app.services import periodos
+            plazo = periodos.plazo(c.plazo_pago)
     count = (
         await db.execute(
             select(func.count(RequestProposal.id)).where(RequestProposal.request_id == req.id)
         )
     ).scalar_one()
     return out.model_copy(update={
-        "company_name": company_name, "company_logo": company_logo, "proposals_count": count})
+        "company_name": company_name, "company_logo": company_logo, "plazo_pago": plazo,
+        "proposals_count": count})
 
 
 def _today_start() -> datetime:

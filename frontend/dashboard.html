@@ -5222,7 +5222,7 @@ function reqCard(r){
       <div class="t">${esc(r.title)}</div>
       <div class="reqc-cols">
         <div class="reqc-main">
-          <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
+          <div class="meta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}${plazoTag(r.plazo_pago)}</div>
           <div class="meta">💰 ${r.budget_min?MXN(r.budget_min):'—'}${r.budget_max?' – '+MXN(r.budget_max):''} MXN</div>
           ${m.horario?`<div class="meta">🕐 ${esc(m.horario)}</div>`:''}
           ${r.event_date?`<div class="meta">📅 ${fmtDate(r.event_date)}</div>`:''}
@@ -6271,9 +6271,16 @@ function ligaInvitacion(cid){
 // pagan el fee de SHOWMA. Al proveedor no se le habla de fee del hotel.
 // Cuándo cobra el proveedor esta actuación: sale del plazo de pago del hotel
 // (A 30, B 60, C 90 días; David, 10/11). Sólo se le enseña al proveedor.
+// Plazo con que paga el hotel, a la vista del proveedor: los que pagan antes
+// resultan más atractivos (David, 11/11: "creamos una competencia").
+function plazoTag(c){
+  if(!c || !(ME && ME.artist_id)) return '';
+  const d=({A:30,B:60,C:90})[c]; if(!d) return '';
+  return ` · <span class="ptag${c==='A'?' ok':''}" title="Calificación de pago del hotel">${c} · paga a ${d} días</span>`;
+}
 function cobroLinea(b){
   if(!(ME && ME.artist_id) || !b || !b.fecha_pago || b.status==='cancelled') return '';
-  return `<div class="agfolio" style="font-family:inherit" title="Fecha en que cobras esta actuación, según el plazo de pago del hotel">Cobro ${qDMY(b.fecha_pago)}</div>`;
+  return `<div class="agfolio" style="font-family:inherit" title="Fecha en que cobras esta actuación, según el plazo de pago del hotel">Cobro ${qDMY(b.fecha_pago)}${b.plazo_pago?' · hotel '+esc(b.plazo_pago):''}</div>`;
 }
 function propioTag(b){
   if(!b || !b.show_propio) return '';
@@ -6570,7 +6577,7 @@ async function rdRender(){
   const rimgs=((r.images&&r.images.length)?r.images:(r.venue_photo_url?[r.venue_photo_url]:[])).slice(0,3);
   const det=`${rimgs.length?`<div class="pgal" style="margin-bottom:12px">${rimgs.map(u=>`<div class="pthumb" style="background-image:url('${esc(u)}')" onclick="lightbox('${esc(u)}')"></div>`).join('')}</div>`:''}
     <div class="rddet">
-      <div class="rdmeta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}</div>
+      <div class="rdmeta">🏨 ${esc(r.company_name||'—')} · 📍 ${esc(r.city||'—')}${plazoTag(r.plazo_pago)}</div>
       <div class="rdmeta">🎭 ${esc(pretty(r.category)||'—')}${r.subcategory?' · '+esc(pretty(r.subcategory)):''}</div>
       <div class="rdmeta">📅 ${r.event_date?fmtDate(r.event_date):'Fecha por definir'}</div>
       ${meta.horario?`<div class="rdmeta">🕐 ${esc(meta.horario)}</div>`:''}
@@ -7573,7 +7580,7 @@ function selectPayout(i){
     </div>
     <table class="podesg"><thead><tr><th>Concepto</th><th class="num">Base</th><th class="num">%</th><th class="num">Importe</th></tr></thead><tbody>
       <tr><td><b>Honorarios contratados</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.honorarios)}</b></td></tr>
-      <tr><td>Platform Service</td><td class="num">${MXN2(inv.honorarios)}</td><td class="num">${pct(inv.com_pct)}</td><td class="num neg">−${MXN2(inv.comision)}</td></tr>
+      <tr><td>Platform Service${inv.exento_propio?`<div class="muted" style="font-size:11px">Sin comisión en tu show propio: ${MXN2(inv.exento_propio)}</div>`:''}</td><td class="num">${MXN2(inv.base_comision!=null?inv.base_comision:inv.honorarios)}</td><td class="num">${pct(inv.com_pct)}</td><td class="num neg">−${MXN2(inv.comision)}</td></tr>
       <tr class="sub"><td><b>Base para emitir CFDI</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.base_cfdi)}</b></td></tr>
       <tr><td>IVA trasladado</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${pct(inv.iva_pct)}</td><td class="num pos">+${MXN2(inv.iva)}</td></tr>
       <tr class="sub"><td><b>Subtotal con IVA</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.subtotal_iva)}</b></td></tr>
@@ -7796,7 +7803,7 @@ async function dlPayout(btn){
     meta:[['Hotel',inv.company],['Periodo',inv.period],['Fecha de corte',inv.issue],['Pago',inv.due]],
     table:{head:['Concepto','Base','%','Importe'],align:['l','r','r','r'],rows:[
       ['Honorarios contratados','','',MXN2(inv.honorarios)],
-      ['Platform Service',MXN2(inv.honorarios),p(inv.com_pct),'−'+MXN2(inv.comision)],
+      ['Platform Service'+(inv.exento_propio?' (sin comisión en show propio: '+MXN2(inv.exento_propio)+')':''),MXN2(inv.base_comision!=null?inv.base_comision:inv.honorarios),p(inv.com_pct),'−'+MXN2(inv.comision)],
       ['Base para emitir CFDI','','',MXN2(inv.base_cfdi)],
       ['IVA trasladado',MXN2(inv.base_cfdi),p(inv.iva_pct),'+'+MXN2(inv.iva)],
       ['Subtotal con IVA','','',MXN2(inv.subtotal_iva)],
@@ -7810,7 +7817,7 @@ async function dlPayout(btn){
     +`<tr><td><b>Fecha de corte:</b> ${esc(inv.issue)}</td><td style="text-align:right"><b>Pago:</b> ${esc(inv.due)}</td></tr></table>`
     +`<table><thead><tr><th>Concepto</th><th class="num">Base</th><th class="num">%</th><th class="num">Importe</th></tr></thead><tbody>`
     +`<tr><td><b>Honorarios contratados</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.honorarios)}</b></td></tr>`
-    +`<tr><td>Platform Service</td><td class="num">${MXN2(inv.honorarios)}</td><td class="num">${p(inv.com_pct)}</td><td class="num">−${MXN2(inv.comision)}</td></tr>`
+    +`<tr><td>Platform Service${inv.exento_propio?' (sin comisión en show propio: '+MXN2(inv.exento_propio)+')':''}</td><td class="num">${MXN2(inv.base_comision!=null?inv.base_comision:inv.honorarios)}</td><td class="num">${p(inv.com_pct)}</td><td class="num">−${MXN2(inv.comision)}</td></tr>`
     +`<tr><td><b>Base para emitir CFDI</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.base_cfdi)}</b></td></tr>`
     +`<tr><td>IVA trasladado</td><td class="num">${MXN2(inv.base_cfdi)}</td><td class="num">${p(inv.iva_pct)}</td><td class="num">+${MXN2(inv.iva)}</td></tr>`
     +`<tr><td><b>Subtotal con IVA</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${MXN2(inv.subtotal_iva)}</b></td></tr>`

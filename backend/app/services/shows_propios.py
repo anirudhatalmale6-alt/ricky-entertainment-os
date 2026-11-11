@@ -9,6 +9,22 @@ from app.models.enums import BookingStatus
 from app.models.show_propio import ShowPropio
 
 
+def sin_comision_proveedor(booking, artist) -> bool:
+    """El proveedor tampoco paga su comisión de plataforma en un show propio
+    si eligió NO ser público (David, 11/11): SHOWMA no lo promueve con nadie,
+    sólo trabaja con el hotel que lo trajo. Si es público sí la paga.
+
+    Se mira al facturar, no al contratar: es su estado cuando se cobra."""
+    return bool(getattr(booking, "show_propio", False)) and artist is not None \
+        and getattr(artist, "catalogo_publico", True) is False
+
+
+def importe_exento(bookings, artist) -> float:
+    """Honorarios de esas actuaciones que no llevan comisión del proveedor."""
+    return round(sum(float(b.agreed_price or 0) for b in bookings
+                     if sin_comision_proveedor(b, artist)), 2)
+
+
 async def es_propio(db: AsyncSession, company_id: int | None, show_id: int | None) -> bool:
     if not company_id or not show_id:
         return False

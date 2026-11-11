@@ -35,6 +35,7 @@ from app.core import security
 from app.services.facturama import FacturamaError, get_facturama
 from app.services import afinidad as af
 from app.services import cfdi_subido, facturacion, figura_fiscal, folios, mailer, passwords, periodos, rfc as rfc_svc
+from app.services import shows_propios as shows_propios_svc
 from app.models.contract import (
     ARTIST_CONTRACT_SLUG,
     ContractAcceptance,
@@ -321,7 +322,9 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
     for g in groups.values():
         rows = g["rows"]
         honorarios = round(sum(float(b.agreed_price or 0) for b in rows), 2)
-        comision = round(honorarios * com_pct / 100.0, 2)
+        # Show propio de un proveedor no público: sin comisión (David, 11/11).
+        exento = shows_propios_svc.importe_exento(rows, artist)
+        comision = round(max(honorarios - exento, 0.0) * com_pct / 100.0, 2)
         base_cfdi = round(honorarios - comision, 2)
         iva = round(base_cfdi * iva_pct / 100.0, 2)
         subtotal_iva = round(base_cfdi + iva, 2)
@@ -361,6 +364,8 @@ async def my_payouts(scope: CurrentScope, db: DbSession):
             "status": status_s,
             "honorarios": honorarios,
             "com_pct": round(com_pct, 4), "comision": comision,
+            # Lo que sí lleva comisión, y lo que no por ser show propio (11/11).
+            "base_comision": round(honorarios - exento, 2), "exento_propio": exento,
             "base_cfdi": base_cfdi,
             "iva_pct": round(iva_pct, 4), "iva": iva,
             "subtotal_iva": subtotal_iva,
@@ -904,7 +909,8 @@ async def facturas_pendientes(scope: CurrentScope, db: DbSession):
         for company_id, lista in por_hotel.items():
             company = await db.get(Company, company_id)
             honorarios = sum(float(b.agreed_price or 0) for b in lista)
-            d = facturacion.compute_desglose(honorarios, figura)
+            d = facturacion.compute_desglose(honorarios, figura,
+                                             exento=shows_propios_svc.importe_exento(lista, artist))
             salida.append({
                 "periodo": clave,
                 "periodo_label": periodos.label(clave),
@@ -967,7 +973,8 @@ async def subir_factura(
     company = await db.get(Company, company_id)
     figura = await facturacion._load_figura(db, artist)
     honorarios = sum(float(b.agreed_price or 0) for b in bookings)
-    esperado = facturacion.compute_desglose(honorarios, figura)["total"]
+    esperado = facturacion.compute_desglose(
+        honorarios, figura, exento=shows_propios_svc.importe_exento(bookings, artist))["total"]
 
     # Quién puede emitir: él, o el tercero que registró. En modo "tercero" la
     # factura la hace el tercero, así que su RFC también vale.

@@ -77,6 +77,9 @@ class ProductRequestOut(ProductRequestBase):
     # filled by the endpoint
     company_name: str | None = None
     company_logo: str | None = None
+    # Plazo con que paga ese hotel (A 30, B 60, C 90 días). Se enseña a los
+    # proveedores para que los hoteles compitan por pagar antes (David, 11/11).
+    plazo_pago: str | None = None
     proposals_count: int = 0
 
 

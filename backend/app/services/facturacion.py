@@ -48,8 +48,12 @@ def _round2(x: float) -> float:
     return round(float(x or 0), 2)
 
 
-def compute_desglose(honorarios: float, figura: TaxFigure | None) -> dict:
-    """Desglose fiscal de un importe de honorarios, idéntico a /me/payouts."""
+def compute_desglose(honorarios: float, figura: TaxFigure | None, exento: float = 0.0) -> dict:
+    """Desglose fiscal de un importe de honorarios, idéntico a /me/payouts.
+
+    `exento`: la parte de los honorarios que no lleva comisión SHOWMA (show
+    propio de un proveedor no público, ver shows_propios.sin_comision_proveedor).
+    """
     com_pct = float(getattr(figura, "commission_pct", 0) or 0) if figura else 0.0
     if not com_pct:
         com_pct = _DEFAULT_COMMISSION_PCT
@@ -58,7 +62,7 @@ def compute_desglose(honorarios: float, figura: TaxFigure | None) -> dict:
     risr_pct = float(getattr(figura, "isr_ret_pct", 0) or 0) if figura else 0.0
 
     honorarios = _round2(honorarios)
-    comision = _round2(honorarios * com_pct / 100.0)
+    comision = _round2(max(honorarios - _round2(exento), 0.0) * com_pct / 100.0)
     base_cfdi = _round2(honorarios - comision)
     iva = _round2(base_cfdi * iva_pct / 100.0)
     ret_iva = _round2(base_cfdi * riva_pct / 100.0)
@@ -104,7 +108,9 @@ def build_cfdi_payload(
     folio: str | int,
 ) -> dict:
     """Construye el JSON del CFDI 4.0 (Multiemisor) para una actuación."""
-    d = compute_desglose(float(booking.agreed_price or 0), figura)
+    from app.services.shows_propios import sin_comision_proveedor
+    precio = float(booking.agreed_price or 0)
+    d = compute_desglose(precio, figura, exento=precio if sin_comision_proveedor(booking, artist) else 0.0)
     base = d["base_cfdi"]
 
     issuer_rfc = _require(artist.rfc, "el RFC del músico")
@@ -342,9 +348,12 @@ def build_period_cfdi_payload(
     receiver_cp = _require(company.postal_code, "el código postal fiscal del hotel")
     receiver_use = _sat_code(company.cfdi_use) or "G03"
 
+    from app.services.shows_propios import sin_comision_proveedor
+
     items = []
     for b in sorted(bookings, key=lambda x: (x.starts_at or "", x.id)):
-        d = compute_desglose(float(b.agreed_price or 0), figura)
+        precio = float(b.agreed_price or 0)
+        d = compute_desglose(precio, figura, exento=precio if sin_comision_proveedor(b, artist) else 0.0)
         base = d["base_cfdi"]
         taxes = [{
             "Name": "IVA", "Base": base, "Rate": round(d["iva_pct"] / 100.0, 6),
